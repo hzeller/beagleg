@@ -12,14 +12,16 @@ PASM=$(AM335_BASE)/utils/pasm
 LIBDIR_APP_LOADER?=$(AM335_BASE)/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/app_loader/include
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2 -mtune=cortex-a8 -march=armv7-a
-LDFLAGS+=-L$(LIBDIR_APP_LOADER) -lprussdrv -lpthread
+#CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2 -mtune=cortex-a8 -march=armv7-a
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2
+#LDFLAGS+=-L$(LIBDIR_APP_LOADER) -lprussdrv -lpthread
 
-OBJECTS=motor-interface.o motor-test.o
+#OBJECTS=motor-interface.o gcode-parser.o motor-test.o gcode-test.o
+OBJECTS=gcode-parser.o gcode-test.o
 PRU_BIN=motor-control.bin
-TARGET=motor-test
+TARGET=gcode-test
 
-all : $(TARGET) $(PRU_BIN)
+all : $(TARGET)
 
 %.o: %.c
 	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $< 
@@ -30,7 +32,7 @@ $(TARGET): $(OBJECTS)
 %.bin : %.p
 	$(PASM) -V3 -b $<
 
-motor-interface.o : shared-constants.h
+motor-interface.o : shared-constants.h $(PRU_BIN)
 motor-control.bin : shared-constants.h
 
 clean:
