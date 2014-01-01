@@ -13,6 +13,7 @@ const unsigned char kAllAxesBitmap =
 
 struct GCodeParser {
   struct GCodeParserCb callbacks;
+  void *cb_userdata;
   int provided_axes;
   float unit_to_mm_factor;  // metric: 1.0; imperial 25.4
   int is_absolute;
@@ -21,31 +22,35 @@ struct GCodeParser {
   AxesRegister axes_pos;
 };
 
-static void dummy_set_feedrate(float f) {
+static void dummy_set_feedrate(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_feedrate(%.2f)\n", f);
 }
 
-static void dummy_move(const float *axes) {
+static void dummy_move(void *user, const float *axes) {
   fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...)\n",
 	  axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
 }
 
-static void dummy_go_home(unsigned char flags) {
+static void dummy_go_home(void *user, unsigned char flags) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", flags);
 }
 
-static char *dummy_unprocessed(char letter, float value, const char *remaining) {
+static const char *dummy_unprocessed(void *user, char letter, float value,
+				     const char *remaining) {
   fprintf(stderr, "GCodeParser: unprocessed('%c', %d, '%s')\n",
 	  letter, (int) value, remaining);
   return NULL;
 }
 
-struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
+struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
+			       void *userdata) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
   if (callbacks) {
     memcpy(&result->callbacks, callbacks, sizeof(*callbacks));
   }
+  result->cb_userdata = userdata;
+
   // Set some reasonable defaults for unprovided callbacks:
   if (!result->callbacks.go_home)
       result->callbacks.go_home = &dummy_go_home;
@@ -102,11 +107,13 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     case 'B': homing_flags |= (1 << AXIS_X); break;
     case 'C': homing_flags |= (1 << AXIS_X); break;
     default:
-      p->callbacks.go_home(homing_flags != 0 ? homing_flags : kAllAxesBitmap);
-      return p->callbacks.unprocessed(axis, dummy, line);
+      p->callbacks.go_home(p->cb_userdata,
+			   homing_flags != 0 ? homing_flags : kAllAxesBitmap);
+      return p->callbacks.unprocessed(p->cb_userdata, axis, dummy, line);
     }
   }
-  p->callbacks.go_home(homing_flags != 0 ? homing_flags : kAllAxesBitmap);
+  p->callbacks.go_home(p->cb_userdata,
+		       homing_flags != 0 ? homing_flags : kAllAxesBitmap);
   return NULL;
 }
 
@@ -124,14 +131,14 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
     case 'B': p->relative_zero[AXIS_B] = p->axes_pos[AXIS_B] - unit_value; break;
     case 'C': p->relative_zero[AXIS_C] = p->axes_pos[AXIS_C] - unit_value; break;
     default:
-      return p->callbacks.unprocessed(axis, value, line);
+      return p->callbacks.unprocessed(p->cb_userdata, axis, value, line);
     }
   }
   return NULL;
 }
 
 static const char *handle_move(struct GCodeParser *p,
-			       void (*fun_move)(const float *),
+			       void (*fun_move)(void *, const float *),
 			       const char *line) {
   char axis;
   float value;
@@ -152,7 +159,7 @@ static const char *handle_move(struct GCodeParser *p,
     switch (axis) {
     case 'F': {
       if (p->current_feedrate != unit_value) {
-	p->callbacks.set_feedrate(unit_value);
+	p->callbacks.set_feedrate(p->cb_userdata, unit_value);
 	p->current_feedrate = unit_value;
       }
       break;
@@ -166,13 +173,13 @@ static const char *handle_move(struct GCodeParser *p,
     case 'C': UPDATE_AXIS(AXIS_C, unit_value); break;
     default:
       // Uh, got someething unexpected. Flush current move, the call
-      if (any_change) fun_move(p->axes_pos);
-      return p->callbacks.unprocessed(axis, value, line);
+      if (any_change) fun_move(p->cb_userdata, p->axes_pos);
+      return p->callbacks.unprocessed(p->cb_userdata, axis, value, line);
     }
   }
 #undef UPDATE_AXIS
 
-  if (any_change) fun_move(p->axes_pos);
+  if (any_change) fun_move(p->cb_userdata, p->axes_pos);
   return NULL;
 }
 
@@ -192,12 +199,12 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
       case 91: p->is_absolute = 0; break;
       case 92: line = handle_rebase(p, line); break;
       default:
-	line = p->callbacks.unprocessed(letter, value, line);
+	line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
 	break;
       }
     }
     else {
-      line = p->callbacks.unprocessed(letter, value, line);
+      line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
     }
   }
 }

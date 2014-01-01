@@ -1,12 +1,8 @@
 /*
-  common codes
-  G0
-  G1
-  G21   milimeter as unit. (G20: inches)
-  G28   go home
-  G90   absolute positioning
-  G92   set current as home (used for E)
-*/
+ * Parser for commong G-codes. Translates movements into absolute mm coordinates
+ * and calls callbacks on changes.
+ * Simple implementation, by no means complete.
+ */
 
 typedef struct GCodeParser GCodeParser_t;  // Opaque type with the parser object.
 
@@ -24,22 +20,22 @@ enum GGodeParserAxes {
 // differently).
 struct GCodeParserCb {
   // Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  void (*go_home)(unsigned char axis_bitmap);
+  void (*go_home)(void *, unsigned char axis_bitmap);
 
   // Set feedrate for the following commands. Parameter is in mm/min
-  void (*set_feedrate)(float);
+  void (*set_feedrate)(void *, float);
 
   // Coordinated move to absolute coordinates of motor vector.
   // (Unused axes always stay at 0).
   // Parameter: vector, number of elements (Axes are: X, Y, Z, E, A, B, C)
-  void (*coordinated_move)(const float *);
-  void (*rapid_move)(const float *);   // Parameters like coordinated_move
+  void (*coordinated_move)(void *, const float *);
+  void (*rapid_move)(void *, const float *);   // like coordinated_move()
 
   // Parameters: letter + value of the command that could not be processed.
   // string of rest of line.
   // Should return pointer to remaining line after processed or NULL if it
   // consumed it all.
-  char *(*unprocessed)(char letter, float value, const char *);
+  const char *(*unprocessed)(void *, char letter, float value, const char *);
 };
 
 
@@ -47,7 +43,8 @@ struct GCodeParserCb {
 // axis and their correspondence to the output array. E.g. "XYZEABC"
 // Returns an opaque type used in the parse functions.
 // Does not take ownership of the axes string or callbacks.
-GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
+GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks,
+			  void *callback_context);
 void gcodep_delete(GCodeParser_t *object);
 
 // Parse a gcode line, call callbacks if needed.
