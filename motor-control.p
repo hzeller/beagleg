@@ -34,10 +34,10 @@
 #define PARAM_START r8
 #define PARAM_END  r16
 .struct TravelParameters
-	.u16 steps
-	.u16 travel_speed
-	.u32 fraction_1   // Array would be good :)
-	.u32 fraction_2
+	.u16 steps         // Total number of steps.
+	.u16 travel_delay  // delay-loop count.
+	.u32 fraction_1    // Fixed point increments.
+	.u32 fraction_2    // (Array would be good :) )
 	.u32 fraction_3
 	.u32 fraction_4
 	.u32 fraction_5
@@ -147,7 +147,7 @@ STEP_GEN:
 
 	;; TODO: figure out the number of steps according to acceleration.
 	;; now, we just do the travel speed loop time.
-	MOV r1, travel_params.travel_speed
+	MOV r1, travel_params.travel_delay
 STEP_DELAY:			; TODO: LOOP instruction ?
 	SUB r1, r1, 1
 	QBNE STEP_DELAY, r1, 0

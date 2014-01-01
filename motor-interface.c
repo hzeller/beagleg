@@ -22,9 +22,9 @@
 struct QueueElement {
   uint8_t state;
   uint8_t direction_bits;
-  uint16_t steps;
-  uint16_t travel_speed;
-  uint32_t fractions[MOTOR_COUNT];
+  uint16_t steps;          // Number of total steps
+  uint16_t travel_delay;   // delay-loop count
+  uint32_t fractions[MOTOR_COUNT];  // fixed point fractions to add each step.
 } __attribute__((packed));
 
 
@@ -84,7 +84,7 @@ int beagleg_init(void) {
 #ifdef DEBUG_QUEUE
 static void DumpQueueElement(const struct QueueElement *element) {
   fprintf(stderr, "enqueue: dir:0x%02x steps:%d speed:%d f0:0x%08x f7:0x%08x\n",
-	  element->direction_bits, element->steps, element->travel_speed,
+	  element->direction_bits, element->steps, element->travel_delay,
 	  element->fractions[0], element->fractions[7]);
 }
 #endif
@@ -101,7 +101,7 @@ static void enqueue_internal(struct QueueElement *element) {
 }
 
 static int speed_2_delay(float steps_per_second) {
-  // Roughly, we neexd 2 * cycle-time delay.
+  // Roughly, we neexd 4 * cycle-time delay. At 200Mhz, we have 5ns cycles.
   // There is some overhead for each toplevel loop, but we ignore that for now.
   const float kLoopTimeSeconds = 5e-9 * 4;
   return (1/steps_per_second) / kLoopTimeSeconds;
@@ -111,7 +111,7 @@ int beagleg_enqueue(const struct bg_movement *param) {
   int delay_steps = speed_2_delay(param->travel_speed);
   if (delay_steps > 65535) delay_steps = 65535;
   struct QueueElement new_element;
-  new_element.travel_speed = delay_steps;
+  new_element.travel_delay = delay_steps;
   int biggest_value = abs(param->steps[0]);
   new_element.direction_bits = 0;
   for (int i = 0; i < MOTOR_COUNT; ++i) {
