@@ -83,9 +83,13 @@ int beagleg_init(void) {
 
 #ifdef DEBUG_QUEUE
 static void DumpQueueElement(const struct QueueElement *element) {
-  fprintf(stderr, "enqueue: dir:0x%02x steps:%d speed:%d f0:0x%08x f7:0x%08x\n",
-	  element->direction_bits, element->steps, element->travel_delay,
-	  element->fractions[0], element->fractions[7]);
+  fprintf(stderr, "enqueue: dir:0x%02x steps:%d speed:%d ",
+	  element->direction_bits, element->steps, element->travel_delay);
+  for (int i = 0; i < MOTOR_COUNT; ++i) {
+    fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
+  }
+  fprintf(stderr, "\n");
+	    
 }
 #endif
 

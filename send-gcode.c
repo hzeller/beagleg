@@ -1,10 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
+#include <string.h>
 #include <math.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "gcode-parser.h"
+#include "motor-interface.h"
 
+/* Little sample code to determine the approximate total print time */
 struct DurationData {
   float total_time;
   float current_feedrate_mm_per_sec;
@@ -53,6 +58,99 @@ void determine_duration(const char *filename) {
 	 state.total_time, state.filament_len);
 }
 
+// Per axis X, Y, Z, E (Z and E: need to look up)
+static int kStepsPerMM[] = { 160, 160, 160, 40 };
+struct PrinterState {
+  float current_feedrate_mm_per_sec;
+  int axes_pos[4];  // Absolute position in steps for each of the 4 axis
+};
+static void printer_feedrate(void *userdata, float fr) {
+  ((struct PrinterState*)userdata)->current_feedrate_mm_per_sec = fr/60;
+}
+static int choose_max_abs(int a, int b) {
+  return abs(a) > abs(b) ? abs(a) : abs(b);
+}
+static void printer_move(void *userdata, float feedrate, const float *axis) {
+  struct PrinterState *state = (struct PrinterState*)userdata;
+  int new_axes_pos[4];
+  new_axes_pos[AXIS_X] = axis[AXIS_X] * kStepsPerMM[AXIS_X];
+  new_axes_pos[AXIS_Y] = axis[AXIS_Y] * kStepsPerMM[AXIS_Y];
+  new_axes_pos[AXIS_Z] = axis[AXIS_Z] * kStepsPerMM[AXIS_Z];
+  new_axes_pos[AXIS_E] = axis[AXIS_E] * kStepsPerMM[AXIS_E];
+  struct bg_movement command;
+  bzero(&command, sizeof(command));
+  command.steps[AXIS_X] = new_axes_pos[AXIS_X] - state->axes_pos[AXIS_X];
+  command.steps[AXIS_Y] = new_axes_pos[AXIS_Y] - state->axes_pos[AXIS_Y];
+  command.steps[AXIS_Z] = new_axes_pos[AXIS_Z] - state->axes_pos[AXIS_Z];
+  command.steps[AXIS_E] = new_axes_pos[AXIS_E] - state->axes_pos[AXIS_E];
+  if (command.steps[AXIS_X] == 0 && command.steps[AXIS_Y] == 0
+      && command.steps[AXIS_Z] == 0 && command.steps[AXIS_E] == 0)
+    return;		       
+
+  int min_feedrate_relevant_steps_per_mm = -1;
+  for (int i = 0; i < 4; ++i) {
+    // The axis with the lowest number of steps per mm ultimately determines
+    // the maximum feedrate in steps/second (TODO: do relative to distance this
+    // axis has to travel)
+    if (command.steps[i] != 0 &&
+	(min_feedrate_relevant_steps_per_mm < 0
+	 || min_feedrate_relevant_steps_per_mm > kStepsPerMM[i])) {
+      min_feedrate_relevant_steps_per_mm = kStepsPerMM[i];
+    }
+  }
+
+  // For now: set that to x/y speed.
+  min_feedrate_relevant_steps_per_mm = kStepsPerMM[AXIS_X];
+
+  int max_axis_steps = choose_max_abs(command.steps[AXIS_X],
+				      command.steps[AXIS_Y]);
+  if (max_axis_steps > 0) {
+    double euklid_steps = sqrt(command.steps[AXIS_X] * command.steps[AXIS_X]
+			       + command.steps[AXIS_Y] * command.steps[AXIS_Y]);
+    command.travel_speed = max_axis_steps * min_feedrate_relevant_steps_per_mm
+      * feedrate / euklid_steps;
+  } else {
+    command.travel_speed = min_feedrate_relevant_steps_per_mm * feedrate;
+  }
+
+  // This is now our new position.
+  memcpy(state->axes_pos, new_axes_pos, sizeof(new_axes_pos));
+
+  beagleg_enqueue(&command);
+  printf("x=%4d y=%4d z=%4d e=%4d speed=%6.2f\n",
+	 command.steps[0], command.steps[1], command.steps[2],
+	 command.steps[3], command.travel_speed);
+}
+
+static void printer_coordinated_move(void *userdata, const float *axis) {
+  struct PrinterState *state = (struct PrinterState*)userdata;
+  printer_move(userdata, state->current_feedrate_mm_per_sec, axis);
+}
+
+static void printer_rapid_move(void *userdata, const float *axis) {
+  printer_move(userdata, 600, axis);
+}
+
+void send_to_printer(const char *filename) {
+  beagleg_init();
+  struct PrinterState state;
+  bzero(&state, sizeof(state));
+  struct GCodeParserCb callbacks;
+  bzero(&callbacks, sizeof(callbacks));
+  callbacks.set_feedrate = &printer_feedrate;
+  callbacks.coordinated_move = &printer_coordinated_move;
+  callbacks.rapid_move = &printer_rapid_move;
+  callbacks.go_home = &dummy_home;
+  GCodeParser_t *parser = gcodep_new(&callbacks, &state);
+  FILE *f = fopen(filename, "r");
+  char buffer[1024];
+  while (fgets(buffer, sizeof(buffer), f)) {
+    gcodep_parse_line(parser, buffer);
+  }
+  gcodep_delete(parser);
+  beagleg_exit();
+}
+
 int main(int argc, char *argv[]) {
   if (argc != 2) {
     fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
@@ -60,4 +158,9 @@ int main(int argc, char *argv[]) {
   }
   const char *filename = argv[1];
   determine_duration(filename);
+  if (geteuid() != 0) {
+    fprintf(stderr, "Need to run as root to access GPIO pins\n");
+    return 1;
+  }
+  send_to_printer(filename);
 }
