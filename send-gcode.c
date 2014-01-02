@@ -54,19 +54,22 @@ void determine_duration(const char *filename) {
     gcodep_parse_line(parser, buffer);
   }
   gcodep_delete(parser);
-  printf("Total print time: ~%.1f seconds; %.1fmm filament used\n",
+  printf("Total original print time: ~%.1f seconds; %.1fmm filament used\n",
 	 state.total_time, state.filament_len);
 }
 
 // Per axis X, Y, Z, E (Z and E: need to look up)
 static int kStepsPerMM[] = { 160, 160, 160, 40 };
 struct PrinterState {
+  float speed_factor;
   float current_feedrate_mm_per_sec;
   int axes_pos[4];  // Absolute position in steps for each of the 4 axis
 };
 static void printer_feedrate(void *userdata, float fr) {
-  ((struct PrinterState*)userdata)->current_feedrate_mm_per_sec = fr/60;
+  struct PrinterState *state = (struct PrinterState*)userdata;
+  state->current_feedrate_mm_per_sec = state->speed_factor * fr/60;
 }
+
 static int choose_max_abs(int a, int b) {
   return abs(a) > abs(b) ? abs(a) : abs(b);
 }
@@ -131,10 +134,11 @@ static void printer_rapid_move(void *userdata, const float *axis) {
   printer_move(userdata, 600, axis);
 }
 
-void send_to_printer(const char *filename) {
+void send_to_printer(const char *filename, float factor) {
   beagleg_init();
   struct PrinterState state;
   bzero(&state, sizeof(state));
+  state.speed_factor = factor;
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
   callbacks.set_feedrate = &printer_feedrate;
@@ -151,16 +155,25 @@ void send_to_printer(const char *filename) {
   beagleg_exit();
 }
 
+static int usage(const char *prog) {
+   fprintf(stderr, "Usage: %s <filename> [<speed-factor>]\n", prog);
+   return 1;
+}
+
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
-    return 1;
+  if (argc < 2 || argc > 3) {
+    return usage(argv[0]);
   }
   const char *filename = argv[1];
+  float factor = 1.0;
+  if (argc >= 3) {
+    factor = atof(argv[2]);
+    if (factor <= 0) return usage(argv[0]);
+  }
   determine_duration(filename);
   if (geteuid() != 0) {
     fprintf(stderr, "Need to run as root to access GPIO pins\n");
     return 1;
   }
-  send_to_printer(filename);
+  send_to_printer(filename, factor);
 }
