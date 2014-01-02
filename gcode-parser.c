@@ -89,7 +89,7 @@ static const char *parse_next_pair(const char *line,
     line++;  // Skip text we just parsed
   while (*line && isspace(*line))
     line++;  // Skip whitespace, maybe we're done anyway.
-  return line;  // never NULL because we successfully parsed something.
+  return line;  // We parsed something; return whatever is remaining.
 }
 
 static const char *handle_home(struct GCodeParser *p, const char *line) {
@@ -102,12 +102,12 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   while ((line = parse_next_pair(line, &axis, &dummy))) {
     switch (axis) {
     case 'X': homing_flags |= (1 << AXIS_X); break;
-    case 'Y': homing_flags |= (1 << AXIS_X); break;
-    case 'Z': homing_flags |= (1 << AXIS_X); break;
-    case 'E': homing_flags |= (1 << AXIS_X); break;
-    case 'A': homing_flags |= (1 << AXIS_X); break;
-    case 'B': homing_flags |= (1 << AXIS_X); break;
-    case 'C': homing_flags |= (1 << AXIS_X); break;
+    case 'Y': homing_flags |= (1 << AXIS_Y); break;
+    case 'Z': homing_flags |= (1 << AXIS_Z); break;
+    case 'E': homing_flags |= (1 << AXIS_E); break;
+    case 'A': homing_flags |= (1 << AXIS_A); break;
+    case 'B': homing_flags |= (1 << AXIS_B); break;
+    case 'C': homing_flags |= (1 << AXIS_C); break;
     default:
       p->callbacks.go_home(p->cb_userdata,
 			   homing_flags != 0 ? homing_flags : kAllAxesBitmap);
