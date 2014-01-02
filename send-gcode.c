@@ -5,9 +5,12 @@
 #include <math.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <getopt.h>
 
 #include "gcode-parser.h"
 #include "motor-interface.h"
+
+#define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 600
 
 /* Little sample code to determine the approximate total print time */
 struct DurationData {
@@ -54,20 +57,28 @@ void determine_duration(const char *filename) {
     gcodep_parse_line(parser, buffer);
   }
   gcodep_delete(parser);
-  printf("Total original print time: ~%.1f seconds; %.1fmm filament used\n",
-	 state.total_time, state.filament_len);
+  printf("Total original print time: ~%.1f seconds; height: %.1fmm; "
+	 "%.1fmm filament used.\n",
+	 state.total_time, state.last_z, state.filament_len);
 }
 
 // Per axis X, Y, Z, E (Z and E: need to look up)
 static int kStepsPerMM[] = { 160, 160, 160, 40 };
 struct PrinterState {
   float speed_factor;
+  float max_feedrate;
+  char dry_run;
+  char debug_print;
+
   float current_feedrate_mm_per_sec;
   int axes_pos[4];  // Absolute position in steps for each of the 4 axis
 };
 static void printer_feedrate(void *userdata, float fr) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   state->current_feedrate_mm_per_sec = state->speed_factor * fr/60;
+  if (state->current_feedrate_mm_per_sec > state->max_feedrate) {
+    state->current_feedrate_mm_per_sec = state->max_feedrate;
+  }
 }
 
 static int choose_max_abs(int a, int b) {
@@ -91,6 +102,7 @@ static void printer_move(void *userdata, float feedrate, const float *axis) {
     return;		       
 
   int min_feedrate_relevant_steps_per_mm = -1;
+#if 0
   for (int i = 0; i < 4; ++i) {
     // The axis with the lowest number of steps per mm ultimately determines
     // the maximum feedrate in steps/second (TODO: do relative to distance this
@@ -101,9 +113,10 @@ static void printer_move(void *userdata, float feedrate, const float *axis) {
       min_feedrate_relevant_steps_per_mm = kStepsPerMM[i];
     }
   }
-
+#else
   // For now: set that to x/y speed.
   min_feedrate_relevant_steps_per_mm = kStepsPerMM[AXIS_X];
+#endif
 
   int max_axis_steps = choose_max_abs(command.steps[AXIS_X],
 				      command.steps[AXIS_Y]);
@@ -119,10 +132,18 @@ static void printer_move(void *userdata, float feedrate, const float *axis) {
   // This is now our new position.
   memcpy(state->axes_pos, new_axes_pos, sizeof(new_axes_pos));
 
-  beagleg_enqueue(&command);
-  printf("x=%4d y=%4d z=%4d e=%4d speed=%6.2f\n",
-	 command.steps[0], command.steps[1], command.steps[2],
-	 command.steps[3], command.travel_speed);
+  if (!state->dry_run) beagleg_enqueue(&command);
+  if (state->debug_print) {
+    if (command.steps[2] != 0) {
+      printf("(%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.0f mm/s)\n",
+	     command.steps[0], command.steps[1], command.steps[2],
+	     command.steps[3], command.travel_speed / 1000.0, feedrate);
+    } else {
+      printf("(%6d, %6d)       E:%-3d step kHz:%-8.3f (%.0f mm/s)\n",
+	     command.steps[0], command.steps[1],
+	     command.steps[3], command.travel_speed / 1000.0, feedrate);
+    }
+  }
 }
 
 static void printer_coordinated_move(void *userdata, const float *axis) {
@@ -131,20 +152,29 @@ static void printer_coordinated_move(void *userdata, const float *axis) {
 }
 
 static void printer_rapid_move(void *userdata, const float *axis) {
-  printer_move(userdata, 600, axis);
+  struct PrinterState *state = (struct PrinterState*)userdata;
+  printer_move(userdata, state->max_feedrate, axis);
 }
 
-void send_to_printer(const char *filename, float factor) {
-  beagleg_init();
+void send_to_printer(const char *filename,
+		     char dry_run, char debug_print,
+		     int max_feedrate, float factor) {
+  if (!dry_run) beagleg_init();
+
   struct PrinterState state;
   bzero(&state, sizeof(state));
   state.speed_factor = factor;
+  state.max_feedrate = max_feedrate;
+  state.dry_run = dry_run;
+  state.debug_print = debug_print;
+
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
   callbacks.set_feedrate = &printer_feedrate;
   callbacks.coordinated_move = &printer_coordinated_move;
   callbacks.rapid_move = &printer_rapid_move;
   callbacks.go_home = &dummy_home;
+
   GCodeParser_t *parser = gcodep_new(&callbacks, &state);
   FILE *f = fopen(filename, "r");
   char buffer[1024];
@@ -152,28 +182,58 @@ void send_to_printer(const char *filename, float factor) {
     gcodep_parse_line(parser, buffer);
   }
   gcodep_delete(parser);
-  beagleg_exit();
+
+  if (!dry_run) beagleg_exit();
 }
 
 static int usage(const char *prog) {
-   fprintf(stderr, "Usage: %s <filename> [<speed-factor>]\n", prog);
+   fprintf(stderr, "Usage: %s [options] <filename>\n"
+	   "Options:\n"
+	   "  -f <factor> : Print speed factor. (Default 1.0)\n"
+	   "  -m <rate>   : Max. feedrate. (Default %dmm/s)\n"
+	   "  -p          : Toggle printing motor steps. (Default:on)\n"
+	   "  -n          : dryrun; don't send to motors. (Default:off)\n",
+	   prog, DEFAULT_MAX_FEEDRATE_MM_PER_SEC);
    return 1;
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2 || argc > 3) {
-    return usage(argv[0]);
-  }
-  const char *filename = argv[1];
+  int max_feedrate = DEFAULT_MAX_FEEDRATE_MM_PER_SEC;
   float factor = 1.0;
-  if (argc >= 3) {
-    factor = atof(argv[2]);
-    if (factor <= 0) return usage(argv[0]);
+  char dry_run = 0;
+  char debug_print = 0;
+  int opt;
+  while ((opt = getopt(argc, argv, "pnf:m:")) != -1) {
+    switch (opt) {
+    case 'f':
+      factor = atof(optarg);
+      if (factor <= 0) return usage(argv[0]);
+      break;
+    case 'm':
+      max_feedrate = atoi(optarg);
+      if (max_feedrate <= 0) return usage(argv[0]);
+      break;
+    case 'n':
+      dry_run = !dry_run;
+      break;
+    case 'p':
+      debug_print = !debug_print;
+      break;
+    default:
+      return usage(argv[0]);
+    }
   }
+
+  if (optind >= argc) return usage(argv[0]);
+
+  const char *filename = argv[optind];
+
   determine_duration(filename);
+
   if (geteuid() != 0) {
     fprintf(stderr, "Need to run as root to access GPIO pins\n");
     return 1;
   }
-  send_to_printer(filename, factor);
+
+  send_to_printer(filename, dry_run, debug_print, max_feedrate, factor);
 }
