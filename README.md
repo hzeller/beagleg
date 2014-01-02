@@ -5,5 +5,4 @@ are controlled in a coordinated move, with real-time controlled steps at rates
 that can go beyond 200kHz. The host operating system is just queueing commands.
 
 TODO
-  * Implement G-code interpreter
   * Implement acceleration and jerk.
