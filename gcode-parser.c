@@ -262,67 +262,45 @@ static const char *handle_move(struct GCodeParser *p,
 }
 
 void gcodep_parse_line(struct GCodeParser *p, const char *line) {
+  void *const userdata = p->cb_userdata;
+  struct GCodeParserCb *cb = &p->callbacks;
   char letter;
   float value;
   while ((line = parse_next_pair(line, &letter, &value))) {
     if (letter == 'G') {
       switch ((int) value) {
-      case 0: line = handle_move(p, p->callbacks.rapid_move, line); break;
-      case 1: line = handle_move(p, p->callbacks.coordinated_move, line); break;
+      case 0: line = handle_move(p, cb->rapid_move, line); break;
+      case 1: line = handle_move(p, cb->coordinated_move, line); break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
       case 90: set_all_axis_to_absolute(p, 1); break;
       case 91: set_all_axis_to_absolute(p, 0); break;
       case 92: line = handle_rebase(p, line); break;
-      default:
-	line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
-	break;
+      default: line = cb->unprocessed(userdata, letter, value, line); break;
       }
     }
     else if (letter == 'M') {
       switch ((int) value) {
-      case 82:
-	p->axis_is_absolute[AXIS_E] = 1;
-	break;
-      case 83:
-	p->axis_is_absolute[AXIS_E] = 0;
-	break;
-      case 84:
-	p->callbacks.disable_motors(p->cb_userdata);
-	break;
-
-      case 104:
-	line = set_S_param(p->cb_userdata, p->callbacks.set_temperature, line);
-	break;
-
-      case 106:
-	line = set_S_param(p->cb_userdata, p->callbacks.set_fanspeed, line);
-	break;
-
-      case 107:
-	p->callbacks.set_fanspeed(p->cb_userdata, 0);
-	break;
-
+      case 82: p->axis_is_absolute[AXIS_E] = 1; break;
+      case 83: p->axis_is_absolute[AXIS_E] = 0; break;
+      case 84: cb->disable_motors(userdata); break;
+      case 104: line = set_S_param(userdata, cb->set_temperature, line); break;
+      case 106: line = set_S_param(userdata, cb->set_fanspeed, line); break;
+      case 107: cb->set_fanspeed(userdata, 0); break;
       case 109:
-	line = set_S_param(p->cb_userdata, p->callbacks.set_temperature, line);
-	p->callbacks.wait_temperature(p->cb_userdata);
+	line = set_S_param(userdata, cb->set_temperature, line);
+	cb->wait_temperature(userdata);
 	break;
-
-      case 116:
-	p->callbacks.wait_temperature(p->cb_userdata);
-	break;
-
-      default:
-	line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
-	break;
+      case 116: cb->wait_temperature(userdata); break;
+      default: line = cb->unprocessed(userdata, letter, value, line); break;
       }
     }
     else if (letter == 'N') {
       // Line number? Yeah, ignore for now :)
     }
     else {
-      line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
+      line = cb->unprocessed(userdata, letter, value, line);
     }
   }
 }
