@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
 
   determine_duration(filename);
 
-  if (geteuid() != 0) {
+  if (!print_config.dry_run && geteuid() != 0) {
     fprintf(stderr, "Need to run as root to access GPIO pins\n");
     return 1;
   }
