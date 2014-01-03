@@ -64,20 +64,24 @@ void determine_duration(const char *filename) {
 
 // Per axis X, Y, Z, E (Z and E: need to look up)
 static int kStepsPerMM[] = { 160, 160, 160, 40 };
-struct PrinterState {
-  float speed_factor;
+struct PrintConfig {
   float max_feedrate;
+  float speed_factor;
   char dry_run;
   char debug_print;
-
+  char synchronous;
+};
+struct PrinterState {
+  struct PrintConfig config;
   float current_feedrate_mm_per_sec;
   int axes_pos[4];  // Absolute position in steps for each of the 4 axis
 };
+
 static void printer_feedrate(void *userdata, float fr) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  state->current_feedrate_mm_per_sec = state->speed_factor * fr/60;
-  if (state->current_feedrate_mm_per_sec > state->max_feedrate) {
-    state->current_feedrate_mm_per_sec = state->max_feedrate;
+  state->current_feedrate_mm_per_sec = state->config.speed_factor * fr/60;
+  if (state->current_feedrate_mm_per_sec > state->config.max_feedrate) {
+    state->current_feedrate_mm_per_sec = state->config.max_feedrate;
   }
 }
 
@@ -132,8 +136,12 @@ static void printer_move(void *userdata, float feedrate, const float *axis) {
   // This is now our new position.
   memcpy(state->axes_pos, new_axes_pos, sizeof(new_axes_pos));
 
-  if (!state->dry_run) beagleg_enqueue(&command);
-  if (state->debug_print) {
+  if (!state->config.dry_run) {
+    if (state->config.synchronous) beagleg_wait_queue_empty();
+    beagleg_enqueue(&command);
+  }
+
+  if (state->config.debug_print) {
     if (command.steps[2] != 0) {
       printf("(%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.0f mm/s)\n",
 	     command.steps[0], command.steps[1], command.steps[2],
@@ -153,20 +161,16 @@ static void printer_coordinated_move(void *userdata, const float *axis) {
 
 static void printer_rapid_move(void *userdata, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  printer_move(userdata, state->max_feedrate, axis);
+  printer_move(userdata, state->config.max_feedrate, axis);
 }
 
 void send_to_printer(const char *filename,
-		     char dry_run, char debug_print,
-		     int max_feedrate, float factor) {
-  if (!dry_run) beagleg_init();
+		     struct PrintConfig *config) {
+  if (!config->dry_run) beagleg_init();
 
   struct PrinterState state;
   bzero(&state, sizeof(state));
-  state.speed_factor = factor;
-  state.max_feedrate = max_feedrate;
-  state.dry_run = dry_run;
-  state.debug_print = debug_print;
+  state.config = *config;
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
@@ -183,7 +187,7 @@ void send_to_printer(const char *filename,
   }
   gcodep_delete(parser);
 
-  if (!dry_run) beagleg_exit();
+  if (!config->dry_run) beagleg_exit();
 }
 
 static int usage(const char *prog) {
@@ -192,32 +196,38 @@ static int usage(const char *prog) {
 	   "  -f <factor> : Print speed factor. (Default 1.0)\n"
 	   "  -m <rate>   : Max. feedrate. (Default %dmm/s)\n"
 	   "  -p          : Toggle printing motor steps. (Default:on)\n"
-	   "  -n          : dryrun; don't send to motors. (Default:off)\n",
+	   "  -n          : dryrun; don't send to motors. (Default:off)\n"
+	   "  -s          : synchronous: don't queue (useful only for debug)\n",
 	   prog, DEFAULT_MAX_FEEDRATE_MM_PER_SEC);
    return 1;
 }
 
 int main(int argc, char *argv[]) {
-  int max_feedrate = DEFAULT_MAX_FEEDRATE_MM_PER_SEC;
-  float factor = 1.0;
-  char dry_run = 0;
-  char debug_print = 0;
+  struct PrintConfig print_config;
+  print_config.max_feedrate = DEFAULT_MAX_FEEDRATE_MM_PER_SEC;
+  print_config.speed_factor = 1;
+  print_config.dry_run = 0;
+  print_config.debug_print = 0;
+  print_config.synchronous = 0;
   int opt;
-  while ((opt = getopt(argc, argv, "pnf:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "spnf:m:")) != -1) {
     switch (opt) {
     case 'f':
-      factor = atof(optarg);
-      if (factor <= 0) return usage(argv[0]);
+      print_config.speed_factor = atof(optarg);
+      if (print_config.speed_factor <= 0) return usage(argv[0]);
       break;
     case 'm':
-      max_feedrate = atoi(optarg);
-      if (max_feedrate <= 0) return usage(argv[0]);
+      print_config.max_feedrate = atoi(optarg);
+      if (print_config.max_feedrate <= 0) return usage(argv[0]);
       break;
     case 'n':
-      dry_run = !dry_run;
+      print_config.dry_run = 1;
       break;
     case 'p':
-      debug_print = !debug_print;
+      print_config.debug_print = 1;
+      break;
+    case 's':
+      print_config.synchronous = 1;
       break;
     default:
       return usage(argv[0]);
@@ -235,5 +245,5 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  send_to_printer(filename, dry_run, debug_print, max_feedrate, factor);
+  send_to_printer(filename, &print_config);
 }

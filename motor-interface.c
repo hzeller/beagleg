@@ -31,7 +31,7 @@ struct QueueElement {
 #define PRU_NUM 0
 
 struct QueueElement *volatile shared_queue_;
-struct QueueElement *volatile shared_queue_it_;
+unsigned int queue_pos_;
 
 static void init_queue(struct QueueElement *elements) {
   memset(elements, 0x00, QUEUE_LEN * sizeof(*elements));
@@ -44,20 +44,18 @@ static struct QueueElement *volatile map_queue() {
   void *result;
   prussdrv_map_prumem (PRUSS0_PRU0_DATARAM, &result);
   shared_queue_ = (struct QueueElement*) result;
-  shared_queue_it_ = shared_queue_;
+  queue_pos_ = 0;
   init_queue(shared_queue_);
   return shared_queue_;
 }
 
 static struct QueueElement *volatile next_queue_element() {
-  if (shared_queue_it_ - shared_queue_ >= QUEUE_LEN) {  // ringbuffer.
-    shared_queue_it_ = shared_queue_;
-  }
-  while (shared_queue_it_->state != STATE_EMPTY) {
+  queue_pos_ %= QUEUE_LEN;
+  while (shared_queue_[queue_pos_].state != STATE_EMPTY) {
     prussdrv_pru_wait_event (PRU_EVTOUT_0);
     prussdrv_pru_clear_event (PRU0_ARM_INTERRUPT);
   }
-  return shared_queue_it_++;
+  return &shared_queue_[queue_pos_++];
 }
 
 int beagleg_init(void) {
@@ -145,7 +143,11 @@ int beagleg_enqueue(const struct bg_movement *param) {
 }
 
 void beagleg_wait_queue_empty(void) {
-  // TODO
+  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
+  while (shared_queue_[last_insert_position].state == STATE_FILLED) {
+    prussdrv_pru_wait_event (PRU_EVTOUT_0);
+    prussdrv_pru_clear_event (PRU0_ARM_INTERRUPT);
+  }
 }
 
 void beagleg_exit(void) {
