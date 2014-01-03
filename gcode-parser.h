@@ -49,6 +49,7 @@ struct GCodeParserCb {
   // Set temperature to given temperature in Celsius.
   void (*set_temperature)(void *, float);
   void (*wait_temperature)(void *);
+  void (*dwell)(void *, float);
 
   void (*disable_motors)(void *);
 

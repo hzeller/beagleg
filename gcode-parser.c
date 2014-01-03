@@ -53,6 +53,9 @@ static void dummy_set_fanspeed(void *user, float speed) {
 static void dummy_wait_temperature(void *user) {
   fprintf(stderr, "GCodeParser: wait_temperature()\n");
 }
+static void dummy_dwell(void *user, float f) {
+  fprintf(stderr, "GCodeParser: dwell(%.1f)\n", f);
+}
 static void dummy_disable_motors(void *user) {
   fprintf(stderr, "GCodeParser: disable_motors()\n");
 }
@@ -96,6 +99,8 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
     result->callbacks.set_temperature = &dummy_set_temperature;
   if (!result->callbacks.wait_temperature)
     result->callbacks.wait_temperature = &dummy_wait_temperature;
+  if (!result->callbacks.dwell)
+    result->callbacks.dwell = &dummy_dwell;
   if (!result->callbacks.disable_motors)
     result->callbacks.disable_motors = &dummy_disable_motors;
   if (!result->callbacks.coordinated_move)
@@ -113,6 +118,12 @@ void gcodep_delete(struct GCodeParser *parser) {
   free(parser);
 }
 
+static const char *skip_white(const char *line) {
+  while (*line && isspace(*line))
+    line++;
+  return line;
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 static const char *parse_next_pair(const char *line,
@@ -120,10 +131,17 @@ static const char *parse_next_pair(const char *line,
   // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
-  while (*line && isspace(*line))
-    line++;
+  line = skip_white(line);
+
   if (*line == '\0' || *line == ';' || *line == '%')
     return NULL;
+
+  if (*line == '(') {  // mid-of-line comment.
+    while (*line && *line != ')')
+      line++;
+    line = skip_white(line + 1);
+    if (*line == '\0') return NULL;
+  }
 
   *letter = toupper(*line++);
   if (*line == '\0') {
@@ -154,9 +172,7 @@ static const char *parse_next_pair(const char *line,
   }
   line = endptr;
 
-
-  while (*line && isspace(*line))
-    line++;  // Skip whitespace, makes the line better to deal with.
+  line = skip_white(line); // Makes the line better to deal with.
   return line;  // We parsed something; return whatever is remaining.
 }
 
@@ -216,13 +232,13 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   return line;
 }
 
-static const char *set_S_param(void *userdata,
-			       void (*value_setter)(void *, float),
-			       const char *line) {
+static const char *set_param(char param_letter, void *userdata,
+			     void (*value_setter)(void *, float),
+			     const char *line) {
   char letter;
   float value;
   const char *remaining_line = parse_next_pair(line, &letter, &value);
-  if (remaining_line != NULL && letter == 'S') {
+  if (remaining_line != NULL && letter == param_letter) {
     value_setter(userdata, value);
     return remaining_line;
   }
@@ -290,6 +306,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;
       case 1: line = handle_move(p, cb->coordinated_move, line); break;
+      case 4: line = set_param('P', userdata, cb->dwell, line); break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
@@ -304,11 +321,11 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
       case 84: cb->disable_motors(userdata); break;
-      case 104: line = set_S_param(userdata, cb->set_temperature, line); break;
-      case 106: line = set_S_param(userdata, cb->set_fanspeed, line); break;
+      case 104: line = set_param('S',userdata, cb->set_temperature, line); break;
+      case 106: line = set_param('S', userdata, cb->set_fanspeed, line); break;
       case 107: cb->set_fanspeed(userdata, 0); break;
       case 109:
-	line = set_S_param(userdata, cb->set_temperature, line);
+	line = set_param('S', userdata, cb->set_temperature, line);
 	cb->wait_temperature(userdata);
 	break;
       case 116: cb->wait_temperature(userdata); break;

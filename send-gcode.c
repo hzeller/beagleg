@@ -182,6 +182,10 @@ static void printer_rapid_move(void *userdata, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   printer_move(userdata, state->config.max_feedrate, axis);
 }
+static void printer_dwell(void *userdata, float value) {
+  beagleg_wait_queue_empty();
+  usleep((int) (value * 1000));
+}
 
 void send_to_printer(const char *filename,
 		     struct PrintConfig *config) {
@@ -197,6 +201,7 @@ void send_to_printer(const char *filename,
   callbacks.coordinated_move = &printer_coordinated_move;
   callbacks.rapid_move = &printer_rapid_move;
   callbacks.go_home = &dummy_home;
+  callbacks.dwell = &printer_dwell;
 
   GCodeParser_t *parser = gcodep_new(&callbacks, &state);
   FILE *f = fopen(filename, "r");
