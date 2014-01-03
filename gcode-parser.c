@@ -75,20 +75,46 @@ void gcodep_delete(struct GCodeParser *parser) {
 // Returns the remaining line or NULL if end reached.
 static const char *parse_next_pair(const char *line,
 				   char *letter, float *value) {
+  // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
   while (*line && isspace(*line))
     line++;
   if (*line == '\0' || *line == ';' || *line == '%')
     return NULL;
-  if (sscanf(line, "%c%f", letter, value) != 2) {
-    fprintf(stderr, "Error parsing '%s'\n", line); // TODO: error callback.
+
+  *letter = toupper(*line++);
+  if (*line == '\0') {
+    fprintf(stderr, "Error: expected value after '%c'\n", *letter);
     return NULL;
   }
-  while (*line && !isspace(*line))
-    line++;  // Skip text we just parsed
+  // If this line has a checksum, we ignore it. In fact, the line is done.
+  if (*letter == '*')
+    return NULL;
   while (*line && isspace(*line))
-    line++;  // Skip whitespace, maybe we're done anyway.
+    line++;
+
+  // Parsing with strtof() can be problematic if the line does
+  // not contain spaces, and strof() sees the sequence 0X... as it treats that
+  // as hex value. E.g. G0X1. Unlikely, but let's do a nasty workaround:
+  char *repair_x = (*(line+1) == 'x' || *(line+1) == 'X') ? (char*)line+1 : NULL;
+  if (repair_x) *repair_x = '\0';  // pretend that is the end of number.
+
+  char *endptr;
+  *value = strtof(line, &endptr);
+
+  if (repair_x) *repair_x = 'X';  // Put the 'X' back.
+
+  if (line == endptr) {
+    fprintf(stderr, "Error: '%c' is not followed by a number: '%s'\n",
+	    *letter, line);
+    return NULL;
+  }
+  line = endptr;
+
+
+  while (*line && isspace(*line))
+    line++;  // Skip whitespace, makes the line better to deal with.
   return line;  // We parsed something; return whatever is remaining.
 }
 
@@ -99,7 +125,9 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   unsigned char homing_flags = 0;
   char axis;
   float dummy;
-  while ((line = parse_next_pair(line, &axis, &dummy))) {
+  const char *remaining_line;
+  while ((remaining_line = parse_next_pair(line, &axis, &dummy))) {
+    char done = 0;
     switch (axis) {
     case 'X': homing_flags |= (1 << AXIS_X); break;
     case 'Y': homing_flags |= (1 << AXIS_Y); break;
@@ -109,21 +137,24 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     case 'B': homing_flags |= (1 << AXIS_B); break;
     case 'C': homing_flags |= (1 << AXIS_C); break;
     default:
-      p->callbacks.go_home(p->cb_userdata,
-			   homing_flags != 0 ? homing_flags : kAllAxesBitmap);
-      return p->callbacks.unprocessed(p->cb_userdata, axis, dummy, line);
+      done = 1;  // Possibly start of new command.
+      break;
     }
+    if (done) break;
+    line = remaining_line;
   }
   p->callbacks.go_home(p->cb_userdata,
 		       homing_flags != 0 ? homing_flags : kAllAxesBitmap);
-  return NULL;
+  return line;
 }
 
 static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   char axis;
   float value;
-  while ((line = parse_next_pair(line, &axis, &value))) {
+  const char *remaining_line;
+  while ((remaining_line = parse_next_pair(line, &axis, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
+    char done = 0;
     switch (axis) {
     case 'X': p->relative_zero[AXIS_X] = p->axes_pos[AXIS_X] - unit_value; break;
     case 'Y': p->relative_zero[AXIS_Y] = p->axes_pos[AXIS_Y] - unit_value; break;
@@ -133,10 +164,14 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
     case 'B': p->relative_zero[AXIS_B] = p->axes_pos[AXIS_B] - unit_value; break;
     case 'C': p->relative_zero[AXIS_C] = p->axes_pos[AXIS_C] - unit_value; break;
     default:
-      return p->callbacks.unprocessed(p->cb_userdata, axis, value, line);
+      done = 1;  // Possibly start of new command.
+      break;
     }
+    if (done)
+      break;
+    line = remaining_line;
   }
-  return NULL;
+  return line;
 }
 
 static const char *handle_move(struct GCodeParser *p,
@@ -145,18 +180,11 @@ static const char *handle_move(struct GCodeParser *p,
   char axis;
   float value;
   int any_change = 0;
-
-#define UPDATE_AXIS(name, val) do {			\
-    if (p->is_absolute) {				\
-      p->axes_pos[name] = p->relative_zero[name] + val;	\
-    }							\
-    else {						\
-      p->axes_pos[AXIS_X] += val;			\
-    }							\
-    any_change = 1;					\
-  } while(0)
   
-  while ((line = parse_next_pair(line, &axis, &value))) {
+  const char *remaining_line;
+  char done = 0;
+  int update_axis = -1;
+  while ((remaining_line = parse_next_pair(line, &axis, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     switch (axis) {
     case 'F': {
@@ -166,27 +194,38 @@ static const char *handle_move(struct GCodeParser *p,
       }
       break;
     }
-    case 'X': UPDATE_AXIS(AXIS_X, unit_value); break;
-    case 'Y': UPDATE_AXIS(AXIS_Y, unit_value); break;
-    case 'Z': UPDATE_AXIS(AXIS_Z, unit_value); break;
-    case 'E': UPDATE_AXIS(AXIS_E, unit_value); break;
-    case 'A': UPDATE_AXIS(AXIS_A, unit_value); break;
-    case 'B': UPDATE_AXIS(AXIS_B, unit_value); break;
-    case 'C': UPDATE_AXIS(AXIS_C, unit_value); break;
+    case 'X': update_axis = AXIS_X; break;
+    case 'Y': update_axis = AXIS_Y; break;
+    case 'Z': update_axis = AXIS_Z; break;
+    case 'E': update_axis = AXIS_E; break;
+    case 'A': update_axis = AXIS_A; break;
+    case 'B': update_axis = AXIS_B; break;
+    case 'C': update_axis = AXIS_C; break;
     default:
-      // Uh, got someething unexpected. Flush current move, the call
-      if (any_change) fun_move(p->cb_userdata, p->axes_pos);
-      return p->callbacks.unprocessed(p->cb_userdata, axis, value, line);
+      done = 1;  // Possibly start of new command.
+      break;
     }
+
+    if (update_axis >= 0) {
+      if (p->is_absolute) {
+	p->axes_pos[update_axis] = p->relative_zero[update_axis] + unit_value;
+      }
+      else {
+	p->axes_pos[update_axis] += unit_value;
+      }
+      any_change = 1;
+    }
+    if (done)
+      break;
+    line = remaining_line;
+    update_axis = -1;
   }
-#undef UPDATE_AXIS
 
   if (any_change) fun_move(p->cb_userdata, p->axes_pos);
-  return NULL;
+  return line;
 }
 
 void gcodep_parse_line(struct GCodeParser *p, const char *line) {
-  // TODO: strip of Nxx   *xx
   char letter;
   float value;
   while ((line = parse_next_pair(line, &letter, &value))) {
@@ -204,6 +243,9 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
 	line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
 	break;
       }
+    }
+    else if (letter == 'N') {
+      // Line number? Yeah, ignore for now :)
     }
     else {
       line = p->callbacks.unprocessed(p->cb_userdata, letter, value, line);
