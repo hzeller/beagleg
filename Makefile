@@ -34,4 +34,4 @@ motor-interface.o : shared-constants.h $(PRU_BIN)
 motor-control.bin : shared-constants.h
 
 clean:
-	rm -rf $(TARGET) $(OBJECTS)
+	rm -rf $(TARGET) $(OBJECTS) $(PRU_BIN)
