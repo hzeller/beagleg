@@ -170,11 +170,11 @@ static void printer_move(void *userdata, float feedrate, const float *axis) {
 
   if (state->config.debug_print) {
     if (command.steps[2] != 0) {
-      printf("(%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.0f mm/s)\n",
+      printf("(%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.1f mm/s)\n",
 	     command.steps[0], command.steps[1], command.steps[2],
 	     command.steps[3], command.travel_speed / 1000.0, feedrate);
     } else {
-      printf("(%6d, %6d)       E:%-3d step kHz:%-8.3f (%.0f mm/s)\n",
+      printf("(%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
 	     command.steps[0], command.steps[1],
 	     command.steps[3], command.travel_speed / 1000.0, feedrate);
     }
