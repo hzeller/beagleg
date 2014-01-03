@@ -22,8 +22,16 @@ struct GCodeParserCb {
   // Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, unsigned char axis_bitmap);
 
-  // Set feedrate for the following commands. Parameter is in mm/min
+  // Set feedrate for the following G-commands. Parameter is in mm/min
   void (*set_feedrate)(void *, float);
+
+  void (*set_fanspeed)(void *, float);  // 0 == off; 255 == full speed
+
+  // Set temperature to given temperature in Celsius.
+  void (*set_temperature)(void *, float);
+  void (*wait_temperature)(void *);
+
+  void (*disable_motors)(void *);
 
   // Coordinated move to absolute coordinates of motor vector.
   // (Unused axes always stay at 0).
