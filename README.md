@@ -1,7 +1,8 @@
 BeagleG
 -------
 
-Experimental motor controller using the PRU capability of the Beaglebone Black.
+Experimental step-motor controller using the PRU capability of the
+Beaglebone Black to create precisely timed stepper-pulses.
 
 The host library motor-interface allows to enqueue steps of up to 8 motors that
 are controlled in a coordinated move, with real-time controlled steps at rates
