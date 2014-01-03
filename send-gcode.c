@@ -17,6 +17,9 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// get usleep()
+#define _XOPEN_SOURCE 500
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
@@ -59,6 +62,10 @@ static void duration_move(void *userdata, const float *axis) {
   state->last_z = axis[AXIS_Z];
   state->filament_len = axis[AXIS_E];
 }
+static void duration_dwell(void *userdata, float value) {
+  struct DurationData *state = (struct DurationData*)userdata;
+  state->total_time += value / 1000.0f;
+}
 
 void determine_duration(const char *filename) {
   struct DurationData state;
@@ -68,6 +75,7 @@ void determine_duration(const char *filename) {
   callbacks.set_feedrate = &duration_feedrate;
   callbacks.coordinated_move = &duration_move;
   callbacks.go_home = &dummy_home;
+  callbacks.dwell = &duration_dwell;
   callbacks.unprocessed = &dummy_unprocessed;
   GCodeParser_t *parser = gcodep_new(&callbacks, &state);
   FILE *f = fopen(filename, "r");
