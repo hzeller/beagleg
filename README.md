@@ -39,8 +39,8 @@ The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6]
 
 ## Pinout
 
-    Step     : GPIO-0  2,  3,  4,  5,  7, 14, 15, 20
-    Direction: GPIO-1 12, 13, 14, 15, 16, 17, 18, 19
+    Step     : GPIO-0 |  2,  3,  4,  5,  7, 14, 15, 20
+    Direction: GPIO-1 | 12, 13, 14, 15, 16, 17, 18, 19
 
 For your interface: note this is 3.3V level (and assume not more than ~4mA).
 
