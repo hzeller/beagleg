@@ -6,7 +6,7 @@ Beaglebone Black to create precisely timed stepper-pulses (just velocity right
 now, no acceleration or jerk implemented).
 
 The motor-interface API allows to enqueue step-{count, frequency}
-of _8_ steppers that are controlled in a coordinated move (G1), with real-time
+of 8 steppers that are controlled in a coordinated move (G1), with real-time
 controlled steps at rates that can go well beyond 500khz.
 So: sufficient even for advanced step motors and drivers :)
 
@@ -34,8 +34,7 @@ To test things properly, there is a G-code interpreter.
       -s          : synchronous: don't queue (useful only for debug)
       -l          : Loop forever.
 
-The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6]
-(Last motor is not used with G-Code).
+The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
 
 ## Pinout
 
@@ -61,3 +60,4 @@ the Free Software Foundation, either version 3 of the License, or
    - Implement acceleration and jerk.
    - Read end-switches
    - Needed for full 3D printer solution: add PWM for heaters.
+   - ...
