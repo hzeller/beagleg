@@ -214,7 +214,8 @@ static void printer_rapid_move(void *userdata, const float *axis) {
   printer_move(userdata, state->config.max_feedrate, axis);
 }
 static void printer_dwell(void *userdata, float value) {
-  beagleg_wait_queue_empty();
+  struct PrinterState *state = (struct PrinterState*)userdata;
+  if (!state->config.dry_run) beagleg_wait_queue_empty();
   usleep((int) (value * 1000));
 }
 
@@ -248,7 +249,7 @@ void send_to_printer(const char *filename, char do_loop,
 }
 
 static int usage(const char *prog) {
-   fprintf(stderr, "Usage: %s [options] <filename>\n"
+   fprintf(stderr, "Usage: %s [options] <gcode-filename>\n"
 	   "Options:\n"
 	   "  -f <factor> : Print speed factor. (Default 1.0)\n"
 	   "  -m <rate>   : Max. feedrate. (Default %dmm/s)\n"
