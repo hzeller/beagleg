@@ -24,15 +24,14 @@ The functionality is encapsulated in independently usable APIs.
 
 ## G-Code interpreter
 To test things properly, there is a G-code interpreter.
-
     Usage: ./send-gcode [options] <gcode-filename>
     Options:
-      -f <factor> : Print speed factor. (Default 1.0)
-      -m <rate>   : Max. feedrate. (Default 600mm/s)
-      -p          : Toggle printing motor steps. (Default:on)
-      -n          : dryrun; don't send to motors. (Default:off)
-      -s          : synchronous: don't queue (useful only for debug)
-      -l          : Loop forever.
+      -f <factor> : Print speed factor (Default 1.0).
+      -m <rate>   : Max. feedrate (Default 600mm/s).
+      -p          : Print motor commands to console (Default: off).
+      -n          : Dryrun; don't send to motors (Default: off).
+      -s          : Synchronous: don't queue (Default: off).
+      -l          : Loop file forever.
 
 The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
 

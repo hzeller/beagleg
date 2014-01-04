@@ -251,12 +251,12 @@ void send_to_printer(const char *filename, char do_loop,
 static int usage(const char *prog) {
    fprintf(stderr, "Usage: %s [options] <gcode-filename>\n"
 	   "Options:\n"
-	   "  -f <factor> : Print speed factor. (Default 1.0)\n"
-	   "  -m <rate>   : Max. feedrate. (Default %dmm/s)\n"
-	   "  -p          : Toggle printing motor steps. (Default:on)\n"
-	   "  -n          : dryrun; don't send to motors. (Default:off)\n"
-	   "  -s          : synchronous: don't queue (useful only for debug)\n"
-	   "  -l          : Loop forever.\n",
+	   "  -f <factor> : Print speed factor (Default 1.0).\n"
+	   "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
+	   "  -p          : Print motor commands to console (Default: off).\n"
+	   "  -n          : Dryrun; don't send to motors (Default: off).\n"
+	   "  -s          : Synchronous: don't queue (Default: off).\n"
+	   "  -l          : Loop file forever.\n",
 	   prog, DEFAULT_MAX_FEEDRATE_MM_PER_SEC);
    return 1;
 }
