@@ -34,6 +34,9 @@
 
 #include "shared-constants.h"
 
+// Generated PRU code from motor-control.p
+#include "motor-control_bin.h"
+
 //#define DEBUG_QUEUE
 
 #define MOTOR_COUNT 8
@@ -98,8 +101,12 @@ int beagleg_init(void) {
     fprintf(stderr, "Couldn't map memory\n");
     return 1;
   }
-  // TODO: load in binary.
-  prussdrv_exec_program(PRU_NUM, "./motor-control.bin");
+
+  // For some silly reason, the API does not take a const unsigned int*.
+  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, (unsigned int*) PRUcode,
+			    sizeof(PRUcode));
+  prussdrv_pru_enable(0);
+
   return 0;
 }
 
