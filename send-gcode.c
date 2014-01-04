@@ -34,10 +34,22 @@
 
 #define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 600
 
-/* Little sample code to determine the approximate total print time */
+// Per axis X, Y, Z, E (Z and E: need to look up)
+static int kStepsPerMM[] = { 160, 160, 160, 40 };
+struct PrintConfig {
+  float max_feedrate;
+  float speed_factor;
+  char dry_run;
+  char debug_print;
+  char synchronous;
+};
+
+/* Determine the approximate total print time */
 struct DurationData {
+  struct PrintConfig config;
   float total_time;
   float current_feedrate_mm_per_sec;
+  float capped_feedrate;
   float last_x, last_y, last_z;  // last coordinate.
   float filament_len;
 };
@@ -45,9 +57,17 @@ struct DurationData {
 static void dummy_home(void *userdata, unsigned char x) {}
 static const char *dummy_unprocessed(void *userdata, char letter, float value,
 				     const char *remaining) { return NULL; }
-
+static void dummy_setvalue(void *userdata, float v) {}
+static void dummy_noparam(void *userdata) {}
 static void duration_feedrate(void *userdata, float fr) {
-  ((struct DurationData*)userdata)->current_feedrate_mm_per_sec = fr/60;
+  struct DurationData *state = (struct DurationData*)userdata;
+  state->current_feedrate_mm_per_sec = state->config.speed_factor * fr/60;
+  if (state->current_feedrate_mm_per_sec > state->config.max_feedrate) {
+    if (state->capped_feedrate < state->current_feedrate_mm_per_sec) {
+      state->capped_feedrate = state->current_feedrate_mm_per_sec;
+    }
+    state->current_feedrate_mm_per_sec = state->config.max_feedrate;
+  }
 }
 static void duration_move(void *userdata, const float *axis) {
   struct DurationData *state = (struct DurationData*)userdata;
@@ -67,9 +87,10 @@ static void duration_dwell(void *userdata, float value) {
   state->total_time += value / 1000.0f;
 }
 
-void determine_duration(const char *filename) {
+void determine_duration(const char *filename, struct PrintConfig *config) {
   struct DurationData state;
   bzero(&state, sizeof(state));
+  state.config = *config;
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
   callbacks.set_feedrate = &duration_feedrate;
@@ -77,6 +98,10 @@ void determine_duration(const char *filename) {
   callbacks.go_home = &dummy_home;
   callbacks.dwell = &duration_dwell;
   callbacks.unprocessed = &dummy_unprocessed;
+  callbacks.set_fanspeed = &dummy_setvalue;
+  callbacks.set_temperature = &dummy_setvalue;
+  callbacks.disable_motors = &dummy_noparam;
+  callbacks.wait_temperature = &dummy_noparam;
   GCodeParser_t *parser = gcodep_new(&callbacks, &state);
   FILE *f = fopen(filename, "r");
   char buffer[1024];
@@ -84,20 +109,18 @@ void determine_duration(const char *filename) {
     gcodep_parse_line(parser, buffer);
   }
   gcodep_delete(parser);
-  printf("Total original print time: ~%.3f seconds; height: %.1fmm; "
+  printf("----------------------------------------------\n");
+  printf("Print time: %.3f seconds; %.1fmm height; "
 	 "%.1fmm filament used.\n",
 	 state.total_time, state.last_z, state.filament_len);
+  if (state.capped_feedrate > 0) {
+    printf("Max feedrate requested %.1f mm/s, but capped to %.1f mm/s "
+	   "(change max-feedrate with -m)\n",
+	   state.capped_feedrate, state.config.max_feedrate);
+  }
+  printf("----------------------------------------------\n");
 }
 
-// Per axis X, Y, Z, E (Z and E: need to look up)
-static int kStepsPerMM[] = { 160, 160, 160, 40 };
-struct PrintConfig {
-  float max_feedrate;
-  float speed_factor;
-  char dry_run;
-  char debug_print;
-  char synchronous;
-};
 struct PrinterState {
   struct PrintConfig config;
   float current_feedrate_mm_per_sec;
@@ -277,7 +300,7 @@ int main(int argc, char *argv[]) {
 
   const char *filename = argv[optind];
 
-  determine_duration(filename);
+  determine_duration(filename, &print_config);
 
   if (!print_config.dry_run && geteuid() != 0) {
     fprintf(stderr, "Need to run as root to access GPIO pins\n");
