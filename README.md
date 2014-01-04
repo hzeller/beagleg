@@ -34,12 +34,15 @@ To test things properly, there is a G-code interpreter.
       -s          : synchronous: don't queue (useful only for debug)
       -l          : Loop forever.
 
-The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
-(Last motor is not used with GCode).
+The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6]
+(Last motor is not used with G-Code).
 
 ## Pinout
-Step outputs for axes [0..7]:      __GPIO-0__  2,  3,  4,  5,  7, 14, 15, 20
-Direction outputs for axes [0..7]: __GPIO-1__ 12, 13, 14, 15, 16, 17, 18, 19
+
+    Step     : GPIO-0  2,  3,  4,  5,  7, 14, 15, 20
+    Direction: GPIO-1 12, 13, 14, 15, 16, 17, 18, 19
+
+For your interface: note this is 3.3V level (and assume not more than ~4mA).
 
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
