@@ -19,16 +19,24 @@
 
 struct bg_movement {
   // Speed is steps/second of the axis with the highest number of steps. All
-  // other axis are scaled accordingly.
+  // other axes are scaled down accordingly.
   float start_speed;
   float travel_speed;
   float end_speed;
 
-  int steps[8];   // number of steps for axis. Negative for 'backwards'
+  int steps[8];   // number of steps for axis. Negative for 'backwards'.
 };
 
-int beagleg_init(void); 
+// Initialize beagleg motor control. Returns 0 on success, 1 on some error.
+int beagleg_init(void);
+void beagleg_exit(void);  // shutdown motor control.
+
+// Enqueue a coordinated move command.
+// If there is space in the ringbuffer, this function returns immediately,
+// otherwise it waits until a slot frees up.
+// Returns 0 on success, 1 if this is a no-op with no steps to move and 2 if
+// number of steps per single command is exceeded (right now, 64k).
 int beagleg_enqueue(const struct bg_movement *param);
 
+// Wait, until all elements in the ring-buffer are consumed.
 void beagleg_wait_queue_empty(void);
-void beagleg_exit(void);

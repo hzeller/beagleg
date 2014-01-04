@@ -57,8 +57,8 @@ struct GCodeParserCb {
   // G1 (coordinated move) and G0 (rapid move).
   // Move to absolute coordinates. The given float[] is indexed by
   // GCodeParserAxes.
-  void (*coordinated_move)(void *, const float *);  // G1
-  void (*rapid_move)(void *, const float *);        // G0
+  void (*coordinated_move)(void *, const float[]);  // G1
+  void (*rapid_move)(void *, const float[]);        // G0
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,
