@@ -133,16 +133,20 @@ static void enqueue_internal(struct QueueElement *element) {
   queue_element->state = STATE_FILLED;
 }
 
-static uint32_t speed_2_delay(float steps_per_second) {
+static int speed_2_delay(float steps_per_second) {
   // Roughly, we neexd 4 * cycle-time delay. At 200Mhz, we have 5ns cycles.
   // There is some overhead for each toplevel loop, but we ignore that for now.
   const float kLoopTimeSeconds = 5e-9 * 4;
-  return (1/steps_per_second) / kLoopTimeSeconds - LOOP_OVERHEAD_CYCLES;
+  float steps = (1/steps_per_second) / kLoopTimeSeconds;
+  if (steps > 0x7fffffff) { return 0x7fffffff; }   // Cap veeery long period.
+  return steps - LOOP_OVERHEAD_CYCLES;
 }
 
 int beagleg_enqueue(const struct bg_movement *param) {
   struct QueueElement new_element;
-  new_element.travel_delay = speed_2_delay(param->travel_speed);
+  int delay = speed_2_delay(param->travel_speed);
+  if (delay <= 0) delay = 1;
+  new_element.travel_delay = delay;
   int biggest_value = abs(param->steps[0]);
   new_element.direction_bits = 0;
   for (int i = 0; i < MOTOR_COUNT; ++i) {
@@ -181,7 +185,8 @@ void beagleg_wait_queue_empty(void) {
 
 void beagleg_exit(void) {
   struct QueueElement end_element;
-  end_element.steps = 0;
+  memset(&end_element, 0x00, sizeof(end_element));
+  end_element.steps = 0;  // 0 steps: sentinel to exit.
   enqueue_internal(&end_element);
   beagleg_wait_queue_empty();
   prussdrv_pru_disable (PRU_NUM);
