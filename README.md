@@ -16,7 +16,7 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.h` : C-API to enqueue motor commands, that are executed
+   - `motor-interface.h` : C-API to enqueue motor moves, that are executed
      in the PRU.
    - `gcode-parser.h` : C-API that parses G-code and calls callbacks, while
      taking care of many internals, e.g. it automatically translates everything
@@ -63,4 +63,6 @@ the Free Software Foundation, either version 3 of the License, or
    - Implement acceleration and jerk.
    - Read end-switches
    - Needed for full 3D printer solution: add PWM for heaters.
+   - Fast stop without waiting for queues to empty, but still be able to
+     recover exact last position.
    - ...

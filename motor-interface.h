@@ -20,9 +20,9 @@
 struct bg_movement {
   // Speed is steps/second of the axis with the highest number of steps. All
   // other axes are scaled down accordingly.
-  float start_speed;
+  float start_speed;     // (requires acceleration; not implemented yet)
   float travel_speed;
-  float end_speed;
+  float end_speed;       // (requires acceleration; not implemented yet)
 
   int steps[8];   // number of steps for axis. Negative for 'backwards'.
 };

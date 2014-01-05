@@ -30,6 +30,5 @@ struct BeagleGPrintStats {
 // Given the input file-descriptor (which is read to EOF and then closed)
 // and the given constraints, determine statistics about the gcode-file.
 // Returns 0 on success.
-int determine_print_stats(int input_fd,
-			  float max_feedrate, float speed_factor,
+int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 			  struct BeagleGPrintStats *result);

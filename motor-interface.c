@@ -136,7 +136,7 @@ static void enqueue_internal(struct QueueElement *element) {
 
 static int speed_2_delay(float steps_per_second) {
   // Roughly, we neexd 4 * cycle-time delay. At 200Mhz, we have 5ns cycles.
-  // There is some overhead for each toplevel loop, but we ignore that for now.
+  // There is some overhead for each toplevel loop that we substract.
   const float kLoopTimeSeconds = 5e-9 * 4;
   float steps = (1/steps_per_second) / kLoopTimeSeconds;
   if (steps > 0x7fffffff) { return 0x7fffffff; }   // Cap veeery long period.
@@ -159,11 +159,11 @@ int beagleg_enqueue(const struct bg_movement *param) {
     }
   }
   if (biggest_value == 0) {
-    fprintf(stderr, "zero steps. Bailing out");
+    fprintf(stderr, "zero steps. Bailing out.");
     return 1;
   }
   if (biggest_value > 65535) {
-    fprintf(stderr, "At most 65535 steps. Bailing out");
+    fprintf(stderr, "At most 65535 steps. Bailing out.");
     return 2;
   }
   new_element.steps = biggest_value;

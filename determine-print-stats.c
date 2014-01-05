@@ -68,8 +68,7 @@ static void duration_dwell(void *userdata, float value) {
   data->stats->total_time_seconds += value / 1000.0f;
 }
 
-int determine_print_stats(int input_fd,
-			  float max_feedrate, float speed_factor,
+int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 			  struct BeagleGPrintStats *result) {
   struct StatsData data;
   bzero(&data, sizeof(data));
