@@ -21,6 +21,9 @@ The functionality is encapsulated in independently usable APIs.
    - `gcode-parser.{h,c}` : C-API that parses G-code and calls callbacks, while
      taking care of many internals, e.g. it automatically translates everything
      into metric, absolute coordinates.
+   - `determine-print-stats.{h,c}`: C-API to determine some basic stats about
+      a G-Code file; it processes the entire file and determines estimated
+      print time, filament used etc. Mostly an example for gcode-parser.h.
 
 ## G-Code interpreter
 To test things properly, there is a G-code interpreter.

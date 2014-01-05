@@ -20,6 +20,10 @@
 // get usleep()
 #define _XOPEN_SOURCE 500
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
@@ -31,11 +35,13 @@
 
 #include "gcode-parser.h"
 #include "motor-interface.h"
+#include "determine-print-stats.h"
 
 #define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 600
 
 // Per axis X, Y, Z, E (Z and E: need to look up)
 static int kStepsPerMM[] = { 160, 160, 160, 40 };
+
 struct PrintConfig {
   float max_feedrate;
   float speed_factor;
@@ -44,81 +50,22 @@ struct PrintConfig {
   char synchronous;
 };
 
-/* Determine the approximate total print time */
-struct DurationData {
-  struct PrintConfig config;
-  float total_time;
-  float current_feedrate_mm_per_sec;
-  float capped_feedrate;
-  float last_x, last_y, last_z;  // last coordinate.
-  float filament_len;
-};
-
-static void dummy_home(void *userdata, unsigned char x) {}
-static const char *dummy_unprocessed(void *userdata, char letter, float value,
-				     const char *remaining) { return NULL; }
-static void dummy_setvalue(void *userdata, float v) {}
-static void dummy_noparam(void *userdata) {}
-static void duration_feedrate(void *userdata, float fr) {
-  struct DurationData *state = (struct DurationData*)userdata;
-  state->current_feedrate_mm_per_sec = state->config.speed_factor * fr/60;
-  if (state->current_feedrate_mm_per_sec > state->config.max_feedrate) {
-    if (state->capped_feedrate < state->current_feedrate_mm_per_sec) {
-      state->capped_feedrate = state->current_feedrate_mm_per_sec;
+void print_file_stats(const char *filename, struct PrintConfig *config) {
+  struct BeagleGPrintStats result;
+  if (determine_print_stats(open(filename, O_RDONLY),
+			    config->max_feedrate, config->speed_factor,
+			    &result) == 0) {
+    printf("----------------------------------------------\n");
+    printf("Print time: %.3f seconds; %.1fmm height; "
+	   "%.1fmm filament used.\n",
+	   result.total_time_seconds, result.last_z, result.filament_len);
+    if (result.highest_capped_feedrate > 0) {
+      printf("Max feedrate requested %.1f mm/s, but capped to %.1f mm/s "
+	     "(change max-feedrate with -m)\n",
+	     result.highest_capped_feedrate, config->max_feedrate);
     }
-    state->current_feedrate_mm_per_sec = state->config.max_feedrate;
+    printf("----------------------------------------------\n");
   }
-}
-static void duration_move(void *userdata, const float *axis) {
-  struct DurationData *state = (struct DurationData*)userdata;
-  const float distance
-    = sqrtf((axis[AXIS_X] - state->last_x)*(axis[AXIS_X] - state->last_x)
-	    + (axis[AXIS_Y] - state->last_y)*(axis[AXIS_Y] - state->last_y)
-	    + (axis[AXIS_Z] - state->last_z)*(axis[AXIS_Z] - state->last_z));
-  // we're ignoring acceleration and assume full feedrate
-  state->total_time += distance / state->current_feedrate_mm_per_sec;
-  state->last_x = axis[AXIS_X];
-  state->last_y = axis[AXIS_Y];
-  state->last_z = axis[AXIS_Z];
-  state->filament_len = axis[AXIS_E];
-}
-static void duration_dwell(void *userdata, float value) {
-  struct DurationData *state = (struct DurationData*)userdata;
-  state->total_time += value / 1000.0f;
-}
-
-void determine_duration(const char *filename, struct PrintConfig *config) {
-  struct DurationData state;
-  bzero(&state, sizeof(state));
-  state.config = *config;
-  struct GCodeParserCb callbacks;
-  bzero(&callbacks, sizeof(callbacks));
-  callbacks.set_feedrate = &duration_feedrate;
-  callbacks.coordinated_move = &duration_move;
-  callbacks.go_home = &dummy_home;
-  callbacks.dwell = &duration_dwell;
-  callbacks.unprocessed = &dummy_unprocessed;
-  callbacks.set_fanspeed = &dummy_setvalue;
-  callbacks.set_temperature = &dummy_setvalue;
-  callbacks.disable_motors = &dummy_noparam;
-  callbacks.wait_temperature = &dummy_noparam;
-  GCodeParser_t *parser = gcodep_new(&callbacks, &state);
-  FILE *f = fopen(filename, "r");
-  char buffer[1024];
-  while (fgets(buffer, sizeof(buffer), f)) {
-    gcodep_parse_line(parser, buffer);
-  }
-  gcodep_delete(parser);
-  printf("----------------------------------------------\n");
-  printf("Print time: %.3f seconds; %.1fmm height; "
-	 "%.1fmm filament used.\n",
-	 state.total_time, state.last_z, state.filament_len);
-  if (state.capped_feedrate > 0) {
-    printf("Max feedrate requested %.1f mm/s, but capped to %.1f mm/s "
-	   "(change max-feedrate with -m)\n",
-	   state.capped_feedrate, state.config.max_feedrate);
-  }
-  printf("----------------------------------------------\n");
 }
 
 struct PrinterState {
@@ -219,6 +166,8 @@ static void printer_dwell(void *userdata, float value) {
   usleep((int) (value * 1000));
 }
 
+static void dummy_home(void *userdata, unsigned char x) {}
+
 void send_to_printer(const char *filename, char do_loop,
 		     struct PrintConfig *config) {
   if (!config->dry_run) beagleg_init();
@@ -237,6 +186,10 @@ void send_to_printer(const char *filename, char do_loop,
     state.config = *config;
     GCodeParser_t *parser = gcodep_new(&callbacks, &state);
     FILE *f = fopen(filename, "r");
+    if (f == NULL) {
+      perror("Opening file for printing");
+      return;
+    }
     char buffer[1024];
     while (fgets(buffer, sizeof(buffer), f)) {
       gcodep_parse_line(parser, buffer);
@@ -301,7 +254,7 @@ int main(int argc, char *argv[]) {
 
   const char *filename = argv[optind];
 
-  determine_duration(filename, &print_config);
+  print_file_stats(filename, &print_config);
 
   if (!print_config.dry_run && geteuid() != 0) {
     fprintf(stderr, "Need to run as root to access GPIO pins\n");
