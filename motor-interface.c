@@ -112,7 +112,8 @@ int beagleg_init(void) {
 
 #ifdef DEBUG_QUEUE
 static void DumpQueueElement(const struct QueueElement *element) {
-  fprintf(stderr, "enqueue: dir:0x%02x steps:%d delay:%d ",
+  fprintf(stderr, "enqueue[%d]: dir:0x%02x steps:%d delay:%d ",
+	  element - shared_queue_,
 	  element->direction_bits, element->steps, element->travel_delay);
   for (int i = 0; i < MOTOR_COUNT; ++i) {
     fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
@@ -123,12 +124,12 @@ static void DumpQueueElement(const struct QueueElement *element) {
 #endif
 
 static void enqueue_internal(struct QueueElement *element) {
-#ifdef DEBUG_QUEUE
-  DumpQueueElement(element);
-#endif
   element->state = STATE_EMPTY;  // Don't set yet to avoid race.
   struct QueueElement *volatile queue_element = next_queue_element();
   memcpy(queue_element, element, sizeof(*element));
+#ifdef DEBUG_QUEUE
+  DumpQueueElement(queue_element);
+#endif
   // Fully initialized. Tell PRU
   queue_element->state = STATE_FILLED;
 }
