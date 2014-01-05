@@ -7,26 +7,29 @@ now, no acceleration or jerk implemented).
 
 The motor-interface API allows to enqueue step-{count, frequency}
 of 8 steppers that are controlled in a coordinated move (G1), with real-time
-controlled steps at rates that can go well beyond 500khz.
+controlled steps at rates that can go well beyond 500kHz.
 So: sufficient even for advanced step motors and drivers :)
 
-The `send-gcode` test-program is parsing G-code, extracting axes moves and
+The `send-gcode` test-program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit.
 
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.h` : C-API to enqueue motor moves, that are executed
-     in the PRU.
-   - `gcode-parser.h` : C-API that parses G-code and calls callbacks, while
-     taking care of many internals, e.g. it automatically translates everything
-     into metric, absolute coordinates.
+   - `motor-interface.h` : C-API to enqueue motor moves, that are
+      executed in the PRU.
+   - `gcode-parser.h` : C-API that parses G-Code and calls callbacks, while
+      taking care of many internals, e.g. it automatically translates everything
+      into metric, absolute coordinates.
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
-      print time, filament used etc. Mostly an example for gcode-parser.h.
+      print time, filament used etc. Implementation is mostly an example using
+      gcode-parser.h.
+   - `gcode-machine-control.h` : highlevel C-API to control a machine via
+      G-Code: it reads G-Code and emits the necessary machine commands.
 
 ## G-Code interpreter
-To test things properly, there is a G-code interpreter.
+To test things properly, there is a G-Code interpreter.
 
     Usage: ./send-gcode [options] <gcode-filename>
     Options:
@@ -37,7 +40,7 @@ To test things properly, there is a G-code interpreter.
       -s          : Synchronous: don't queue (Default: off).
       -l          : Loop file forever.
 
-The G-code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
+The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
 
 ## Pinout
 

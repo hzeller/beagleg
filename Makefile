@@ -15,7 +15,8 @@ INCDIR_APP_LOADER?=$(AM335_BASE)/app_loader/include
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2 -mtune=cortex-a8 -march=armv7-a
 LDFLAGS+=-L$(LIBDIR_APP_LOADER) -lprussdrv -lpthread -lm
 
-OBJECTS=motor-interface.o gcode-parser.o send-gcode.o determine-print-stats.o
+OBJECTS=motor-interface.o gcode-parser.o send-gcode.o determine-print-stats.o \
+       gcode-machine-control.o
 PRU_BIN=motor-interface-pru_bin.h
 TARGET=send-gcode
 
