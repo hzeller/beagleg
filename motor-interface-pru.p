@@ -18,7 +18,7 @@
 ;; along with BeagleG.  If not, see <http:;;www.gnu.org/licenses/>.
 
 
-#include "shared-constants.h"
+#include "motor-interface-constants.h"
 
 .origin 0
 .entrypoint INIT

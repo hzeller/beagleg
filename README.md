@@ -16,12 +16,12 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.{h,c}` : C-API to enqueue motor commands, that are executed
+   - `motor-interface.h` : C-API to enqueue motor commands, that are executed
      in the PRU.
-   - `gcode-parser.{h,c}` : C-API that parses G-code and calls callbacks, while
+   - `gcode-parser.h` : C-API that parses G-code and calls callbacks, while
      taking care of many internals, e.g. it automatically translates everything
      into metric, absolute coordinates.
-   - `determine-print-stats.{h,c}`: C-API to determine some basic stats about
+   - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
       print time, filament used etc. Mostly an example for gcode-parser.h.
 

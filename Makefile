@@ -16,7 +16,7 @@ CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2 -mtune=cortex-a8 -m
 LDFLAGS+=-L$(LIBDIR_APP_LOADER) -lprussdrv -lpthread -lm
 
 OBJECTS=motor-interface.o gcode-parser.o send-gcode.o determine-print-stats.o
-PRU_BIN=motor-control_bin.h
+PRU_BIN=motor-interface-pru_bin.h
 TARGET=send-gcode
 
 all : $(TARGET)
@@ -30,8 +30,8 @@ $(TARGET): $(OBJECTS)
 %_bin.h : %.p
 	$(PASM) -V3 -c $<
 
-motor-interface.o : shared-constants.h $(PRU_BIN)
-motor-control.bin : shared-constants.h
+motor-interface.o : motor-interface-constants.h $(PRU_BIN)
+$(PRU_BIN) : motor-interface-constants.h
 
 clean:
 	rm -rf $(TARGET) $(OBJECTS) $(PRU_BIN)

@@ -32,10 +32,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "shared-constants.h"
+#include "motor-interface-constants.h"
 
-// Generated PRU code from motor-control.p
-#include "motor-control_bin.h"
+// Generated PRU code from motor-interface-pru.p
+#include "motor-interface-pru_bin.h"
 
 //#define DEBUG_QUEUE
 
