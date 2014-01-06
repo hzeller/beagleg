@@ -23,6 +23,8 @@
  * Simple implementation, by no means complete.
  */
 
+#include <stdio.h>
+
 typedef struct GCodeParser GCodeParser_t;  // Opaque type with the parser object.
 
 // Axis supported by this parser.
@@ -81,11 +83,14 @@ GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks,
 void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 
 // Main workhorse: Parse a gcode line, call callbacks if needed.
-void gcodep_parse_line(GCodeParser_t *obj, const char *line);
+// If "err_stream" is non-NULL, sends error messages that way.
+void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
 
 // Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
 // a pair of the letter 'P' and the value '123').
 // Takes care of skipping whitespace, comments etc.
+//
+// If "err_stream" is non-NULL, sends error messages that way.
 //
 // Can be used by implementors of unprocessed() to parse the remainder of the
 // line they received.
@@ -95,4 +100,5 @@ void gcodep_parse_line(GCodeParser_t *obj, const char *line);
 //
 // Returns the remainder of the line or NULL if no pair has been found and the
 // end-of-string has been reached.
-const char *gcodep_parse_pair(const char *line, char *letter, float *value);
+const char *gcodep_parse_pair(const char *line, char *letter, float *value,
+			      FILE *err_stream);

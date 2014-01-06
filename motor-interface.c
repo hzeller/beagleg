@@ -143,7 +143,7 @@ static int speed_2_delay(float steps_per_second) {
   return steps - LOOP_OVERHEAD_CYCLES;
 }
 
-int beagleg_enqueue(const struct bg_movement *param) {
+int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   struct QueueElement new_element;
   int delay = speed_2_delay(param->travel_speed);
   if (delay <= 0) delay = 1;
@@ -159,11 +159,12 @@ int beagleg_enqueue(const struct bg_movement *param) {
     }
   }
   if (biggest_value == 0) {
-    fprintf(stderr, "zero steps. Bailing out.");
+    fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
     return 1;
   }
   if (biggest_value > 65535) {
-    fprintf(stderr, "At most 65535 steps. Bailing out.");
+    fprintf(err_stream ? err_stream : stderr,
+	    "At most 65535 steps, got %d. Ignoring command.\n", biggest_value);
     return 2;
   }
   new_element.steps = biggest_value;

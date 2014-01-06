@@ -34,6 +34,7 @@
 
 struct PrinterState {
   struct MachineControlConfig cfg;
+  GCodeParser_t *parser;
   float current_feedrate_mm_per_sec;
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
   FILE *msg_stream;
@@ -129,7 +130,7 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
 
   if (!state->cfg.dry_run) {
     if (state->cfg.synchronous) beagleg_wait_queue_empty();
-    beagleg_enqueue(&command);
+    beagleg_enqueue(&command, state->msg_stream);
   }
   
   if (state->cfg.debug_print && state->msg_stream) {
@@ -192,9 +193,10 @@ static void printer_home(void *userdata, unsigned char axes_bitmap) {
 
   // Goal is to bring back the machine the negative amount of steps.
   for (int i = 0; i <= GCODE_NUM_AXES; ++i) {
-    // We skip AXIS_E, as 'homing' filament never makes sense.
-    if (((1 << i) & axes_bitmap) && i != AXIS_E) {
-      machine_pos_differences[i] = -state->machine_position[i];
+    if ((1 << i) & axes_bitmap) {
+      if (i != AXIS_E) {  // 'homing' of filament never makes sense.
+	machine_pos_differences[i] = -state->machine_position[i];
+      }
       state->machine_position[i] = 0;
     }
   }
@@ -210,10 +212,10 @@ static void printer_home(void *userdata, unsigned char axes_bitmap) {
   // Solution (b) is what we're doing.
   // TODO: do this with endswitches.
   if (state->msg_stream) {
-    fprintf(state->msg_stream, "MachineControl: Homing requested, but don't "
-	    "have endswitches, so move difference steps (%d, %d, %d)\n",
-	    machine_pos_differences[AXIS_X], machine_pos_differences[AXIS_Y],
-	    machine_pos_differences[AXIS_Z]);
+    fprintf(state->msg_stream, "MachineControl: Homing requested (0x%02x), but "
+	    "don't have endswitches, so move difference steps (%d, %d, %d)\n",
+	    axes_bitmap, machine_pos_differences[AXIS_X],
+	    machine_pos_differences[AXIS_Y], machine_pos_differences[AXIS_Z]);
   }
   move_machine_steps(state, state->cfg.max_feedrate, machine_pos_differences);
 }
@@ -239,25 +241,6 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   s_mstate->cfg = *config;
   s_mstate->current_feedrate_mm_per_sec = config->max_feedrate / 10;
 
-  return 0;
-}
-
-void gcode_machine_control_exit() {
-  if (!s_mstate) {
-    fprintf(stderr, "gcode_machine_control_exit() called without init.\n");
-    return;
-  }
-  if (!s_mstate->cfg.dry_run)
-    beagleg_exit();
-  free(s_mstate);
-  s_mstate = NULL;
-}
-
-int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
-  if (!s_mstate) {
-    fprintf(stderr, "Machine control not initialized.\n");
-    return 1;
-  }
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
   callbacks.set_feedrate = &printer_feedrate;
@@ -273,7 +256,31 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
   callbacks.disable_motors = &dummy_disable_motors;
   callbacks.unprocessed = &dummy_unprocessed;
 
-  GCodeParser_t *parser = gcodep_new(&callbacks, s_mstate);
+  // The parser keeps track of the real-world coordinates (mm), while we keep
+  // track of the machine coordinates (steps). So it has the same life-cycle.
+  s_mstate->parser = gcodep_new(&callbacks, s_mstate);
+
+  return 0;
+}
+
+void gcode_machine_control_exit() {
+  if (!s_mstate) {
+    fprintf(stderr, "gcode_machine_control_exit() called without init.\n");
+    return;
+  }
+  if (!s_mstate->cfg.dry_run)
+    beagleg_exit();
+  gcodep_delete(s_mstate->parser);
+  free(s_mstate);
+  s_mstate = NULL;
+}
+
+int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
+  if (!s_mstate) {
+    fprintf(stderr, "Machine control not initialized.\n");
+    return 1;
+  }
+
   if (output_fd >= 0) {
     s_mstate->msg_stream = fdopen(output_fd, "w");
     if (s_mstate->msg_stream) {
@@ -289,10 +296,9 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
 
   char buffer[1024];
   while (fgets(buffer, sizeof(buffer), gcode_stream)) {
-    gcodep_parse_line(parser, buffer);
+    gcodep_parse_line(s_mstate->parser, buffer, s_mstate->msg_stream);
   }
 
-  gcodep_delete(parser);
   if (s_mstate->msg_stream) {
     fflush(s_mstate->msg_stream);
     s_mstate->msg_stream = NULL;

@@ -33,6 +33,7 @@ const unsigned char kAllAxesBitmap =
 struct GCodeParser {
   struct GCodeParserCb callbacks;
   void *cb_userdata;
+  FILE *msg;
   int provided_axes;
   float unit_to_mm_factor;  // metric: 1.0; imperial 25.4
   char axis_is_absolute[GCODE_NUM_AXES];
@@ -126,7 +127,8 @@ static const char *skip_white(const char *line) {
 
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
-const char *gcodep_parse_pair(const char *line, char *letter, float *value) {
+const char *gcodep_parse_pair(const char *line, char *letter, float *value,
+			      FILE *err_stream) {
   // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
@@ -144,7 +146,8 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value) {
 
   *letter = toupper(*line++);
   if (*line == '\0') {
-    fprintf(stderr, "Error: expected value after '%c'\n", *letter);
+    fprintf(err_stream ? err_stream : stderr,
+	    "Error: expected value after '%c'\n", *letter);
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
@@ -165,8 +168,8 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value) {
   if (repair_x) *repair_x = 'X';  // Put the 'X' back.
 
   if (line == endptr) {
-    fprintf(stderr, "Error: '%c' is not followed by a number: '%s'\n",
-	    *letter, line);
+    fprintf(err_stream ? err_stream : stderr,
+	    "Error: '%c' is not followed by a number: '%s'\n", *letter, line);
     return NULL;
   }
   line = endptr;
@@ -176,14 +179,11 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value) {
 }
 
 static const char *handle_home(struct GCodeParser *p, const char *line) {
-  memset(p->axes_pos, 0x00, sizeof(AxesRegister));
-  memset(p->relative_zero, 0x00, sizeof(AxesRegister));
-
   unsigned char homing_flags = 0;
   char axis;
   float dummy;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &dummy))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &dummy, p->msg))) {
     char done = 0;
     switch (axis) {
     case 'X': homing_flags |= (1 << AXIS_X); break;
@@ -200,8 +200,16 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     if (done) break;
     line = remaining_line;
   }
-  p->callbacks.go_home(p->cb_userdata,
-		       homing_flags != 0 ? homing_flags : kAllAxesBitmap);
+  if (homing_flags == 0) homing_flags = kAllAxesBitmap;
+  p->callbacks.go_home(p->cb_userdata, homing_flags);
+
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (homing_flags & (1 << i)) {
+      p->axes_pos[i] = 0;
+      p->relative_zero[i] = 0;
+    }
+  }
+
   return line;
 }
 
@@ -209,7 +217,7 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   char axis;
   float value;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &value))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
     const float unit_value = value * p->unit_to_mm_factor;
     char done = 0;
     switch (axis) {
@@ -231,14 +239,14 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   return line;
 }
 
-static const char *set_param(char param_letter, void *userdata,
+static const char *set_param(struct GCodeParser *p, char param_letter,
 			     void (*value_setter)(void *, float),
 			     const char *line) {
   char letter;
   float value;
-  const char *remaining_line = gcodep_parse_pair(line, &letter, &value);
+  const char *remaining_line = gcodep_parse_pair(line, &letter, &value, p->msg);
   if (remaining_line != NULL && letter == param_letter) {
-    value_setter(userdata, value);
+    value_setter(p->cb_userdata, value);
     return remaining_line;
   }
   return line;
@@ -254,7 +262,7 @@ static const char *handle_move(struct GCodeParser *p,
   const char *remaining_line;
   char done = 0;
   int update_axis = -1;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &value))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
     const float unit_value = value * p->unit_to_mm_factor;
     switch (axis) {
     case 'F': {
@@ -295,17 +303,19 @@ static const char *handle_move(struct GCodeParser *p,
   return line;
 }
 
-void gcodep_parse_line(struct GCodeParser *p, const char *line) {
+void gcodep_parse_line(struct GCodeParser *p, const char *line,
+		       FILE *err_stream) {
   void *const userdata = p->cb_userdata;
   struct GCodeParserCb *cb = &p->callbacks;
+  p->msg = err_stream;  // remember as 'instance' variable.
   char letter;
   float value;
-  while ((line = gcodep_parse_pair(line, &letter, &value))) {
+  while ((line = gcodep_parse_pair(line, &letter, &value, p->msg))) {
     if (letter == 'G') {
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;
       case 1: line = handle_move(p, cb->coordinated_move, line); break;
-      case 4: line = set_param('P', userdata, cb->dwell, line); break;
+      case 4: line = set_param(p, 'P', cb->dwell, line); break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
@@ -320,11 +330,11 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
       case 84: cb->disable_motors(userdata); break;
-      case 104: line = set_param('S',userdata, cb->set_temperature, line); break;
-      case 106: line = set_param('S', userdata, cb->set_fanspeed, line); break;
+      case 104: line = set_param(p, 'S', cb->set_temperature, line); break;
+      case 106: line = set_param(p, 'S', cb->set_fanspeed, line); break;
       case 107: cb->set_fanspeed(userdata, 0); break;
       case 109:
-	line = set_param('S', userdata, cb->set_temperature, line);
+	line = set_param(p, 'S', cb->set_temperature, line);
 	cb->wait_temperature(userdata);
 	break;
       case 116: cb->wait_temperature(userdata); break;
@@ -338,4 +348,5 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
       line = cb->unprocessed(userdata, letter, value, line);
     }
   }
+  p->msg = NULL;
 }

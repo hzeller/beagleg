@@ -17,6 +17,8 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdio.h>
+
 struct bg_movement {
   // Speed is steps/second of the axis with the highest number of steps. All
   // other axes are scaled down accordingly.
@@ -35,8 +37,9 @@ void beagleg_exit(void);  // shutdown motor control.
 // If there is space in the ringbuffer, this function returns immediately,
 // otherwise it waits until a slot frees up.
 // Returns 0 on success, 1 if this is a no-op with no steps to move and 2 if
-// number of steps per single command is exceeded (right now, 64k).
-int beagleg_enqueue(const struct bg_movement *param);
+// number of steps per single command is exceeded (right now, 64k). If
+// err_stream is non-NULL, prints error message there.
+int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream);
 
 // Wait, until all elements in the ring-buffer are consumed.
 void beagleg_wait_queue_empty(void);

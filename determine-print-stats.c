@@ -97,7 +97,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   GCodeParser_t *parser = gcodep_new(&callbacks, &data);
   char buffer[1024];
   while (fgets(buffer, sizeof(buffer), f)) {
-    gcodep_parse_line(parser, buffer);
+    gcodep_parse_line(parser, buffer, stderr);
   }
   fclose(f);
   gcodep_delete(parser);
