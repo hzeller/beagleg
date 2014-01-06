@@ -276,6 +276,10 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
   GCodeParser_t *parser = gcodep_new(&callbacks, s_mstate);
   if (output_fd >= 0) {
     s_mstate->msg_stream = fdopen(output_fd, "w");
+    if (s_mstate->msg_stream) {
+      // Output needs to be unbuffered, otherwise they'll never make it.
+      setvbuf(s_mstate->msg_stream, NULL, _IONBF, 0);
+    }
   }
   FILE *gcode_stream = fdopen(gcode_fd, "r");
   if (gcode_stream == NULL) {
