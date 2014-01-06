@@ -37,7 +37,7 @@
 #include "gcode-machine-control.h"
 
 // Some default settings.
-#define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 600
+#define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 150
 static const int kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
 
 static void print_file_stats(const char *filename,
