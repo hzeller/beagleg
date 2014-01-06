@@ -28,7 +28,7 @@ The functionality is encapsulated in independently usable APIs.
    - `gcode-machine-control.h` : highlevel C-API to control a machine via
       G-Code: it reads G-Code and emits the necessary machine commands.
 
-## G-Code interpreter and machine control.
+## Machine control binary
 To test things properly, there is a G-Code interpreter that you can either give
 a filename, or a port to listen to.
 
@@ -58,17 +58,22 @@ Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet` to have an interactive session or send a file
 with `socat`:
 
-     cat myfile.gcode | socat -t5 - TCP4:bbb:4444
+     cat myfile.gcode | socat -t5 - TCP4:beaglebone-hostname:4444
 
 Use `socat`, don't use the ancient `nc` (netcat) - its buffering seems to be
-broken so that it gets stuck. With `socat`, it should be possible to connect
-this to a pseudo-terminal in case your printer-software only talks to a terminal
+broken so that it can get stuck. With `socat`, it should be possible to connect
+to a pseudo-terminal in case your printer-software only talks to a terminal
 (haven't tried that yet, please let me know if it works).
 
-Note, there can only be one open connection at any given time.
+Note, there can only be one open TCP connection at any given time.
 
 ## Pinout
 
+These are the GPIO bits associated with the motor outputs. The actual physical
+pins are all over the place on the Beaglebone Black extension headers P8 and P9,
+check the mapping in your BBB documentation.
+
+    Axis G-Code name  |  X   Y   Z   E   A   B   C  <unassigned>
     Step     : GPIO-0 |  2,  3,  4,  5,  7, 14, 15, 20
     Direction: GPIO-1 | 12, 13, 14, 15, 16, 17, 18, 19
 
