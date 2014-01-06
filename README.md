@@ -35,7 +35,7 @@ a filename, or a port to listen to.
     Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
       -f <factor> : Print speed factor (Default 1.0).
-      -m <rate>   : Max. feedrate (Default 600mm/s).
+      -m <rate>   : Max. feedrate (Default 200mm/s).
       -l <port>   : Listen on this TCP port on 0.0.0.0.
       -n          : Dryrun; don't send to motors (Default: off).
       -P          : Verbose: Print motor commands (Default: off).
