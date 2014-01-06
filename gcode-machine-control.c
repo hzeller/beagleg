@@ -32,18 +32,6 @@
 #include "motor-interface.h"
 #include "gcode-parser.h"
 
-// We don't have endswitches yet, so homing brings us in a bad situation with
-// two bad solutions:
-//  (a) just 'assume' we're home. This really only works well the first time
-//      if the machine was manually homed. Followups are considering the last
-//      position as home, which might be ... uhm .. worse.
-//  (b) Rapid move to position 0 of the requested axes. This will work multiple
-//      times but still assumes that we were at 0 initially and it is subject
-//      to machine shift.
-// Definining this will implement (b).
-// TODO: add endswitches :)
-#define DANGEROUS_HOMING_WITHOUT_ENDSWITCHES
-
 struct PrinterState {
   struct MachineControlConfig cfg;
   float current_feedrate_mm_per_sec;
@@ -210,23 +198,24 @@ static void printer_home(void *userdata, unsigned char axes_bitmap) {
       state->machine_position[i] = 0;
     }
   }
-  
-#ifdef DANGEROUS_HOMING_WITHOUT_ENDSWITCHES
+
+  // We don't have endswitches yet, so homing brings us in a bad situation with
+  // two bad solutions:
+  //  (a) just 'assume' we're home. This really only works well the first time
+  //      if the machine was manually homed. Followups are considering the last
+  //      position as home, which might be ... uhm .. worse.
+  //  (b) Rapid move to position 0 of the requested axes. This will work multiple
+  //      times but still assumes that we were at 0 initially and it is subject
+  //      to machine shift.
+  // Solution (b) is what we're doing.
+  // TODO: do this with endswitches.
   if (state->msg_stream) {
     fprintf(state->msg_stream, "MachineControl: Homing requested, but don't "
 	    "have endswitches, so move difference steps (%d, %d, %d)\n",
 	    machine_pos_differences[AXIS_X], machine_pos_differences[AXIS_Y],
 	    machine_pos_differences[AXIS_Z]);
   }
-  // TODO: do this with endswitches.
   move_machine_steps(state, state->cfg.max_feedrate, machine_pos_differences);
-#else
-  if (state->msg_stream) {
-    fprintf(state->msg_stream, "MachienControl: Homing requested (axes 0x%02x), "
-	    "but don't have endswitches, so we're DANGEROUSLY ASSUMING "
-	    "we're there.\n", x);
-  }
-#endif
 }
 
 int gcode_machine_control_init(const struct MachineControlConfig *config) {
