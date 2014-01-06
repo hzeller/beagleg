@@ -43,7 +43,7 @@ enum GCodeParserAxes {
 // The first parameter in any callback is the "userdata" pointer passed
 // in the constructor in gcodep_new().
 struct GCodeParserCb {
-  // M28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
+  // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, unsigned char axis_bitmap);
 
   // Set feedrate for the following G-commands. Parameter is normalized to mm/min
