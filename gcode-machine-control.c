@@ -47,7 +47,7 @@
 struct PrinterState {
   struct MachineControlConfig cfg;
   float current_feedrate_mm_per_sec;
-  int axes_pos_steps[GCODE_NUM_AXES];  // Absolute position in for each axis.
+  int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
   FILE *msg_stream;
 };
 
@@ -170,7 +170,7 @@ static void printer_move(void *userdata, float feedrate, const float axis[]) {
 
   int differences[GCODE_NUM_AXES];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    differences[i] = new_machine_position[i] - state->axes_pos_steps[i];
+    differences[i] = new_machine_position[i] - state->machine_position[i];
   }
 
   // TODO: for acceleration planning, we need to do a whole bunch more here.
@@ -178,8 +178,8 @@ static void printer_move(void *userdata, float feedrate, const float axis[]) {
   move_machine_steps(state, feedrate, differences);
 
   // This is now our new position.
-  memcpy(state->axes_pos_steps, new_machine_position,
-	 sizeof(state->axes_pos_steps));
+  memcpy(state->machine_position, new_machine_position,
+	 sizeof(state->machine_position));
 }
 
 static void printer_coordinated_move(void *userdata, const float *axis) {
@@ -206,8 +206,8 @@ static void printer_home(void *userdata, unsigned char axes_bitmap) {
   for (int i = 0; i <= GCODE_NUM_AXES; ++i) {
     // We skip AXIS_E, as 'homing' filament never makes sense.
     if (((1 << i) & axes_bitmap) && i != AXIS_E) {
-      machine_pos_differences[i] = -state->axes_pos_steps[i];
-      state->axes_pos_steps[i] = 0;
+      machine_pos_differences[i] = -state->machine_position[i];
+      state->machine_position[i] = 0;
     }
   }
   
