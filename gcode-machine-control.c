@@ -248,6 +248,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
   bzero(s_mstate, sizeof(*s_mstate));
   s_mstate->cfg = *config;
+  s_mstate->current_feedrate_mm_per_sec = config->max_feedrate / 10;
 
   return 0;
 }
@@ -299,12 +300,11 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
   }
 
   gcodep_delete(parser);
-  fclose(gcode_stream);
   if (s_mstate->msg_stream) {
+    fflush(s_mstate->msg_stream);
     s_mstate->msg_stream = NULL;
   }
+  fclose(gcode_stream);
 
-  // Hack: we don't have endswitches yet, so lets go home dangerously, so that
-  // the next call to this function can assume home position.
   return 0;
 }

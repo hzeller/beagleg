@@ -28,19 +28,44 @@ The functionality is encapsulated in independently usable APIs.
    - `gcode-machine-control.h` : highlevel C-API to control a machine via
       G-Code: it reads G-Code and emits the necessary machine commands.
 
-## G-Code interpreter
-To test things properly, there is a G-Code interpreter.
+## G-Code interpreter and machine control.
+To test things properly, there is a G-Code interpreter that you can either give
+a filename, or a port to listen to.
 
-    Usage: ./send-gcode [options] <gcode-filename>
+    Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
       -f <factor> : Print speed factor (Default 1.0).
       -m <rate>   : Max. feedrate (Default 600mm/s).
-      -p          : Print motor commands to console (Default: off).
+      -l <port>   : Listen on this TCP port on 0.0.0.0.
       -n          : Dryrun; don't send to motors (Default: off).
-      -s          : Synchronous: don't queue (Default: off).
-      -l          : Loop file forever.
+      -P          : Verbose: Print motor commands (Default: off).
+      -S          : Synchronous: don't queue (Default: off).
+      -R          : Repeat file forever.
 
 The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
+
+### Examples
+
+    ./send-gcode -f 10 -m 1000 -R myfile.gcode
+
+Output the file `myfile.gcode` in 10x the original speed, with a feedrate
+capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
+
+
+    ./send-gcode -l 4444
+
+Listen on TCP port 4444 for incoming connections and execute G-Codes over this
+line. So you could use `telnet` to have an interactive session or send a file
+with `socat`:
+
+     cat myfile.gcode | socat -t5 - TCP4:bbb:4444
+
+Use `socat`, don't use the ancient `nc` (netcat) - its buffering seems to be
+broken so that it gets stuck. With `socat`, it should be possible to connect
+this to a pseudo-terminal in case your printer-software only talks to a terminal
+(haven't tried that yet, please let me know if it works).
+
+Note, there can only be one open connection at any given time.
 
 ## Pinout
 
