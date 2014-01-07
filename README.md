@@ -36,7 +36,8 @@ a filename, or a port to listen to.
     Options:
       -f <factor> : Print speed factor (Default 1.0).
       -m <rate>   : Max. feedrate (Default 200mm/s).
-      -l <port>   : Listen on this TCP port on 0.0.0.0.
+      -l <port>   : Listen on this TCP port.
+      -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)
       -n          : Dryrun; don't send to motors (Default: off).
       -P          : Verbose: Print motor commands (Default: off).
       -S          : Synchronous: don't queue (Default: off).

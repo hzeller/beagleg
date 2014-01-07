@@ -7,16 +7,17 @@
 
 #CROSS_COMPILE?=arm-arago-linux-gnueabi-
 CROSS_COMPILE=
+ARM_OPTIONS=-mtune=cortex-a8 -march=armv7-a
 AM335_BASE=../../am335x_pru_package/pru_sw
 PASM=$(AM335_BASE)/utils/pasm
 LIBDIR_APP_LOADER?=$(AM335_BASE)/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/app_loader/include
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D__DEBUG -O2 -mtune=cortex-a8 -march=armv7-a
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D_XOPEN_SOURCE=500 -O2 $(ARM_OPTIONS)
 LDFLAGS+=-L$(LIBDIR_APP_LOADER) -lprussdrv -lpthread -lm
 
-OBJECTS=motor-interface.o gcode-parser.o send-gcode.o determine-print-stats.o \
-       gcode-machine-control.o
+OBJECTS=send-gcode.o  gcode-parser.o determine-print-stats.o \
+        gcode-machine-control.o motor-interface.o
 PRU_BIN=motor-interface-pru_bin.h
 TARGET=send-gcode
 

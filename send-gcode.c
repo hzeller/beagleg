@@ -64,7 +64,8 @@ static int usage(const char *prog) {
 	   "Options:\n"
 	   "  -f <factor> : Print speed factor (Default 1.0).\n"
 	   "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
-	   "  -l <port>   : Listen on this TCP port on 0.0.0.0.\n"
+	   "  -l <port>   : Listen on this TCP port.\n"
+	   "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
 	   "  -n          : Dryrun; don't send to motors (Default: off).\n"
 	   "  -P          : Verbose: Print motor commands (Default: off).\n"
 	   "  -S          : Synchronous: don't queue (Default: off).\n"
@@ -83,7 +84,7 @@ static int send_file_to_printer(const char *filename, char do_loop) {
   return 0;
 }
 
-static int run_server(int port) {
+static int run_server(const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
     return 1;
@@ -98,6 +99,14 @@ static int run_server(int port) {
   bzero(&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
+  if (bind_addr) {
+    if (!inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
+      fprintf(stderr, "Invalid bind IP address %s\n", bind_addr);
+      return 1;
+    }
+  } else {
+    bind_addr = "0.0.0.0";
+  }
   serv_addr.sin_port = htons(port);
   int on = 1;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -109,7 +118,7 @@ static int run_server(int port) {
   signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
 
   listen(s, 2);
-  printf("Listening on port %d\n", port);
+  printf("Listening on %s:%d\n", bind_addr, port);
 
   for (;;) {
     struct sockaddr_in client;
@@ -142,8 +151,9 @@ int main(int argc, char *argv[]) {
 
   int listen_port = -1;
   char do_file_repeat = 0;
+  char *bind_addr = NULL;
   int opt;
-  while ((opt = getopt(argc, argv, "SPRnl:f:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "SPRnl:f:m:b:")) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = atof(optarg);
@@ -167,6 +177,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'l':
       listen_port = atoi(optarg);
+      break;
+    case 'b':
+      bind_addr = strdup(optarg);
       break;
     default:
       return usage(argv[0]);
@@ -193,9 +206,10 @@ int main(int argc, char *argv[]) {
     print_file_stats(filename, &config);
     ret = send_file_to_printer(filename, do_file_repeat);
   } else {
-    ret = run_server(listen_port);
+    ret = run_server(bind_addr, listen_port);
   }
 
   gcode_machine_control_exit();
+  free(bind_addr);
   return ret;
 }
