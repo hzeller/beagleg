@@ -230,7 +230,8 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
       // to just access these GPIOs.
-      fprintf(stderr, "Need to run as root to access GPIO pins.\n");
+      fprintf(stderr, "Need to run as root to access GPIO pins. "
+	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
     beagleg_init();
