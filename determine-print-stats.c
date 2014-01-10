@@ -49,20 +49,31 @@ static void duration_feedrate(void *userdata, float fr) {
     data->current_feedrate = data->max_feedrate;
   }
 }
-static void duration_move(void *userdata, const float *axis) {
-  struct StatsData *d = (struct StatsData*)userdata;
+static void duration_move(struct BeagleGPrintStats *stats,
+			  float feedrate, const float axis[]) {
   const float distance
-    = sqrtf((axis[AXIS_X] - d->stats->last_x)*(axis[AXIS_X] - d->stats->last_x)
-	    + (axis[AXIS_Y] - d->stats->last_y)*(axis[AXIS_Y] - d->stats->last_y)
-	    + (axis[AXIS_Z] - d->stats->last_z)*(axis[AXIS_Z] - d->stats->last_z)
+    = sqrtf((axis[AXIS_X] - stats->last_x)*(axis[AXIS_X] - stats->last_x)
+	    + (axis[AXIS_Y] - stats->last_y)*(axis[AXIS_Y] - stats->last_y)
+	    + (axis[AXIS_Z] - stats->last_z)*(axis[AXIS_Z] - stats->last_z)
 	    );
   // We're ignoring acceleration and assume full feedrate
-  d->stats->total_time_seconds += distance / d->current_feedrate;
-  d->stats->last_x = axis[AXIS_X];
-  d->stats->last_y = axis[AXIS_Y];
-  d->stats->last_z = axis[AXIS_Z];
-  d->stats->filament_len = axis[AXIS_E];
+  stats->total_time_seconds += distance / feedrate;
+  stats->last_x = axis[AXIS_X];
+  stats->last_y = axis[AXIS_Y];
+  stats->last_z = axis[AXIS_Z];
+  stats->filament_len = axis[AXIS_E];
 }
+
+static void duration_G0(void *userdata, const float axis[]) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  duration_move(data->stats, data->max_feedrate, axis);
+}
+
+static void duration_G1(void *userdata, const float axis[]) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  duration_move(data->stats, data->current_feedrate, axis);
+}
+
 static void duration_dwell(void *userdata, float value) {
   struct StatsData *data = (struct StatsData*)userdata;
   data->stats->total_time_seconds += value / 1000.0f;
@@ -74,13 +85,15 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   bzero(&data, sizeof(data));
   data.max_feedrate = max_feedrate;
   data.speed_factor = speed_factor;
+  data.current_feedrate = max_feedrate / 10; // some reasonable default.
   bzero(result, sizeof(*result));
   data.stats = result;
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
   callbacks.set_feedrate = &duration_feedrate;
-  callbacks.coordinated_move = &duration_move;
+  callbacks.rapid_move = &duration_G0;
+  callbacks.coordinated_move = &duration_G1;
   callbacks.go_home = &dummy_home;
   callbacks.dwell = &duration_dwell;
   callbacks.unprocessed = &dummy_unprocessed;

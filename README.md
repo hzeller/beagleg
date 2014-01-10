@@ -25,8 +25,17 @@ The functionality is encapsulated in independently usable APIs.
       a G-Code file; it processes the entire file and determines estimated
       print time, filament used etc. Implementation is mostly an example using
       gcode-parser.h.
+      Used in the `gcode-print-stats` binary.
    - `gcode-machine-control.h` : highlevel C-API to control a machine via
       G-Code: it reads G-Code and emits the necessary machine commands.
+      Used in the `send-gcode` binary.
+
+## G-Code stats binary
+There is a binary `gcode-print-stats` to extract information from the G-Code
+file,, e.g. estimated print-time, Object height (=maximum Z-axis), filament
+length.
+
+    Usage: ./gcode-print-stats <gcode-file> [<gcode-file> ..]
 
 ## Machine control binary
 To test things properly, there is a G-Code interpreter that you can either give
@@ -83,10 +92,22 @@ For your interface: note this is 3.3V level (and assume not more than ~4mA).
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
 directly, or using a cross compiler (see Makefile).
+
 You need to have checked out https://github.com/beagleboard/am335x_pru_package
 which provides the pasm PRU assembler and the library to push this code to the
 PRU.
 
+    # Check out and build am335 package
+    git clone git@github.com:beagleboard/am335x_pru_package.git
+    cd am335x_pru_package/
+    cd pru_sw/utils/pasm_source ; ./linuxbuild ; cd -
+    make -C pru_sw/app_loader/interface/
+    cd ..
+
+    # Check out BeagleG and build
+    git clone git@github.com:hzeller/beagleg.git
+    make
+    
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
