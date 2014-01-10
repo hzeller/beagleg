@@ -44,4 +44,5 @@ int main(int argc, char *argv[]) {
   for (int i = 1; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, factor, max_feedrate);
   }
+  return 0;
 }
