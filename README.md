@@ -32,14 +32,14 @@ The functionality is encapsulated in independently usable APIs.
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
-file,, e.g. estimated print-time, Object height (=maximum Z-axis), filament
+file e.g. estimated print-time, Object height (=maximum Z-axis), filament
 length.
 
     Usage: ./gcode-print-stats <gcode-file> [<gcode-file> ..]
 
 ## Machine control binary
-To test things properly, there is a G-Code interpreter that you can either give
-a filename, or a port to listen to.
+To control a machine with G-Code, use `send-gcode`. This interpreter either
+takes a filename or a TCP port to listen on.
 
     Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
@@ -106,6 +106,7 @@ PRU.
 
     # Check out BeagleG and build
     git clone git@github.com:hzeller/beagleg.git
+    cd beagleg
     make
     
 ## License
