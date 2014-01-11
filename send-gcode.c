@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <math.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdio.h>
@@ -37,8 +38,9 @@
 #include "gcode-machine-control.h"
 
 // Some default settings.
-#define DEFAULT_MAX_FEEDRATE_MM_PER_SEC 200
+static const int kDefaultMaxFeedrate = 200; // mm/s
 static const int kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
+static const float kFilamentDiameter = 1.7;  // mm
 
 static void print_file_stats(const char *filename,
 			     struct MachineControlConfig *config) {
@@ -46,11 +48,13 @@ static void print_file_stats(const char *filename,
   if (determine_print_stats(open(filename, O_RDONLY),
 			    config->max_feedrate, config->speed_factor,
 			    &result) == 0) {
+    const float filament_volume
+      = kFilamentDiameter*kFilamentDiameter/4 * M_PI * result.filament_len;
     printf("----------------------------------------------\n");
-    printf("Print time: %.3f seconds; %.1fmm height; %.1fmm/s max-feedrate; "
-	   "%.1fmm filament used.\n",
+    printf("Print time: %.3f seconds; height: %.1fmm; max feedrate: %.1fmm/s; "
+	   "filament length: %.1fmm (volume %.2fcm^3).\n",
 	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
-	   result.filament_len);
+	   result.filament_len, filament_volume / 1000);
     printf("----------------------------------------------\n");
   }
 }
@@ -66,7 +70,7 @@ static int usage(const char *prog) {
 	   "  -P          : Verbose: Print motor commands (Default: off).\n"
 	   "  -S          : Synchronous: don't queue (Default: off).\n"
 	   "  -R          : Repeat file forever.\n",
-	   prog, DEFAULT_MAX_FEEDRATE_MM_PER_SEC);
+	   prog, kDefaultMaxFeedrate);
    fprintf(stderr, "You can either specify -l <port> to listen for commands "
 	   "or give a filename\n");
    return 1;
@@ -139,7 +143,7 @@ int main(int argc, char *argv[]) {
   // Per axis X, Y, Z, E (Z and E: need to look up)
   memcpy(config.axis_steps_per_mm, kStepsPerMM,
 	 sizeof(config.axis_steps_per_mm));
-  config.max_feedrate = DEFAULT_MAX_FEEDRATE_MM_PER_SEC;
+  config.max_feedrate = kDefaultMaxFeedrate;
   config.speed_factor = 1;
   config.dry_run = 0;
   config.debug_print = 0;
