@@ -263,7 +263,7 @@ static const char *handle_move(struct GCodeParser *p,
   while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
     const float unit_value = value * p->unit_to_mm_factor;
     switch (axis) {
-    case 'F': feedrate = unit_value; any_change = 1; break;
+    case 'F': feedrate = unit_value / 60.0; any_change = 1; break;
     case 'X': update_axis = AXIS_X; break;
     case 'Y': update_axis = AXIS_Y; break;
     case 'Z': update_axis = AXIS_Z; break;

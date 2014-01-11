@@ -56,7 +56,7 @@ struct GCodeParserCb {
 
   // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates. 
   // First parameter is the userdata.
-  // Second parameter is feedrate in mm/min if provided, or -1 otherwise.
+  // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
   // by GCodeParserAxes.

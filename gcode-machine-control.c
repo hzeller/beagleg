@@ -166,7 +166,7 @@ static void printer_move(void *userdata, float feedrate, const float axis[]) {
 static void printer_G1(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (feed > 0) {
-    state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed / 60.0f;
+    state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
     if (state->current_feedrate_mm_per_sec > state->cfg.max_feedrate) {
       state->current_feedrate_mm_per_sec = state->cfg.max_feedrate;
     }
@@ -177,7 +177,7 @@ static void printer_G1(void *userdata, float feed, const float *axis) {
 static void printer_G0(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   float rapid_feed = state->cfg.max_feedrate;
-  const float given = state->cfg.speed_factor * feed / 60.0f;
+  const float given = state->cfg.speed_factor * feed;
   if (feed > 0 && given < state->cfg.max_feedrate)
     rapid_feed = given;
 

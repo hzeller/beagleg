@@ -58,7 +58,7 @@ static void duration_move(struct BeagleGPrintStats *stats,
 static void duration_G0(void *userdata, float feed, const float axis[]) {
   struct StatsData *data = (struct StatsData*)userdata;
   float rapid_feed = data->max_feedrate;
-  const float given = data->speed_factor * feed / 60.0f;
+  const float given = data->speed_factor * feed;
   if (feed > 0 && given < data->max_feedrate)
     rapid_feed = given;
 
@@ -70,7 +70,7 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
   struct StatsData *data = (struct StatsData*)userdata;
   if (feed > 0) {
     // Change current feedrate.
-    data->current_feedrate = data->speed_factor * feed / 60.0f;
+    data->current_feedrate = data->speed_factor * feed;
     if (data->current_feedrate > data->max_feedrate) {
       if (data->stats->highest_capped_feedrate < data->current_feedrate) {
 	data->stats->highest_capped_feedrate = data->current_feedrate;
