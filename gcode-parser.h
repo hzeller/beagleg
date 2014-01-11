@@ -60,14 +60,14 @@ struct GCodeParserCb {
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
   // by GCodeParserAxes.
-  void (*coordinated_move)(void *, float, const float[]);  // G1
-  void (*rapid_move)(void *, float, const float[]);        // G0
+  void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
+  void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,
   // string of rest of line.
-  // Should return pointer to remaining line after processed or NULL if it
-  // consumed it all.
+  // Should return pointer to remaining line after processed (after all consumed
+  // parameters) or NULL if the whole remaining line was consumed.
   // Implementors might want to use gcodep_parse_pair() if they need to read
   // G-code words from the remaining line.
   const char *(*unprocessed)(void *, char letter, float value, const char *);
