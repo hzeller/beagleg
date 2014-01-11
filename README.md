@@ -30,13 +30,6 @@ The functionality is encapsulated in independently usable APIs.
       G-Code: it reads G-Code and emits the necessary machine commands.
       Used in the `send-gcode` binary.
 
-## G-Code stats binary
-There is a binary `gcode-print-stats` to extract information from the G-Code
-file e.g. estimated print-time, Object height (=maximum Z-axis), filament
-length.
-
-    Usage: ./gcode-print-stats <gcode-file> [<gcode-file> ..]
-
 ## Machine control binary
 To control a machine with G-Code, use `send-gcode`. This interpreter either
 takes a filename or a TCP port to listen on.
@@ -76,6 +69,24 @@ to a pseudo-terminal in case your printer-software only talks to a terminal
 (haven't tried that yet, please let me know if it works).
 
 Note, there can only be one open TCP connection at any given time.
+
+## G-Code stats binary
+There is a binary `gcode-print-stats` to extract information from the G-Code
+file e.g. estimated print-time, Object height (=maximum Z-axis), filament
+length.
+
+    Usage: ./gcode-print-stats [options] <gcode-file> [<gcode-file> ..]
+    Options:
+            -m <max-feedrate> : Maximum feedrate in mm/s
+            -f <factor>       : Speedup-factor for print
+    Use filename '-' for stdin.
+
+The output is in column form, so you can use standard tools to process them.
+For instance, from a bunch of gcode files, find the one that takes the longest
+time
+
+    ./gcode-print-stats *.gcode | sort -k2 -n
+
 
 ## Pinout
 
