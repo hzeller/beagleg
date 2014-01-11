@@ -21,7 +21,7 @@ struct BeagleGPrintStats {
   float total_time_seconds;      // Total time real execution would take.
   // If feedrate was too high after speed-factor: this was the highest feedrate
   // seen, that was capped to the provided max feedrate.
-  float highest_capped_feedrate;
+  float max_G1_feedrate;         // Max feedrate for G1 seen.
   float last_x, last_y, last_z;  // last coordinate.
   float filament_len;            // total filament length
 

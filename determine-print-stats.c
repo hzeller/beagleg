@@ -71,13 +71,12 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
     // Change current feedrate.
     data->current_feedrate = data->speed_factor * feed;
     if (data->current_feedrate > data->max_feedrate) {
-      if (data->stats->highest_capped_feedrate < data->current_feedrate) {
-	data->stats->highest_capped_feedrate = data->current_feedrate;
-      }
-      data->current_feedrate = data->max_feedrate;
+      data->current_feedrate = data->max_feedrate;  // Limit.
+    }
+    if (data->current_feedrate > data->stats->max_G1_feedrate) {
+      data->stats->max_G1_feedrate = data->current_feedrate;
     }
   }
-
   duration_move(data->stats, data->current_feedrate, axis);
 }
 

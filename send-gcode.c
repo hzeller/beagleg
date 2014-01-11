@@ -47,14 +47,10 @@ static void print_file_stats(const char *filename,
 			    config->max_feedrate, config->speed_factor,
 			    &result) == 0) {
     printf("----------------------------------------------\n");
-    printf("Print time: %.3f seconds; %.1fmm height; "
+    printf("Print time: %.3f seconds; %.1fmm height; %.1fmm/s max-feedrate; "
 	   "%.1fmm filament used.\n",
-	   result.total_time_seconds, result.last_z, result.filament_len);
-    if (result.highest_capped_feedrate > 0) {
-      printf("Max feedrate requested %.1f mm/s, but capped to %.1f mm/s "
-	     "(change max-feedrate with -m)\n",
-	     result.highest_capped_feedrate, config->max_feedrate);
-    }
+	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
+	   result.filament_len);
     printf("----------------------------------------------\n");
   }
 }
