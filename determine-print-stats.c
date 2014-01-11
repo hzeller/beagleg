@@ -45,8 +45,7 @@ static void duration_move(struct BeagleGPrintStats *stats,
   const float distance
     = sqrtf((axis[AXIS_X] - stats->last_x)*(axis[AXIS_X] - stats->last_x)
 	    + (axis[AXIS_Y] - stats->last_y)*(axis[AXIS_Y] - stats->last_y)
-	    + (axis[AXIS_Z] - stats->last_z)*(axis[AXIS_Z] - stats->last_z)
-	    );
+	    + (axis[AXIS_Z] - stats->last_z)*(axis[AXIS_Z] - stats->last_z));
   // We're ignoring acceleration and assume full feedrate
   stats->total_time_seconds += distance / feedrate;
   stats->last_x = axis[AXIS_X];
