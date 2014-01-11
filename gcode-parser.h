@@ -48,19 +48,20 @@ struct GCodeParserCb {
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, unsigned char axis_bitmap);
 
-  // Set feedrate for the following G-commands. Parameter is normalized to mm/min
-  void (*set_feedrate)(void *, float);
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
   void (*set_temperature)(void *, float);  // M104, M109: Set temp. in Celsius.
   void (*wait_temperature)(void *);        // M109, M116: Wait for temp. reached.
   void (*dwell)(void *, float);            // G4: dwell for milliseconds.
   void (*disable_motors)(void *);          // M84: Switch off motors
 
-  // G1 (coordinated move) and G0 (rapid move).
-  // Move to absolute coordinates. The given float[] is indexed by
-  // GCodeParserAxes.
-  void (*coordinated_move)(void *, const float[]);  // G1
-  void (*rapid_move)(void *, const float[]);        // G0
+  // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates. 
+  // First parameter is the userdata.
+  // Second parameter is feedrate in mm/min if provided, or -1 otherwise.
+  //   (typically, the user would need to remember the positive values).
+  // The third parameter is an array of absolute coordinates (in mm), indexed
+  // by GCodeParserAxes.
+  void (*coordinated_move)(void *, float, const float[]);  // G1
+  void (*rapid_move)(void *, float, const float[]);        // G0
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,

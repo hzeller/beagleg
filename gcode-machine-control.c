@@ -83,14 +83,6 @@ static const char *dummy_unprocessed(void *userdata, char letter, float value,
   return NULL;
 }
 
-static void printer_feedrate(void *userdata, float fr) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
-  state->current_feedrate_mm_per_sec = state->cfg.speed_factor * fr/60;
-  if (state->current_feedrate_mm_per_sec > state->cfg.max_feedrate) {
-    state->current_feedrate_mm_per_sec = state->cfg.max_feedrate;
-  }
-}
-
 static int choose_max_abs(int a, int b) {
   return abs(a) > abs(b) ? abs(a) : abs(b);
 }
@@ -171,15 +163,27 @@ static void printer_move(void *userdata, float feedrate, const float axis[]) {
 	 sizeof(state->machine_position));
 }
 
-static void printer_coordinated_move(void *userdata, const float *axis) {
+static void printer_G1(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
+  if (feed > 0) {
+    state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed / 60.0f;
+    if (state->current_feedrate_mm_per_sec > state->cfg.max_feedrate) {
+      state->current_feedrate_mm_per_sec = state->cfg.max_feedrate;
+    }
+  }
   printer_move(userdata, state->current_feedrate_mm_per_sec, axis);
 }
 
-static void printer_rapid_move(void *userdata, const float *axis) {
+static void printer_G0(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  printer_move(userdata, state->cfg.max_feedrate, axis);
+  float rapid_feed = state->cfg.max_feedrate;
+  const float given = state->cfg.speed_factor * feed / 60.0f;
+  if (feed > 0 && given < state->cfg.max_feedrate)
+    rapid_feed = given;
+
+  printer_move(userdata, rapid_feed, axis);
 }
+
 static void printer_dwell(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (!state->cfg.dry_run) beagleg_wait_queue_empty();
@@ -244,9 +248,8 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
-  callbacks.set_feedrate = &printer_feedrate;
-  callbacks.coordinated_move = &printer_coordinated_move;
-  callbacks.rapid_move = &printer_rapid_move;
+  callbacks.coordinated_move = &printer_G1;
+  callbacks.rapid_move = &printer_G0;
   callbacks.go_home = &printer_home;
   callbacks.dwell = &printer_dwell;
 

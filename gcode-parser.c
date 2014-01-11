@@ -37,14 +37,10 @@ struct GCodeParser {
   int provided_axes;
   float unit_to_mm_factor;  // metric: 1.0; imperial 25.4
   char axis_is_absolute[GCODE_NUM_AXES];
-  float current_feedrate;
   AxesRegister relative_zero;  // reference, set by G92 commands
   AxesRegister axes_pos;
 };
 
-static void dummy_set_feedrate(void *user, float f) {
-  fprintf(stderr, "GCodeParser: set_feedrate(%.2f)\n", f);
-}
 static void dummy_set_temperature(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_temperature(%.1f)\n", f);
 }
@@ -60,9 +56,13 @@ static void dummy_dwell(void *user, float f) {
 static void dummy_disable_motors(void *user) {
   fprintf(stderr, "GCodeParser: disable_motors()\n");
 }
-static void dummy_move(void *user, const float *axes) {
-  fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...)\n",
+static void dummy_move(void *user, float feed, const float *axes) {
+  fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
 	  axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
+  if (feed > 0)
+    fprintf(stderr, " feed=%.1f\n", feed);
+  else
+    fprintf(stderr, "\n");
 }
 static void dummy_go_home(void *user, unsigned char flags) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", flags);
@@ -92,8 +92,6 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
   // Set some reasonable defaults for unprovided callbacks:
   if (!result->callbacks.go_home)
       result->callbacks.go_home = &dummy_go_home;
-  if (!result->callbacks.set_feedrate)
-    result->callbacks.set_feedrate = &dummy_set_feedrate;
   if (!result->callbacks.set_fanspeed)
     result->callbacks.set_fanspeed = &dummy_set_fanspeed;
   if (!result->callbacks.set_temperature)
@@ -253,25 +251,19 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
 }
 
 static const char *handle_move(struct GCodeParser *p,
-			       void (*fun_move)(void *, const float *),
+			       void (*fun_move)(void *, float, const float *),
 			       const char *line) {
   char axis;
   float value;
   int any_change = 0;
-  
+  float feedrate = -1;
   const char *remaining_line;
   char done = 0;
   int update_axis = -1;
   while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
     const float unit_value = value * p->unit_to_mm_factor;
     switch (axis) {
-    case 'F': {
-      if (p->current_feedrate != unit_value) {
-	p->callbacks.set_feedrate(p->cb_userdata, unit_value);
-	p->current_feedrate = unit_value;
-      }
-      break;
-    }
+    case 'F': feedrate = unit_value; any_change = 1; break;
     case 'X': update_axis = AXIS_X; break;
     case 'Y': update_axis = AXIS_Y; break;
     case 'Z': update_axis = AXIS_Z; break;
@@ -299,7 +291,7 @@ static const char *handle_move(struct GCodeParser *p,
     update_axis = -1;
   }
 
-  if (any_change) fun_move(p->cb_userdata, p->axes_pos);
+  if (any_change) fun_move(p->cb_userdata, feedrate, p->axes_pos);
   return line;
 }
 
