@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "determine-print-stats.h"
 
@@ -14,7 +15,8 @@ int usage(const char *prog) {
 static void print_file_stats(const char *filename, int indentation,
 			     float speed_factor, float max_feedrate) {
   struct BeagleGPrintStats result;
-  if (determine_print_stats(open(filename, O_RDONLY),
+  int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
+  if (determine_print_stats(fd,
 			    max_feedrate, speed_factor, &result) == 0) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s\t%9.3fs\t%6.1fmm\t%7.1fmm", indentation, filename,
