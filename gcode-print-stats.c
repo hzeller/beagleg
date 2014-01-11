@@ -76,15 +76,15 @@ int main(int argc, char *argv[]) {
   if (optind >= argc)
     return usage(argv[0]);
 
-  int longest_filename = strlen(argv[optind]);
-  for (int i = optind + 1; i < argc; ++i) {
+  int longest_filename = strlen("#[filename]"); // table header
+  for (int i = optind; i < argc; ++i) {
     int len = strlen(argv[i]);
     if (len > longest_filename) longest_filename = len;
   }
   // Print table header
   printf("%-*s\t%10s\t%8s\t%9s\t%9s\n", longest_filename,
-	 "#--filename", "time", "height", "max-feed", "filament");
-  for (int i = optind + 1; i < argc; ++i) {
+	 "#[filename]", "[time]", "[height]", "[max-feed]", "[filament]");
+  for (int i = optind; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, factor, max_feedrate);
   }
   return 0;
