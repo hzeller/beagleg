@@ -32,6 +32,8 @@ struct bg_movement {
 // Initialize beagleg motor control. Returns 0 on success, 1 on some error.
 int beagleg_init(void);
 void beagleg_exit(void);  // shutdown motor control.
+// shutdown motor control immediately, don't wait for current queue to empty.
+void beagleg_exit_nowait(void);
 
 // Enqueue a coordinated move command.
 // If there is space in the ringbuffer, this function returns immediately,

@@ -79,7 +79,8 @@ static int usage(const char *prog) {
 static int send_file_to_printer(const char *filename, char do_loop) {
   do {
     int fd = open(filename, O_RDONLY);
-    gcode_machine_control_from_stream(fd, STDERR_FILENO);
+    if (gcode_machine_control_from_stream(fd, STDERR_FILENO) != 0)
+      return 1;
   } while (do_loop);
   return 0;
 }
