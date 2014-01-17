@@ -16,9 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-// Use fdopen()
-#define _XOPEN_SOURCE 500
-
 #include "gcode-machine-control.h"
 
 #include <math.h>
@@ -37,7 +34,7 @@ struct PrinterState {
   struct MachineControlConfig cfg;
   GCodeParser_t *parser;
   float current_feedrate_mm_per_sec;
-  float prog_speed_factor;              // M220 - factor for our speed.
+  float prog_speed_factor;               // Speed factor set by program (M220)
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
   FILE *msg_stream;
 };
@@ -213,13 +210,16 @@ static void printer_dwell(void *userdata, float value) {
 
 static void printer_set_speed_factor(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (value < 0.5) {
+  if (value < 0) {
+    value = 1.0f + value;   // M220 S-10 interpreted as: 90%
+  }
+  if (value < 0.005) {
     if (state->msg_stream) fprintf(state->msg_stream,
 				   "M220: Not accepting speed "
-				   "factors < 0.5%% (got %.1f%%)\n", value);
+				   "factors < 0.5%% (got %.1f%%)\n",
+				   100.0f * value);
     return;
   }
-  value /= 100.0f;
   state->prog_speed_factor = value;
 }
 
@@ -285,7 +285,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   callbacks.rapid_move = &printer_G0;
   callbacks.go_home = &printer_home;
   callbacks.dwell = &printer_dwell;
-  callbacks.set_speed_override = &printer_set_speed_factor;
+  callbacks.set_speed_factor = &printer_set_speed_factor;
 
   // Not yet implemented
   callbacks.set_fanspeed = &dummy_set_fanspeed;

@@ -41,8 +41,8 @@ struct GCodeParser {
   AxesRegister axes_pos;
 };
 
-static void dummy_set_speed_override(void *user, float f) {
-  fprintf(stderr, "GCodeParser: set_speed_override(%.1f)\n", f);
+static void dummy_set_speed_factor(void *user, float f) {
+  fprintf(stderr, "GCodeParser: set_speed_factor(%.1f)\n", f);
 }
 static void dummy_set_temperature(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_temperature(%.1f)\n", f);
@@ -103,8 +103,8 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
       result->callbacks.go_home = &dummy_go_home;
   if (!result->callbacks.set_fanspeed)
     result->callbacks.set_fanspeed = &dummy_set_fanspeed;
-  if (!result->callbacks.set_speed_override)
-    result->callbacks.set_speed_override = &dummy_set_speed_override;
+  if (!result->callbacks.set_speed_factor)
+    result->callbacks.set_speed_factor = &dummy_set_speed_factor;
   if (!result->callbacks.set_temperature)
     result->callbacks.set_temperature = &dummy_set_temperature;
   if (!result->callbacks.wait_temperature)
@@ -250,13 +250,13 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
 // Set a parameter on a user callback.
 // These all have the form foo(void *userdata, float value)
 static const char *set_param(struct GCodeParser *p, char param_letter,
-			     void (*value_setter)(void *, float),
+			     void (*value_setter)(void *, float), float factor,
 			     const char *line) {
   char letter;
   float value;
   const char *remaining_line = gcodep_parse_pair(line, &letter, &value, p->msg);
   if (remaining_line != NULL && letter == param_letter) {
-    value_setter(p->cb_userdata, value);   // setting value on a user-callback
+    value_setter(p->cb_userdata, factor * value);   // value on a user-callback
     return remaining_line;
   }
   return line;
@@ -319,7 +319,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;
       case 1: line = handle_move(p, cb->coordinated_move, line); break;
-      case 4: line = set_param(p, 'P', cb->dwell, line); break;
+      case 4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
@@ -334,15 +334,17 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
       case 84: cb->disable_motors(userdata); break;
-      case 104: line = set_param(p, 'S', cb->set_temperature, line); break;
-      case 106: line = set_param(p, 'S', cb->set_fanspeed, line); break;
+      case 104: line = set_param(p, 'S', cb->set_temperature, 1.0f, line); break;
+      case 106: line = set_param(p, 'S', cb->set_fanspeed, 1.0f, line); break;
       case 107: cb->set_fanspeed(userdata, 0); break;
       case 109:
-	line = set_param(p, 'S', cb->set_temperature, line);
+	line = set_param(p, 'S', cb->set_temperature, 1.0f, line);
 	cb->wait_temperature(userdata);
 	break;
       case 116: cb->wait_temperature(userdata); break;
-      case 220: line = set_param(p, 'S', cb->set_speed_override, line); break;
+      case 220:
+	line = set_param(p, 'S', cb->set_speed_factor, 0.01f, line);
+	break;
       default: line = cb->unprocessed(userdata, letter, value, line); break;
       }
     }

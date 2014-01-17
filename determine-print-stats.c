@@ -16,9 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-// Use fdopen()
-#define _XOPEN_SOURCE 500
-
 #include "determine-print-stats.h"
 
 #include <math.h>
@@ -29,8 +26,9 @@
 
 struct StatsData {
   float max_feedrate;
-  float speed_factor;
-  float current_feedrate;  // mm/s
+  float cfg_speed_factor;   // speed factor set from commandline
+  float prog_speed_factor;  // factor set from program
+  float current_feedrate;   // mm/s
   struct BeagleGPrintStats *stats;
 };
 
@@ -54,10 +52,19 @@ static void duration_move(struct BeagleGPrintStats *stats,
   stats->filament_len = axis[AXIS_E];
 }
 
+static void duration_set_speed_factor(void *userdata, float value) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  if (value < 0) {
+    value = 1.0f + value;   // M220 S-10 interpreted as: 90%
+  }
+  if (value < 0.005) return;
+  data->prog_speed_factor = value;
+}
+
 static void duration_G0(void *userdata, float feed, const float axis[]) {
   struct StatsData *data = (struct StatsData*)userdata;
   float rapid_feed = data->max_feedrate;
-  const float given = data->speed_factor * feed;
+  const float given = data->cfg_speed_factor * data->prog_speed_factor * feed;
   if (feed > 0 && given < data->max_feedrate)
     rapid_feed = given;
 
@@ -69,15 +76,16 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
   struct StatsData *data = (struct StatsData*)userdata;
   if (feed > 0) {
     // Change current feedrate.
-    data->current_feedrate = data->speed_factor * feed;
-    if (data->current_feedrate > data->max_feedrate) {
-      data->current_feedrate = data->max_feedrate;  // Limit.
-    }
-    if (data->current_feedrate > data->stats->max_G1_feedrate) {
-      data->stats->max_G1_feedrate = data->current_feedrate;
-    }
+    data->current_feedrate = data->cfg_speed_factor * feed;
   }
-  duration_move(data->stats, data->current_feedrate, axis);
+  float feedrate = data->current_feedrate * data->prog_speed_factor;
+  if (feedrate > data->max_feedrate) {
+    if (feedrate > data->stats->max_G1_feedrate) {
+      data->stats->max_G1_feedrate = feedrate;
+    }
+    feedrate = data->max_feedrate;  // limit.
+  }
+  duration_move(data->stats, feedrate, axis);
 }
 
 static void duration_dwell(void *userdata, float value) {
@@ -90,7 +98,8 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   struct StatsData data;
   bzero(&data, sizeof(data));
   data.max_feedrate = max_feedrate;
-  data.speed_factor = speed_factor;
+  data.cfg_speed_factor = speed_factor;
+  data.prog_speed_factor = 1.0f;
   data.current_feedrate = max_feedrate / 10; // some reasonable default.
   bzero(result, sizeof(*result));
   data.stats = result;
@@ -99,8 +108,11 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   bzero(&callbacks, sizeof(callbacks));
   callbacks.rapid_move = &duration_G0;
   callbacks.coordinated_move = &duration_G1;
-  callbacks.go_home = &dummy_home;
   callbacks.dwell = &duration_dwell;
+  callbacks.set_speed_factor = &duration_set_speed_factor;
+
+  // Not implemented
+  callbacks.go_home = &dummy_home;
   callbacks.unprocessed = &dummy_unprocessed;
   callbacks.set_fanspeed = &dummy_setvalue;
   callbacks.set_temperature = &dummy_setvalue;
