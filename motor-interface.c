@@ -185,12 +185,16 @@ void beagleg_wait_queue_empty(void) {
   }
 }
 
+void beagleg_exit_nowait(void) {
+  prussdrv_pru_disable (PRU_NUM);
+  prussdrv_exit ();
+}
+
 void beagleg_exit(void) {
   struct QueueElement end_element;
   memset(&end_element, 0x00, sizeof(end_element));
   end_element.steps = 0;  // 0 steps: sentinel to exit.
   enqueue_internal(&end_element);
   beagleg_wait_queue_empty();
-  prussdrv_pru_disable (PRU_NUM);
-  prussdrv_exit ();
+  beagleg_exit_nowait();
 }

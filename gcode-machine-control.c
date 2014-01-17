@@ -28,6 +28,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "motor-interface.h"
 #include "gcode-parser.h"
@@ -42,6 +43,25 @@ struct PrinterState {
 
 // Since there is only one machine, we just keep this as a singleton.
 static struct PrinterState *s_mstate = NULL;
+
+// It is usually good to shut down gracefully, otherwise the PRU keeps running.
+// So we're intercepting signals and exit gcode_machine_control_from_stream()
+// cleanly.
+static volatile char caught_signal = 0;
+static void receive_signal() {
+  caught_signal = 1;
+  static char msg[] = "Caught signal. Shutting down ASAP.\n";
+  write(STDERR_FILENO, msg, sizeof(msg));
+}
+static void arm_signal_handler() {
+  caught_signal = 0;
+  signal(SIGTERM, &receive_signal);  // Regular kill
+  signal(SIGINT, &receive_signal);   // Ctrl-C
+}
+static void disarm_signal_handler() {
+  signal(SIGTERM, SIG_DFL);  // Regular kill
+  signal(SIGINT, SIG_DFL);   // Ctrl-C
+}
 
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
@@ -272,8 +292,14 @@ void gcode_machine_control_exit() {
     fprintf(stderr, "gcode_machine_control_exit() called without init.\n");
     return;
   }
-  if (!s_mstate->cfg.dry_run)
-    beagleg_exit();
+  if (!s_mstate->cfg.dry_run) {
+    if (caught_signal) {
+      fprintf(stderr, "Skipping potential remaining queue.\n");
+      beagleg_exit_nowait();
+    } else {
+      beagleg_exit();
+    }
+  }
   gcodep_delete(s_mstate->parser);
   free(s_mstate);
   s_mstate = NULL;
@@ -298,10 +324,12 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
     return 1;
   }
 
+  arm_signal_handler();
   char buffer[1024];
-  while (fgets(buffer, sizeof(buffer), gcode_stream)) {
+  while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
     gcodep_parse_line(s_mstate->parser, buffer, s_mstate->msg_stream);
   }
+  disarm_signal_handler();
 
   if (s_mstate->msg_stream) {
     fflush(s_mstate->msg_stream);
@@ -309,5 +337,5 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
   }
   fclose(gcode_stream);
 
-  return 0;
+  return caught_signal ? 2 : 0;
 }
