@@ -20,7 +20,8 @@
 /*
  * Parser for commong G-codes. Translates movements into absolute mm coordinates
  * and calls callbacks on changes.
- * Simple implementation, by no means complete.
+ * All un-implemented G- and M-Codes are sent back via a callback for the
+ * user to handle.
  */
 
 #include <stdio.h>
