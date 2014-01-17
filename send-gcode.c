@@ -121,7 +121,8 @@ static int run_server(const char *bind_addr, int port) {
   listen(s, 2);
   printf("Listening on %s:%d\n", bind_addr, port);
 
-  for (;;) {
+  int process_result;
+  do {
     struct sockaddr_in client;
     socklen_t socklen = sizeof(client);
     int connection = accept(s, (struct sockaddr*) &client, &socklen);
@@ -133,9 +134,13 @@ static int run_server(const char *bind_addr, int port) {
     const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
 				     ip_buffer, sizeof(ip_buffer));
     printf("Accepting new connection from %s\n", print_ip);
-    gcode_machine_control_from_stream(connection, connection);
+    process_result = gcode_machine_control_from_stream(connection, connection);
     printf("Connection to %s closed.\n", print_ip);
-  }
+  } while (process_result == 0);
+
+  close(s);
+  fprintf(stderr, "Last gcode_machine_control_from_stream() == %d. Exiting\n",
+	  process_result);
   return 0;
 }
 
