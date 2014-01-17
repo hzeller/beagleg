@@ -158,7 +158,7 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
   }
 }
 
-static void printer_move(void *userdata, float feedrate, const float axis[]) {
+static void machine_move(void *userdata, float feedrate, const float axis[]) {
   struct PrinterState *state = (struct PrinterState*)userdata;
 
   // Real world -> machine coordinates
@@ -181,7 +181,7 @@ static void printer_move(void *userdata, float feedrate, const float axis[]) {
 	 sizeof(state->machine_position));
 }
 
-static void printer_G1(void *userdata, float feed, const float *axis) {
+static void machine_G1(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (feed > 0) {
     state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
@@ -189,26 +189,26 @@ static void printer_G1(void *userdata, float feed, const float *axis) {
   float feedrate = state->prog_speed_factor * state->current_feedrate_mm_per_sec;
   if (feedrate > state->cfg.max_feedrate)
     feedrate = state->cfg.max_feedrate;
-  printer_move(userdata, feedrate, axis);
+  machine_move(userdata, feedrate, axis);
 }
 
-static void printer_G0(void *userdata, float feed, const float *axis) {
+static void machine_G0(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   float rapid_feed = state->cfg.max_feedrate;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   if (feed > 0 && given < state->cfg.max_feedrate)
     rapid_feed = given;
 
-  printer_move(userdata, rapid_feed, axis);
+  machine_move(userdata, rapid_feed, axis);
 }
 
-static void printer_dwell(void *userdata, float value) {
+static void machine_dwell(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (!state->cfg.dry_run) beagleg_wait_queue_empty();
   usleep((int) (value * 1000));
 }
 
-static void printer_set_speed_factor(void *userdata, float value) {
+static void machine_set_speed_factor(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (value < 0) {
     value = 1.0f + value;   // M220 S-10 interpreted as: 90%
@@ -223,7 +223,7 @@ static void printer_set_speed_factor(void *userdata, float value) {
   state->prog_speed_factor = value;
 }
 
-static void printer_home(void *userdata, unsigned char axes_bitmap) {
+static void machine_home(void *userdata, unsigned char axes_bitmap) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
@@ -281,11 +281,11 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
-  callbacks.coordinated_move = &printer_G1;
-  callbacks.rapid_move = &printer_G0;
-  callbacks.go_home = &printer_home;
-  callbacks.dwell = &printer_dwell;
-  callbacks.set_speed_factor = &printer_set_speed_factor;
+  callbacks.coordinated_move = &machine_G1;
+  callbacks.rapid_move = &machine_G0;
+  callbacks.go_home = &machine_home;
+  callbacks.dwell = &machine_dwell;
+  callbacks.set_speed_factor = &machine_set_speed_factor;
 
   // Not yet implemented
   callbacks.set_fanspeed = &dummy_set_fanspeed;
