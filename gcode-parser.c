@@ -35,12 +35,15 @@ struct GCodeParser {
   void *cb_userdata;
   FILE *msg;
   int provided_axes;
-  float unit_to_mm_factor;  // metric: 1.0; imperial 25.4
+  float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
   char axis_is_absolute[GCODE_NUM_AXES];
   AxesRegister relative_zero;  // reference, set by G92 commands
   AxesRegister axes_pos;
 };
 
+static void dummy_set_speed_override(void *user, float f) {
+  fprintf(stderr, "GCodeParser: set_speed_override(%.1f)\n", f);
+}
 static void dummy_set_temperature(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_temperature(%.1f)\n", f);
 }
@@ -84,6 +87,12 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
 			       void *userdata) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
+
+  // Initial values for various constants.
+  result->unit_to_mm_factor = 1.0f;
+  set_all_axis_to_absolute(result, 1);
+
+  // Setting up all callbacks
   if (callbacks) {
     memcpy(&result->callbacks, callbacks, sizeof(*callbacks));
   }
@@ -94,6 +103,8 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
       result->callbacks.go_home = &dummy_go_home;
   if (!result->callbacks.set_fanspeed)
     result->callbacks.set_fanspeed = &dummy_set_fanspeed;
+  if (!result->callbacks.set_speed_override)
+    result->callbacks.set_speed_override = &dummy_set_speed_override;
   if (!result->callbacks.set_temperature)
     result->callbacks.set_temperature = &dummy_set_temperature;
   if (!result->callbacks.wait_temperature)
@@ -108,8 +119,7 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
     result->callbacks.rapid_move = result->callbacks.coordinated_move;
   if (!result->callbacks.unprocessed)
     result->callbacks.unprocessed = &dummy_unprocessed;
-  result->unit_to_mm_factor = 1.0f;
-  set_all_axis_to_absolute(result, 1);
+
   return result;
 }
 
@@ -237,6 +247,8 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   return line;
 }
 
+// Set a parameter on a user callback.
+// These all have the form foo(void *userdata, float value)
 static const char *set_param(struct GCodeParser *p, char param_letter,
 			     void (*value_setter)(void *, float),
 			     const char *line) {
@@ -244,7 +256,7 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
   float value;
   const char *remaining_line = gcodep_parse_pair(line, &letter, &value, p->msg);
   if (remaining_line != NULL && letter == param_letter) {
-    value_setter(p->cb_userdata, value);
+    value_setter(p->cb_userdata, value);   // setting value on a user-callback
     return remaining_line;
   }
   return line;
@@ -330,6 +342,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
 	cb->wait_temperature(userdata);
 	break;
       case 116: cb->wait_temperature(userdata); break;
+      case 220: line = set_param(p, 'S', cb->set_speed_override, line); break;
       default: line = cb->unprocessed(userdata, letter, value, line); break;
       }
     }
