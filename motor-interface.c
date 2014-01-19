@@ -1,5 +1,5 @@
 /*
- * (c) 2013, 1014 Henner Zeller <h.zeller@acm.org>
+ * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
  *
@@ -69,7 +69,7 @@ static void init_queue(struct QueueElement *elements) {
 
 static struct QueueElement *volatile map_queue() {
   void *result;
-  prussdrv_map_prumem (PRUSS0_PRU0_DATARAM, &result);
+  prussdrv_map_prumem(PRUSS0_PRU0_DATARAM, &result);
   shared_queue_ = (struct QueueElement*) result;
   queue_pos_ = 0;
   init_queue(shared_queue_);
@@ -79,8 +79,8 @@ static struct QueueElement *volatile map_queue() {
 static struct QueueElement *volatile next_queue_element() {
   queue_pos_ %= QUEUE_LEN;
   while (shared_queue_[queue_pos_].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event (PRU_EVTOUT_0);
-    prussdrv_pru_clear_event (PRU0_ARM_INTERRUPT);
+    prussdrv_pru_wait_event(PRU_EVTOUT_0);
+    prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
   }
   return &shared_queue_[queue_pos_++];
 }
@@ -88,7 +88,7 @@ static struct QueueElement *volatile next_queue_element() {
 int beagleg_init(void) {
   unsigned int ret;
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
-  prussdrv_init ();
+  prussdrv_init();
 
   /* Get the interrupt initialized */
   ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
@@ -180,14 +180,14 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
 void beagleg_wait_queue_empty(void) {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (shared_queue_[last_insert_position].state == STATE_FILLED) {
-    prussdrv_pru_wait_event (PRU_EVTOUT_0);
-    prussdrv_pru_clear_event (PRU0_ARM_INTERRUPT);
+    prussdrv_pru_wait_event(PRU_EVTOUT_0);
+    prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
   }
 }
 
 void beagleg_exit_nowait(void) {
-  prussdrv_pru_disable (PRU_NUM);
-  prussdrv_exit ();
+  prussdrv_pru_disable(PRU_NUM);
+  prussdrv_exit();
 }
 
 void beagleg_exit(void) {

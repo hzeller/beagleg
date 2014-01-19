@@ -1,5 +1,5 @@
 /*
- * (c) 2013, 1014 Henner Zeller <h.zeller@acm.org>
+ * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
  *
