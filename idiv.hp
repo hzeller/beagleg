@@ -1,10 +1,13 @@
 ;;; -*- asm -*-
+;;; Integer division operation (idiv) for the am335x Beaglebone Black PRU.
+;;;
 ;;; (c) 2014 Henner Zeller <h.zeller@acm.org>
 ;;;
 ;;; This file is part of BeagleG. http://github.com/hzeller/beagleg
 ;;;
-;;; Note: while the rest of beagleG is GPL v3.0, this file idiv.hp is granted
-;;; the more permissible MIT license.
+;;; Note: while the rest of BeagleG is GPL v3.0, this file idiv.hp is granted
+;;; the more permissible MIT license. Just keep the copyright header and you're
+;;; good to include it anywhere.
 ;;;
 ;;; Permission is hereby granted, free of charge, to any person obtaining a copy
 ;;; of this software and associated documentation files (the "Software"), to deal
@@ -15,7 +18,7 @@
 ;;;
 ;;; The above copyright notice and this permission notice shall be included in
 ;;; all copies or substantial portions of the Software.
-;;
+;;;
 ;;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 ;;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 ;;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
