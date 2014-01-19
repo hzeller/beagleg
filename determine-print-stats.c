@@ -28,7 +28,7 @@ struct StatsData {
   float max_feedrate;
   float cfg_speed_factor;   // speed factor set from commandline
   float prog_speed_factor;  // factor set from program
-  float current_feedrate;   // mm/s
+  float current_G1_feedrate;   // mm/s
   struct BeagleGPrintStats *stats;
 };
 
@@ -76,14 +76,14 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
   struct StatsData *data = (struct StatsData*)userdata;
   if (feed > 0) {
     // Change current feedrate.
-    data->current_feedrate = data->cfg_speed_factor * feed;
+    data->current_G1_feedrate = data->cfg_speed_factor * feed;
   }
-  float feedrate = data->current_feedrate * data->prog_speed_factor;
+  float feedrate = data->current_G1_feedrate * data->prog_speed_factor;
   if (feedrate > data->max_feedrate) {
-    if (feedrate > data->stats->max_G1_feedrate) {
-      data->stats->max_G1_feedrate = feedrate;
-    }
     feedrate = data->max_feedrate;  // limit.
+  }
+  if (feedrate > data->stats->max_G1_feedrate) {
+    data->stats->max_G1_feedrate = feedrate;
   }
   duration_move(data->stats, feedrate, axis);
 }
@@ -100,7 +100,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   data.max_feedrate = max_feedrate;
   data.cfg_speed_factor = speed_factor;
   data.prog_speed_factor = 1.0f;
-  data.current_feedrate = max_feedrate / 10; // some reasonable default.
+  data.current_G1_feedrate = max_feedrate / 10; // some reasonable default.
   bzero(result, sizeof(*result));
   data.stats = result;
 
