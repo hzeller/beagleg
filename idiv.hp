@@ -25,62 +25,71 @@
 ;;; THE SOFTWARE.
 
 
-;;; Input: (hi || lo) = numerator, d = divisor
-;;;        (We only support 32 bit / 32 bit, so hi needs to be zero).
-;;; Output: lo := quotient, hi := remainder; d: untouched
+;;; Typical cycle count of division operation.
+#define IDIV_MACRO_CYCLE_COUNT 128
+
+;;; Input:  32 bit divident, 32 bit divisor, 32 bit space to hold remainder
+;;; Output:
+;;;   divident_becomes_quotient := divident_becomes_quotient / divisor
+;;;   remainder                 := divident_becomes_quotient % divisor
+;;;   divisor: untouched
 ;;;
-;;; Uses: 3 registers; 96 .. 160 cycles (avg 128)
+;;; Uses: 3 registers; 97 .. 161 cycles (avg 128.5)
 .macro idiv_macro
-.mparam hi,lo, d
-	;;  Unrolled loop of 32 division steps.
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
+.mparam divident_becomes_quotient, divisor, remainder
+	;; divident is the lo-word and will become the quotient
+	;; remainder is the hi-word; is 0 initially.
 
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
+	zero &remainder, 4	; 1 cycle
+	;;  Unrolled loop of 32 division steps. 32 * 3 .. 5 cycles
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
 
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
 
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
-	_idiv_division_step hi, lo, d
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
+	_idiv_division_step remainder, divident_becomes_quotient, divisor
 .endm
 	
 ;;; Internal division step for idiv_macro; uses between 3 and 5 cycles
-;;; (hi || lo) - internal state; initially lo is numerator
+;;; (hi || lo) - internal state; initially lo is divident
 ;;;              then gradually becomes quotient, hi the remainder.
 ;;; d          - divisor
 .macro _idiv_division_step
 .mparam hi, lo, d
-	add lo, lo, lo		;  c || lo := lo << 1          ; c : carry
-	adc hi, hi, hi		;  c || hi := (hi || c) << 1
+	add lo, lo, lo		; c || lo := lo << 1          ; c : carry
+	adc hi, hi, hi		; c || hi := (hi || c) << 1
 	;; If we'd support 64/32bit: now [add lo, lo, 0] [qbbs DO_SUB, lo, 0]
-	qblt NO_SUBSTRACT, d, hi ; if (hi >= d) (i.e. skip if hi < d)
-	set lo, 0		 ;   set the low bit
-DO_SUB:	sub hi, hi, d		 ;   and substract divisor
-NO_SUBSTRACT:
+	qblt SKIP_SUB, d, hi    ; if (hi >= d) (i.e. skip if hi < d)
+	set lo, 0		;   set the low bit
+DO_SUB:	sub hi, hi, d		;   and substract divisor
+SKIP_SUB:
 .endm
