@@ -34,7 +34,7 @@
 
 #define QUEUE_ELEMENT_SIZE (SIZE(QueueHeader) + SIZE(TravelParameters))
 
-#define MOTOR_DIR_GPIO1_SHIFT 12 ; contiguous direction bits in GPIO1
+#define DIRECTION_GPIO1_SHIFT 12 ; contiguous direction bits in GPIO1
 
 ;; GPIO-0 - output steps.
 #define MOTOR_1_STEP_BIT 2
@@ -46,9 +46,10 @@
 #define MOTOR_7_STEP_BIT 15
 #define MOTOR_8_STEP_BIT 20
 
-// Setting direction. Output bits are 0
+// Setting direction. Output bits are 0, and the assembler doesn't understand
+// the ~ operator. Hence with xor.
 #define MOTOR_OUT_BITS (0xFFFFFFFF ^ ((1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<7) | (1<<14) | (1<<15) | (1<<20)))
-#define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << MOTOR_DIR_GPIO1_SHIFT)
+#define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << DIRECTION_GPIO1_SHIFT)
 
 #define PARAM_START r8
 #define PARAM_END  r17
@@ -85,18 +86,6 @@
 	.u32 m8
 .ends
 
-.macro DebugBitOn
-	MOV r25, (0xFF << MOTOR_DIR_GPIO1_SHIFT)
-	MOV r26, GPIO1 | GPIO_DATAOUT
-	SBBO r25, r26, 0, 4
-.endm
-
-.macro DebugBitOff
-	ZERO &r25, 4
-	MOV r26, GPIO1 | GPIO_DATAOUT
-	SBBO r25, r26, 0, 4
-.endm
-
 .macro UpdateMotor
 .mparam state_reg, fraction, bit
 	ADD state_reg, state_reg, fraction
@@ -129,10 +118,10 @@ QUEUE_READ:
 
 	;; Output direction bits
 	MOV r3, queue_header.direction_bits
-	LSL r3, r3, MOTOR_DIR_GPIO1_SHIFT
+	LSL r3, r3, DIRECTION_GPIO1_SHIFT
 	MOV r4, GPIO1 | GPIO_DATAOUT
 	SBBO r3, r4, 0, 4
-	
+
 	;; queue_header processed, r1 is free to use
 	ADD r1, r2, SIZE(QueueHeader) ; r2 stays at queue pos
 	.assign TravelParameters, PARAM_START, PARAM_END, travel_params
@@ -172,7 +161,7 @@ STEP_DELAY:			; TODO: LOOP instruction ? Does it >16bit ?
 	SUB r1, r1, 1
 	QBNE STEP_DELAY, r1, 0
 
-	
+
 	SUB r0, r0, 1		; number of steps.
 	QBNE STEP_GEN, r0, 0
 
