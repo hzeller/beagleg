@@ -1,6 +1,7 @@
 ;;; -*- asm -*-
 ;;; Integer division operation (idiv) for the am335x Beaglebone Black PRU.
-;;;
+;;; Standard shift-and-substract algorithm.
+;;; 
 ;;; (c) 2014 Henner Zeller <h.zeller@acm.org>
 ;;;
 ;;; This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -33,8 +34,8 @@
 
 ;;; Input:  32 bit divident, 32 bit divisor, 32 bit space to hold remainder
 ;;; Output:
-;;;   divident_becomes_quotient := divident_becomes_quotient / divisor
 ;;;   remainder                 := divident_becomes_quotient % divisor
+;;;   divident_becomes_quotient := divident_becomes_quotient / divisor
 ;;;   divisor: untouched
 ;;;
 ;;; Uses: 3 registers; 97 .. 161 cycles (avg 128.5)
