@@ -59,21 +59,24 @@ static void print_file_stats(const char *filename,
   }
 }
 
-static int usage(const char *prog) {
-   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
-	   "Options:\n"
-	   "  -f <factor> : Print speed factor (Default 1.0).\n"
-	   "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
-	   "  -l <port>   : Listen on this TCP port.\n"
-	   "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
-	   "  -n          : Dryrun; don't send to motors (Default: off).\n"
-	   "  -P          : Verbose: Print motor commands (Default: off).\n"
-	   "  -S          : Synchronous: don't queue (Default: off).\n"
-	   "  -R          : Repeat file forever.\n",
-	   prog, kDefaultMaxFeedrate);
-   fprintf(stderr, "You can either specify -l <port> to listen for commands "
-	   "or give a filename\n");
-   return 1;
+static int usage(const char *prog, const char *msg) {
+  if (msg) {
+    fprintf(stderr, "%s\n\n", msg);
+  }
+  fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
+	  "Options:\n"
+	  "  -f <factor> : Print speed factor (Default 1.0).\n"
+	  "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
+	  "  -l <port>   : Listen on this TCP port.\n"
+	  "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
+	  "  -n          : Dryrun; don't send to motors (Default: off).\n"
+	  "  -P          : Verbose: Print motor commands (Default: off).\n"
+	  "  -S          : Synchronous: don't queue (Default: off).\n"
+	  "  -R          : Repeat file forever.\n",
+	  prog, kDefaultMaxFeedrate);
+  fprintf(stderr, "You can either specify -l <port> to listen for commands "
+	  "or give a filename\n");
+  return 1;
 }
 
 static int send_file_to_printer(const char *filename, char do_loop) {
@@ -163,11 +166,13 @@ int main(int argc, char *argv[]) {
     switch (opt) {
     case 'f':
       config.speed_factor = atof(optarg);
-      if (config.speed_factor <= 0) return usage(argv[0]);
+      if (config.speed_factor <= 0)
+	return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
     case 'm':
       config.max_feedrate = atoi(optarg);
-      if (config.max_feedrate <= 0) return usage(argv[0]);
+      if (config.max_feedrate <= 0)
+	return usage(argv[0], "Feedrate cannot be <= 0");
       break;
     case 'n':
       config.dry_run = 1;
@@ -188,18 +193,16 @@ int main(int argc, char *argv[]) {
       bind_addr = strdup(optarg);
       break;
     default:
-      return usage(argv[0]);
+      return usage(argv[0], "Unknown flag");
     }
   }
 
   const char has_filename = (optind < argc);
   if (! (has_filename ^ (listen_port > 0))) {
-    fprintf(stderr, "Choose one: Either gcode-filename or listen on port.\n");
-    return usage(argv[0]);
+    return usage(argv[0], "Choose one: <gcode-filename> or -l <port>.");
   }
   if (!has_filename && do_file_repeat) {
-    fprintf(stderr, "-R (repeat) only makes sense with a filename.\n");
-    return usage(argv[0]);
+    return usage(argv[0], "-R (repeat) only makes sense with a filename.");
   }
 
   if (gcode_machine_control_init(&config) != 0) {
