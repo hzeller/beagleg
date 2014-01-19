@@ -30,7 +30,7 @@
 
 
 ;;; Typical cycle count of division operation.
-#define IDIV_MACRO_CYCLE_COUNT 128
+#define IDIV_MACRO_CYCLE_COUNT 129
 
 ;;; Input:  32 bit divident, 32 bit divisor, 32 bit space to hold remainder
 ;;; Output:
@@ -38,7 +38,7 @@
 ;;;   divident_becomes_quotient := divident_becomes_quotient / divisor
 ;;;   divisor: untouched
 ;;;
-;;; Uses: 3 registers; 97 .. 161 cycles (avg 128.5)
+;;; Uses: 3 registers; 97 .. 161 cycles (avg 129)
 .macro idiv_macro
 .mparam divident_becomes_quotient, divisor, remainder
 	;; divident is the lo-word and will become the quotient
