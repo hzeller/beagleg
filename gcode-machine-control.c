@@ -30,6 +30,9 @@
 #include "motor-interface.h"
 #include "gcode-parser.h"
 
+// In case we get a zero feedrate, send this frequency to motors instead.
+#define ZERO_FEEDRATE_OVERRIDE_HZ 5
+
 struct PrinterState {
   struct MachineControlConfig cfg;
   GCodeParser_t *parser;
@@ -136,6 +139,16 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
       * feedrate / euclid_steps;
   } else {
     command.travel_speed = min_feedrate_relevant_steps_per_mm * feedrate;
+  }
+
+  if (command.travel_speed == 0) {
+    // In case someone choose a feedrate of 0, set something
+    if (state->msg_stream) {
+      fprintf(state->msg_stream, "Ignoring speed of 0, setting to %.6f mm/s\n",
+	      (1.0f * ZERO_FEEDRATE_OVERRIDE_HZ
+	       / min_feedrate_relevant_steps_per_mm));
+    }
+    command.travel_speed = ZERO_FEEDRATE_OVERRIDE_HZ;
   }
 
   if (!state->cfg.dry_run) {
@@ -278,6 +291,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   bzero(s_mstate, sizeof(*s_mstate));
   s_mstate->cfg = *config;
   s_mstate->current_feedrate_mm_per_sec = config->max_feedrate / 10;
+  s_mstate->prog_speed_factor = 1.0f;
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
