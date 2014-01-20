@@ -1,16 +1,23 @@
 BeagleG
 =======
 
-Experimental step-motor controller using the PRU capability of the
-Beaglebone Black to create precisely timed stepper-pulses (just velocity right
-now, no acceleration or jerk implemented).
+Step-motor controller (and eventually 3D printer controller) using the PRU
+capability of the Beaglebone Black to create precisely timed stepper-pulses for
+acceleration and travel.
 
-The motor-interface API allows to enqueue step-{count, frequency}
+The motor-interface API allows to enqueue
+step-{count, {start,travel,end}-frequency}
 of 8 steppers that are controlled in a coordinated move (G1), with real-time
-controlled steps at rates that can go well beyond 500kHz.
+controlled steps at rates that can go beyond 500kHz.
 So: sufficient even for advanced step motors and drivers :)
 
-The `send-gcode` test-program is parsing G-Code, extracting axes moves and
+The [acceleration - travel - deceleration] motion profile is entirely
+created within the PRU from parameters sent by the host CPU via a ring-buffer.
+The host CPU prepares the data, such as parsing the G-Code and doing travel
+planning, while all the real-time critical parts are done in the PRU. The host
+program needs less than 1% CPU-time processing a typical G-Code file.
+
+The `send-gcode` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit.
 
 ## APIs
@@ -38,6 +45,7 @@ takes a filename or a TCP port to listen on.
     Options:
       -f <factor> : Print speed factor (Default 1.0).
       -m <rate>   : Max. feedrate (Default 200mm/s).
+      -a <accel>  : Acceleration/Deceleration (Default 4000mm/s^2).
       -l <port>   : Listen on this TCP port.
       -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)
       -n          : Dryrun; don't send to motors (Default: off).
@@ -58,8 +66,8 @@ capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
     ./send-gcode -l 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
-line. So you could use `telnet` to have an interactive session or send a file
-with `socat`:
+line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
+session or send a file with `socat`:
 
      cat myfile.gcode | socat -t5 - TCP4:beaglebone-hostname:4444
 
@@ -98,7 +106,9 @@ check the mapping in your BBB documentation.
     Step     : GPIO-0 |  2,  3,  4,  5,  7, 14, 15, 20
     Direction: GPIO-1 | 12, 13, 14, 15, 16, 17, 18, 19
 
-For your interface: note this is 3.3V level (and assume not more than ~4mA).
+For your interface: note this is 3.3V level (and assume not more than ~4mA). The
+RAMPS driver board for instance only works if you power the 5V input with 3.3V,
+so that the Pololu inputs detect the logic level properly.
 
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
@@ -127,7 +137,6 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 ## TODO
-   - Implement acceleration and jerk.
    - Read end-switches
    - Needed for full 3D printer solution: add PWM for heaters.
    - Fast stop without waiting for queues to empty, but still be able to
