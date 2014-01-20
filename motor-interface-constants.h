@@ -20,4 +20,10 @@
 
 #define STATE_EMPTY 0
 #define STATE_FILLED 1
+#define STATE_EXIT 2
+
 #define QUEUE_LEN 16
+
+// In calculation of delay cycles: number of bits shifted
+// for higher resolution.
+#define DELAY_CYCLE_SHIFT 5

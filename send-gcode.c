@@ -39,6 +39,7 @@
 
 // Some default settings.
 static const int kDefaultMaxFeedrate = 200; // mm/s
+static const int kDefaultAcceleration = 4000; // mm/s^2
 static const int kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
 static const float kFilamentDiameter = 1.7;  // mm
 
@@ -67,13 +68,14 @@ static int usage(const char *prog, const char *msg) {
 	  "Options:\n"
 	  "  -f <factor> : Print speed factor (Default 1.0).\n"
 	  "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
+	  "  -a <accel>  : Acceleration/Deceleration (Default %dmm/s^2).\n"
 	  "  -l <port>   : Listen on this TCP port.\n"
 	  "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
 	  "  -n          : Dryrun; don't send to motors (Default: off).\n"
 	  "  -P          : Verbose: Print motor commands (Default: off).\n"
 	  "  -S          : Synchronous: don't queue (Default: off).\n"
 	  "  -R          : Repeat file forever.\n",
-	  prog, kDefaultMaxFeedrate);
+	  prog, kDefaultMaxFeedrate, kDefaultAcceleration);
   fprintf(stderr, "You can either specify -l <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
@@ -154,6 +156,7 @@ int main(int argc, char *argv[]) {
 	 sizeof(config.axis_steps_per_mm));
   config.max_feedrate = kDefaultMaxFeedrate;
   config.speed_factor = 1;
+  config.acceleration_steps_s2 = kStepsPerMM[0] * kDefaultAcceleration;
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
@@ -162,7 +165,7 @@ int main(int argc, char *argv[]) {
   char do_file_repeat = 0;
   char *bind_addr = NULL;
   int opt;
-  while ((opt = getopt(argc, argv, "SPRnl:f:m:b:")) != -1) {
+  while ((opt = getopt(argc, argv, "SPRnl:f:m:a:b:")) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = atof(optarg);
@@ -173,6 +176,11 @@ int main(int argc, char *argv[]) {
       config.max_feedrate = atoi(optarg);
       if (config.max_feedrate <= 0)
 	return usage(argv[0], "Feedrate cannot be <= 0");
+      break;
+    case 'a':
+      config.acceleration_steps_s2 = kStepsPerMM[0] * atoi(optarg);
+      if (config.acceleration_steps_s2 <= 0)
+	return usage(argv[0], "Acceleration cannot be <= 0");
       break;
     case 'n':
       config.dry_run = 1;

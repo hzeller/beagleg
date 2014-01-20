@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <math.h>
 #include <pruss_intc_mapping.h>
 #include <prussdrv.h>
 #include <stdint.h>
@@ -37,7 +38,7 @@
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
 
-//#define DEBUG_QUEUE
+#define DEBUG_QUEUE
 
 #define MOTOR_COUNT 8
 
@@ -46,19 +47,28 @@
 #define LOOP_OVERHEAD_CYCLES 11
 
 struct QueueElement {
+  // Queue header
   uint8_t state;
   uint8_t direction_bits;
-  uint16_t steps;          // Number of total steps
-  uint16_t padding;        // align properly.
-  uint32_t travel_delay;   // delay-loop count
+
+  // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
+  uint16_t accel_series_index;
+  uint16_t steps_accel;    // Phase 1: steps spent in acceleration
+  uint16_t steps_travel;   // Phase 2: steps spent in travel
+  uint16_t steps_decel;    // Phase 3: steps spent in deceleration
+  
+  uint32_t hires_accel_cycles;  // initial delay cycles.
+  uint32_t travel_cycles;       // travel cycles.
+
   uint32_t fractions[MOTOR_COUNT];  // fixed point fractions to add each step.
 } __attribute__((packed));
 
 
 #define PRU_NUM 0
 
+static float acceleration_;
 struct QueueElement *volatile shared_queue_;
-unsigned int queue_pos_;
+static unsigned int queue_pos_;
 
 static void init_queue(struct QueueElement *elements) {
   memset(elements, 0x00, QUEUE_LEN * sizeof(*elements));
@@ -85,7 +95,8 @@ static struct QueueElement *volatile next_queue_element() {
   return &shared_queue_[queue_pos_++];
 }
 
-int beagleg_init(void) {
+int beagleg_init(float acceleration_steps_s2) {
+  acceleration_ = acceleration_steps_s2;
   unsigned int ret;
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
   prussdrv_init();
@@ -111,13 +122,19 @@ int beagleg_init(void) {
 }
 
 #ifdef DEBUG_QUEUE
-static void DumpQueueElement(const struct QueueElement *element) {
-  fprintf(stderr, "enqueue[%d]: dir:0x%02x steps:%d delay:%d ",
-	  element - shared_queue_,
-	  element->direction_bits, element->steps, element->travel_delay);
+static void DumpQueueElement(const struct QueueElement *e) {
+  fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:%5d+%5d+%5d=%5d "
+	  "accel-delay: %d (%u raw); travel-delay: %d",
+	  e - shared_queue_, e->direction_bits,
+	  e->steps_accel, e->steps_travel, e->steps_decel,
+	  e->steps_accel + e->steps_travel + e->steps_decel,
+	  e->hires_accel_cycles >> DELAY_CYCLE_SHIFT, e->hires_accel_cycles,
+	  e->travel_cycles);
+#if 0
   for (int i = 0; i < MOTOR_COUNT; ++i) {
     fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
   }
+#endif
   fprintf(stderr, "\n");
 	    
 }
@@ -134,6 +151,8 @@ static void enqueue_internal(struct QueueElement *element) {
   queue_element->state = STATE_FILLED;
 }
 
+static double cycles_per_second() { return 100e6; } // two cycles per loop.
+#if 0
 static int speed_2_delay(float steps_per_second) {
   // Roughly, we neexd 4 * cycle-time delay. At 200Mhz, we have 5ns cycles.
   // There is some overhead for each toplevel loop that we substract.
@@ -142,12 +161,11 @@ static int speed_2_delay(float steps_per_second) {
   if (steps > 0x7fffffff) { return 0x7fffffff; }   // Cap veeery long period.
   return steps - LOOP_OVERHEAD_CYCLES;
 }
+#endif
 
 int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   struct QueueElement new_element;
-  int delay = speed_2_delay(param->travel_speed);
-  if (delay <= 0) delay = 1;
-  new_element.travel_delay = delay;
+
   int biggest_value = abs(param->steps[0]);
   new_element.direction_bits = 0;
   for (int i = 0; i < MOTOR_COUNT; ++i) {
@@ -167,12 +185,49 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
 	    "At most 65535 steps, got %d. Ignoring command.\n", biggest_value);
     return 2;
   }
-  new_element.steps = biggest_value;
   const uint64_t max_fraction = 0x7FFFFFFF;
   for (int i = 0; i < MOTOR_COUNT; ++i) {
     const uint64_t delta = abs(param->steps[i]);
     new_element.fractions[i] = delta * max_fraction / biggest_value;
   }
+
+  // Calculate speeds
+  // First step while exerpimenting: assume start/endspeed always 0.
+  // TODO: take these into account (requires acceleration planning)
+  const int total_steps = biggest_value;
+
+  // TODO(hzeller): we need two step-count per motor cycle (edge up, edge down),
+  // So we need to multiply step-counts by 2 (currently, motors only move
+  // half the distance).
+  // We're constrained by 16 bit registers for the counters, so we can't easily
+  // <<1. OTOH, we'd like to have 64k step-count, as it means a travel-distance
+  // of comforatable > 400mm@160 steps/mm
+
+  // Steps to reach requested speed at acceleration
+  // v = a*t -> t = v/a
+  // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
+  int steps_accel = (param->travel_speed*param->travel_speed
+		     / (2.0 * acceleration_));
+  if (2 * steps_accel < total_steps) {
+    new_element.steps_accel = steps_accel;
+    new_element.steps_travel = total_steps - 2*steps_accel;
+    new_element.steps_decel = steps_accel;
+  } else {
+    // We don't want deceleration have more steps than acceleration (the
+    // iterative approximation will not be happy), so let's make sure to have
+    // accel_steps >= decel_steps by using the fact that integer div essentially
+    // does floor()
+    new_element.steps_decel = total_steps / 2;
+    new_element.steps_travel = 0;
+    new_element.steps_accel = total_steps - new_element.steps_decel;
+  }
+  double accel_factor = cycles_per_second() * (sqrt(2.0 / acceleration_));
+
+  new_element.accel_series_index = 0;   // zero speed start
+  new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
+				    * accel_factor * 0.67605);
+  new_element.travel_cycles = cycles_per_second() / param->travel_speed;
+
   enqueue_internal(&new_element);
   return 0;
 }
@@ -193,7 +248,7 @@ void beagleg_exit_nowait(void) {
 void beagleg_exit(void) {
   struct QueueElement end_element;
   memset(&end_element, 0x00, sizeof(end_element));
-  end_element.steps = 0;  // 0 steps: sentinel to exit.
+  end_element.state = STATE_EXIT;
   enqueue_internal(&end_element);
   beagleg_wait_queue_empty();
   beagleg_exit_nowait();

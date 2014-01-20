@@ -22,15 +22,16 @@
 struct bg_movement {
   // Speed is steps/second of the axis with the highest number of steps. All
   // other axes are scaled down accordingly.
-  float start_speed;     // (requires acceleration; not implemented yet)
+  float start_speed;
   float travel_speed;
-  float end_speed;       // (requires acceleration; not implemented yet)
+  float end_speed;
 
   int steps[8];   // number of steps for axis. Negative for 'backwards'.
 };
 
-// Initialize beagleg motor control. Returns 0 on success, 1 on some error.
-int beagleg_init(void);
+// Initialize beagleg motor control. Initializes the acceleration in steps/s^2.
+//  Returns 0 on success, 1 on some error.
+int beagleg_init(float acceleration_steps_s2);
 void beagleg_exit(void);  // shutdown motor control.
 // shutdown motor control immediately, don't wait for current queue to empty.
 void beagleg_exit_nowait(void);

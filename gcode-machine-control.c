@@ -284,7 +284,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    beagleg_init();
+    beagleg_init(config->acceleration_steps_s2);
   }
 
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
