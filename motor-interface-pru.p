@@ -106,57 +106,85 @@
 ;;; Outputs the resulting delay in output_reg.
 ;;; Returns special value 0 when done.
 ;;; Only used once, so just macro.
+;;; 
+;;; We're approximating the needed sqrt() operation with a few terms
+;;; from an Taylor series which brings sufficient accuracy and boils down
+;;; to a single (somewhat expensive) division. I tried as well using an
+;;; integer sqrt directly, but the rounding errors were worse.
+;;; Thanks to this paper for inspiration:
+;;;   http://embedded.com/design/mcus-processors-and-socs/4006438
 .macro CalculateDelay
 .mparam output_reg, params, state_register, divident_tmp, divisor_tmp
-;;; Phase 1: Acceleration
-ACCEL:
-	QBEQ TRAVEL, params.steps_accel, 0
-	QBEQ ACCEL_CALC_DONE, params.accel_series_index, 0 // init ? good to go
+;;; We use the 'state_register' to store the remainder of the division
+;;; to carry it to the next division for higher accuracy.
+;;; Note, we're using the division macro twice here instead of wrapping it in
+;;; a function. There is no need, we have enough code-space.
+PHASE_1_ACCELERATION:	; ==================================================
+	QBEQ PHASE_2_TRAVEL, params.steps_accel, 0
+	QBEQ accel_calc_done, params.accel_series_index, 0 // first ? no calc.
+	
 	;; divident = (hires_accel_cycles) << 1 + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
-	// Add previous remainder for higher resolution.
+	;; Add previous remainder for higher resolution.
 	ADD divident_tmp, divident_tmp, state_register
+	
 	;; divisor = (accel_series_index << 2) + 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	ADD divisor_tmp, divisor_tmp, 1
-	// We call the macro here instead of having a function, but we have
-	// enough code-space and function calling is a hassle.
+	
 	idiv_macro divident_tmp, divisor_tmp, state_register
+	
+	;; params.hires_accel_cycles -= quotient
 	SUB params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
-ACCEL_CALC_DONE:
-	ADD params.accel_series_index, params.accel_series_index, 1
-	SUB params.steps_accel, params.steps_accel, 1
+accel_calc_done:
+	ADD params.accel_series_index, params.accel_series_index, 1 ; series++
+	SUB params.steps_accel, params.steps_accel, 1		; steps_accel--
+
+	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
+	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
-	JMP DONE
 
-;;; Phaes 2: regular travel
-TRAVEL:
-	QBEQ DECEL, params.steps_travel, 0
-	SUB params.steps_travel, params.steps_travel, 1
+	;; Correct Timing: Substract the number of cycles we've spent in this
+	;; routine. We take half, because the delay-loop needs 2 cycles.
+	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 9) / 2
+	JMP DONE_CALCULATE_DELAY
+
+PHASE_2_TRAVEL:		; ==================================================
+	QBEQ PHASE_3_DECELERATION, params.steps_travel, 0
+	SUB params.steps_travel, params.steps_travel, 1	        ; steps_travel--
 	MOV output_reg, params.travel_cycles
-	JMP DONE
+	SUB output_reg, output_reg, (4 / 2)
+	JMP DONE_CALCULATE_DELAY
 
-;;; Phase 3: deceleration
-DECEL:
-	QBNE CALC_DECEL, params.steps_decel, 0
-	ZERO &params.hires_accel_cycles, 4   // we're done. Special stop value
-	JMP DONE
-CALC_DECEL:
+PHASE_3_DECELERATION:	; ==================================================
+	QBNE calc_decel, params.steps_decel, 0
+	ZERO &output_reg, 4                // we're done. Special stop value 0
+	JMP DONE_CALCULATE_DELAY
+calc_decel:
 	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	ADD divident_tmp, divident_tmp, state_register
+	
 	;; divisor = (accel_series_index << 2) - 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	SUB divisor_tmp, divisor_tmp, 1
+	
 	idiv_macro divident_tmp, divisor_tmp, state_register
+	
+	;; params.hires_accel_cycles += quotient
 	ADD params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 
-	SUB params.accel_series_index, params.accel_series_index, 1
-	SUB params.steps_decel, params.steps_decel, 1
-	
+	SUB params.accel_series_index, params.accel_series_index, 1 ; series--
+	SUB params.steps_decel, params.steps_decel, 1	        ; steps_decel--
+
+	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
+	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
-DONE:
-	;; todo: substract overhead induced by expensive calculation.
+	
+	;; Correct timing: Substract the number of cycles we've spent here.
+	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 11) / 2
+
+DONE_CALCULATE_DELAY:
 .endm
 
 ;;; Update the state register of a motor with its 1.31 resolution fraction.
@@ -164,7 +192,7 @@ DONE:
 .macro UpdateMotor
 .mparam output_register, state_reg, fraction, bit
 	ADD state_reg, state_reg, fraction
-	QBBC M_END, state_reg, 31
+	QBBC M_END, state_reg, 31          ; Check MSB
 	SET output_register, bit
 M_END:
 .endm
@@ -175,11 +203,13 @@ INIT:
 	CLR r0, r0, 4
 	SBCO r0, C4, 4, 4
 	
-	;; Make sure that we can write. Clearing the motor bits
+	;; Make sure that we can write. Clearing the bits means: output.
+	;; Stepper bits on GPIO-0
 	MOV r2, MOTOR_OUT_BITS
 	MOV r3, GPIO0 | GPIO_OE
 	SBBO r2, r3, 0, 4
 
+	;; Direction bits on GPIO-1
 	MOV r2, DIRECTION_OUT_BITS
 	MOV r3, GPIO1 | GPIO_OE
 	SBBO r2, r3, 0, 4
@@ -187,6 +217,7 @@ INIT:
 	MOV r2, 0		; Queue address in PRU memory
 
 QUEUE_READ:
+	;; Check queue header at our read-position until it contains something.
 	.assign QueueHeader, r1.w0, r1.w0, queue_header
 	LBCO queue_header, CONST_PRUDRAM, r2, SIZE(queue_header)
 	QBEQ QUEUE_READ, queue_header.state, STATE_EMPTY ; wait until got data.
@@ -194,6 +225,10 @@ QUEUE_READ:
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 	
 	;; Output direction bits
+	;; TODO(hzeller): we should time the first step output after this a
+	;; bit later, the Allegro documentation talks about >= 200ns
+	;; Right now, the first step might arrive a just couple of ns later.
+	;; (Instead of 2 phases, we need 4, so that we land in blanks)
 	MOV r3, queue_header.direction_bits
 	LSL r3, r3, DIRECTION_GPIO1_SHIFT
 	MOV r4, GPIO1 | GPIO_DATAOUT
@@ -208,13 +243,15 @@ QUEUE_READ:
 	ZERO &mstate, SIZE(mstate)
 	
 	MOV r4, GPIO0 | GPIO_DATAOUT
-
+	ZERO &r3, 4		; initialize delay calculation state register.
+	
 	;; in use
 	;; r2 = queue pos
+	;; r3 = state for CalculateDelay
 	;; r4 = motor out GPIO
 	;; status: r8..r16
 STEP_GEN:
-	;; update states and extract overflow bit into r1
+	;; update states and extract overflow bits into r1
 	ZERO &r1, 4
 	UpdateMotor r1, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
 	UpdateMotor r1, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
@@ -228,7 +265,7 @@ STEP_GEN:
 	SBBO r1, r4, 0, 4	; motor bits to GPIO0
 
 	CalculateDelay r1, travel_params, r3, r5, r6
-	QBEQ DONE_STEP_GEN, r1, 0
+	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
 STEP_DELAY:
 	SUB r1, r1, 1
 	QBNE STEP_DELAY, r1, 0
