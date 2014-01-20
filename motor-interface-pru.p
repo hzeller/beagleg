@@ -48,8 +48,12 @@
 #define MOTOR_8_STEP_BIT 20
 
 // Setting direction. Output bits are 0, and the assembler does not understand
-// the ~ operator. Hence with xor.
-#define MOTOR_OUT_BITS (0xFFFFFFFF ^ ((1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<7) | (1<<14) | (1<<15) | (1<<20)))
+// the ~ operator in immediates. Thus we do it with xor.
+// Also the pre-processor does not allow for backslash-line-continuation, hence
+// this looks a bit ugly in one line.
+#define MOTOR_OUT_BITS (0xFFFFFFFF ^ ( (1<<MOTOR_1_STEP_BIT) | (1<<MOTOR_2_STEP_BIT) | (1<<MOTOR_3_STEP_BIT) | (1<<MOTOR_4_STEP_BIT) | (1<<MOTOR_5_STEP_BIT) | (1<<MOTOR_6_STEP_BIT) | (1<<MOTOR_7_STEP_BIT) | (1<<MOTOR_8_STEP_BIT) ))
+	
+// Direction bits are a contiguous chunk, just a bit shifted.
 #define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << DIRECTION_GPIO1_SHIFT)
 
 #define PARAM_START r7
