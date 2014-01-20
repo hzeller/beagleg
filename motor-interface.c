@@ -123,7 +123,7 @@ int beagleg_init(float acceleration_steps_s2) {
 
 #ifdef DEBUG_QUEUE
 static void DumpQueueElement(const struct QueueElement *e) {
-  fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:%5d+%5d+%5d=%5d "
+  fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
 	  "accel-delay: %d (%u raw); travel-delay: %d",
 	  e - shared_queue_, e->direction_bits,
 	  e->steps_accel, e->steps_travel, e->steps_decel,
@@ -208,11 +208,17 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
   int steps_accel = (param->travel_speed*param->travel_speed
 		     / (2.0 * acceleration_));
-  if (2 * steps_accel < total_steps) {
+  if (acceleration_ <= 0) {
+    // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
+    new_element.steps_accel = new_element.steps_decel = 0;
+    new_element.steps_travel = total_steps;
+  }
+  else if (2 * steps_accel < total_steps) {
     new_element.steps_accel = steps_accel;
     new_element.steps_travel = total_steps - 2*steps_accel;
     new_element.steps_decel = steps_accel;
-  } else {
+  }
+  else {
     // We don't want deceleration have more steps than acceleration (the
     // iterative approximation will not be happy), so let's make sure to have
     // accel_steps >= decel_steps by using the fact that integer div essentially

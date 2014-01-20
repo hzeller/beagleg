@@ -179,8 +179,7 @@ int main(int argc, char *argv[]) {
       break;
     case 'a':
       config.acceleration_steps_s2 = kStepsPerMM[0] * atoi(optarg);
-      if (config.acceleration_steps_s2 <= 0)
-	return usage(argv[0], "Acceleration cannot be <= 0");
+      // Negative or 0 means: 'infinite'.
       break;
     case 'n':
       config.dry_run = 1;
