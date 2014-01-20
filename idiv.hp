@@ -93,7 +93,7 @@
 	adc hi, hi, hi		; c || hi := (hi || c) << 1
 	;; If we'd support 64/32bit: now [add lo, lo, 0] [qbbs DO_SUB, lo, 0]
 	qblt SKIP_SUB, d, hi    ; if (hi >= d) (i.e. skip if hi < d)
-	set lo, 0		;   set the low bit
-DO_SUB:	sub hi, hi, d		;   and substract divisor
+	set lo, 0               ;   set the low bit
+DO_SUB: sub hi, hi, d           ;   and substract divisor
 SKIP_SUB:
 .endm
