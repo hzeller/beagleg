@@ -47,7 +47,7 @@
 #define MOTOR_7_STEP_BIT 15
 #define MOTOR_8_STEP_BIT 20
 
-// Setting direction. Output bits are 0, and the assembler doesn't understand
+// Setting direction. Output bits are 0, and the assembler does not understand
 // the ~ operator. Hence with xor.
 #define MOTOR_OUT_BITS (0xFFFFFFFF ^ ((1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<7) | (1<<14) | (1<<15) | (1<<20)))
 #define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << DIRECTION_GPIO1_SHIFT)
@@ -107,7 +107,7 @@
 ;;; Returns special value 0 when done.
 ;;; Only used once, so just macro.
 ;;; 
-;;; We're approximating the needed sqrt() operation with a few terms
+;;; We are approximating the needed sqrt() operation with a few terms
 ;;; from an Taylor series which brings sufficient accuracy and boils down
 ;;; to a single (somewhat expensive) division. I tried as well using an
 ;;; integer sqrt directly, but the rounding errors were worse.
@@ -117,7 +117,7 @@
 .mparam output_reg, params, state_register, divident_tmp, divisor_tmp
 ;;; We use the 'state_register' to store the remainder of the division
 ;;; to carry it to the next division for higher accuracy.
-;;; Note, we're using the division macro twice here instead of wrapping it in
+;;; Note, we are using the division macro twice here instead of wrapping it in
 ;;; a function. There is no need, we have enough code-space.
 PHASE_1_ACCELERATION:	; ==================================================
 	QBEQ PHASE_2_TRAVEL, params.steps_accel, 0
@@ -158,7 +158,7 @@ PHASE_2_TRAVEL:		; ==================================================
 
 PHASE_3_DECELERATION:	; ==================================================
 	QBNE calc_decel, params.steps_decel, 0
-	ZERO &output_reg, 4                // we're done. Special stop value 0
+	ZERO &output_reg, 4                // we are done. Special stop value 0
 	JMP DONE_CALCULATE_DELAY
 calc_decel:
 	;; divident = (hires_accel_cycles << 1) + remainder
@@ -273,7 +273,7 @@ STEP_DELAY:
 	JMP STEP_GEN
 
 DONE_STEP_GEN:
-	;; We're done with instruction. Mark slot as empty...
+	;; We are done with instruction. Mark slot as empty...
 	MOV queue_header.state, STATE_EMPTY
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16 ; signal host program free slot.
