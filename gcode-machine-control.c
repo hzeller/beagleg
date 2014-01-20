@@ -108,6 +108,10 @@ static int choose_max_abs(int a, int b) {
   return abs(a) > abs(b) ? abs(a) : abs(b);
 }
 
+static double euklid_distance(double a, double b) {
+  return sqrt(a*a + b*b);
+}
+
 // Move the given number of machine steps for each axis.
 static void move_machine_steps(struct PrinterState *state, float feedrate,
 			       int machine_steps[]) {
@@ -133,8 +137,9 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
   int max_axis_steps = choose_max_abs(command.steps[AXIS_X],
 				      command.steps[AXIS_Y]);
   if (max_axis_steps > 0) {
-    double euclid_steps = sqrt(command.steps[AXIS_X] * command.steps[AXIS_X]
-			       + command.steps[AXIS_Y] * command.steps[AXIS_Y]);
+    const double euclid_steps = euklid_distance(command.steps[AXIS_X],
+						command.steps[AXIS_Y]);
+
     command.travel_speed = max_axis_steps * min_feedrate_relevant_steps_per_mm
       * feedrate / euclid_steps;
   } else {
@@ -163,7 +168,7 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
 	      command.steps[0], command.steps[1], command.steps[2],
 	      command.steps[3], command.travel_speed / 1000.0, feedrate);
     } else {
-      fprintf(state->msg_stream,
+      fprintf(state->msg_stream,  // less clutter, when there is no Z
 	      "(%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
 	      command.steps[0], command.steps[1],
 	      command.steps[3], command.travel_speed / 1000.0, feedrate);
