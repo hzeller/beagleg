@@ -19,6 +19,7 @@
 
 #include "motor-interface.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -27,7 +28,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -67,17 +68,17 @@ struct QueueElement {
 #define PRU_NUM 0
 
 static float acceleration_;
-struct QueueElement *volatile shared_queue_;
+volatile struct QueueElement *shared_queue_;
 static unsigned int queue_pos_;
 
-static void init_queue(struct QueueElement *elements) {
-  memset(elements, 0x00, QUEUE_LEN * sizeof(*elements));
+static void init_queue(volatile struct QueueElement *elements) {
+  bzero((void*) elements, QUEUE_LEN * sizeof(*elements));
   for (int i = 0; i < QUEUE_LEN; ++i) {
     elements[i].state = STATE_EMPTY;
   }
 }
 
-static struct QueueElement *volatile map_queue() {
+static volatile struct QueueElement *map_queue() {
   void *result;
   prussdrv_map_prumem(PRUSS0_PRU0_DATARAM, &result);
   shared_queue_ = (struct QueueElement*) result;
@@ -86,7 +87,7 @@ static struct QueueElement *volatile map_queue() {
   return shared_queue_;
 }
 
-static struct QueueElement *volatile next_queue_element() {
+static volatile struct QueueElement *next_queue_element() {
   queue_pos_ %= QUEUE_LEN;
   while (shared_queue_[queue_pos_].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
@@ -122,33 +123,42 @@ int beagleg_init(float acceleration_steps_s2) {
 }
 
 #ifdef DEBUG_QUEUE
-static void DumpQueueElement(const struct QueueElement *e) {
-  fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
-	  "accel-delay: %d (%u raw); travel-delay: %d",
-	  e - shared_queue_, e->direction_bits,
-	  e->steps_accel, e->steps_travel, e->steps_decel,
-	  e->steps_accel + e->steps_travel + e->steps_decel,
-	  e->hires_accel_cycles >> DELAY_CYCLE_SHIFT, e->hires_accel_cycles,
-	  e->travel_cycles);
+static void DumpQueueElement(volatile const struct QueueElement *e) {
+  if (e->state == STATE_EXIT) {
+    fprintf(stderr, "enqueue[%02d]: EXIT\n", e - shared_queue_);
+  } else {
+    struct QueueElement copy = *e;
+    fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
+	    "accel-delay: %d (%u raw); travel-delay: %d",
+	    e - shared_queue_, copy.direction_bits,
+	    copy.steps_accel, copy.steps_travel, copy.steps_decel,
+	    copy.steps_accel + copy.steps_travel + copy.steps_decel,
+	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
+	    copy.hires_accel_cycles, copy.travel_cycles);
 #if 0
-  for (int i = 0; i < MOTOR_COUNT; ++i) {
-    fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
-  }
+    for (int i = 0; i < MOTOR_COUNT; ++i) {
+      fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
+    }
 #endif
   fprintf(stderr, "\n");
-	    
+  }	    
 }
 #endif
 
 static void enqueue_internal(struct QueueElement *element) {
-  element->state = STATE_EMPTY;  // Don't set yet to avoid race.
-  struct QueueElement *volatile queue_element = next_queue_element();
-  memcpy(queue_element, element, sizeof(*element));
+  const uint8_t state_to_send = element->state;
+  assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
+  // Initially, we copy everything with 'STATE_EMPTY', then flip the state
+  // to avoid a race condition while copying.
+  element->state = STATE_EMPTY; 
+  volatile struct QueueElement *queue_element = next_queue_element();
+  *queue_element = *element;
+
+  // Fully initialized. Tell busy-waiting PRU by flipping the state.
+  queue_element->state = state_to_send;
 #ifdef DEBUG_QUEUE
   DumpQueueElement(queue_element);
 #endif
-  // Fully initialized. Tell PRU
-  queue_element->state = STATE_FILLED;
 }
 
 static double cycles_per_second() { return 100e6; } // two cycles per loop.
@@ -233,6 +243,7 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
 				    * accel_factor * 0.67605);
   new_element.travel_cycles = cycles_per_second() / param->travel_speed;
+  new_element.state = STATE_FILLED;
 
   enqueue_internal(&new_element);
   return 0;
@@ -240,7 +251,7 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
 
 void beagleg_wait_queue_empty(void) {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (shared_queue_[last_insert_position].state == STATE_FILLED) {
+  while (shared_queue_[last_insert_position].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
     prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
   }
@@ -253,7 +264,7 @@ void beagleg_exit_nowait(void) {
 
 void beagleg_exit(void) {
   struct QueueElement end_element;
-  memset(&end_element, 0x00, sizeof(end_element));
+  bzero(&end_element, sizeof(end_element));
   end_element.state = STATE_EXIT;
   enqueue_internal(&end_element);
   beagleg_wait_queue_empty();

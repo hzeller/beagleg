@@ -18,9 +18,9 @@
 
 // To be read by *.c and *.p file, so only // comments.
 
-#define STATE_EMPTY 0
+#define STATE_EMPTY  0
 #define STATE_FILLED 1
-#define STATE_EXIT 2
+#define STATE_EXIT   2
 
 #define QUEUE_LEN 16
 
