@@ -173,6 +173,7 @@ static int speed_2_delay(float steps_per_second) {
 }
 #endif
 
+#define SUB_STEPS 2
 int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   struct QueueElement new_element;
 
@@ -204,7 +205,7 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   // Calculate speeds
   // First step while exerpimenting: assume start/endspeed always 0.
   // TODO: take these into account (requires acceleration planning)
-  const int total_steps = biggest_value;
+  const int total_steps = SUB_STEPS * biggest_value;
 
   // TODO(hzeller): we need two step-count per motor cycle (edge up, edge down),
   // So we need to multiply step-counts by 2 (currently, motors only move
@@ -216,8 +217,17 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   // Steps to reach requested speed at acceleration
   // v = a*t -> t = v/a
   // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
-  int steps_accel = (param->travel_speed*param->travel_speed
-		     / (2.0 * acceleration_));
+  int steps_accel = SUB_STEPS * (param->travel_speed*param->travel_speed
+				 / (2.0 * acceleration_));
+
+  // Temporary stop-gap.
+  if (total_steps - 2 * steps_accel > 65535 || steps_accel > 65535) {
+    fprintf(err_stream ? err_stream : stderr,
+	    "// Too many steps in move. Ignored for now, fixed soon "
+	    "(a=%d t=%d)\n", total_steps, steps_accel);
+    return 2;
+  }
+
   if (acceleration_ <= 0) {
     // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
     new_element.steps_accel = new_element.steps_decel = 0;
@@ -237,7 +247,7 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
     new_element.steps_travel = 0;
     new_element.steps_accel = total_steps - new_element.steps_decel;
   }
-  double accel_factor = cycles_per_second() * (sqrt(2.0 / acceleration_));
+  double accel_factor = cycles_per_second() * (sqrt(SUB_STEPS * 2.0 / acceleration_));
 
   new_element.accel_series_index = 0;   // zero speed start
   new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
