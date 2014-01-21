@@ -121,13 +121,13 @@
 .mparam output_reg, params, state_register, divident_tmp, divisor_tmp
 ;;; We use the 'state_register' to store the remainder of the division
 ;;; to carry it to the next division for higher accuracy.
-;;; Note, we are using the division macro twice here instead of wrapping it in
-;;; a function. There is no need, we have enough code-space.
+;;; Note, we are inlining the division macro twice here instead of wrapping it
+;;; in a function. There is no need, we have enough code-space.
 PHASE_1_ACCELERATION:	; ==================================================
 	QBEQ PHASE_2_TRAVEL, params.steps_accel, 0
 	QBEQ accel_calc_done, params.accel_series_index, 0 // first ? no calc.
 	
-	;; divident = (hires_accel_cycles) << 1 + remainder
+	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	;; Add previous remainder for higher resolution.
 	ADD divident_tmp, divident_tmp, state_register
@@ -138,7 +138,7 @@ PHASE_1_ACCELERATION:	; ==================================================
 	
 	idiv_macro divident_tmp, divisor_tmp, state_register
 	
-	;; params.hires_accel_cycles -= quotient
+	;; params.hires_accel_cycles -= quotient (divident_tmp became quotient)
 	SUB params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 accel_calc_done:
 	ADD params.accel_series_index, params.accel_series_index, 1 ; series++
@@ -148,7 +148,7 @@ accel_calc_done:
 	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
 
-	;; Correct Timing: Substract the number of cycles we've spent in this
+	;; Correct Timing: Substract the number of cycles we have spent in this
 	;; routine. We take half, because the delay-loop needs 2 cycles.
 	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 9) / 2
 	JMP DONE_CALCULATE_DELAY
@@ -175,7 +175,7 @@ calc_decel:
 	
 	idiv_macro divident_tmp, divisor_tmp, state_register
 	
-	;; params.hires_accel_cycles += quotient
+	;; params.hires_accel_cycles += quotient (divident_tmp became quotient)
 	ADD params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 
 	SUB params.accel_series_index, params.accel_series_index, 1 ; series--
@@ -185,7 +185,7 @@ calc_decel:
 	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
 	
-	;; Correct timing: Substract the number of cycles we've spent here.
+	;; Correct timing: Substract the number of cycles we have spent here.
 	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 11) / 2
 
 DONE_CALCULATE_DELAY:
@@ -221,6 +221,10 @@ INIT:
 	MOV r2, 0		; Queue address in PRU memory
 
 QUEUE_READ:
+	;; 
+	;; Read next element from ring-buffer
+	;;
+	
 	;; Check queue header at our read-position until it contains something.
 	.assign QueueHeader, r1.w0, r1.w0, queue_header
 	LBCO queue_header, CONST_PRUDRAM, r2, SIZE(queue_header)
@@ -228,7 +232,7 @@ QUEUE_READ:
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 	
-	;; Output direction bits
+	;; Output direction bits to GPIO-1
 	;; TODO(hzeller): we should time the first step output after this a
 	;; bit later, the Allegro documentation talks about >= 200ns
 	;; Right now, the first step might arrive a just couple of ns later.
@@ -255,6 +259,10 @@ QUEUE_READ:
 	;; r4 = motor out GPIO
 	;; status: r8..r16
 STEP_GEN:
+	;; 
+	;; Generate motion profile configured by TravelParameters
+	;;
+	
 	;; update states and extract overflow bits into r1
 	ZERO &r1, 4
 	UpdateMotor r1, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
@@ -266,11 +274,11 @@ STEP_GEN:
 	UpdateMotor r1, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
 	UpdateMotor r1, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
-	SBBO r1, r4, 0, 4	; motor bits to GPIO0
+	SBBO r1, r4, 0, 4	; motor bits to GPIO-0
 
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
-STEP_DELAY:
+STEP_DELAY:				; Create time delay between steps.
 	SUB r1, r1, 1
 	QBNE STEP_DELAY, r1, 0
 
