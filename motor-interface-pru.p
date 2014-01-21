@@ -59,7 +59,7 @@
 #define PARAM_START r7
 #define PARAM_END  r18
 .struct TravelParameters
-	// We are doing at most 65535 accleration steps. The
+	// We are doing at most 2^16 accleration steps. The
 	// acceleration/deceleration function is Taylor approximated.
 	// If we start with speed 0, this starts with 0, at higher start-speeds,
 	// this points to some index in the series.

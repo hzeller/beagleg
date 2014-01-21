@@ -33,6 +33,9 @@
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
 
+#define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG " \
+  "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
+
 struct PrinterState {
   struct MachineControlConfig cfg;
   GCodeParser_t *parser;
@@ -69,37 +72,53 @@ static void dummy_set_temperature(void *userdata, float f) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
-	    "MachineControl: set_temperature(%.1f) not implemented.\n", f);
+	    "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
   }
 }
 static void dummy_set_fanspeed(void *userdata, float speed) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
-	    "MachineControl: set_fanspeed(%.0f) not implemented.\n", speed);
+	    "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
   }
 }
 static void dummy_wait_temperature(void *userdata) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
-	    "MachineControl: wait_temperature() not implemented.\n");
+	    "// BeagleG: wait_temperature() not implemented.\n");
   }
 }
 static void dummy_disable_motors(void *userdata) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
-	    "MachineControl: disable_motors() not implemented.\n");
+	    "// BeagleG: disable_motors() not implemented.\n");
   }
 }
-static const char *dummy_unprocessed(void *userdata, char letter, float value,
-				     const char *remaining) {
+static const char *special_commands(void *userdata, char letter, float value,
+				    const char *remaining) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream,
-	    "MachineControl: didn't understand ('%c', %d, '%s')\n",
-	    letter, (int) value, remaining);
+  if (!state->msg_stream)
+    return NULL;
+  switch ((int) value) {
+  case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
+  case 114:
+    fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
+	    (1.0f * state->machine_position[AXIS_X]
+	     / state->cfg.axis_steps_per_mm[AXIS_X]),
+	    (1.0f * state->machine_position[AXIS_Y]
+	     / state->cfg.axis_steps_per_mm[AXIS_Y]),
+	    (1.0f * state->machine_position[AXIS_Z]
+	     / state->cfg.axis_steps_per_mm[AXIS_Z]),
+	    (1.0f * state->machine_position[AXIS_E]
+	     / state->cfg.axis_steps_per_mm[AXIS_E]));
+    break;
+  case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
+  default:  fprintf(state->msg_stream,
+		    "// BeagleG: didn't understand ('%c', %d, '%s')\n",
+		    letter, (int) value, remaining);
+    break;
   }
   return NULL;
 }
@@ -149,7 +168,8 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
   if (command.travel_speed == 0) {
     // In case someone choose a feedrate of 0, set something
     if (state->msg_stream) {
-      fprintf(state->msg_stream, "Ignoring speed of 0, setting to %.6f mm/s\n",
+      fprintf(state->msg_stream,
+	      "// Ignoring speed of 0, setting to %.6f mm/s\n",
 	      (1.0f * ZERO_FEEDRATE_OVERRIDE_HZ
 	       / min_feedrate_relevant_steps_per_mm));
     }
@@ -164,12 +184,12 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
   if (state->cfg.debug_print && state->msg_stream) {
     if (command.steps[2] != 0) {
       fprintf(state->msg_stream,
-	      "(%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.1f mm/s)\n",
+	      "// (%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.1f mm/s)\n",
 	      command.steps[0], command.steps[1], command.steps[2],
 	      command.steps[3], command.travel_speed / 1000.0, feedrate);
     } else {
       fprintf(state->msg_stream,  // less clutter, when there is no Z
-	      "(%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
+	      "// (%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
 	      command.steps[0], command.steps[1],
 	      command.steps[3], command.travel_speed / 1000.0, feedrate);
     }
@@ -233,7 +253,7 @@ static void machine_set_speed_factor(void *userdata, float value) {
   }
   if (value < 0.005) {
     if (state->msg_stream) fprintf(state->msg_stream,
-				   "M220: Not accepting speed "
+				   "// M220: Not accepting speed "
 				   "factors < 0.5%% (got %.1f%%)\n",
 				   100.0f * value);
     return;
@@ -267,7 +287,7 @@ static void machine_home(void *userdata, unsigned char axes_bitmap) {
   // Solution (b) is what we're doing.
   // TODO: do this with endswitches.
   if (state->msg_stream) {
-    fprintf(state->msg_stream, "MachineControl: Homing requested (0x%02x), but "
+    fprintf(state->msg_stream, "// BeagleG: Homing requested (0x%02x), but "
 	    "don't have endswitches, so move difference steps (%d, %d, %d)\n",
 	    axes_bitmap, machine_pos_differences[AXIS_X],
 	    machine_pos_differences[AXIS_Y], machine_pos_differences[AXIS_Z]);
@@ -305,13 +325,13 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   callbacks.go_home = &machine_home;
   callbacks.dwell = &machine_dwell;
   callbacks.set_speed_factor = &machine_set_speed_factor;
+  callbacks.unprocessed = &special_commands;
 
   // Not yet implemented
   callbacks.set_fanspeed = &dummy_set_fanspeed;
   callbacks.set_temperature = &dummy_set_temperature;
   callbacks.wait_temperature = &dummy_wait_temperature;
   callbacks.disable_motors = &dummy_disable_motors;
-  callbacks.unprocessed = &dummy_unprocessed;
 
   // The parser keeps track of the real-world coordinates (mm), while we keep
   // track of the machine coordinates (steps). So it has the same life-cycle.
