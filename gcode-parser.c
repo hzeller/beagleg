@@ -155,7 +155,7 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
   *letter = toupper(*line++);
   if (*line == '\0') {
     fprintf(err_stream ? err_stream : stderr,
-	    "Error: expected value after '%c'\n", *letter);
+	    "// G-Code Syntax Error: expected value after '%c'\n", *letter);
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
@@ -176,8 +176,8 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
   if (repair_x) *repair_x = 'X';  // Put the 'X' back.
 
   if (line == endptr) {
-    fprintf(err_stream ? err_stream : stderr,
-	    "Error: '%c' is not followed by a number: '%s'\n", *letter, line);
+    fprintf(err_stream ? err_stream : stderr, "// G-Code Syntax Error: "
+	    "Letter '%c' is not followed by a number.\n", *letter);
     return NULL;
   }
   line = endptr;
