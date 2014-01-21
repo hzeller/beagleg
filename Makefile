@@ -10,7 +10,7 @@
 #CROSS_COMPILE?=arm-arago-linux-gnueabi-
 
 # Tuning options for ARM CPU.
-#ARM_OPTIONS=-mtune=cortex-a8 -march=armv7-a
+ARM_OPTIONS=-mtune=cortex-a8 -march=armv7-a
 
 # Location of am335x package https://github.com/beagleboard/am335x_pru_package
 AM335_BASE=../am335x_pru_package/pru_sw
