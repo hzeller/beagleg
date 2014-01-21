@@ -173,7 +173,6 @@ static int speed_2_delay(float steps_per_second) {
 }
 #endif
 
-#define SUB_STEPS 2
 int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   struct QueueElement new_element;
 
@@ -202,29 +201,30 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
     new_element.fractions[i] = delta * max_fraction / biggest_value;
   }
 
-  // Calculate speeds
-  // First step while exerpimenting: assume start/endspeed always 0.
-  // TODO: take these into account (requires acceleration planning)
-  const int total_steps = SUB_STEPS * biggest_value;
-
   // TODO(hzeller): we need two step-count per motor cycle (edge up, edge down),
   // So we need to multiply step-counts by 2 (currently, motors only move
   // half the distance).
   // We're constrained by 16 bit registers for the counters, so we can't easily
   // <<1. OTOH, we'd like to have 64k step-count, as it means a travel-distance
   // of comforatable > 400mm@160 steps/mm
+#define SUB_STEPS 2
+
+  // Calculate speeds
+  // First step while exerpimenting: assume start/endspeed always 0.
+  // TODO: take these into account (requires acceleration planning)
+  const int total_steps = SUB_STEPS * biggest_value;
 
   // Steps to reach requested speed at acceleration
   // v = a*t -> t = v/a
   // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
-  int steps_accel = SUB_STEPS * (param->travel_speed*param->travel_speed
-				 / (2.0 * acceleration_));
+  const int steps_accel = SUB_STEPS * (param->travel_speed*param->travel_speed
+				       / (2.0 * acceleration_));
 
   // Temporary stop-gap.
-  if (total_steps - 2 * steps_accel > 65535 || steps_accel > 65535) {
+  if (total_steps > 65535) {
     fprintf(err_stream ? err_stream : stderr,
 	    "// Too many steps in move. Ignored for now, fixed soon "
-	    "(a=%d t=%d)\n", total_steps, steps_accel);
+	    "(accel=%d travel=%d)\n", steps_accel, total_steps);
     return 2;
   }
 
@@ -250,6 +250,7 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   double accel_factor = cycles_per_second() * (sqrt(SUB_STEPS * 2.0 / acceleration_));
 
   new_element.accel_series_index = 0;   // zero speed start
+  // TODO(hzeller): check that cycle shift does not mean overflow.
   new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
 				    * accel_factor * 0.67605);
   new_element.travel_cycles = cycles_per_second() / param->travel_speed;
