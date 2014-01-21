@@ -125,10 +125,10 @@ int beagleg_init(float acceleration_steps_s2) {
 #ifdef DEBUG_QUEUE
 static void DumpQueueElement(volatile const struct QueueElement *e) {
   if (e->state == STATE_EXIT) {
-    fprintf(stderr, "enqueue[%02d]: EXIT\n", e - shared_queue_);
+    fprintf(stderr, "enqueue[%02td]: EXIT\n", e - shared_queue_);
   } else {
     struct QueueElement copy = *e;
-    fprintf(stderr, "enqueue[%02d]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
+    fprintf(stderr, "enqueue[%02td]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
 	    "accel-delay: %d (%u raw); travel-delay: %d",
 	    e - shared_queue_, copy.direction_bits,
 	    copy.steps_accel, copy.steps_travel, copy.steps_decel,
