@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 	 sizeof(config.axis_steps_per_mm));
   config.max_feedrate = kDefaultMaxFeedrate;
   config.speed_factor = 1;
-  config.acceleration_steps_s2 = kStepsPerMM[0] * kDefaultAcceleration;
+  config.acceleration = kDefaultAcceleration;
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "Feedrate cannot be <= 0");
       break;
     case 'a':
-      config.acceleration_steps_s2 = kStepsPerMM[0] * atoi(optarg);
+      config.acceleration = atoi(optarg);
       // Negative or 0 means: 'infinite'.
       break;
     case 'n':

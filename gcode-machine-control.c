@@ -309,7 +309,9 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    beagleg_init(config->acceleration_steps_s2);
+    const int steps_per_mm = config->axis_steps_per_mm[AXIS_X];
+    if (beagleg_init(config->acceleration * steps_per_mm) != 0)
+      return 1;
   }
 
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));

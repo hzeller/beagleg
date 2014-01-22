@@ -20,8 +20,8 @@
 /* Configuration constants for the controller. */
 struct MachineControlConfig {
   int axis_steps_per_mm[8];    // Steps per mm for each axis.
-  float acceleration_steps_s2; // Acceleration in steps/s^2
-  float max_feedrate;          // Maximum allowed euclidean feedrate.
+  float acceleration;          // Euclidian (x/y) acceleration in mm/s^2
+  float max_feedrate;          // Maximum allowed euclidean feedrate in mm/s
   float speed_factor;          // Should be 1.0 by default.
   char dry_run;                // Don't actually send motor commands if 1.
   char debug_print;            // Print step-tuples to output_fd if 1.
