@@ -65,9 +65,9 @@
 	// this points to some index in the series.
 	.u16 accel_series_index	 // index in the acceleration approx.
 	
-	.u16 steps_accel	 // Phase 1: steps spent in acceleration.
-	.u16 steps_travel	 // Phase 2: steps spent in travel.
-	.u16 steps_decel         // Phase 3: steps spent in deceleration.
+	.u16 loops_accel	 // Phase 1: steps spent in acceleration.
+	.u16 loops_travel	 // Phase 2: steps spent in travel.
+	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 	
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
 	                         // shifted by DELAY_CYCLE_RESOLUTION_SHIFT
@@ -124,7 +124,7 @@
 ;;; Note, we are inlining the division macro twice here instead of wrapping it
 ;;; in a function. There is no need, we have enough code-space.
 PHASE_1_ACCELERATION:	; ==================================================
-	QBEQ PHASE_2_TRAVEL, params.steps_accel, 0
+	QBEQ PHASE_2_TRAVEL, params.loops_accel, 0
 	QBEQ accel_calc_done, params.accel_series_index, 0 // first ? no calc.
 	
 	;; divident = (hires_accel_cycles << 1) + remainder
@@ -142,7 +142,7 @@ PHASE_1_ACCELERATION:	; ==================================================
 	SUB params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 accel_calc_done:
 	ADD params.accel_series_index, params.accel_series_index, 1 ; series++
-	SUB params.steps_accel, params.steps_accel, 1		; steps_accel--
+	SUB params.loops_accel, params.loops_accel, 1		; loops_accel--
 
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
 	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
@@ -154,14 +154,14 @@ accel_calc_done:
 	JMP DONE_CALCULATE_DELAY
 
 PHASE_2_TRAVEL:		; ==================================================
-	QBEQ PHASE_3_DECELERATION, params.steps_travel, 0
-	SUB params.steps_travel, params.steps_travel, 1	        ; steps_travel--
+	QBEQ PHASE_3_DECELERATION, params.loops_travel, 0
+	SUB params.loops_travel, params.loops_travel, 1	        ; loops_travel--
 	MOV output_reg, params.travel_cycles
 	SUB output_reg, output_reg, (4 / 2)
 	JMP DONE_CALCULATE_DELAY
 
 PHASE_3_DECELERATION:	; ==================================================
-	QBNE calc_decel, params.steps_decel, 0
+	QBNE calc_decel, params.loops_decel, 0
 	ZERO &output_reg, 4                // we are done. Special stop value 0
 	JMP DONE_CALCULATE_DELAY
 calc_decel:
@@ -179,7 +179,7 @@ calc_decel:
 	ADD params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 
 	SUB params.accel_series_index, params.accel_series_index, 1 ; series--
-	SUB params.steps_decel, params.steps_decel, 1	        ; steps_decel--
+	SUB params.loops_decel, params.loops_decel, 1	        ; loops_decel--
 
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
 	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
