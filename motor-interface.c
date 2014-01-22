@@ -43,10 +43,10 @@
 
 #define MOTOR_COUNT 8
 
-// We need two loops per motor cycle (edge up, edge down),
-// So we need to multiply step-counts by 2 (currently, motors only move
-// half the distance).
-#define SUB_STEPS (1 << 1)
+// We need two loops per motor step (edge up, edge down),
+// So we need to multiply step-counts by 2
+// This could be more, if we wanted to implement sub-step resolution.
+#define LOOPS_PER_STEP (1 << 1)
 
 struct QueueElement {
   // Queue header
@@ -106,7 +106,7 @@ int beagleg_init(float acceleration_steps_s2) {
   max_speed_ = 1e6;  // 1 MHz. Limit due to PRU-CPU speed.
 
   const double accel_factor = cycles_per_second()
-    * (sqrt(SUB_STEPS * 2.0 / acceleration_));
+    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
   if ((1 << DELAY_CYCLE_SHIFT) * accel_factor * 0.67605 > 0xFFFFFFFF) {
     fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
 	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
@@ -189,11 +189,10 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   // The defining_axis_steps is the number of steps of the axis that requires
   // the most number of steps. All the others are a fraction of the steps.
   //
-  // The top bits represent SUB_STEPS (2 is the minium, as we need two cycles
-  // for a 0 1 transition. So in that case we have 31 bit fraction and 1 bit
-  // that overflows and toggles for the steps we want to generate.
-  // It could be more if we wanted, for explicit sub-step addressing.
-  const uint64_t max_fraction = 0xFFFFFFFF / SUB_STEPS;
+  // The top bits have LOOPS_PER_STEP states (2 is the minium, as we need two
+  // cycles for a 0 1 transition. So in that case we have 31 bit fraction
+  // and 1 bit that overflows and toggles for the steps we want to generate.
+  const uint64_t max_fraction = 0xFFFFFFFF / LOOPS_PER_STEP;
   for (int i = 0; i < MOTOR_COUNT; ++i) {
     if (param->steps[i] < 0) {
       new_element.direction_bits |= (1 << i);
@@ -207,13 +206,13 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   // Calculate speeds
   // First step while exerpimenting: assume start/endspeed always 0.
   // TODO: take these into account (requires acceleration planning)
-  const int total_loops = SUB_STEPS * defining_axis_steps;
+  const int total_loops = LOOPS_PER_STEP * defining_axis_steps;
 
   // Steps to reach requested speed at acceleration
   // v = a*t -> t = v/a
   // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
-  const int accel_loops = SUB_STEPS * (travel_speed*travel_speed
-				       / (2.0 * acceleration_));
+  const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
+					    / (2.0 * acceleration_));
 
   if (acceleration_ <= 0) {
     // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
@@ -235,7 +234,8 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     new_element.loops_accel = total_loops - new_element.loops_decel;
   }
 
-  double accel_factor = cycles_per_second() * (sqrt(SUB_STEPS * 2.0 / acceleration_));
+  double accel_factor = cycles_per_second()
+    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
 
   new_element.accel_series_index = 0;   // zero speed start
   // TODO(hzeller): check that cycle shift does not mean overflow.
@@ -261,12 +261,12 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
     fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
     return 1;
   }
-  if (biggest_value > 65535 / SUB_STEPS) {
+  if (biggest_value > 65535 / LOOPS_PER_STEP) {
     // TODO: for now, we limit the number. This should be implemented by
     // cutting this in multiple pieces, each calling beagleg_enqueue_internal()
     fprintf(err_stream ? err_stream : stderr,
-	    "At most %d steps, got %d. Ignoring command.\n", 65535 / SUB_STEPS,
-	    biggest_value);
+	    "At most %d steps, got %d. Ignoring command.\n",
+	    65535 / LOOPS_PER_STEP, biggest_value);
     return 2;
   }
   beagleg_enqueue_internal(param, biggest_value);
