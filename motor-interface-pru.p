@@ -57,22 +57,24 @@
 #define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << DIRECTION_GPIO1_SHIFT)
 
 #define PARAM_START r7
-#define PARAM_END  r18
+#define PARAM_END  r19
 .struct TravelParameters
-	// We are doing at most 2^16 accleration steps. The
-	// acceleration/deceleration function is Taylor approximated.
-	// If we start with speed 0, this starts with 0, at higher start-speeds,
-	// this points to some index in the series.
-	.u16 accel_series_index	 // index in the acceleration approx.
-	
+	// We do at most 2^16 loops to avoid accumulating too much rounding
+	// error in the fraction addition. Longer moves are split into separate
+	// requests by the host.
 	.u16 loops_accel	 // Phase 1: steps spent in acceleration.
 	.u16 loops_travel	 // Phase 2: steps spent in travel.
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
+
+	.u16 padding		 // not used right now.
 	
+	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
-	                         // shifted by DELAY_CYCLE_RESOLUTION_SHIFT
+	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
-	.u32 travel_cycles       // Exact value for travel.
+	.u32 travel_cycles       // Exact cycle value for travel (don't rely
+	                         // on approximation to exactly reach that)
+	
 	// 1.31 Fixed point increments for each motor
 	.u32 fraction_1
 	.u32 fraction_2          
@@ -90,8 +92,8 @@
 .ends
 
 	;; counter states of the motors
-#define STATE_START r19   	; after PARAM_END
-#define STATE_END r26
+#define STATE_START r20   	; after PARAM_END
+#define STATE_END r27
 .struct MotorState
 	.u32 m1
 	.u32 m2

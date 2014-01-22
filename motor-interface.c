@@ -54,11 +54,12 @@ struct QueueElement {
   uint8_t direction_bits;
 
   // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
-  uint16_t accel_series_index;
   uint16_t loops_accel;    // Phase 1: loops spent in acceleration
   uint16_t loops_travel;   // Phase 2: lops spent in travel
   uint16_t loops_decel;    // Phase 3: loops spent in deceleration
-  
+  uint16_t padding;
+  uint32_t accel_series_index;  // index in taylor
+
   uint32_t hires_accel_cycles;  // initial delay cycles.
   uint32_t travel_cycles;       // travel cycles.
 
@@ -103,22 +104,25 @@ static volatile struct QueueElement *next_queue_element() {
 
 int beagleg_init(float acceleration_steps_s2) {
   acceleration_ = acceleration_steps_s2;
-  max_speed_ = 1e6;  // 1 MHz. Limit due to PRU-CPU speed.
+  max_speed_ = 1e6;    // Don't go over 1 Mhz
 
+  // Check that the fixed point acceleration parameter (that we shift
+  // DELAY_CYCLE_SHIFT) fits into 32 bit.
+  // Also 2 additional bits headroom because we need to shift it by 2 in the
+  // division.
   const double accel_factor = cycles_per_second()
     * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
-  if ((1 << DELAY_CYCLE_SHIFT) * accel_factor * 0.67605 > 0xFFFFFFFF) {
+  if ((1 << (DELAY_CYCLE_SHIFT + 2)) * accel_factor * 0.67605 > 0xFFFFFFFF) {
     fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
 	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
     return 1;
   }
 
-  unsigned int ret;
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
   prussdrv_init();
 
   /* Get the interrupt initialized */
-  ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
+  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
   if (ret) {
     fprintf(stderr, "prussdrv_open() failed (%d)\n", ret);
     return ret;
@@ -238,7 +242,6 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
 
   new_element.accel_series_index = 0;   // zero speed start
-  // TODO(hzeller): check that cycle shift does not mean overflow.
   new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
 				    * accel_factor * 0.67605);
   new_element.travel_cycles = cycles_per_second() / param->travel_speed;
