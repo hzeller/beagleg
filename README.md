@@ -43,12 +43,13 @@ takes a filename or a TCP port to listen on.
 
     Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
-      -f <factor> : Print speed factor (Default 1.0).
       -m <rate>   : Max. feedrate (Default 200mm/s).
       -a <accel>  : Acceleration/Deceleration (Default 4000mm/s^2).
       -l <port>   : Listen on this TCP port.
+      -x <axis-steps>: steps/mm, comma separated. (Default 160,160,160,40)
       -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)
       -n          : Dryrun; don't send to motors (Default: off).
+      -f <factor> : Print speed factor (Default 1.0).
       -P          : Verbose: Print motor commands (Default: off).
       -S          : Synchronous: don't queue (Default: off).
       -R          : Repeat file forever.

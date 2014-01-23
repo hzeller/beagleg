@@ -66,12 +66,14 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  -f <factor> : Print speed factor (Default 1.0).\n"
 	  "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
 	  "  -a <accel>  : Acceleration/Deceleration (Default %dmm/s^2).\n"
 	  "  -l <port>   : Listen on this TCP port.\n"
+	  "  -x <axis-steps>: steps/mm, comma separated. "
+	  "(Default 160,160,160,40)\n"
 	  "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
 	  "  -n          : Dryrun; don't send to motors (Default: off).\n"
+	  "  -f <factor> : Print speed factor (Default 1.0).\n"
 	  "  -P          : Verbose: Print motor commands (Default: off).\n"
 	  "  -S          : Synchronous: don't queue (Default: off).\n"
 	  "  -R          : Repeat file forever.\n",
@@ -149,6 +151,17 @@ static int run_server(const char *bind_addr, int port) {
   return 0;
 }
 
+static int parse_text_array(const char *input, int result[], int count) {
+  for (int i = 0; i < count; ++i) {
+    char *end;
+    result[i] = strtol(input, &end, 10);
+    if (end == input) return 0;  // parse error.
+    if (*end == '\0') return 1;
+    input = end + 1;
+  }
+  return 1;
+}
+
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
   // Per axis X, Y, Z, E (Z and E: need to look up)
@@ -165,7 +178,7 @@ int main(int argc, char *argv[]) {
   char do_file_repeat = 0;
   char *bind_addr = NULL;
   int opt;
-  while ((opt = getopt(argc, argv, "SPRnl:f:m:a:b:")) != -1) {
+  while ((opt = getopt(argc, argv, "SPRnl:f:m:a:b:x:")) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = atof(optarg);
@@ -180,6 +193,10 @@ int main(int argc, char *argv[]) {
     case 'a':
       config.acceleration = atoi(optarg);
       // Negative or 0 means: 'infinite'.
+      break;
+    case 'x':
+      if (!parse_text_array(optarg, config.axis_steps_per_mm, 8))
+	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case 'n':
       config.dry_run = 1;
