@@ -38,9 +38,9 @@
 #include "gcode-machine-control.h"
 
 // Some default settings.
-static const int kDefaultMaxFeedrate = 200; // mm/s
-static const int kDefaultAcceleration = 4000; // mm/s^2
-static const int kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
+static const float kDefaultMaxFeedrate = 200; // mm/s
+static const float kDefaultAcceleration = 4000; // mm/s^2
+static const float kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
 static const float kFilamentDiameter = 1.7;  // mm
 
 static void print_file_stats(const char *filename,
@@ -66,8 +66,8 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  -m <rate>   : Max. feedrate (Default %dmm/s).\n"
-	  "  -a <accel>  : Acceleration/Deceleration (Default %dmm/s^2).\n"
+	  "  -m <rate>   : Max. feedrate (Default %.1fmm/s).\n"
+	  "  -a <accel>  : Acceleration/Deceleration (Default %.1fmm/s^2).\n"
 	  "  -l <port>   : Listen on this TCP port.\n"
 	  "  -x <axis-steps>: steps/mm, comma separated. "
 	  "(Default 160,160,160,40)\n"
@@ -151,10 +151,10 @@ static int run_server(const char *bind_addr, int port) {
   return 0;
 }
 
-static int parse_text_array(const char *input, int result[], int count) {
+static int parse_number_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = strtol(input, &end, 10);
+    result[i] = strtod(input, &end);
     if (end == input) return 0;  // parse error.
     if (*end == '\0') return 1;
     input = end + 1;
@@ -186,16 +186,16 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
     case 'm':
-      config.max_feedrate = atoi(optarg);
+      config.max_feedrate = atof(optarg);
       if (config.max_feedrate <= 0)
 	return usage(argv[0], "Feedrate cannot be <= 0");
       break;
     case 'a':
-      config.acceleration = atoi(optarg);
+      config.acceleration = atof(optarg);
       // Negative or 0 means: 'infinite'.
       break;
     case 'x':
-      if (!parse_text_array(optarg, config.axis_steps_per_mm, 8))
+      if (!parse_number_array(optarg, config.axis_steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case 'n':
