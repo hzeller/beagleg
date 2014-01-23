@@ -106,16 +106,18 @@ int beagleg_init(float acceleration_steps_s2) {
   acceleration_ = acceleration_steps_s2;
   max_speed_ = 1e6;    // Don't go over 1 Mhz
 
-  // Check that the fixed point acceleration parameter (that we shift
-  // DELAY_CYCLE_SHIFT) fits into 32 bit.
-  // Also 2 additional bits headroom because we need to shift it by 2 in the
-  // division.
-  const double accel_factor = cycles_per_second()
-    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
-  if ((1 << (DELAY_CYCLE_SHIFT + 2)) * accel_factor * 0.67605 > 0xFFFFFFFF) {
-    fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
-	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
-    return 1;
+  if (acceleration_ > 0) {  // acceleration_ <= 0: always full speed.
+    // Check that the fixed point acceleration parameter (that we shift
+    // DELAY_CYCLE_SHIFT) fits into 32 bit.
+    // Also 2 additional bits headroom because we need to shift it by 2 in the
+    // division.
+    const double accel_factor = cycles_per_second()
+      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
+    if ((1 << (DELAY_CYCLE_SHIFT + 2)) * accel_factor * 0.67605 > 0xFFFFFFFF) {
+      fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
+	      "reduce value of #define DELAY_CYCLE_SHIFT\n");
+      return 1;
+    }
   }
 
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
@@ -212,41 +214,43 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   // TODO: take these into account (requires acceleration planning)
   const int total_loops = LOOPS_PER_STEP * defining_axis_steps;
 
-  // Steps to reach requested speed at acceleration
-  // v = a*t -> t = v/a
-  // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
-  const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
-					    / (2.0 * acceleration_));
-
   if (acceleration_ <= 0) {
     // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
     new_element.loops_accel = new_element.loops_decel = 0;
     new_element.loops_travel = total_loops;
   }
-  else if (2 * accel_loops < total_loops) {
-    new_element.loops_accel = accel_loops;
-    new_element.loops_travel = total_loops - 2*accel_loops;
-    new_element.loops_decel = accel_loops;
-  }
   else {
-    // We don't want deceleration have more steps than acceleration (the
-    // iterative approximation will not be happy), so let's make sure to have
-    // accel_steps >= decel_steps by using the fact that integer div essentially
-    // does floor()
-    new_element.loops_decel = total_loops / 2;
-    new_element.loops_travel = 0;
-    new_element.loops_accel = total_loops - new_element.loops_decel;
+    // Steps to reach requested speed at acceleration
+    // v = a*t -> t = v/a
+    // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
+    const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
+					    / (2.0 * acceleration_));
+    if (2 * accel_loops < total_loops) {
+      new_element.loops_accel = accel_loops;
+      new_element.loops_travel = total_loops - 2*accel_loops;
+      new_element.loops_decel = accel_loops;
+    }
+    else {
+      // We don't want deceleration have more steps than acceleration (the
+      // iterative approximation will not be happy), so let's make sure to have
+      // accel_steps >= decel_steps by using the fact that integer div
+      // essentially does floor()
+      new_element.loops_decel = total_loops / 2;
+      new_element.loops_travel = 0;
+      new_element.loops_accel = total_loops - new_element.loops_decel;
+    }
+
+    double accel_factor = cycles_per_second()
+      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
+
+    new_element.accel_series_index = 0;   // zero speed start
+    new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
+				      * accel_factor * 0.67605);
   }
 
-  double accel_factor = cycles_per_second()
-    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
-
-  new_element.accel_series_index = 0;   // zero speed start
-  new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
-				    * accel_factor * 0.67605);
   new_element.travel_cycles = cycles_per_second() / param->travel_speed;
-  new_element.state = STATE_FILLED;
 
+  new_element.state = STATE_FILLED;
   enqueue_element(&new_element);
   return 0;
 }
