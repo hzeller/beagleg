@@ -149,16 +149,17 @@ static void DumpQueueElement(volatile const struct QueueElement *e) {
     fprintf(stderr, "enqueue[%02td]: EXIT\n", e - shared_queue_);
   } else {
     struct QueueElement copy = *e;
-    fprintf(stderr, "enqueue[%02td]: dir:0x%02x steps:(%5d + %5d + %5d) = %5d "
-	    "accel-delay: %d (%u raw); travel-delay: %d",
+    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d "
+	    "ad: %d; td: %d ",
 	    e - shared_queue_, copy.direction_bits,
 	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
 	    copy.loops_accel + copy.loops_travel + copy.loops_decel,
 	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
-	    copy.hires_accel_cycles, copy.travel_cycles);
-#if 0
+	    copy.travel_cycles);
+#if 1
     for (int i = 0; i < MOTOR_COUNT; ++i) {
-      fprintf(stderr, "f%d:0x%08x ", i, element->fractions[i]);
+      if (copy.fractions[i] == 0) continue;  // not interesting.
+      fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
     }
 #endif
   fprintf(stderr, "\n");

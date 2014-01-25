@@ -72,7 +72,7 @@
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
 	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
-	.u32 travel_cycles       // Exact cycle value for travel (don't rely
+	.u32 travel_cycles       // Exact cycle value for travel (do not rely
 	                         // on approximation to exactly reach that)
 	
 	// 1.31 Fixed point increments for each motor
@@ -194,13 +194,14 @@ DONE_CALCULATE_DELAY:
 .endm
 
 ;;; Update the state register of a motor with its 1.31 resolution fraction.
-;;; If this results in an overflow in the MSB, set the bit in output_register
+;;; The carry bit contains the overflow that we're interested in.
+;;; Uses a fixed number of 4 cycles
 .macro UpdateMotor
-.mparam output_register, state_reg, fraction, bit
+.mparam output_register, scratch, state_reg, fraction, bit
 	ADD state_reg, state_reg, fraction
-	QBBC M_END, state_reg, 31          ; Check MSB
-	SET output_register, bit
-M_END:
+	LSR scratch, state_reg, 31
+	LSL scratch, scratch, bit
+	OR  output_register, output_register, scratch ; and set.
 .endm
 
 INIT:
@@ -235,10 +236,6 @@ QUEUE_READ:
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 	
 	;; Output direction bits to GPIO-1
-	;; TODO(hzeller): we should time the first step output after this a
-	;; bit later, the Allegro documentation talks about >= 200ns
-	;; Right now, the first step might arrive a just couple of ns later.
-	;; (Instead of 2 phases, we need 4, so that we land in blanks)
 	MOV r3, queue_header.direction_bits
 	LSL r3, r3, DIRECTION_GPIO1_SHIFT
 	MOV r4, GPIO1 | GPIO_DATAOUT
@@ -250,31 +247,45 @@ QUEUE_READ:
 	LBCO travel_params, CONST_PRUDRAM, r1, SIZE(travel_params)
 
 	.assign MotorState, STATE_START, STATE_END, mstate
-	ZERO &mstate, SIZE(mstate)
+	;; Prime the motor state with half the fraction.
+	LSR mstate.m1, travel_params.fraction_1, 1
+	LSR mstate.m2, travel_params.fraction_2, 1
+	LSR mstate.m3, travel_params.fraction_3, 1
+	LSR mstate.m4, travel_params.fraction_4, 1
+	LSR mstate.m5, travel_params.fraction_5, 1
+	LSR mstate.m6, travel_params.fraction_6, 1
+	LSR mstate.m7, travel_params.fraction_7, 1
+	LSR mstate.m8, travel_params.fraction_8, 1	
 	
 	MOV r4, GPIO0 | GPIO_DATAOUT
 	ZERO &r3, 4		; initialize delay calculation state register.
 	
-	;; in use
+	;; Registers
+	;; r0, r1 free for calculation
 	;; r2 = queue pos
 	;; r3 = state for CalculateDelay
 	;; r4 = motor out GPIO
-	;; status: r8..r16
+	;; r5, r6 scratch
+	;; parameter:    r7..r19
+	;; motor-state: r20..r17
 STEP_GEN:
 	;; 
 	;; Generate motion profile configured by TravelParameters
 	;;
 	
 	;; update states and extract overflow bits into r1
+	;; 8 times 4 = 32 cpu cycles = 160ns. So whatever step output we do
+	;; is some time after we set the direction bit. Good, because the Allegro
+	;; chip requires this time delay.
 	ZERO &r1, 4
-	UpdateMotor r1, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
-	UpdateMotor r1, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
-	UpdateMotor r1, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT
-	UpdateMotor r1, mstate.m4, travel_params.fraction_4, MOTOR_4_STEP_BIT
-	UpdateMotor r1, mstate.m5, travel_params.fraction_5, MOTOR_5_STEP_BIT
-	UpdateMotor r1, mstate.m6, travel_params.fraction_6, MOTOR_6_STEP_BIT
-	UpdateMotor r1, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
-	UpdateMotor r1, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
+	UpdateMotor r1, r5, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
+	UpdateMotor r1, r5, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
+	UpdateMotor r1, r5, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT
+	UpdateMotor r1, r5, mstate.m4, travel_params.fraction_4, MOTOR_4_STEP_BIT
+	UpdateMotor r1, r5, mstate.m5, travel_params.fraction_5, MOTOR_5_STEP_BIT
+	UpdateMotor r1, r5, mstate.m6, travel_params.fraction_6, MOTOR_6_STEP_BIT
+	UpdateMotor r1, r5, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
+	UpdateMotor r1, r5, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
 	SBBO r1, r4, 0, 4	; motor bits to GPIO-0
 
