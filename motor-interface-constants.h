@@ -27,3 +27,20 @@
 // In calculation of delay cycles: number of bits shifted
 // for higher resolution.
 #define DELAY_CYCLE_SHIFT 5
+
+// We only use GPIO-bins that are not otherwise reserved for BeagleBone
+// capabilities.
+// GPIO-0 - output steps.
+#define MOTOR_1_STEP_BIT 2
+#define MOTOR_2_STEP_BIT 3
+#define MOTOR_3_STEP_BIT 4
+#define MOTOR_4_STEP_BIT 5
+#define MOTOR_5_STEP_BIT 7
+#define MOTOR_6_STEP_BIT 14
+#define MOTOR_7_STEP_BIT 15
+#define MOTOR_8_STEP_BIT 20
+
+// GPIO-1 - the direction bits are mapped on GPIO-1, starting from bit 12
+// as that is a contiguous region accessible as IO pins.
+#define DIRECTION_GPIO1_SHIFT 12
+#define MOTOR_ENABLE_GPIO1_BIT 28

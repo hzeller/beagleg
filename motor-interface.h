@@ -36,12 +36,17 @@ void beagleg_exit(void);  // shutdown motor control. Waits for queue to empty.
 // shutdown motor control immediately, don't wait for current queue to empty.
 void beagleg_exit_nowait(void);
 
+// Waits for the queue to be empty and Enables/disables motors according to
+// the given boolean value.
+void beagleg_motor_enable(char on);
+
 // Enqueue a coordinated move command.
 // If there is space in the ringbuffer, this function returns immediately,
 // otherwise it waits until a slot frees up.
 // Returns 0 on success, 1 if this is a no-op with no steps to move and 2 if
 // number of steps per single command is exceeded (right now, 64k). If
 // err_stream is non-NULL, prints error message there.
+// Automatically enables motors if not already.
 int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream);
 
 // Wait, until all elements in the ring-buffer are consumed.

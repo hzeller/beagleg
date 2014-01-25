@@ -39,14 +39,34 @@
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
 
-#define DEBUG_QUEUE
+#define GPIO_0_ADDR 0x44e07000	// memory space mapped to GPIO-0	
+#define GPIO_1_ADDR 0x4804c000	// memory space mapped to GPIO-1
+#define GPIO_MMAP_SIZE 0x2000
+
+#define GPIO_OE 0x134           // setting direction.
+#define GPIO_DATAOUT 0x13c      // Set all the bits
 
 #define MOTOR_COUNT 8
+
+#define MOTOR_OUT_BITS				\
+  ((uint32_t) ( (1<<MOTOR_1_STEP_BIT)		\
+		| (1<<MOTOR_2_STEP_BIT)		\
+		| (1<<MOTOR_3_STEP_BIT)		\
+		| (1<<MOTOR_4_STEP_BIT)		\
+		| (1<<MOTOR_5_STEP_BIT)		\
+		| (1<<MOTOR_6_STEP_BIT)		\
+		| (1<<MOTOR_7_STEP_BIT)		\
+		| (1<<MOTOR_8_STEP_BIT) ))
+
+// Direction bits are a contiguous chunk, just a bit shifted.
+#define DIRECTION_OUT_BITS ((uint32_t) (0xFF << DIRECTION_GPIO1_SHIFT))
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2
 // This could be more, if we wanted to implement sub-step resolution.
 #define LOOPS_PER_STEP (1 << 1)
+
+#define DEBUG_QUEUE
 
 struct QueueElement {
   // Queue header
@@ -73,9 +93,28 @@ static float acceleration_;
 static float max_speed_;
 volatile struct QueueElement *shared_queue_;
 static unsigned int queue_pos_;
+volatile uint32_t *gpio_0 = NULL;
+volatile uint32_t *gpio_1 = NULL;
 
 // delay loops per second.
 static double cycles_per_second() { return 100e6; } // two cycles per loop.
+
+static int map_gpio() {
+  int fd = open("/dev/mem", O_RDWR);
+  gpio_0 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
+				     MAP_SHARED, fd, GPIO_0_ADDR);
+  if (gpio_0 == MAP_FAILED) { perror("mmap() GPIO-0"); return 0; }
+  gpio_1 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
+				     MAP_SHARED, fd, GPIO_1_ADDR);
+  if (gpio_1 == MAP_FAILED) { perror("mmap() GPIO-1"); return 0; }
+  close(fd);
+  return 1;
+}
+
+static void unmap_gpio() {
+  munmap((void*)gpio_0, GPIO_MMAP_SIZE); gpio_0 = NULL;
+  munmap((void*)gpio_1, GPIO_MMAP_SIZE); gpio_1 = NULL;
+}
 
 static void init_queue(volatile struct QueueElement *elements) {
   bzero((void*) elements, QUEUE_LEN * sizeof(*elements));
@@ -100,47 +139,6 @@ static volatile struct QueueElement *next_queue_element() {
     prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
   }
   return &shared_queue_[queue_pos_++];
-}
-
-int beagleg_init(float acceleration_steps_s2) {
-  acceleration_ = acceleration_steps_s2;
-  max_speed_ = 1e6;    // Don't go over 1 Mhz
-
-  if (acceleration_ > 0) {  // acceleration_ <= 0: always full speed.
-    // Check that the fixed point acceleration parameter (that we shift
-    // DELAY_CYCLE_SHIFT) fits into 32 bit.
-    // Also 2 additional bits headroom because we need to shift it by 2 in the
-    // division.
-    const double accel_factor = cycles_per_second()
-      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
-    if ((1 << (DELAY_CYCLE_SHIFT + 2)) * accel_factor * 0.67605 > 0xFFFFFFFF) {
-      fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
-	      "reduce value of #define DELAY_CYCLE_SHIFT\n");
-      return 1;
-    }
-  }
-
-  tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
-  prussdrv_init();
-
-  /* Get the interrupt initialized */
-  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
-  if (ret) {
-    fprintf(stderr, "prussdrv_open() failed (%d)\n", ret);
-    return ret;
-  }
-  prussdrv_pruintc_init(&pruss_intc_initdata);
-  if (map_queue() == NULL) {
-    fprintf(stderr, "Couldn't map memory\n");
-    return 1;
-  }
-
-  // For some silly reason, the API does not take a const unsigned int*.
-  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, (unsigned int*) PRUcode,
-			    sizeof(PRUcode));
-  prussdrv_pru_enable(0);
-
-  return 0;
 }
 
 #ifdef DEBUG_QUEUE
@@ -282,6 +280,70 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   return 0;
 }
 
+static void beagleg_motor_enable_internal_nowait(char on) {
+  // Enable pin is inverse logic: -EN
+  gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
+}
+
+int beagleg_init(float acceleration_steps_s2) {
+  acceleration_ = acceleration_steps_s2;
+  max_speed_ = 1e6;    // Don't go over 1 Mhz
+
+  if (acceleration_ > 0) {  // acceleration_ <= 0: always full speed.
+    // Check that the fixed point acceleration parameter (that we shift
+    // DELAY_CYCLE_SHIFT) fits into 32 bit.
+    // Also 2 additional bits headroom because we need to shift it by 2 in the
+    // division.
+    const double accel_factor = cycles_per_second()
+      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
+    const double start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
+      * accel_factor * 0.67605 / LOOPS_PER_STEP;
+    if (start_accel_cycle_value > 0xFFFFFFFF) {
+      fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
+	      "reduce value of #define DELAY_CYCLE_SHIFT\n");
+      return 1;
+    }
+  }
+
+  if (!map_gpio()) {
+    fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
+    return 1;
+  }
+
+  // Prepare all the pins we need for output.
+  gpio_0[GPIO_OE/4] = ~MOTOR_OUT_BITS;
+  gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
+
+  beagleg_motor_enable_internal_nowait(0);  // motors off initially.
+
+  tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
+  prussdrv_init();
+
+  /* Get the interrupt initialized */
+  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
+  if (ret) {
+    fprintf(stderr, "prussdrv_open() failed (%d)\n", ret);
+    return ret;
+  }
+  prussdrv_pruintc_init(&pruss_intc_initdata);
+  if (map_queue() == NULL) {
+    fprintf(stderr, "Couldn't map PRU memory for queue.\n");
+    return 1;
+  }
+
+  // For some silly reason, the API does not take a const unsigned int*.
+  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, (unsigned int*) PRUcode,
+			    sizeof(PRUcode));
+  prussdrv_pru_enable(0);
+
+  return 0;
+}
+
+void beagleg_motor_enable(char on) {
+  beagleg_wait_queue_empty();
+  beagleg_motor_enable_internal_nowait(on);
+}
+
 void beagleg_wait_queue_empty(void) {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (shared_queue_[last_insert_position].state != STATE_EMPTY) {
@@ -293,6 +355,8 @@ void beagleg_wait_queue_empty(void) {
 void beagleg_exit_nowait(void) {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
+  beagleg_motor_enable_internal_nowait(0);
+  unmap_gpio();
 }
 
 void beagleg_exit(void) {

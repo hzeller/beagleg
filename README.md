@@ -106,10 +106,12 @@ check the mapping in your BBB documentation.
     Axis G-Code name  |  X   Y   Z   E   A   B   C  <unassigned>
     Step     : GPIO-0 |  2,  3,  4,  5,  7, 14, 15, 20
     Direction: GPIO-1 | 12, 13, 14, 15, 16, 17, 18, 19
+    
+Motor enable for all motors is on `GPIO-1`, bit 28.
 
-For your interface: note this is 3.3V level (and assume not more than ~4mA). The
-RAMPS driver board for instance only works if you power the 5V input with 3.3V,
-so that the Pololu inputs detect the logic level properly.
+For your electrical interface: note this is 3.3V level (and assume not more
+than ~4mA). The RAMPS driver board for instance only works if you power the
+5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
 
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black

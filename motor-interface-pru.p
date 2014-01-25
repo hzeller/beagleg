@@ -24,37 +24,15 @@
 .origin 0
 .entrypoint INIT
 
-#define GPIO0 0x44e07000	; memory space mapped to GPIO	
-#define GPIO1 0x4804c000	; memory space mapped to GPI1
+#define GPIO_0 0x44e07000	; memory space mapped to GPIO-0	
+#define GPIO_1 0x4804c000	; memory space mapped to GPIO-1
 
 #define GPIO_DATAOUT 0x13c      ; Set all the bits
-#define GPIO_OE 0x134           ; setting direction.
 
 #define PRU0_ARM_INTERRUPT 19
 #define CONST_PRUDRAM	   C24
 
 #define QUEUE_ELEMENT_SIZE (SIZE(QueueHeader) + SIZE(TravelParameters))
-
-#define DIRECTION_GPIO1_SHIFT 12 ; contiguous direction bits in GPIO1
-
-;; GPIO-0 - output steps.
-#define MOTOR_1_STEP_BIT 2
-#define MOTOR_2_STEP_BIT 3
-#define MOTOR_3_STEP_BIT 4
-#define MOTOR_4_STEP_BIT 5	
-#define MOTOR_5_STEP_BIT 7
-#define MOTOR_6_STEP_BIT 14
-#define MOTOR_7_STEP_BIT 15
-#define MOTOR_8_STEP_BIT 20
-
-// Setting direction. Output bits are 0, and the assembler does not understand
-// the ~ operator in immediates. Thus we do it with xor.
-// Also the pre-processor does not allow for backslash-line-continuation, hence
-// this looks a bit ugly in one line.
-#define MOTOR_OUT_BITS (0xFFFFFFFF ^ ( (1<<MOTOR_1_STEP_BIT) | (1<<MOTOR_2_STEP_BIT) | (1<<MOTOR_3_STEP_BIT) | (1<<MOTOR_4_STEP_BIT) | (1<<MOTOR_5_STEP_BIT) | (1<<MOTOR_6_STEP_BIT) | (1<<MOTOR_7_STEP_BIT) | (1<<MOTOR_8_STEP_BIT) ))
-	
-// Direction bits are a contiguous chunk, just a bit shifted.
-#define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << DIRECTION_GPIO1_SHIFT)
 
 #define PARAM_START r7
 #define PARAM_END  r19
@@ -91,7 +69,7 @@
 	.u8 direction_bits
 .ends
 
-	;; counter states of the motors
+;; counter states of the motors
 #define STATE_START r20   	; after PARAM_END
 #define STATE_END r27
 .struct MotorState
@@ -209,20 +187,8 @@ INIT:
 	LBCO r0, C4, 4, 4
 	CLR r0, r0, 4
 	SBCO r0, C4, 4, 4
-	
-	;; Make sure that we can write. Clearing the bits means: output.
-	;; Stepper bits on GPIO-0
-	MOV r2, MOTOR_OUT_BITS
-	MOV r3, GPIO0 | GPIO_OE
-	SBBO r2, r3, 0, 4
-
-	;; Direction bits on GPIO-1
-	MOV r2, DIRECTION_OUT_BITS
-	MOV r3, GPIO1 | GPIO_OE
-	SBBO r2, r3, 0, 4
 
 	MOV r2, 0		; Queue address in PRU memory
-
 QUEUE_READ:
 	;; 
 	;; Read next element from ring-buffer
@@ -235,10 +201,11 @@ QUEUE_READ:
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 	
-	;; Output direction bits to GPIO-1
+	;; Output direction bits to GPIO-1. Also, this sets the
+	;; motor enable (-EN) bit on this GPIO to zero, i.e. enable.
 	MOV r3, queue_header.direction_bits
 	LSL r3, r3, DIRECTION_GPIO1_SHIFT
-	MOV r4, GPIO1 | GPIO_DATAOUT
+	MOV r4, GPIO_1 | GPIO_DATAOUT
 	SBBO r3, r4, 0, 4
 
 	;; queue_header processed, r1 is free to use
@@ -249,7 +216,7 @@ QUEUE_READ:
 	.assign MotorState, STATE_START, STATE_END, mstate
 	ZERO &mstate, SIZE(mstate)
 	
-	MOV r4, GPIO0 | GPIO_DATAOUT
+	MOV r4, GPIO_0 | GPIO_DATAOUT
 	ZERO &r3, 4		; initialize delay calculation state register.
 	
 	;; Registers
