@@ -32,7 +32,7 @@ struct bg_movement {
 // Initialize beagleg motor control. Initializes the acceleration in steps/s^2.
 //  Returns 0 on success, 1 on some error.
 int beagleg_init(float acceleration_steps_s2);
-void beagleg_exit(void);  // shutdown motor control.
+void beagleg_exit(void);  // shutdown motor control. Waits for queue to empty.
 // shutdown motor control immediately, don't wait for current queue to empty.
 void beagleg_exit_nowait(void);
 

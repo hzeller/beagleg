@@ -60,8 +60,8 @@ struct QueueElement {
   uint16_t padding;
   uint32_t accel_series_index;  // index in taylor
 
-  uint32_t hires_accel_cycles;  // initial delay cycles.
-  uint32_t travel_cycles;       // travel cycles.
+  uint32_t hires_accel_cycles;  // acceleration delay cycles.
+  uint32_t travel_delay_cycles; // travel delay cycles.
 
   uint32_t fractions[MOTOR_COUNT];  // fixed point fractions to add each step.
 } __attribute__((packed));
@@ -155,7 +155,7 @@ static void DumpQueueElement(volatile const struct QueueElement *e) {
 	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
 	    copy.loops_accel + copy.loops_travel + copy.loops_decel,
 	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
-	    copy.travel_cycles);
+	    copy.travel_delay_cycles);
 #if 1
     for (int i = 0; i < MOTOR_COUNT; ++i) {
       if (copy.fractions[i] == 0) continue;  // not interesting.
@@ -246,10 +246,11 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
 
     new_element.accel_series_index = 0;   // zero speed start
     new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
-				      * accel_factor * 0.67605);
+				      * accel_factor * 0.67605 / LOOPS_PER_STEP);
   }
 
-  new_element.travel_cycles = cycles_per_second() / param->travel_speed;
+  new_element.travel_delay_cycles = cycles_per_second() 
+    / (LOOPS_PER_STEP * travel_speed);
 
   new_element.state = STATE_FILLED;
   enqueue_element(&new_element);

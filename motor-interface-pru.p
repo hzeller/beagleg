@@ -72,7 +72,7 @@
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
 	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
-	.u32 travel_cycles       // Exact cycle value for travel (do not rely
+	.u32 travel_delay_cycles // Exact cycle value for travel (do not rely
 	                         // on approximation to exactly reach that)
 	
 	// 1.31 Fixed point increments for each motor
@@ -158,7 +158,7 @@ accel_calc_done:
 PHASE_2_TRAVEL:		; ==================================================
 	QBEQ PHASE_3_DECELERATION, params.loops_travel, 0
 	SUB params.loops_travel, params.loops_travel, 1	        ; loops_travel--
-	MOV output_reg, params.travel_cycles
+	MOV output_reg, params.travel_delay_cycles
 	SUB output_reg, output_reg, (4 / 2)
 	JMP DONE_CALCULATE_DELAY
 
@@ -194,14 +194,14 @@ DONE_CALCULATE_DELAY:
 .endm
 
 ;;; Update the state register of a motor with its 1.31 resolution fraction.
-;;; The carry bit contains the overflow that we're interested in.
+;;; The 31st bit contains the overflow that we're interested in.
 ;;; Uses a fixed number of 4 cycles
 .macro UpdateMotor
 .mparam output_register, scratch, state_reg, fraction, bit
 	ADD state_reg, state_reg, fraction
 	LSR scratch, state_reg, 31
 	LSL scratch, scratch, bit
-	OR  output_register, output_register, scratch ; and set.
+	OR  output_register, output_register, scratch
 .endm
 
 INIT:
@@ -247,15 +247,7 @@ QUEUE_READ:
 	LBCO travel_params, CONST_PRUDRAM, r1, SIZE(travel_params)
 
 	.assign MotorState, STATE_START, STATE_END, mstate
-	;; Prime the motor state with half the fraction.
-	LSR mstate.m1, travel_params.fraction_1, 1
-	LSR mstate.m2, travel_params.fraction_2, 1
-	LSR mstate.m3, travel_params.fraction_3, 1
-	LSR mstate.m4, travel_params.fraction_4, 1
-	LSR mstate.m5, travel_params.fraction_5, 1
-	LSR mstate.m6, travel_params.fraction_6, 1
-	LSR mstate.m7, travel_params.fraction_7, 1
-	LSR mstate.m8, travel_params.fraction_8, 1	
+	ZERO &mstate, SIZE(mstate)
 	
 	MOV r4, GPIO0 | GPIO_DATAOUT
 	ZERO &r3, 4		; initialize delay calculation state register.
