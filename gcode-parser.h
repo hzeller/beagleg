@@ -54,7 +54,8 @@ struct GCodeParserCb {
   void (*set_temperature)(void *, float);  // M104, M109: Set temp. in Celsius.
   void (*wait_temperature)(void *);        // M109, M116: Wait for temp. reached.
   void (*dwell)(void *, float);            // G4: dwell for milliseconds.
-  void (*disable_motors)(void *);          // M84: Switch off motors
+  void (*motors_enable)(void *, char b);   // M17,M84,M18: Switch on/off motors
+                                           // b == 1: on, b == 0: off.
 
   // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates. 
   // First parameter is the userdata.

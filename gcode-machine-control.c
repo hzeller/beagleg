@@ -89,13 +89,11 @@ static void dummy_wait_temperature(void *userdata) {
 	    "// BeagleG: wait_temperature() not implemented.\n");
   }
 }
-static void dummy_disable_motors(void *userdata) {
+static void motors_enable(void *userdata, char b) {  
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream,
-	    "// BeagleG: disable_motors() not implemented.\n");
-  }
+  if (!state->cfg.dry_run) beagleg_motor_enable(b);
 }
+
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
   struct PrinterState *state = (struct PrinterState*)userdata;
@@ -327,13 +325,13 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   callbacks.go_home = &machine_home;
   callbacks.dwell = &machine_dwell;
   callbacks.set_speed_factor = &machine_set_speed_factor;
+  callbacks.motors_enable = &motors_enable;
   callbacks.unprocessed = &special_commands;
 
   // Not yet implemented
   callbacks.set_fanspeed = &dummy_set_fanspeed;
   callbacks.set_temperature = &dummy_set_temperature;
   callbacks.wait_temperature = &dummy_wait_temperature;
-  callbacks.disable_motors = &dummy_disable_motors;
 
   // The parser keeps track of the real-world coordinates (mm), while we keep
   // track of the machine coordinates (steps). So it has the same life-cycle.

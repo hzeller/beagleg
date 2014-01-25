@@ -37,6 +37,7 @@ static const char *dummy_unprocessed(void *userdata, char letter, float value,
 				     const char *remaining) { return remaining; }
 static void dummy_setvalue(void *userdata, float v) {}
 static void dummy_noparam(void *userdata) {}
+static void dummy_motors_enable(void *userdata, char b) {}
 
 static void duration_move(struct BeagleGPrintStats *stats,
 			  float feedrate, const float axis[]) {
@@ -116,7 +117,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
   callbacks.unprocessed = &dummy_unprocessed;
   callbacks.set_fanspeed = &dummy_setvalue;
   callbacks.set_temperature = &dummy_setvalue;
-  callbacks.disable_motors = &dummy_noparam;
+  callbacks.motors_enable = &dummy_motors_enable;
   callbacks.wait_temperature = &dummy_noparam;
 
   FILE *f = fdopen(input_fd, "r");

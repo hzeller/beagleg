@@ -56,8 +56,8 @@ static void dummy_wait_temperature(void *user) {
 static void dummy_dwell(void *user, float f) {
   fprintf(stderr, "GCodeParser: dwell(%.1f)\n", f);
 }
-static void dummy_disable_motors(void *user) {
-  fprintf(stderr, "GCodeParser: disable_motors()\n");
+static void dummy_motors_enable(void *user, char b) {
+  fprintf(stderr, "GCodeParser: %s motors\n", b ? "enable" : "disable");
 }
 static void dummy_move(void *user, float feed, const float *axes) {
   fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
@@ -111,8 +111,8 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
     result->callbacks.wait_temperature = &dummy_wait_temperature;
   if (!result->callbacks.dwell)
     result->callbacks.dwell = &dummy_dwell;
-  if (!result->callbacks.disable_motors)
-    result->callbacks.disable_motors = &dummy_disable_motors;
+  if (!result->callbacks.motors_enable)
+    result->callbacks.motors_enable = &dummy_motors_enable;
   if (!result->callbacks.coordinated_move)
     result->callbacks.coordinated_move = &dummy_move;
   if (!result->callbacks.rapid_move)
@@ -331,9 +331,11 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
     }
     else if (letter == 'M') {
       switch ((int) value) {
+      case 17: cb->motors_enable(userdata, 1); break;
+      case 18: cb->motors_enable(userdata, 0); break;
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
-      case 84: cb->disable_motors(userdata); break;
+      case 84: cb->motors_enable(userdata, 0); break;
       case 104: line = set_param(p, 'S', cb->set_temperature, 1.0f, line); break;
       case 106: line = set_param(p, 'S', cb->set_fanspeed, 1.0f, line); break;
       case 107: cb->set_fanspeed(userdata, 0); break;
