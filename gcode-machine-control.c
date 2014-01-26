@@ -180,16 +180,17 @@ static void move_machine_steps(struct PrinterState *state, float feedrate,
   }
   
   if (state->cfg.debug_print && state->msg_stream) {
-    if (command.steps[2] != 0) {
+    if (command.steps[AXIS_Z] != 0) {
       fprintf(state->msg_stream,
 	      "// (%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.1f mm/s)\n",
-	      command.steps[0], command.steps[1], command.steps[2],
-	      command.steps[3], command.travel_speed / 1000.0, feedrate);
+	      command.steps[AXIS_X], command.steps[AXIS_Y],
+	      command.steps[AXIS_Z], command.steps[AXIS_E],
+	      command.travel_speed / 1000.0, feedrate);
     } else {
       fprintf(state->msg_stream,  // less clutter, when there is no Z
 	      "// (%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
-	      command.steps[0], command.steps[1],
-	      command.steps[3], command.travel_speed / 1000.0, feedrate);
+	      command.steps[AXIS_X], command.steps[AXIS_Y],
+	      command.steps[AXIS_E], command.travel_speed / 1000.0, feedrate);
     }
   }
 }

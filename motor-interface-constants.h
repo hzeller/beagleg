@@ -16,7 +16,7 @@
 // along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-// To be read by *.c and *.p file, so only // comments.
+// To be read by *.c and *.p file, so only // comments and simple defines.
 
 #define STATE_EMPTY  0
 #define STATE_FILLED 1
@@ -31,11 +31,11 @@
 // We only use GPIO-bins that are not otherwise reserved for BeagleBone
 // capabilities.
 // GPIO-0 - output steps.
-#define MOTOR_1_STEP_BIT 2
-#define MOTOR_2_STEP_BIT 3
-#define MOTOR_3_STEP_BIT 4
-#define MOTOR_4_STEP_BIT 5
-#define MOTOR_5_STEP_BIT 7
+#define MOTOR_1_STEP_BIT  2
+#define MOTOR_2_STEP_BIT  3
+#define MOTOR_3_STEP_BIT  4
+#define MOTOR_4_STEP_BIT  5
+#define MOTOR_5_STEP_BIT  7
 #define MOTOR_6_STEP_BIT 14
 #define MOTOR_7_STEP_BIT 15
 #define MOTOR_8_STEP_BIT 20
