@@ -101,13 +101,27 @@ time
 
 These are the GPIO bits associated with the motor outputs. The actual physical
 pins are all over the place on the Beaglebone Black extension headers P8 and P9,
-check the mapping in your BBB documentation.
+see table below.
 
-    Axis G-Code name  |  X   Y   Z   E   A   B   C  <unassigned>
-    Step     : GPIO-0 |  2,  3,  4,  5,  7, 14, 15, 20
-    Direction: GPIO-1 | 12, 13, 14, 15, 16, 17, 18, 19
-    
-Motor enable for all motors is on `GPIO-1`, bit 28.
+Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
+which we're going to use for GPIO. For that, we need to install a device
+tree overlay. Just run the script beagleg-cape-pinmux.sh as root
+
+    sudo ./beagleg-cape-pinmux.sh
+
+Now, all pins are mapped to be used by beagleg. This is the pinout
+
+    Axis G-Code name  |  X     Y     Z     E     A      B     C   <unassigned>
+    Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20
+           BBB Header |P9-22 P9-21 P9-18 P9-17 P9-42A P9-26 P9-24 P9-41A
+                      |
+    Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
+           BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
+
+Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
+(The mapping right now was done because these are consecutive GPIO pins that
+can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
+probably move to an unambiguated pin)
 
 For your electrical interface: note this is 3.3V level (and assume not more
 than ~4mA). The RAMPS driver board for instance only works if you power the

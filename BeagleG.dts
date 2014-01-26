@@ -1,0 +1,68 @@
+/*
+ * Based on github.com/jadonk/validation-scripts/tree/master/test-capemgr
+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Purpose License Version 2 as
+ * published by the Free Software Foundation
+ *
+ * To create the binary representation that the device manager can handle, run
+ *   make BeagleG-00A0.dtbo
+ * (The binary fill is checked into github, so this is only needed if you are
+ *  modifying this file)
+ * See beagleg-cape-pinmux.sh how to enable.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/{
+    compatible = "ti,beaglebone", "ti,beaglebone-black";
+    part-number = "BeagleG";  /* our 'cape' */
+    version = "00A0";
+
+    fragment@0 {
+        target = <&am33xx_pinmux>;
+        __overlay__ {
+            beagleg_gpio_pins: BeagleG_Pins {
+                pinctrl-single,pins = <
+		    /* Offset Mode Description */
+		    /* Motor step pins GPIO-0 */
+		    0x150 0x07 /* GPIO0[2] X-Axis */
+		    0x154 0x07 /* GPIO0[3] Y-Axis */
+		    0x158 0x07 /* GPIO0[4] Z-Axis */
+		    0x15c 0x07 /* GPIO0[5] E-Axis */
+		    0x164 0x07 /* GPIO0[7] A-Axis */
+		    0x180 0x07 /* GPIO0[14] B-Axis */
+		    0x184 0x07 /* GPIO0[15] C-Axis */
+		    0x1b4 0x07 /* GPIO0[20] axis 7 */
+
+		    /* Motor direction pins; GPIO-1 */
+		    0x030 0x07 /* GPIO1[12] X */
+		    0x034 0x07 /* GPIO1[13] Y */
+		    0x038 0x07 /* GPIO1[14] Z */
+		    0x03c 0x07 /* GPIO1[15] E */
+		    0x040 0x07 /* GPIO1[16] A */
+		    0x044 0x07 /* GPIO1[17] B */
+		    0x048 0x07 /* GPIO1[18] C */
+		    0x04c 0x07 /* GPIO1[19] 7 */
+
+		    /* Motor enable */
+		    0x078 0x07 /* GPIO1[28] Motor Enable */
+                >;
+            };
+        };
+    };
+
+    fragment@1 {
+        target = <&ocp>;
+        __overlay__ {
+            test_helper: helper {
+                compatible = "bone-pinmux-helper";
+                pinctrl-names = "default";
+                pinctrl-0 = <&beagleg_gpio_pins>;
+                status = "okay";
+            };
+        };
+    };
+};
