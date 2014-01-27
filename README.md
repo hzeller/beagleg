@@ -5,6 +5,8 @@ Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
 acceleration and travel.
 
+See example here: http://www.youtube.com/watch?v=hIEY9077D64
+
 The motor-interface API allows to enqueue
 step-{count, {start,travel,end}-frequency}
 of 8 steppers that are controlled in a coordinated move (G1), with real-time
@@ -155,7 +157,9 @@ the Free Software Foundation, either version 3 of the License, or
 
 ## TODO
    - Read end-switches
+   - Do planning: no need to decelerate fully if we're going on an (almost)
+     straight line between line segments.
    - Needed for full 3D printer solution: add PWM for heaters.
-   - Fast stop without waiting for queues to empty, but still be able to
-     recover exact last position.
+   - Fast pause without waiting for queues to empty, but still be able to
+     recover exact last position. That way pause/resume is possible.
    - ...
