@@ -12,9 +12,13 @@ if [ ! -e $BIN_DTB ] ; then
 fi
 
 PINS=/sys/kernel/debug/pinctrl/44e10800.pinmux/pins
-SLOTS=/sys/devices/bone_capemgr.9/slots
+SLOTS=/sys/devices/bone_capemgr.*/slots
 
-OFFSETS_800=$(cat BeagleG.dts | grep 0x | awk '{printf("%03x\n", $1 + 2048);}')
+# Some dance around minimal tools available on the system. We get the offsets
+# and add 44e10800 to it, so that we can grep these in the $PINS
+OFFSETS_800=$(for f in $(cat BeagleG.dts | grep 0x | awk '{print $1}') ; do \
+                 printf "%0d" $f | awk '{printf("44e10%03x\n", $1 + 2048)}'; \
+              done)
 
 echo "This is how these pins look before."
 for f in $OFFSETS_800 ; do
@@ -29,7 +33,7 @@ echo "BeagleG" > $SLOTS
 cat $SLOTS
 
 echo
-echo "This is how these pins look afterwards"
+echo "This is how these pins look afterwards. They should all have mode 00000007"
 for f in $OFFSETS_800 ; do
     grep $f $PINS
 done
