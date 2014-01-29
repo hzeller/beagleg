@@ -96,7 +96,7 @@
 ;;; to a single (somewhat expensive) division. I tried as well using an
 ;;; integer sqrt directly, but the rounding errors were worse.
 ;;; Thanks to this paper for inspiration:
-;;;   http://embedded.com/design/mcus-processors-and-socs/4006438
+;;;   http://embedded.com/design/mcus-processors-and-socs/4006438/stepper
 .macro CalculateDelay
 .mparam output_reg, params, state_register, divident_tmp, divisor_tmp
 ;;; We use the 'state_register' to store the remainder of the division
@@ -226,7 +226,7 @@ QUEUE_READ:
 	;; r4 = motor out GPIO
 	;; r5, r6 scratch
 	;; parameter:    r7..r19
-	;; motor-state: r20..r17
+	;; motor-state: r20..r27
 STEP_GEN:
 	;; 
 	;; Generate motion profile configured by TravelParameters
