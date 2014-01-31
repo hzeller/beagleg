@@ -134,6 +134,10 @@ than ~4mA). The RAMPS driver board for instance only works if you power the
 Here is my experimental manual cape
 ![Manual Cape][manual-cape]
 
+This allows to plug in a RAMPS driver. At the middle/bottom of the test board
+you see a headpone connector: many of the early experiments didn't have yet a
+stepper motor installed, but just listening to the step-frequency.
+
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
 directly, or using a cross compiler (see Makefile).
