@@ -40,7 +40,9 @@
 // Some default settings.
 static const float kDefaultMaxFeedrate = 200; // mm/s
 static const float kDefaultAcceleration = 4000; // mm/s^2
-static const float kStepsPerMM[] = { 160, 160, 160, 40, 0, 0, 0, 0 };
+static const float kStepsPerMM[] = { 160, 160, 160, 40,  0,  0,  0,  0 };
+static const float kHomePos[]    = {   0,   0,   0, -1, -1, -1, -1, -1 };
+static const float kMoveRange[]  = { 100, 100, 100, -1, -1, -1, -1, -1 };
 static const float kFilamentDiameter = 1.7;  // mm
 
 static void print_file_stats(const char *filename,
@@ -73,6 +75,14 @@ static int usage(const char *prog, const char *msg) {
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)\n"
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated. "
 	  "(Default 160,160,160,40)\n"
+	  "  --home-pos <pos-mm>       : Home positions of axes. Only values "
+	  ">= 0\n"
+	  "                               participate in homing. "
+	  "(Default: 0,0,0,-1,-1,...)\n"
+	  "  --range <range-mm>    (-r): Range of of axes in mm (0..range[axis])"
+	  ". Only\n"
+	  "                               values > 0 are actively clipped. "
+	  "(Default: 100,100,100,-1,-1,...)\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors "
 	  "(Default: off).\n"
@@ -155,7 +165,7 @@ static int run_server(const char *bind_addr, int port) {
   return 0;
 }
 
-static int parse_number_array(const char *input, float result[], int count) {
+static int parse_float_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
     result[i] = strtod(input, &end);
@@ -171,6 +181,8 @@ int main(int argc, char *argv[]) {
   // Per axis X, Y, Z, E (Z and E: need to look up)
   memcpy(config.axis_steps_per_mm, kStepsPerMM,
 	 sizeof(config.axis_steps_per_mm));
+  memcpy(config.home_position, kHomePos,
+	 sizeof(config.home_position));
   config.max_feedrate = kDefaultMaxFeedrate;
   config.speed_factor = 1;
   config.acceleration = kDefaultAcceleration;
@@ -180,7 +192,8 @@ int main(int argc, char *argv[]) {
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
-    SET_STEPS_MM = 1000
+    SET_STEPS_MM = 1000,
+    SET_HOME_POS,
   };
 
   static struct option long_options[] = {
@@ -188,6 +201,8 @@ int main(int argc, char *argv[]) {
     { "accel",         required_argument, NULL, 'a'},
     { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
     { "port",          required_argument, NULL, 'p'},
+    { "home-pos",      required_argument, NULL, SET_HOME_POS },
+    { "range",         required_argument, NULL, 'r' },
     { "bind-addr",     required_argument, NULL, 'b'},
     { 0,               0,                 0,    0  },
   };
@@ -196,7 +211,7 @@ int main(int argc, char *argv[]) {
   char do_file_repeat = 0;
   char *bind_addr = NULL;
   int opt;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:SPRnf:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPRnf:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -214,8 +229,16 @@ int main(int argc, char *argv[]) {
       // Negative or 0 means: 'infinite'.
       break;
     case SET_STEPS_MM:
-      if (!parse_number_array(optarg, config.axis_steps_per_mm, 8))
+      if (!parse_float_array(optarg, config.axis_steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
+      break;
+    case SET_HOME_POS:
+      if (!parse_float_array(optarg, config.home_position, 8))
+	return usage(argv[0], "Failed to parse home pos.");
+      break;
+    case 'r':
+      if (!parse_float_array(optarg, config.move_range, 8))
+	return usage(argv[0], "Failed to parse ranges.");
       break;
     case 'n':
       config.dry_run = 1;
