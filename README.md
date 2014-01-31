@@ -68,7 +68,7 @@ Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
 
 
-    ./send-gcode -l 4444
+    ./send-gcode --port 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet beaglebone-hostname 4444` to have an interactive

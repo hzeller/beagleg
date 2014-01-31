@@ -94,7 +94,7 @@ static int usage(const char *prog, const char *msg) {
 	  "(Default: off).\n"
 	  "  -R                        : Repeat file forever.\n",
 	  prog, kDefaultMaxFeedrate, kDefaultAcceleration);
-  fprintf(stderr, "You can either specify -l <port> to listen for commands "
+  fprintf(stderr, "You can either specify --port <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
 }
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
 
   const char has_filename = (optind < argc);
   if (! (has_filename ^ (listen_port > 0))) {
-    return usage(argv[0], "Choose one: <gcode-filename> or -l <port>.");
+    return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
   }
   if (!has_filename && do_file_repeat) {
     return usage(argv[0], "-R (repeat) only makes sense with a filename.");
