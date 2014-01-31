@@ -331,9 +331,7 @@ int beagleg_init(float acceleration_steps_s2) {
     return 1;
   }
 
-  // For some silly reason, the API does not take a const unsigned int*.
-  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, (unsigned int*) PRUcode,
-			    sizeof(PRUcode));
+  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, PRUcode, sizeof(PRUcode));
   prussdrv_pru_enable(0);
 
   return 0;
