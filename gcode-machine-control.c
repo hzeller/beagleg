@@ -104,13 +104,13 @@ static const char *special_commands(void *userdata, char letter, float value,
   case 114:
     fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
 	    (1.0f * state->machine_position[AXIS_X]
-	     / state->cfg.axis_steps_per_mm[AXIS_X]),
+	     / state->cfg.steps_per_mm[AXIS_X]),
 	    (1.0f * state->machine_position[AXIS_Y]
-	     / state->cfg.axis_steps_per_mm[AXIS_Y]),
+	     / state->cfg.steps_per_mm[AXIS_Y]),
 	    (1.0f * state->machine_position[AXIS_Z]
-	     / state->cfg.axis_steps_per_mm[AXIS_Z]),
+	     / state->cfg.steps_per_mm[AXIS_Z]),
 	    (1.0f * state->machine_position[AXIS_E]
-	     / state->cfg.axis_steps_per_mm[AXIS_E]));
+	     / state->cfg.steps_per_mm[AXIS_E]));
     break;
   case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
   default:  fprintf(state->msg_stream,
@@ -142,9 +142,9 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
   // We need to calculate the feedrate in real-world coordinates as each
   // axis can have a different amount of steps/mm
   const float total_xyz_length = 
-    euklid_distance(command.steps[AXIS_X]/state->cfg.axis_steps_per_mm[AXIS_X],
-		    command.steps[AXIS_Y]/state->cfg.axis_steps_per_mm[AXIS_Y],
-		    command.steps[AXIS_Z]/state->cfg.axis_steps_per_mm[AXIS_Z]);
+    euklid_distance(command.steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
+		    command.steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
+		    command.steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
 
   // The defining axis is the axis that requires to go the most number of steps.
   // it defines the frequency to go.
@@ -160,14 +160,14 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
       || defining_axis == AXIS_Y
       || defining_axis == AXIS_Z) {
     // Steps per mm of defining axis.
-    const float steps_per_mm = state->cfg.axis_steps_per_mm[defining_axis];
+    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
     const float defining_axis_length = command.steps[defining_axis]/steps_per_mm;
     const float defining_axis_feedrate
       = feedrate_mm_s * fabsf(defining_axis_length) / total_xyz_length;
     command.travel_speed = defining_axis_feedrate * steps_per_mm;
   }
   else {
-    const float steps_per_mm = state->cfg.axis_steps_per_mm[defining_axis];
+    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
     command.travel_speed = feedrate_mm_s * steps_per_mm;
   }
   
@@ -177,7 +177,7 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
       fprintf(state->msg_stream,
 	      "// Ignoring speed of 0, setting to %.6f mm/s\n",
 	      (1.0f * ZERO_FEEDRATE_OVERRIDE_HZ
-	       / state->cfg.axis_steps_per_mm[defining_axis]));
+	       / state->cfg.steps_per_mm[defining_axis]));
     }
     command.travel_speed = ZERO_FEEDRATE_OVERRIDE_HZ;
   }
@@ -211,7 +211,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   int new_machine_position[GCODE_NUM_AXES];
   int differences[GCODE_NUM_AXES];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    new_machine_position[i] = roundf(axis[i] * state->cfg.axis_steps_per_mm[i]);
+    new_machine_position[i] = roundf(axis[i] * state->cfg.steps_per_mm[i]);
     differences[i] = new_machine_position[i] - state->machine_position[i];
   }
 
@@ -314,7 +314,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    const int steps_per_mm = config->axis_steps_per_mm[AXIS_X];
+    const int steps_per_mm = config->steps_per_mm[AXIS_X];
     if (beagleg_init(config->acceleration * steps_per_mm) != 0)
       return 1;
   }

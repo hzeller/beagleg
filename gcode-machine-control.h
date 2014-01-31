@@ -19,17 +19,19 @@
 
 /* Configuration constants for the controller. */
 struct MachineControlConfig {
-  float axis_steps_per_mm[8];  // Steps per mm for each axis.
-  float move_range[8];         // Available of axes in mm (0..range[axis])
-                               // Only values > 0 are actively clipped.
-  float home_position[8];      // Home position for axes in mm. Axes with values
-                               // < 0 don't participate in homing.
-  float acceleration;          // Euclidian (x/y) acceleration in mm/s^2
-  float max_feedrate;          // Maximum allowed euclidean feedrate in mm/s
-  float speed_factor;          // Should be 1.0 by default.
-  char dry_run;                // Don't actually send motor commands if 1.
-  char debug_print;            // Print step-tuples to output_fd if 1.
-  char synchronous;            // Don't queue, wait for command to finish if 1.
+  // Arrays with values for each axis
+  float steps_per_mm[8];   // Steps per mm for each axis.
+  float move_range[8];     // Available of axes in mm (0..range[axis])
+                           // Only values > 0 are actively clipped.
+  float home_position[8];  // Home position for axes in mm. Axes with values
+                           // < 0 don't participate in homing.
+
+  float acceleration;      // Euclidian (x/y) acceleration in mm/s^2
+  float max_feedrate;      // Maximum allowed euclidean feedrate in mm/s
+  float speed_factor;      // Should be 1.0 by default.
+  char dry_run;            // Don't actually send motor commands if 1.
+  char debug_print;        // Print step-tuples to output_fd if 1.
+  char synchronous;        // Don't queue, wait for command to finish if 1.
 };
 
 

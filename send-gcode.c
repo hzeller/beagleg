@@ -183,10 +183,10 @@ static int parse_float_array(const char *input, float result[], int count) {
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
-  memcpy(config.axis_steps_per_mm, kStepsPerMM,
-	 sizeof(config.axis_steps_per_mm));
-  memcpy(config.home_position, kHomePos,
-	 sizeof(config.home_position));
+  bzero(&config, sizeof(config));
+  memcpy(config.steps_per_mm, kStepsPerMM, sizeof(config.steps_per_mm));
+  memcpy(config.home_position, kHomePos, sizeof(config.home_position));
+  memcpy(config.move_range, kMoveRange, sizeof(config.move_range));
   config.max_feedrate = kDefaultMaxFeedrate;
   config.speed_factor = 1;
   config.acceleration = kDefaultAcceleration;
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
       // Negative or 0 means: 'infinite'.
       break;
     case SET_STEPS_MM:
-      if (!parse_float_array(optarg, config.axis_steps_per_mm, 8))
+      if (!parse_float_array(optarg, config.steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case SET_HOME_POS:
