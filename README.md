@@ -62,13 +62,12 @@ The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
 
 ### Examples
 
-    ./send-gcode -f 10 -m 1000 -R myfile.gcode
+    sudo ./send-gcode -f 10 -m 1000 -R myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
 
-
-    ./send-gcode --port 4444
+    sudo ./send-gcode --port 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
