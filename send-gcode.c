@@ -32,10 +32,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "gcode-parser.h"
-#include "motor-interface.h"
 #include "determine-print-stats.h"
 #include "gcode-machine-control.h"
+#include "gcode-parser.h"
+#include "motor-interface.h"
 
 // Some default settings.
 static const float kDefaultMaxFeedrate = 200; // mm/s
@@ -123,13 +123,9 @@ static int run_server(const char *bind_addr, int port) {
   bzero(&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
-  if (bind_addr) {
-    if (!inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
-      fprintf(stderr, "Invalid bind IP address %s\n", bind_addr);
-      return 1;
-    }
-  } else {
-    bind_addr = "0.0.0.0";
+  if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
+    fprintf(stderr, "Invalid bind IP address %s\n", bind_addr);
+    return 1;
   }
   serv_addr.sin_port = htons(port);
   int on = 1;
@@ -142,7 +138,7 @@ static int run_server(const char *bind_addr, int port) {
   signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
 
   listen(s, 2);
-  printf("Listening on %s:%d\n", bind_addr, port);
+  printf("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
 
   int process_result;
   do {
@@ -180,7 +176,6 @@ static int parse_float_array(const char *input, float result[], int count) {
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
-  // Per axis X, Y, Z, E (Z and E: need to look up)
   memcpy(config.axis_steps_per_mm, kStepsPerMM,
 	 sizeof(config.axis_steps_per_mm));
   memcpy(config.home_position, kHomePos,
@@ -201,10 +196,10 @@ int main(int argc, char *argv[]) {
   static struct option long_options[] = {
     { "max-feedrate",  required_argument, NULL, 'm'},
     { "accel",         required_argument, NULL, 'a'},
+    { "range",         required_argument, NULL, 'r' },
+    { "home-pos",      required_argument, NULL, SET_HOME_POS },
     { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
     { "port",          required_argument, NULL, 'p'},
-    { "home-pos",      required_argument, NULL, SET_HOME_POS },
-    { "range",         required_argument, NULL, 'r' },
     { "bind-addr",     required_argument, NULL, 'b'},
     { 0,               0,                 0,    0  },
   };
