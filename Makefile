@@ -20,7 +20,7 @@ INCDIR_APP_LOADER?=$(AM335_BASE)/app_loader/include
 
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D_XOPEN_SOURCE=500 -O2 $(ARM_OPTIONS)
 LDFLAGS+=-lpthread -lm
-PRUSS_LIBS=-L$(LIBDIR_APP_LOADER) -lprussdrv
+PRUSS_LIBS=-Wl,-rpath=$(LIBDIR_APP_LOADER) -L$(LIBDIR_APP_LOADER) -lprussdrv
 
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h

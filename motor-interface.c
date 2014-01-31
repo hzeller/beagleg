@@ -136,7 +136,7 @@ static volatile struct QueueElement *next_queue_element() {
   queue_pos_ %= QUEUE_LEN;
   while (shared_queue_[queue_pos_].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
+    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
   }
   return &shared_queue_[queue_pos_++];
 }
@@ -348,7 +348,7 @@ void beagleg_wait_queue_empty(void) {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (shared_queue_[last_insert_position].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU0_ARM_INTERRUPT);
+    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
   }
 }
 
