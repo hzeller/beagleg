@@ -75,6 +75,7 @@ static int usage(const char *prog, const char *msg) {
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)\n"
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated. "
 	  "(Default 160,160,160,40)\n"
+#if 0   // not yet implemented
 	  "  --home-pos <pos-mm>       : Home positions of axes. Only values "
 	  ">= 0\n"
 	  "                               participate in homing. "
@@ -83,6 +84,7 @@ static int usage(const char *prog, const char *msg) {
 	  ". Only\n"
 	  "                               values > 0 are actively clipped. "
 	  "(Default: 100,100,100,-1,-1,...)\n"
+#endif
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors "
 	  "(Default: off).\n"
