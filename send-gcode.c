@@ -37,7 +37,7 @@
 #include "gcode-parser.h"
 #include "motor-interface.h"
 
-// Some default settings.
+// Some default settings. These are most likely overrridden via flags by user.
 static const float kDefaultMaxFeedrate = 200; // mm/s
 static const float kDefaultAcceleration = 4000; // mm/s^2
 static const float kStepsPerMM[] = { 160, 160, 160, 40,  0,  0,  0,  0 };
@@ -99,15 +99,20 @@ static int usage(const char *prog, const char *msg) {
   return 1;
 }
 
-static int send_file_to_printer(const char *filename, char do_loop) {
+// Reads the given "gcode_filename" with GCode and operates machine with it.
+// If "do_loop" is 1, repeats this forever (e.g. for stress test).
+static int send_file_to_machine(const char *gcode_filename, char do_loop) {
   do {
-    int fd = open(filename, O_RDONLY);
+    int fd = open(gcode_filename, O_RDONLY);
     if (gcode_machine_control_from_stream(fd, STDERR_FILENO) != 0)
       return 1;
   } while (do_loop);
   return 0;
 }
 
+// Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
+// Interprets GCode coming from a connection. Only one connection at a
+// time can be active.
 static int run_server(const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
@@ -163,6 +168,8 @@ static int run_server(const char *bind_addr, int port) {
   return 0;
 }
 
+// Parse comma (or other character) separated array of up to "count" float
+// numbers and fill into result[]. Returns 1 on success.
 static int parse_float_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
@@ -197,8 +204,8 @@ int main(int argc, char *argv[]) {
     { "max-feedrate",  required_argument, NULL, 'm'},
     { "accel",         required_argument, NULL, 'a'},
     { "range",         required_argument, NULL, 'r' },
-    { "home-pos",      required_argument, NULL, SET_HOME_POS },
     { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
+    { "home-pos",      required_argument, NULL, SET_HOME_POS },
     { "port",          required_argument, NULL, 'p'},
     { "bind-addr",     required_argument, NULL, 'b'},
     { 0,               0,                 0,    0  },
@@ -276,7 +283,7 @@ int main(int argc, char *argv[]) {
   if (has_filename) {
     const char *filename = argv[optind];
     print_file_stats(filename, &config);
-    ret = send_file_to_printer(filename, do_file_repeat);
+    ret = send_file_to_machine(filename, do_file_repeat);
   } else {
     ret = run_server(bind_addr, listen_port);
   }
