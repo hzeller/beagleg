@@ -150,6 +150,10 @@ PRU.
     git clone git@github.com:hzeller/beagleg.git
     cd beagleg
     make
+
+If you run into compile problems, make sure to have both, am335x_pru_package and
+beagleg up-to-date from git; looks like there were some recent changes in the
+am335x_pru_package.
     
 ## License
 BeagleG is free software: you can redistribute it and/or modify
