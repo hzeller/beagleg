@@ -14,10 +14,12 @@ controlled steps at rates that can go beyond 500kHz.
 So: sufficient even for advanced step motors and drivers :)
 
 The [acceleration - travel - deceleration] motion profile is entirely
-created within the PRU from parameters sent by the host CPU via a ring-buffer.
+created within the PRU from parameters sent by the host CPU (i.e. BeagleBone ARM)
+via a ring-buffer.
 The host CPU prepares the data, such as parsing the G-Code and doing travel
-planning, while all the real-time critical parts are done in the PRU. The host
-program needs less than 1% CPU-time processing a typical G-Code file.
+planning, while all the real-time critical parts are
+done in the PRU. The host program needs less than 1% CPU-time processing a
+typical G-Code file.
 
 The `send-gcode` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit.
@@ -141,7 +143,7 @@ PRU.
     git clone git@github.com:beagleboard/am335x_pru_package.git
     cd am335x_pru_package/
     cd pru_sw/utils/pasm_source ; ./linuxbuild ; cd -
-    make -C pru_sw/app_loader/interface/
+    CROSS_COMPILE= make -C pru_sw/app_loader/interface/
     cd ..
 
     # Check out BeagleG and build
