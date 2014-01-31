@@ -45,16 +45,16 @@ takes a filename or a TCP port to listen on.
 
     Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
-      -m <rate>   : Max. feedrate (Default 200mm/s).
-      -a <accel>  : Acceleration/Deceleration (Default 4000mm/s^2).
-      -l <port>   : Listen on this TCP port.
-      -x <axis-steps>: steps/mm, comma separated. (Default 160,160,160,40)
-      -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)
-      -n          : Dryrun; don't send to motors (Default: off).
-      -f <factor> : Print speed factor (Default 1.0).
-      -P          : Verbose: Print motor commands (Default: off).
-      -S          : Synchronous: don't queue (Default: off).
-      -R          : Repeat file forever.
+      --max-feedrate <rate> (-m): Max. feedrate (Default 200.0mm/s).
+      --accel <accel>       (-a): Acceleration/Deceleration (Default 4000.0mm/s^2).
+      --port <port>         (-p): Listen on this TCP port.
+      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)
+      --steps-mm <axis-steps>   : steps/mm, comma separated. (Default 160,160,160,40)
+      -f <factor>               : Print speed factor (Default 1.0).
+      -n                        : Dryrun; don't send to motors (Default: off).
+      -P                        : Verbose: Print motor commands (Default: off).
+      -S                        : Synchronous: don't queue (Default: off).
+      -R                        : Repeat file forever.
 
 The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
 

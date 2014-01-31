@@ -66,17 +66,21 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  -m <rate>   : Max. feedrate (Default %.1fmm/s).\n"
-	  "  -a <accel>  : Acceleration/Deceleration (Default %.1fmm/s^2).\n"
-	  "  -l <port>   : Listen on this TCP port.\n"
-	  "  -x <axis-steps>: steps/mm, comma separated. "
+	  "  --max-feedrate <rate> (-m): Max. feedrate (Default %.1fmm/s).\n"
+	  "  --accel <accel>       (-a): "
+	  "Acceleration/Deceleration (Default %.1fmm/s^2).\n"
+	  "  --port <port>         (-p): Listen on this TCP port.\n"
+	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)\n"
+	  "  --steps-mm <axis-steps>   : steps/mm, comma separated. "
 	  "(Default 160,160,160,40)\n"
-	  "  -b <bind-ip>: Bind to this IP (Default: 0.0.0.0)\n"
-	  "  -n          : Dryrun; don't send to motors (Default: off).\n"
-	  "  -f <factor> : Print speed factor (Default 1.0).\n"
-	  "  -P          : Verbose: Print motor commands (Default: off).\n"
-	  "  -S          : Synchronous: don't queue (Default: off).\n"
-	  "  -R          : Repeat file forever.\n",
+	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
+	  "  -n                        : Dryrun; don't send to motors "
+	  "(Default: off).\n"
+	  "  -P                        : Verbose: Print motor commands "
+	  "(Default: off).\n"
+	  "  -S                        : Synchronous: don't queue "
+	  "(Default: off).\n"
+	  "  -R                        : Repeat file forever.\n",
 	  prog, kDefaultMaxFeedrate, kDefaultAcceleration);
   fprintf(stderr, "You can either specify -l <port> to listen for commands "
 	  "or give a filename\n");
@@ -174,11 +178,26 @@ int main(int argc, char *argv[]) {
   config.debug_print = 0;
   config.synchronous = 0;
 
+  // Less common options don't have a short option.
+  enum LongOptionsOnly {
+    SET_STEPS_MM = 1000
+  };
+
+  static struct option long_options[] = {
+    { "max-feedrate",  required_argument, NULL, 'm'},
+    { "accel",         required_argument, NULL, 'a'},
+    { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
+    { "port",          required_argument, NULL, 'p'},
+    { "bind-addr",     required_argument, NULL, 'b'},
+    { 0,               0,                 0,    0  },
+  };
+
   int listen_port = -1;
   char do_file_repeat = 0;
   char *bind_addr = NULL;
   int opt;
-  while ((opt = getopt(argc, argv, "SPRnl:f:m:a:b:x:")) != -1) {
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:SPRnf:",
+			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = atof(optarg);
@@ -194,7 +213,7 @@ int main(int argc, char *argv[]) {
       config.acceleration = atof(optarg);
       // Negative or 0 means: 'infinite'.
       break;
-    case 'x':
+    case SET_STEPS_MM:
       if (!parse_number_array(optarg, config.axis_steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
@@ -210,7 +229,7 @@ int main(int argc, char *argv[]) {
     case 'R':
       do_file_repeat = 1;
       break;
-    case 'l':
+    case 'p':
       listen_port = atoi(optarg);
       break;
     case 'b':
