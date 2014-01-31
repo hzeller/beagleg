@@ -143,7 +143,7 @@ PRU.
     git clone git@github.com:beagleboard/am335x_pru_package.git
     cd am335x_pru_package/
     cd pru_sw/utils/pasm_source ; ./linuxbuild ; cd -
-    CROSS_COMPILE= make -C pru_sw/app_loader/interface/
+    CROSS_COMPILE="" make -C pru_sw/app_loader/interface/
     cd ..
 
     # Check out BeagleG and build
