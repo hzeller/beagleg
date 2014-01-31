@@ -131,6 +131,9 @@ For your electrical interface: note this is 3.3V level (and assume not more
 than ~4mA). The RAMPS driver board for instance only works if you power the
 5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
 
+Here is my experimental manual cape
+![Manual Cape][manual-cape]
+
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
 directly, or using a cross compiler (see Makefile).
@@ -169,3 +172,5 @@ the Free Software Foundation, either version 3 of the License, or
    - Fast pause without waiting for queues to empty, but still be able to
      recover exact last position. That way pause/resume is possible.
    - ...
+
+[manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
