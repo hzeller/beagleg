@@ -17,17 +17,22 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+enum HomeType {
+  HOME_POS_NONE     = -1,  // Axis does not do homing.
+  HOME_POS_ORIGIN   = 0,   // Home position is at origin '0' for this axis
+  HOME_POS_ENDRANGE = 1,   // Home position is at end of range for this axis.
+};
+
 /* Configuration constants for the controller. */
 struct MachineControlConfig {
   // Arrays with values for each axis
   float steps_per_mm[8];   // Steps per mm for each axis.
-  float move_range[8];     // Available of axes in mm (0..range[axis])
+  float move_range_mm[8];  // Available of axes in mm (0..range[axis])
                            // Only values > 0 are actively clipped.
-  float home_position[8];  // Home position for axes in mm. Axes with values
-                           // < 0 don't participate in homing.
-
-  float acceleration;      // Euclidian (x/y) acceleration in mm/s^2
-  float max_feedrate;      // Maximum allowed euclidean feedrate in mm/s
+  enum HomeType home_switch[8]; // Home position for axes. Axis with
+                            // HOME_POS_NONE don't participate in homing.
+  float max_feedrate[8];    // Max feedrate for axis.
+  float acceleration[8];   // Max acceleration for axis
   float speed_factor;      // Should be 1.0 by default.
   char dry_run;            // Don't actually send motor commands if 1.
   char debug_print;        // Print step-tuples to output_fd if 1.

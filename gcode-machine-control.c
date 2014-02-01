@@ -37,8 +37,18 @@
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 struct PrinterState {
-  struct MachineControlConfig cfg;
+  const struct MachineControlConfig cfg;
+  // Derived configuration
+  float g0_feedrate_mm_per_sec;          // Highest of all axes; used for G0
+                                         // (will be trimmed if needed)
+  // Pre-calcualted per axis limits in steps/s, steps/s^2
+  float max_axis_speed[GCODE_NUM_AXES];  // max travel speed hz
+  float max_axis_accel[GCODE_NUM_AXES];  // acceleration hz/s
+  float highest_accel;                   // hightest accel of all axes.
+
   GCodeParser_t *parser;
+
+  // Current machine state
   float current_feedrate_mm_per_sec;
   float prog_speed_factor;               // Speed factor set by program (M220)
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
@@ -125,7 +135,8 @@ static double euklid_distance(double x, double y, double z) {
 }
 
 // Move the given number of machine steps for each axis.
-static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
+static void move_machine_steps(struct PrinterState *state,
+			       float requested_feedrate_mm_s,
 			       int machine_steps[]) {
   struct bg_movement command;
   bzero(&command, sizeof(command));
@@ -147,12 +158,13 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
       defining_axis = (enum GCodeParserAxes) i;
   }
 
-  const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
-  command.travel_speed = feedrate_mm_s * steps_per_mm;
-  command.acceleration = state->cfg.acceleration * steps_per_mm;
+  command.travel_speed
+    = requested_feedrate_mm_s * state->cfg.steps_per_mm[defining_axis];
+  command.acceleration = state->highest_accel;  // Trimmed below.
 
   // If we're in the euklidian space, choose the step-frequency according to
   // the relative feedrate of the defining axis.
+  // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
   if (defining_axis == AXIS_X
       || defining_axis == AXIS_Y
       || defining_axis == AXIS_Z) {
@@ -162,15 +174,29 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
       euklid_distance(command.steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
 		      command.steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
 		      command.steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
+    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
     const float defining_axis_length = command.steps[defining_axis]/steps_per_mm;
-    // Fraction the defining axis does of the full travel.
     const float euklid_fraction = fabsf(defining_axis_length) / total_xyz_length;
     command.travel_speed *= euklid_fraction;
-    command.acceleration *= euklid_fraction;
+  }
+
+  // Now: range limiting. We trim speed and acceleration to what the weakest
+  // involved axis can handle.
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (command.steps[i] == 0)
+      continue;
+    // We only get this fraction of steps, so this is how our speed is scaled.
+    float fraction = fabs(1.0 * command.steps[i] / command.steps[defining_axis]);
+    if (command.travel_speed * fraction > state->max_axis_speed[i])
+      command.travel_speed = state->max_axis_speed[i] / fraction;
+    // Acceleration can be set to a value <= 0 to mean 'infinite'.
+    if (state->max_axis_accel[i] > 0
+	&& command.acceleration * fraction > state->max_axis_accel[i])
+      command.acceleration = state->max_axis_accel[i] / fraction;
   }
   
   if (command.travel_speed == 0) {
-    // In case someone choose a feedrate of 0, set something
+    // In case someone choose a feedrate of 0, set something smallish.
     if (state->msg_stream) {
       fprintf(state->msg_stream,
 	      "// Ignoring speed of 0, setting to %.6f mm/s\n",
@@ -186,18 +212,24 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
   }
   
   if (state->cfg.debug_print && state->msg_stream) {
+    float defining_feedrate
+      = command.travel_speed / state->cfg.steps_per_mm[defining_axis];
+    float defining_accel
+      = command.acceleration / state->cfg.steps_per_mm[defining_axis];
     if (command.steps[AXIS_Z] != 0) {
       fprintf(state->msg_stream,
-	      "// (%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f (%.1f mm/s)\n",
+	      "// (%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f "
+	      "(main axis: %.1f mm/s, %.1fmm/s^2)\n",
 	      command.steps[AXIS_X], command.steps[AXIS_Y],
 	      command.steps[AXIS_Z], command.steps[AXIS_E],
-	      command.travel_speed / 1000.0, feedrate_mm_s);
+	      command.travel_speed / 1000.0, defining_feedrate, defining_accel);
     } else {
       fprintf(state->msg_stream,  // less clutter, when there is no Z
-	      "// (%6d, %6d)       E:%-3d step kHz:%-8.3f (%.1f mm/s)\n",
+	      "// (%6d, %6d)       E:%-3d step kHz:%-8.3f "
+	      "(main axis: %.1f mm/s, %.1fmm/s^2)\n",
 	      command.steps[AXIS_X], command.steps[AXIS_Y],
 	      command.steps[AXIS_E], command.travel_speed / 1000.0,
-	      feedrate_mm_s);
+	      defining_feedrate, defining_accel);
     }
   }
 }
@@ -228,19 +260,14 @@ static void machine_G1(void *userdata, float feed, const float *axis) {
     state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
   }
   float feedrate = state->prog_speed_factor * state->current_feedrate_mm_per_sec;
-  if (feedrate > state->cfg.max_feedrate)
-    feedrate = state->cfg.max_feedrate;
   machine_move(userdata, feedrate, axis);
 }
 
 static void machine_G0(void *userdata, float feed, const float *axis) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  float rapid_feed = state->cfg.max_feedrate;
+  float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
-  if (feed > 0 && given < state->cfg.max_feedrate)
-    rapid_feed = given;
-
-  machine_move(userdata, rapid_feed, axis);
+  machine_move(userdata, given > 0 ? given : rapid_feed, axis);
 }
 
 static void machine_dwell(void *userdata, float value) {
@@ -269,6 +296,7 @@ static void machine_home(void *userdata, unsigned char axes_bitmap) {
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
 
+  // TODO(hzeller): use home_switch info.
   // Goal is to bring back the machine the negative amount of steps.
   for (int i = 0; i <= GCODE_NUM_AXES; ++i) {
     if ((1 << i) & axes_bitmap) {
@@ -295,7 +323,13 @@ static void machine_home(void *userdata, unsigned char axes_bitmap) {
 	    axes_bitmap, machine_pos_differences[AXIS_X],
 	    machine_pos_differences[AXIS_Y], machine_pos_differences[AXIS_Z]);
   }
-  move_machine_steps(state, state->cfg.max_feedrate, machine_pos_differences);
+  move_machine_steps(state, state->g0_feedrate_mm_per_sec,
+		     machine_pos_differences);
+}
+
+static void cleanup_state() {
+  free(s_mstate);
+  s_mstate = NULL;
 }
 
 int gcode_machine_control_init(const struct MachineControlConfig *config) {
@@ -304,27 +338,27 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
     return 1;
   }
 
-  if (!config->dry_run) {
-    if (geteuid() != 0) {
-      // TODO: running as root is generally not a good idea. Setup permissions
-      // to just access these GPIOs.
-      fprintf(stderr, "Need to run as root to access GPIO pins. "
-	      "(use the dryrun option -n to not write to GPIO)\n");
-      return 1;
-    }
-    float smallest_step_mm = config->steps_per_mm[AXIS_X];
-    if (config->steps_per_mm[AXIS_Y] < smallest_step_mm)
-      smallest_step_mm = config->steps_per_mm[AXIS_Y];
-    if (config->steps_per_mm[AXIS_Z] < smallest_step_mm)
-      smallest_step_mm = config->steps_per_mm[AXIS_Z];
-    if (beagleg_init(config->acceleration * smallest_step_mm) != 0)
-      return 1;
-  }
-
+  // Initialize basic state and derived configuration.
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
   bzero(s_mstate, sizeof(*s_mstate));
-  s_mstate->cfg = *config;
-  s_mstate->current_feedrate_mm_per_sec = config->max_feedrate / 10;
+  // Here we assign it to the 'const' cfg, all other accesses will check for
+  // the readonly ness. So some nasty override here: we know what we're doing.
+  *((struct MachineControlConfig*) &s_mstate->cfg) = *config;
+  s_mstate->current_feedrate_mm_per_sec = config->max_feedrate[AXIS_X] / 10;
+  float lowest_accel
+    = config->max_feedrate[AXIS_X] * config->steps_per_mm[AXIS_X];
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (config->max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec)
+      s_mstate->g0_feedrate_mm_per_sec = config->max_feedrate[i];
+    s_mstate->max_axis_speed[i]
+      = config->max_feedrate[i] * config->steps_per_mm[i];
+    float accel = config->acceleration[i] * config->steps_per_mm[i];
+    s_mstate->max_axis_accel[i] = accel;
+    if (accel > s_mstate->highest_accel)
+      s_mstate->highest_accel = accel;
+    if (accel < lowest_accel)
+      lowest_accel = accel;
+  }
   s_mstate->prog_speed_factor = 1.0f;
 
   struct GCodeParserCb callbacks;
@@ -346,6 +380,22 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   // track of the machine coordinates (steps). So it has the same life-cycle.
   s_mstate->parser = gcodep_new(&callbacks, s_mstate);
 
+  // Init motor control.
+  if (!config->dry_run) {
+    if (geteuid() != 0) {
+      // TODO: running as root is generally not a good idea. Setup permissions
+      // to just access these GPIOs.
+      fprintf(stderr, "Need to run as root to access GPIO pins. "
+	      "(use the dryrun option -n to not write to GPIO)\n");
+      cleanup_state();
+      return 1;
+    }
+    if (beagleg_init(lowest_accel) != 0) {
+      cleanup_state();
+      return 1;
+    }
+  }
+
   return 0;
 }
 
@@ -363,8 +413,7 @@ void gcode_machine_control_exit() {
     }
   }
   gcodep_delete(s_mstate->parser);
-  free(s_mstate);
-  s_mstate = NULL;
+  cleanup_state();
 }
 
 int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {

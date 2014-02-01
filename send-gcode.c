@@ -38,10 +38,15 @@
 #include "motor-interface.h"
 
 // Some default settings. These are most likely overrridden via flags by user.
-static const float kDefaultMaxFeedrate = 200; // mm/s
-static const float kDefaultAcceleration = 4000; // mm/s^2
-static const float kStepsPerMM[] = { 160, 160, 160, 40,  0,  0,  0,  0 };
-static const float kHomePos[]    = {   0,   0,   0, -1, -1, -1, -1, -1 };
+static const float kMaxFeedrate[] = {  200,  200,  90,     10, 0, 0, 0, 0 };
+static const float kDefaultAccel[]= { 4000, 4000, 1000, 10000, 0, 0, 0, 0 };
+static const float kStepsPerMM[]  = {  160,  160,  160,    40, 0, 0, 0, 0 };
+static const enum HomeType kHomePos[] = { HOME_POS_ORIGIN,
+					  HOME_POS_ORIGIN,
+					  HOME_POS_ORIGIN,
+					  HOME_POS_NONE, HOME_POS_NONE,
+					  HOME_POS_NONE, HOME_POS_NONE,
+					  HOME_POS_NONE };
 static const float kMoveRange[]  = { 100, 100, 100, -1, -1, -1, -1, -1 };
 static const float kFilamentDiameter = 1.7;  // mm
 
@@ -49,7 +54,7 @@ static void print_file_stats(const char *filename,
 			     struct MachineControlConfig *config) {
   struct BeagleGPrintStats result;
   if (determine_print_stats(open(filename, O_RDONLY),
-			    config->max_feedrate, config->speed_factor,
+			    config->max_feedrate[AXIS_X], config->speed_factor,
 			    &result) == 0) {
     const float filament_volume
       = kFilamentDiameter*kFilamentDiameter/4 * M_PI * result.filament_len;
@@ -68,17 +73,16 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  --max-feedrate <rate> (-m): Max. feedrate (Default %.1fmm/s).\n"
+	  "  --max-feedrate <rate> (-m): Max. feedrate\n"
 	  "  --accel <accel>       (-a): "
-	  "Acceleration/Deceleration (Default %.1fmm/s^2).\n"
+	  "Acceleration/Deceleration.\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)\n"
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated. "
 	  "(Default 160,160,160,40)\n"
 #if 0   // not yet implemented
-	  "  --home-pos <pos-mm>       : Home positions of axes. Only values "
-	  ">= 0\n"
-	  "                               participate in homing. "
+	  "  --home-pos <-1/0/1>,*       : Home positions of axes. 0 = origin, "
+	  "1 = end-of-range; -1 = no-homing\n"
 	  "(Default: 0,0,0,-1,-1,...)\n"
 	  "  --range <range-mm>    (-r): Range of of axes in mm (0..range[axis])"
 	  ". Only\n"
@@ -93,7 +97,7 @@ static int usage(const char *prog, const char *msg) {
 	  "  -S                        : Synchronous: don't queue "
 	  "(Default: off).\n"
 	  "  -R                        : Repeat file forever.\n",
-	  prog, kDefaultMaxFeedrate, kDefaultAcceleration);
+	  prog);
   fprintf(stderr, "You can either specify --port <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
@@ -169,27 +173,27 @@ static int run_server(const char *bind_addr, int port) {
 }
 
 // Parse comma (or other character) separated array of up to "count" float
-// numbers and fill into result[]. Returns 1 on success.
+// numbers and fill into result[]. Returns number of elements parsed on success.
 static int parse_float_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
     result[i] = strtod(input, &end);
     if (end == input) return 0;  // parse error.
-    if (*end == '\0') return 1;
+    if (*end == '\0') return i + 1;
     input = end + 1;
   }
-  return 1;
+  return count;
 }
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
   bzero(&config, sizeof(config));
   memcpy(config.steps_per_mm, kStepsPerMM, sizeof(config.steps_per_mm));
-  memcpy(config.home_position, kHomePos, sizeof(config.home_position));
-  memcpy(config.move_range, kMoveRange, sizeof(config.move_range));
-  config.max_feedrate = kDefaultMaxFeedrate;
+  memcpy(config.home_switch, kHomePos, sizeof(config.home_switch));
+  memcpy(config.move_range_mm, kMoveRange, sizeof(config.move_range_mm));
+  memcpy(config.max_feedrate, kMaxFeedrate, sizeof(config.max_feedrate));
+  memcpy(config.acceleration, kDefaultAccel, sizeof(config.acceleration));
   config.speed_factor = 1;
-  config.acceleration = kDefaultAcceleration;
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
@@ -215,6 +219,7 @@ int main(int argc, char *argv[]) {
   char do_file_repeat = 0;
   char *bind_addr = NULL;
   int opt;
+  int parse_count;
   while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPRnf:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
@@ -224,24 +229,29 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
     case 'm':
-      config.max_feedrate = atof(optarg);
-      if (config.max_feedrate <= 0)
-	return usage(argv[0], "Feedrate cannot be <= 0");
+      parse_count = parse_float_array(optarg, config.max_feedrate, 8);
+      if (!parse_count) return usage(argv[0], "max-feedrate missing.");
       break;
     case 'a':
-      config.acceleration = atof(optarg);
+      parse_count = parse_float_array(optarg, config.acceleration, 8);
+      if (!parse_count) return usage(argv[0], "Acceleration missing.");
       // Negative or 0 means: 'infinite'.
       break;
     case SET_STEPS_MM:
       if (!parse_float_array(optarg, config.steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
-    case SET_HOME_POS:
-      if (!parse_float_array(optarg, config.home_position, 8))
-	return usage(argv[0], "Failed to parse home pos.");
+    case SET_HOME_POS: {
+      float tmp[8];
+      bzero(tmp, sizeof(tmp));
+      if (!parse_float_array(optarg, tmp, 8))
+	return usage(argv[0], "Failed to parse home switch.");
+      for (int i = 0; i < 8; ++i)
+	config.home_switch[i] = (enum HomeType) tmp[i];
+    }
       break;
     case 'r':
-      if (!parse_float_array(optarg, config.move_range, 8))
+      if (!parse_float_array(optarg, config.move_range_mm, 8))
 	return usage(argv[0], "Failed to parse ranges.");
       break;
     case 'n':
