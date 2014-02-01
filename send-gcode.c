@@ -73,22 +73,24 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  --max-feedrate <rate> (-m): Max. feedrate\n"
-	  "  --accel <accel>       (-a): "
-	  "Acceleration/Deceleration.\n"
-	  "  --port <port>         (-p): Listen on this TCP port.\n"
-	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)\n"
-	  "  --steps-mm <axis-steps>   : steps/mm, comma separated. "
-	  "(Default 160,160,160,40)\n"
+	  "  --steps-mm <axis-steps>   : steps/mm, comma separated "
+	  "(Default 160,160,160,40,0, ...).\n"
+	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
+	  "comma separated (Default: 200,200,90,0, ...).\n"
+	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
+	  "comma separated (Default 4000,4000,1000,10000,0, ...).\n"
 #if 0   // not yet implemented
-	  "  --home-pos <-1/0/1>,*       : Home positions of axes. 0 = origin, "
-	  "1 = end-of-range; -1 = no-homing\n"
-	  "(Default: 0,0,0,-1,-1,...)\n"
-	  "  --range <range-mm>    (-r): Range of of axes in mm (0..range[axis])"
+	  "  --home-pos <-1/0/1>,*      : Home positions of axes, comma "
+	  "separated\n"
+	  "                                0 = origin, 1 = end-of-range; "
+	  "-1 = no-homing (Default: 0,0,0,-1, ...).\n"
+	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis])"
 	  ". Only\n"
 	  "                               values > 0 are actively clipped. "
-	  "(Default: 100,100,100,-1,-1,...)\n"
+	  "(Default: 100,100,100,-1,-1, ...)\n"
 #endif
+	  "  --port <port>         (-p): Listen on this TCP port.\n"
+	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors "
 	  "(Default: off).\n"
@@ -98,6 +100,8 @@ static int usage(const char *prog, const char *msg) {
 	  "(Default: off).\n"
 	  "  -R                        : Repeat file forever.\n",
 	  prog);
+  fprintf(stderr, "All comma separated axis values are in the sequence "
+	  "X,Y,Z,E,A,B,C\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
