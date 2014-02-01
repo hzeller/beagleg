@@ -47,18 +47,23 @@ takes a filename or a TCP port to listen on.
 
     Usage: ./send-gcode [options] [<gcode-filename>]
     Options:
-      --max-feedrate <rate> (-m): Max. feedrate (Default 200.0mm/s).
-      --accel <accel>       (-a): Acceleration/Deceleration (Default 4000.0mm/s^2).
+      --steps-mm <axis-steps>   : steps/mm, comma separated (Default 160,160,160,40,0, ...).
+      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,0, ...).
+      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated (Default 4000,4000,1000,10000,0, ...).
+      --motor-output-mapping    : Motor index (=string pos) mapped to which axis.
+                                  Axis letter or '_' for no mapping. (Default: 'XYZEABC')
       --port <port>         (-p): Listen on this TCP port.
-      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0)
-      --steps-mm <axis-steps>   : steps/mm, comma separated. (Default 160,160,160,40)
+      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
       -n                        : Dryrun; don't send to motors (Default: off).
       -P                        : Verbose: Print motor commands (Default: off).
       -S                        : Synchronous: don't queue (Default: off).
       -R                        : Repeat file forever.
+All comma separated axis values are in the sequence X,Y,Z,E,A,B,C
+You can either specify --port <port> to listen for commands or give a filename
 
-The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6].
+The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6],
+which can be changed with the `--motor-output-mapping` flag.
 
 ### Examples
 

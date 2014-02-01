@@ -18,14 +18,15 @@
  */
 #include "gcode-machine-control.h"
 
+#include <ctype.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include "motor-interface.h"
 #include "gcode-parser.h"
@@ -46,6 +47,7 @@ struct PrinterState {
   float max_axis_accel[GCODE_NUM_AXES];  // acceleration hz/s
   float highest_accel;                   // hightest accel of all axes.
 
+  int axis_to_output[GCODE_NUM_AXES];    // which axis is mapped to which motor.
   GCodeParser_t *parser;
 
   // Current machine state
@@ -141,9 +143,10 @@ static void move_machine_steps(struct PrinterState *state,
   struct bg_movement command;
   bzero(&command, sizeof(command));
   char any_work = 0;
+  int axis_steps[GCODE_NUM_AXES];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    command.steps[i] = machine_steps[i];
-    if (command.steps[i] != 0) any_work = 1;
+    axis_steps[i] = machine_steps[i];
+    if (axis_steps[i] != 0) any_work = 1;
   }
 
   if (!any_work) {
@@ -154,7 +157,7 @@ static void move_machine_steps(struct PrinterState *state,
   // it defines the frequency to go.
   enum GCodeParserAxes defining_axis = AXIS_X;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (abs(command.steps[i]) > abs(command.steps[defining_axis]))
+    if (abs(axis_steps[i]) > abs(axis_steps[defining_axis]))
       defining_axis = (enum GCodeParserAxes) i;
   }
 
@@ -171,11 +174,11 @@ static void move_machine_steps(struct PrinterState *state,
     // We need to calculate the feedrate in real-world coordinates as each
     // axis can have a different amount of steps/mm
     const float total_xyz_length = 
-      euklid_distance(command.steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
-		      command.steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
-		      command.steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
+      euklid_distance(axis_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
+		      axis_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
+		      axis_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
     const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
-    const float defining_axis_length = command.steps[defining_axis]/steps_per_mm;
+    const float defining_axis_length = axis_steps[defining_axis]/steps_per_mm;
     const float euklid_fraction = fabsf(defining_axis_length) / total_xyz_length;
     command.travel_speed *= euklid_fraction;
   }
@@ -183,10 +186,10 @@ static void move_machine_steps(struct PrinterState *state,
   // Now: range limiting. We trim speed and acceleration to what the weakest
   // involved axis can handle.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (command.steps[i] == 0)
+    if (axis_steps[i] == 0)
       continue;
     // We only get this fraction of steps, so this is how our speed is scaled.
-    float fraction = fabs(1.0 * command.steps[i] / command.steps[defining_axis]);
+    float fraction = fabs(1.0 * axis_steps[i] / axis_steps[defining_axis]);
     if (command.travel_speed * fraction > state->max_axis_speed[i])
       command.travel_speed = state->max_axis_speed[i] / fraction;
     // Acceleration can be set to a value <= 0 to mean 'infinite'.
@@ -206,6 +209,13 @@ static void move_machine_steps(struct PrinterState *state,
     command.travel_speed = ZERO_FEEDRATE_OVERRIDE_HZ;
   }
 
+  // Now map axis steps to actual motor channel
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    const int motor_for_axis = state->axis_to_output[i];
+    if (motor_for_axis < 0) continue;  // no mapping.
+    command.steps[motor_for_axis] = axis_steps[i];
+  }
+
   if (!state->cfg.dry_run) {
     if (state->cfg.synchronous) beagleg_wait_queue_empty();
     beagleg_enqueue(&command, state->msg_stream);
@@ -216,19 +226,19 @@ static void move_machine_steps(struct PrinterState *state,
       = command.travel_speed / state->cfg.steps_per_mm[defining_axis];
     float defining_accel
       = command.acceleration / state->cfg.steps_per_mm[defining_axis];
-    if (command.steps[AXIS_Z] != 0) {
+    if (axis_steps[AXIS_Z] != 0) {
       fprintf(state->msg_stream,
 	      "// (%6d, %6d) Z:%-3d E:%-2d step kHz:%-8.3f "
 	      "(main axis: %.1f mm/s, %.1fmm/s^2)\n",
-	      command.steps[AXIS_X], command.steps[AXIS_Y],
-	      command.steps[AXIS_Z], command.steps[AXIS_E],
+	      axis_steps[AXIS_X], axis_steps[AXIS_Y],
+	      axis_steps[AXIS_Z], axis_steps[AXIS_E],
 	      command.travel_speed / 1000.0, defining_feedrate, defining_accel);
     } else {
       fprintf(state->msg_stream,  // less clutter, when there is no Z
 	      "// (%6d, %6d)       E:%-3d step kHz:%-8.3f "
 	      "(main axis: %.1f mm/s, %.1fmm/s^2)\n",
-	      command.steps[AXIS_X], command.steps[AXIS_Y],
-	      command.steps[AXIS_E], command.travel_speed / 1000.0,
+	      axis_steps[AXIS_X], axis_steps[AXIS_Y],
+	      axis_steps[AXIS_E], command.travel_speed / 1000.0,
 	      defining_feedrate, defining_accel);
     }
   }
@@ -360,6 +370,29 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
       lowest_accel = accel;
   }
   s_mstate->prog_speed_factor = 1.0f;
+
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    s_mstate->axis_to_output[i] = -1;
+  }
+  const char *output_mapping = config->output_mapping;
+  if (output_mapping == NULL) output_mapping = "XYZEABC";
+  for (int i = 0; *output_mapping; i++, output_mapping++) {
+    switch (toupper(*output_mapping)) {
+    case 'X': s_mstate->axis_to_output[AXIS_X] = i; break;
+    case 'Y': s_mstate->axis_to_output[AXIS_Y] = i; break;
+    case 'Z': s_mstate->axis_to_output[AXIS_Z] = i; break;
+    case 'E': s_mstate->axis_to_output[AXIS_E] = i; break;
+    case 'A': s_mstate->axis_to_output[AXIS_A] = i; break;
+    case 'B': s_mstate->axis_to_output[AXIS_B] = i; break;
+    case 'C': s_mstate->axis_to_output[AXIS_C] = i; break;
+    case '_': break;  // skip.
+    default:
+      fprintf(stderr, "Illegal axis character '%c' in '%s'\n",
+	      toupper(*output_mapping), config->output_mapping);
+      cleanup_state();
+      return 1;
+    }
+  }
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));

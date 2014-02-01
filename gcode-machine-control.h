@@ -26,17 +26,20 @@ enum HomeType {
 /* Configuration constants for the controller. */
 struct MachineControlConfig {
   // Arrays with values for each axis
-  float steps_per_mm[8];   // Steps per mm for each axis.
-  float move_range_mm[8];  // Available of axes in mm (0..range[axis])
-                           // Only values > 0 are actively clipped.
+  float steps_per_mm[8];        // Steps per mm for each axis.
+  float move_range_mm[8];       // Available of axes in mm (0..range[axis])
+                                // Only values > 0 are actively clipped.
   enum HomeType home_switch[8]; // Home position for axes. Axis with
-                            // HOME_POS_NONE don't participate in homing.
-  float max_feedrate[8];    // Max feedrate for axis.
-  float acceleration[8];   // Max acceleration for axis
-  float speed_factor;      // Should be 1.0 by default.
-  char dry_run;            // Don't actually send motor commands if 1.
-  char debug_print;        // Print step-tuples to output_fd if 1.
-  char synchronous;        // Don't queue, wait for command to finish if 1.
+                                // HOME_POS_NONE don't participate in homing.
+  float max_feedrate[8];        // Max feedrate for axis (mm/s)
+  float acceleration[8];        // Max acceleration for axis (mm/s^2)
+  float speed_factor;           // Speed up everything. Should be 1.0 by default.
+  const char *output_mapping;   // Mapping of axis to actual output motor channel
+                                // Assumed "XYZEABC" if NULL. Not mentioned
+                                // axes are not handled.
+  char dry_run;                 // Don't actually send motor commands if 1.
+  char debug_print;             // Print step-tuples to output_fd if 1.
+  char synchronous;             // Don't queue, wait for command to finish if 1.
 };
 
 

@@ -89,6 +89,10 @@ static int usage(const char *prog, const char *msg) {
 	  "                               values > 0 are actively clipped. "
 	  "(Default: 100,100,100,-1,-1, ...)\n"
 #endif
+	  "  --motor-output-mapping    : Motor index (=string pos) mapped "
+	  "to which axis.\n"
+	  "                              Axis letter or '_' for no mapping. "
+	  "(Default: 'XYZEABC')\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
@@ -206,6 +210,7 @@ int main(int argc, char *argv[]) {
   enum LongOptionsOnly {
     SET_STEPS_MM = 1000,
     SET_HOME_POS,
+    SET_MOTOR_MAPPING,
   };
 
   static struct option long_options[] = {
@@ -214,6 +219,7 @@ int main(int argc, char *argv[]) {
     { "range",         required_argument, NULL, 'r' },
     { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
     { "home-pos",      required_argument, NULL, SET_HOME_POS },
+    { "motor-output-mapping",  required_argument, NULL, SET_MOTOR_MAPPING },
     { "port",          required_argument, NULL, 'p'},
     { "bind-addr",     required_argument, NULL, 'b'},
     { 0,               0,                 0,    0  },
@@ -244,6 +250,9 @@ int main(int argc, char *argv[]) {
     case SET_STEPS_MM:
       if (!parse_float_array(optarg, config.steps_per_mm, 8))
 	return usage(argv[0], "steps/mm failed to parse.");
+      break;
+    case SET_MOTOR_MAPPING:
+      config.output_mapping = strdup(optarg);
       break;
     case SET_HOME_POS: {
       float tmp[8];
