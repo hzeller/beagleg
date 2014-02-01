@@ -79,7 +79,7 @@ command line options
 
 Now, you can invoke `send-gcode` like this
 
-    sudo ./send-gcode $($(sed 's/#.*//g' type-a.config) --port 4444
+    sudo ./send-gcode $(sed 's/#.*//g' type-a.config) --port 4444
 
 The `sed` command dumps the configuration, but removes the comment characters.
 
