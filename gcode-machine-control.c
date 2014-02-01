@@ -139,13 +139,6 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
     return;  // Nothing to do.
   }
 
-  // We need to calculate the feedrate in real-world coordinates as each
-  // axis can have a different amount of steps/mm
-  const float total_xyz_length = 
-    euklid_distance(command.steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
-		    command.steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
-		    command.steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
-
   // The defining axis is the axis that requires to go the most number of steps.
   // it defines the frequency to go.
   enum GCodeParserAxes defining_axis = AXIS_X;
@@ -154,21 +147,26 @@ static void move_machine_steps(struct PrinterState *state, float feedrate_mm_s,
       defining_axis = (enum GCodeParserAxes) i;
   }
 
+  const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
+  command.travel_speed = feedrate_mm_s * steps_per_mm;
+  command.acceleration = state->cfg.acceleration * steps_per_mm;
+
   // If we're in the euklidian space, choose the step-frequency according to
-  // the feedrate of the defining axis.
+  // the relative feedrate of the defining axis.
   if (defining_axis == AXIS_X
       || defining_axis == AXIS_Y
       || defining_axis == AXIS_Z) {
-    // Steps per mm of defining axis.
-    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
+    // We need to calculate the feedrate in real-world coordinates as each
+    // axis can have a different amount of steps/mm
+    const float total_xyz_length = 
+      euklid_distance(command.steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
+		      command.steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
+		      command.steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
     const float defining_axis_length = command.steps[defining_axis]/steps_per_mm;
-    const float defining_axis_feedrate
-      = feedrate_mm_s * fabsf(defining_axis_length) / total_xyz_length;
-    command.travel_speed = defining_axis_feedrate * steps_per_mm;
-  }
-  else {
-    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
-    command.travel_speed = feedrate_mm_s * steps_per_mm;
+    // Fraction the defining axis does of the full travel.
+    const float euklid_fraction = fabsf(defining_axis_length) / total_xyz_length;
+    command.travel_speed *= euklid_fraction;
+    command.acceleration *= euklid_fraction;
   }
   
   if (command.travel_speed == 0) {
@@ -314,8 +312,12 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    const int steps_per_mm = config->steps_per_mm[AXIS_X];
-    if (beagleg_init(config->acceleration * steps_per_mm) != 0)
+    float smallest_step_mm = config->steps_per_mm[AXIS_X];
+    if (config->steps_per_mm[AXIS_Y] < smallest_step_mm)
+      smallest_step_mm = config->steps_per_mm[AXIS_Y];
+    if (config->steps_per_mm[AXIS_Z] < smallest_step_mm)
+      smallest_step_mm = config->steps_per_mm[AXIS_Z];
+    if (beagleg_init(config->acceleration * smallest_step_mm) != 0)
       return 1;
   }
 

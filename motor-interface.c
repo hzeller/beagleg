@@ -89,7 +89,6 @@ struct QueueElement {
 
 #define PRU_NUM 0
 
-static float acceleration_;
 static float max_speed_;
 volatile struct QueueElement *shared_queue_;
 static unsigned int queue_pos_;
@@ -186,6 +185,27 @@ static float clip_speed(float v) {
   return v < max_speed_ ? v : max_speed_;
 }
 
+// Is acceleration in acceptable range ?
+static char test_acceleration_ok(float acceleration) {
+  if (acceleration <= 0)
+    return 1;  // <= 0: always full speed.
+
+  // Check that the fixed point acceleration parameter (that we shift
+  // DELAY_CYCLE_SHIFT) fits into 32 bit.
+  // Also 2 additional bits headroom because we need to shift it by 2 in the
+  // division.
+  const double accel_factor = cycles_per_second()
+    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration));
+  const double start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
+    * accel_factor * 0.67605 / LOOPS_PER_STEP;
+  if (start_accel_cycle_value > 0xFFFFFFFF) {
+    fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
+	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
+    return 0;
+  }
+  return 1;
+}
+
 static int beagleg_enqueue_internal(const struct bg_movement *param,
 				    int defining_axis_steps) {
   struct QueueElement new_element;
@@ -213,7 +233,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   // TODO: take these into account (requires acceleration planning)
   const int total_loops = LOOPS_PER_STEP * defining_axis_steps;
 
-  if (acceleration_ <= 0) {
+  if (param->acceleration <= 0) {
     // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
     new_element.loops_accel = new_element.loops_decel = 0;
     new_element.loops_travel = total_loops;
@@ -223,7 +243,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     // v = a*t -> t = v/a
     // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
     const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
-					    / (2.0 * acceleration_));
+					    / (2.0 * param->acceleration));
     if (2 * accel_loops < total_loops) {
       new_element.loops_accel = accel_loops;
       new_element.loops_travel = total_loops - 2*accel_loops;
@@ -240,7 +260,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     }
 
     double accel_factor = cycles_per_second()
-      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
+      * (sqrt(LOOPS_PER_STEP * 2.0 / param->acceleration));
 
     new_element.accel_series_index = 0;   // zero speed start
     new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
@@ -285,25 +305,10 @@ static void beagleg_motor_enable_internal_nowait(char on) {
   gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
 }
 
-int beagleg_init(float acceleration_steps_s2) {
-  acceleration_ = acceleration_steps_s2;
+int beagleg_init(float min_accel) {
+  if (!test_acceleration_ok(min_accel))
+    return 1;
   max_speed_ = 1e6;    // Don't go over 1 Mhz
-
-  if (acceleration_ > 0) {  // acceleration_ <= 0: always full speed.
-    // Check that the fixed point acceleration parameter (that we shift
-    // DELAY_CYCLE_SHIFT) fits into 32 bit.
-    // Also 2 additional bits headroom because we need to shift it by 2 in the
-    // division.
-    const double accel_factor = cycles_per_second()
-      * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration_));
-    const double start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
-      * accel_factor * 0.67605 / LOOPS_PER_STEP;
-    if (start_accel_cycle_value > 0xFFFFFFFF) {
-      fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
-	      "reduce value of #define DELAY_CYCLE_SHIFT\n");
-      return 1;
-    }
-  }
 
   if (!map_gpio()) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");

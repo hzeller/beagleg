@@ -26,12 +26,16 @@ struct bg_movement {
   float travel_speed;
   float end_speed;
 
+  float acceleration;  // steps/s^2
+
   int steps[8];   // number of steps for axis. Negative for 'backwards'.
 };
 
-// Initialize beagleg motor control. Initializes the acceleration in steps/s^2.
+// Initialize beagleg motor control. Gets min value of acceleration
+// expected to do range-checks.
 //  Returns 0 on success, 1 on some error.
-int beagleg_init(float acceleration_steps_s2);
+int beagleg_init(float min_accel);
+
 void beagleg_exit(void);  // shutdown motor control. Waits for queue to empty.
 // shutdown motor control immediately, don't wait for current queue to empty.
 void beagleg_exit_nowait(void);
