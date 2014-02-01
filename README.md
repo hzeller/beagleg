@@ -65,6 +65,24 @@ You can either specify --port <port> to listen for commands or give a filename
 The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6],
 which can be changed with the `--motor-output-mapping` flag.
 
+### Configuration tip
+For a particular machine, you might have some settings you always want to
+use, and maybe add some comments. So create a file that contains all the
+command line options
+
+    $ cat type-a.config
+    # Configuration for Type-A machine series 1, Motors @ 28V
+    --steps-mm 75.075,150.14,800   # x has half the steps than y
+    --max-feedrate 900,900,90
+    --accel 18000,8000,1500
+    --motor-output-mapping XZY
+
+Now, you can invoke `send-gcode` like this
+
+    sudo ./send-gcode $($(sed 's/#.*//g' type-a.config) --port 4444
+
+The `sed` command dumps the configuration, but removes the comment characters.
+
 ### Examples
 
     sudo ./send-gcode -f 10 -m 1000 -R myfile.gcode
