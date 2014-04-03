@@ -67,7 +67,7 @@ static volatile char caught_signal = 0;
 static void receive_signal() {
   caught_signal = 1;
   static char msg[] = "Caught signal. Shutting down ASAP.\n";
-  write(STDERR_FILENO, msg, sizeof(msg));
+  (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
 }
 static void arm_signal_handler() {
   caught_signal = 0;
