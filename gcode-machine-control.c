@@ -47,7 +47,10 @@ struct PrinterState {
   float max_axis_accel[GCODE_NUM_AXES];  // acceleration hz/s
   float highest_accel;                   // hightest accel of all axes.
 
-  int axis_to_output[GCODE_NUM_AXES];    // which axis is mapped to which motor.
+  int axis_to_driver[GCODE_NUM_AXES];    // Which axis is mapped to which
+                                         // physical output driver. This allows
+                                         // to have a logical axis (e.g. X, Y,
+                                         // Z) output to any physical driver.
   GCodeParser_t *parser;
 
   // Current machine state
@@ -209,9 +212,9 @@ static void move_machine_steps(struct PrinterState *state,
     command.travel_speed = ZERO_FEEDRATE_OVERRIDE_HZ;
   }
 
-  // Now map axis steps to actual motor channel
+  // Now map axis steps to actual motor driver
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    const int motor_for_axis = state->axis_to_output[i];
+    const int motor_for_axis = state->axis_to_driver[i];
     if (motor_for_axis < 0) continue;  // no mapping.
     command.steps[motor_for_axis] = axis_steps[i];
   }
@@ -372,22 +375,23 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   s_mstate->prog_speed_factor = 1.0f;
 
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    s_mstate->axis_to_output[i] = -1;
+    s_mstate->axis_to_driver[i] = -1;
   }
   const char *output_mapping = config->output_mapping;
   if (output_mapping == NULL) output_mapping = "XYZEABC";
   for (int i = 0; *output_mapping; i++, output_mapping++) {
     switch (toupper(*output_mapping)) {
-    case 'X': s_mstate->axis_to_output[AXIS_X] = i; break;
-    case 'Y': s_mstate->axis_to_output[AXIS_Y] = i; break;
-    case 'Z': s_mstate->axis_to_output[AXIS_Z] = i; break;
-    case 'E': s_mstate->axis_to_output[AXIS_E] = i; break;
-    case 'A': s_mstate->axis_to_output[AXIS_A] = i; break;
-    case 'B': s_mstate->axis_to_output[AXIS_B] = i; break;
-    case 'C': s_mstate->axis_to_output[AXIS_C] = i; break;
+    case 'X': s_mstate->axis_to_driver[AXIS_X] = i; break;
+    case 'Y': s_mstate->axis_to_driver[AXIS_Y] = i; break;
+    case 'Z': s_mstate->axis_to_driver[AXIS_Z] = i; break;
+    case 'E': s_mstate->axis_to_driver[AXIS_E] = i; break;
+    case 'A': s_mstate->axis_to_driver[AXIS_A] = i; break;
+    case 'B': s_mstate->axis_to_driver[AXIS_B] = i; break;
+    case 'C': s_mstate->axis_to_driver[AXIS_C] = i; break;
     case '_': break;  // skip.
     default:
-      fprintf(stderr, "Illegal axis character '%c' in '%s'\n",
+      fprintf(stderr, "Illegal axis->driver mapping character '%c' in '%s' "
+	      "(use '_' to skip a driver)\n",
 	      toupper(*output_mapping), config->output_mapping);
       cleanup_state();
       return 1;

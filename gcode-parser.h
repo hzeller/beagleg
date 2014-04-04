@@ -16,7 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#ifndef _BEAGLEG_GCODE_PARSER_H
+#define _BEAGLEG_GCODE_PARSER_H
 /*
  * Parser for commong G-codes. Translates movements into absolute mm coordinates
  * and calls callbacks on changes.
@@ -106,3 +107,4 @@ void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
 // end-of-string has been reached.
 const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 			      FILE *err_stream);
+#endif  // _BEAGLEG_GCODE_PARSER_H_

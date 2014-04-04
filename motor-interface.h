@@ -16,7 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#ifndef _BEAGLEG_MOTOR_INTERFACE_H_
+#define _BEAGLEG_MOTOR_INTERFACE_H_
 #include <stdio.h>
 
 struct bg_movement {
@@ -55,3 +56,4 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream);
 
 // Wait, until all elements in the ring-buffer are consumed.
 void beagleg_wait_queue_empty(void);
+#endif  // _BEAGLEG_MOTOR_INTERFACE_H_

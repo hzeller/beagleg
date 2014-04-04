@@ -82,8 +82,8 @@ static int usage(const char *prog, const char *msg) {
 #if 0   // not yet implemented
 	  "  --home-pos <-1/0/1>,*      : Home positions of axes, comma "
 	  "separated\n"
-	  "                                0 = origin, 1 = end-of-range; "
-	  "-1 = no-homing (Default: 0,0,0,-1, ...).\n"
+	  "                                0 = none, 1 = origin; "
+	  "2 = end-of-range (Default: 1,1,1,0,...).\n"
 	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis])"
 	  ". Only\n"
 	  "                               values > 0 are actively clipped. "
