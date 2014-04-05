@@ -216,6 +216,8 @@ At the middle/bottom of the test board you see a headpone connector: many of
 the early experiments didn't have yet a stepper motor installed, but just
 listening to the step-frequency.
 
+*TODO: description of PWM on GPIO-2 and end switches on GPIO-0*
+
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
 file e.g. estimated print-time, Object height (=maximum Z-axis), filament
