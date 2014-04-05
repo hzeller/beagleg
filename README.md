@@ -232,7 +232,10 @@ For instance, from a bunch of gcode files, find the one that takes the longest
 time
 
     ./gcode-print-stats *.gcode | sort -k2 -n
-    
+   
+*Note: this binary is currently not taking acceleration into account, so the
+ estimated times are off*
+
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
