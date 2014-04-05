@@ -29,14 +29,14 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `[motor-interface.h][src-motor-api]` : Low-level motor move C-API to
+   - [motor-interface.h][src-motor-api] : Low-level motor move C-API to
       enqueue motor moves, that are executed in the PRU.
 
-   - `[gcode-parser.h][src-gcode-api]` : C-API for parsing G-Code that calls
+   - [gcode-parser.h][src-gcode-api] : C-API for parsing G-Code that calls
       callback parse events, while taking care of many internals, e.g. it
       automatically translates everything into metric, absolute coordinates.
 
-   - `[gcode-machine-control.h][src-machine-ctrl]` : highlevel C-API to
+   - [gcode-machine-control.h][src-machine-ctrl] : highlevel C-API to
       control a machine via G-Code: it reads G-Code from a stream and emits
       the necessary machine commands.
       Depends on the motor-interface and gcode-parser APIs.
