@@ -29,15 +29,16 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.h` : Low-level motor move C-API to enqueue motor moves,
-      that are executed in the PRU.
+   - `[motor-interface.h][src-motor-api]` : Low-level motor move C-API to
+      enqueue motor moves, that are executed in the PRU.
 
-   - `gcode-parser.h` : C-API for parsing G-Code and calls callbacks, while
-      taking care of many internals, e.g. it automatically translates everything
-      into metric, absolute coordinates.
+   - `[gcode-parser.h][src-gcode-api]` : C-API for parsing G-Code that calls
+      callback parse events, while taking care of many internals, e.g. it
+      automatically translates everything into metric, absolute coordinates.
 
-   - `gcode-machine-control.h` : highlevel C-API to control a machine via
-      G-Code: it reads G-Code and emits the necessary machine commands.
+   - `[gcode-machine-control.h][src-machine-ctrl]` : highlevel C-API to
+      control a machine via G-Code: it reads G-Code from a stream and emits
+      the necessary machine commands.
       Depends on the motor-interface and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
@@ -250,3 +251,6 @@ the Free Software Foundation, either version 3 of the License, or
 [manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
 [bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
 [bumps]: https://github.com/hzeller/bumps
+[src-motor-api]: https://github.com/hzeller/beagleg/blob/master/motor-interface.h
+[src-gcode-api]: https://github.com/hzeller/beagleg/blob/master/gcode-parser.h
+[src-machine-ctrl]: https://github.com/hzeller/beagleg/blob/master/gcode-machine-control.h
