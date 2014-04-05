@@ -58,6 +58,7 @@ struct PrinterState {
   float current_feedrate_mm_per_sec;
   float prog_speed_factor;               // Speed factor set by program (M220)
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
+  int direction_flip[GCODE_NUM_AXES];    // 1 or -1 for direction flip
   FILE *msg_stream;
 };
 
@@ -81,6 +82,19 @@ static void arm_signal_handler() {
 static void disarm_signal_handler() {
   signal(SIGTERM, SIG_DFL);  // Regular kill
   signal(SIGINT, SIG_DFL);   // Ctrl-C
+}
+
+static char axis_to_letter(enum GCodeParserAxes axis) {
+  switch (axis) {
+  case AXIS_X: return 'X';
+  case AXIS_Y: return 'Y';
+  case AXIS_Z: return 'Z';
+  case AXIS_E: return 'E';
+  case AXIS_A: return 'A';
+  case AXIS_B: return 'B';
+  case AXIS_C: return 'C';
+  default: return '?';
+  }
 }
 
 // Dummy implementations of callbacks not yet handled.
@@ -217,7 +231,7 @@ static void move_machine_steps(struct PrinterState *state,
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     const int motor_for_axis = state->axis_to_driver[i];
     if (motor_for_axis < 0) continue;  // no mapping.
-    command.steps[motor_for_axis] = axis_steps[i];
+    command.steps[motor_for_axis] = state->direction_flip[i] * axis_steps[i];
   }
 
   if (!state->cfg.dry_run) {
@@ -348,7 +362,7 @@ static int cleanup_state() {
   return 1;
 }
 
-int gcode_machine_control_init(const struct MachineControlConfig *config) {
+int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
   if (s_mstate != NULL) {
     fprintf(stderr, "gcode_machine_control_init(): already initialized.\n");
     return 1;
@@ -357,18 +371,36 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   // Initialize basic state and derived configuration.
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
   bzero(s_mstate, sizeof(*s_mstate));
+
+  // Always keep the steps_per_mm positive, but extract direction for
+  // final assignment to motor.
+  struct MachineControlConfig cfg = *config_in;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    s_mstate->direction_flip[i] = cfg.steps_per_mm[i] < 0 ? -1 : 1;
+    cfg.steps_per_mm[i] = fabs(cfg.steps_per_mm[i]);
+    if (cfg.max_feedrate[i] < 0) {
+      fprintf(stderr, "Invalid negative feedrate %.1f for axis %c\n",
+              cfg.max_feedrate[i], axis_to_letter(i));
+      return cleanup_state();
+    }
+    if (cfg.acceleration[i] < 0) {
+      fprintf(stderr, "Invalid negative acceleration %.1f for axis %c\n",
+              cfg.acceleration[i], axis_to_letter(i));
+      return cleanup_state();
+    }
+  }
+
   // Here we assign it to the 'const' cfg, all other accesses will check for
   // the readonly ness. So some nasty override here: we know what we're doing.
-  *((struct MachineControlConfig*) &s_mstate->cfg) = *config;
-  s_mstate->current_feedrate_mm_per_sec = config->max_feedrate[AXIS_X] / 10;
-  float lowest_accel
-    = config->max_feedrate[AXIS_X] * config->steps_per_mm[AXIS_X];
+  *((struct MachineControlConfig*) &s_mstate->cfg) = cfg;
+  s_mstate->current_feedrate_mm_per_sec = cfg.max_feedrate[AXIS_X] / 10;
+  float lowest_accel = cfg.max_feedrate[AXIS_X] * cfg.steps_per_mm[AXIS_X];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (config->max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec)
-      s_mstate->g0_feedrate_mm_per_sec = config->max_feedrate[i];
-    s_mstate->max_axis_speed[i]
-      = config->max_feedrate[i] * config->steps_per_mm[i];
-    float accel = config->acceleration[i] * config->steps_per_mm[i];
+    if (cfg.max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec) {
+      s_mstate->g0_feedrate_mm_per_sec = cfg.max_feedrate[i];
+    }
+    s_mstate->max_axis_speed[i] = cfg.max_feedrate[i] * cfg.steps_per_mm[i];
+    const float accel = cfg.acceleration[i] * cfg.steps_per_mm[i];
     s_mstate->max_axis_accel[i] = accel;
     if (accel > s_mstate->highest_accel)
       s_mstate->highest_accel = accel;
@@ -392,7 +424,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
     pos_to_driver[i] = -1;
   }
-  const char *physical_mapping = config->channel_layout;
+  const char *physical_mapping = cfg.channel_layout;
   if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
   if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
     fprintf(stderr, "Physical mapping string longer than available motors. "
@@ -415,7 +447,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     s_mstate->axis_to_driver[i] = -1;
   }
-  const char *axis_mapping = config->axis_mapping;
+  const char *axis_mapping = cfg.axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
   if (strlen(axis_mapping) > BEAGLEG_NUM_MOTORS) {
     fprintf(stderr, "Axis mapping string longer than available connectors."
@@ -435,10 +467,33 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
     default:
       fprintf(stderr, "Illegal axis->connector mapping character '%c' in '%s' "
 	      "(Only valid axis letter or '_' to skip a connector)\n",
-	      toupper(*axis_mapping), config->axis_mapping);
+	      toupper(*axis_mapping), cfg.axis_mapping);
       return cleanup_state();
     }
   }
+
+  // Now let's see what motors are mapped to any useful output.
+  if (s_mstate->cfg.debug_print) fprintf(stderr, "-- Config --\n");
+  int error_count = 0;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (s_mstate->axis_to_driver[i] < 0)
+      continue;
+    char is_error = (s_mstate->cfg.steps_per_mm[i] <= 0
+                     || s_mstate->cfg.max_feedrate[i] <= 0);
+    if (s_mstate->cfg.debug_print || is_error) {
+      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %7.3f steps/mm%s\n",
+              axis_to_letter(i), s_mstate->cfg.max_feedrate[i],
+              s_mstate->cfg.acceleration[i],
+              s_mstate->cfg.steps_per_mm[i],
+              s_mstate->direction_flip[i] < 0 ? " (reversed)" : "");
+    }
+    if (is_error) {
+      fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
+      ++error_count;
+    }
+  }
+  if (error_count)
+    return cleanup_state();
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
@@ -460,7 +515,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   s_mstate->parser = gcodep_new(&callbacks, s_mstate);
 
   // Init motor control.
-  if (!config->dry_run) {
+  if (!cfg.dry_run) {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
       // to just access these GPIOs.
