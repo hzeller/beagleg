@@ -27,19 +27,23 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.h` : C-API to enqueue motor moves, that are
-      executed in the PRU.
-   - `gcode-parser.h` : C-API that parses G-Code and calls callbacks, while
+   - `motor-interface.h` : Low-level motor move C-API to enqueue motor moves,
+      that are executed in the PRU.
+
+   - `gcode-parser.h` : C-API for parsing G-Code and calls callbacks, while
       taking care of many internals, e.g. it automatically translates everything
       into metric, absolute coordinates.
+
+   - `gcode-machine-control.h` : highlevel C-API to control a machine via
+      G-Code: it reads G-Code and emits the necessary machine commands.
+      Depends on the motor-interface and gcode-parser APIs.
+      Provides the functionality provided by the `send-gcode` binary.
+
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
       print time, filament used etc. Implementation is mostly an example using
       gcode-parser.h.
       Used in the `gcode-print-stats` binary.
-   - `gcode-machine-control.h` : highlevel C-API to control a machine via
-      G-Code: it reads G-Code and emits the necessary machine commands.
-      Used in the `send-gcode` binary.
 
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
@@ -62,15 +66,18 @@ PRU.
     make
 
 If you run into compile problems, make sure to have both, am335x_pru_package and
-beagleg up-to-date from git; looks like there were some recent changes in the
-am335x_pru_package.
+beagleg up-to-date from git.
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
-you have to map them. For that, just run the beagleg-cape-pinmux.sh script
-that installs the device overlay.
+we have to tell the pin multiplexer to connect them to the output pins. For
+that, just run the beagleg-cape-pinmux.sh script that installs the device
+overlay.
 
     sudo ./beagleg-cape-pinmux.sh
+
+(Right now, this is needed after every boot of the BBB. It is simple to do that
+ automatically on boot-up, but haven't gotten around to it yet).
 
 ## Machine control binary
 To control a machine with G-Code, use `send-gcode`. This interpreter either
@@ -170,12 +177,12 @@ probably move to an unambiguated pin)
 
 The mapping from axis to driver channel happens in two steps, see documentation
 in `struct MachineControlConfig` about the configuration options `channel_layout`
-and `logic_layout`. The first describes the mapping of driver channels to
+and `axis_mapping`. The first describes the mapping of driver channels to
 connector positions on the cape (which might differ due to board layout reasons),
-the second the logical mapping of g-code axes (such as 'X' or 'Y') to the
+the second the mapping of G-code axes (such as 'X' or 'Y') to the
 connector position. While the 'channel_layout' is
 configured in the code currently (and dependent on the cape hardware), the
-logical layout can be set with the `--motor-output-mapping` flag.
+axis mapping can be set with the `--motor-output-mapping` flag.
 
 In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
 in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
