@@ -177,24 +177,28 @@ connector position. While the 'channel_layout' is
 configured in the code currently (and dependent on the cape hardware), the
 logical layout can be set with the `--motor-output-mapping` flag.
 
-In the following bumps cape, the Y axis is on the very right (here I need two
-connectors for two motors), X axis on the very left, second slot empty, third
-is 'Z' and fourth (second-last) is E. That mapping is configured with
+In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
+in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
+finally the Y axis is on the very right (more space for two connectors which I
+need for my Type-A machine).
+The mapping is configured with:
 
         send-gcode --motor-output-mapping "X_ZEY"  ...
 
 ![Bumps output mapping][bumps-cape]
 
+(The [Bumps cape][bumps] was designed to work with BeagleG).
+
 If you build your own cape: note all logic levels are 3.3V (and assume not more
 than ~4mA). The RAMPS driver board for instance only works if you power the
 5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
 
-This is an early experimental manual cape interfacing to a RAMPS adapter.
+This is an early experimental manual cape interfacing to a RAMPS adapter:
 ![Manual Cape][manual-cape]
 
-This allows to plug in a RAMPS driver. At the middle/bottom of the test board
-you see a headpone connector: many of the early experiments didn't have yet a
-stepper motor installed, but just listening to the step-frequency.
+At the middle/bottom of the test board you see a headpone connector: many of
+the early experiments didn't have yet a stepper motor installed, but just
+listening to the step-frequency.
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
@@ -230,3 +234,4 @@ the Free Software Foundation, either version 3 of the License, or
 
 [manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
 [bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
+[bumps]: https://github.com/hzeller/bumps
