@@ -41,129 +41,6 @@ The functionality is encapsulated in independently usable APIs.
       G-Code: it reads G-Code and emits the necessary machine commands.
       Used in the `send-gcode` binary.
 
-## Machine control binary
-To control a machine with G-Code, use `send-gcode`. This interpreter either
-takes a filename or a TCP port to listen on.
-
-    Usage: ./send-gcode [options] [<gcode-filename>]
-    Options:
-      --steps-mm <axis-steps>   : steps/mm, comma separated (Default 160,160,160,40,0, ...).
-      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,0, ...).
-      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated (Default 4000,4000,1000,10000,0, ...).
-      --motor-output-mapping    : Motor index (=string pos) mapped to which axis.
-                                  Axis letter or '_' for no mapping. (Default: 'XYZEABC')
-      --port <port>         (-p): Listen on this TCP port.
-      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
-      -f <factor>               : Print speed factor (Default 1.0).
-      -n                        : Dryrun; don't send to motors (Default: off).
-      -P                        : Verbose: Print motor commands (Default: off).
-      -S                        : Synchronous: don't queue (Default: off).
-      -R                        : Repeat file forever.
-All comma separated axis values are in the sequence X,Y,Z,E,A,B,C
-You can either specify --port <port> to listen for commands or give a filename
-
-The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper [0..6],
-which can be changed with the `--motor-output-mapping` flag.
-
-### Configuration tip
-For a particular machine, you might have some settings you always want to
-use, and maybe add some comments. So create a file that contains all the
-command line options
-
-    $ cat type-a.config
-    # Configuration for Type-A machine series 1, Motors @ 28V
-    --steps-mm 75.075,150.14,800   # x has half the steps than y
-    --max-feedrate 900,900,90
-    --accel 18000,8000,1500
-    --motor-output-mapping XZY
-
-Now, you can invoke `send-gcode` like this
-
-    sudo ./send-gcode $(sed 's/#.*//g' type-a.config) --port 4444
-
-or, simpler, if you don't have any comments:
-
-    sudo ./send-gcode $(cat type-a.config) --port 4444
-
-The `sed` command dumps the configuration, but removes the comment characters.
-
-### Examples
-
-    sudo ./send-gcode -f 10 -m 1000 -R myfile.gcode
-
-Output the file `myfile.gcode` in 10x the original speed, with a feedrate
-capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
-
-    sudo ./send-gcode --port 4444
-
-Listen on TCP port 4444 for incoming connections and execute G-Codes over this
-line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
-session or send a file with `socat`:
-
-     cat myfile.gcode | socat -t5 - TCP4:beaglebone-hostname:4444
-
-Use `socat`, don't use the ancient `nc` (netcat) - its buffering seems to be
-broken so that it can get stuck. With `socat`, it should be possible to connect
-to a pseudo-terminal in case your printer-software only talks to a terminal
-(haven't tried that yet, please let me know if it works).
-
-Note, there can only be one open TCP connection at any given time.
-
-## G-Code stats binary
-There is a binary `gcode-print-stats` to extract information from the G-Code
-file e.g. estimated print-time, Object height (=maximum Z-axis), filament
-length.
-
-    Usage: ./gcode-print-stats [options] <gcode-file> [<gcode-file> ..]
-    Options:
-            -m <max-feedrate> : Maximum feedrate in mm/s
-            -f <factor>       : Speedup-factor for print
-    Use filename '-' for stdin.
-
-The output is in column form, so you can use standard tools to process them.
-For instance, from a bunch of gcode files, find the one that takes the longest
-time
-
-    ./gcode-print-stats *.gcode | sort -k2 -n
-
-
-## Pinout
-
-These are the GPIO bits associated with the motor outputs. The actual physical
-pins are all over the place on the Beaglebone Black extension headers P8 and P9,
-see table below.
-
-Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
-which we're going to use for GPIO. For that, we need to install a device
-tree overlay. Just run the script beagleg-cape-pinmux.sh as root
-
-    sudo ./beagleg-cape-pinmux.sh
-
-Now, all pins are mapped to be used by beagleg. This is the pinout
-
-    Axis G-Code name  |  X     Y     Z     E     A      B     C   <unassigned>
-    Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20
-           BBB Header |P9-22 P9-21 P9-18 P9-17 P9-42A P9-26 P9-24 P9-41A
-                      |
-    Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
-           BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
-
-Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
-(The mapping right now was done because these are consecutive GPIO pins that
-can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
-probably move to an unambiguated pin)
-
-For your electrical interface: note this is 3.3V level (and assume not more
-than ~4mA). The RAMPS driver board for instance only works if you power the
-5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
-
-Here is my experimental manual cape
-![Manual Cape][manual-cape]
-
-This allows to plug in a RAMPS driver. At the middle/bottom of the test board
-you see a headpone connector: many of the early experiments didn't have yet a
-stepper motor installed, but just listening to the step-frequency.
-
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black
 directly, or using a cross compiler (see Makefile).
@@ -187,6 +64,153 @@ PRU.
 If you run into compile problems, make sure to have both, am335x_pru_package and
 beagleg up-to-date from git; looks like there were some recent changes in the
 am335x_pru_package.
+
+## Getting started
+Before you can use beagleg and get meaningful outputs on the GPIO pins,
+you have to map them. For that, just run the beagleg-cape-pinmux.sh script
+that installs the device overlay.
+
+    sudo ./beagleg-cape-pinmux.sh
+
+## Machine control binary
+To control a machine with G-Code, use `send-gcode`. This interpreter either
+takes a filename or a TCP port to listen on.
+
+    Usage: ./send-gcode [options] [<gcode-filename>]
+    Options:
+      --steps-mm <axis-steps>   : steps/mm, comma separated (Default 160,160,160,40,0, ...).
+      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,0, ...).
+      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated (Default 4000,4000,1000,10000,0, ...).
+      --motor-output-mapping    : Motor index (=string pos) mapped to which axis.
+                                  Axis letter or '_' for no mapping. (Default: 'XYZEABC')
+      --port <port>         (-p): Listen on this TCP port.
+      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
+      -f <factor>               : Print speed factor (Default 1.0).
+      -n                        : Dryrun; don't send to motors (Default: off).
+      -P                        : Verbose: Print motor commands (Default: off).
+      -S                        : Synchronous: don't queue (Default: off).
+      -R                        : Repeat file forever.
+All comma separated axis values are in the sequence X,Y,Z,E,A,B,C
+You can either specify --port <port> to listen for commands or give a filename
+
+The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper channels
+[0..6], which can be changed with the `--motor-output-mapping` flag. This flag
+maps the logical axis (such as 'Y') to a physical location on the cape - the
+position in the string represents the position of the connector.
+
+### Examples
+
+    sudo ./send-gcode -f 10 -m 1000 -R myfile.gcode
+
+Output the file `myfile.gcode` in 10x the original speed, with a feedrate
+capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
+
+    sudo ./send-gcode --port 4444
+
+Listen on TCP port 4444 for incoming connections and execute G-Codes over this
+line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
+session or send a file with `socat`:
+
+     cat myfile.gcode | socat -t5 - TCP4:beaglebone-hostname:4444
+
+Use `socat`, don't use the ancient `nc` (netcat) - its buffering seems to be
+broken so that it can get stuck. With `socat`, it should be possible to connect
+to a pseudo-terminal in case your printer-software only talks to a terminal
+(haven't tried that yet, please let me know if it works).
+
+Note, there can only be one open TCP connection at any given time.
+
+### Configuration tip
+For a particular machine, you might have some settings you always want to
+use, and maybe add some comments. So create a file that contains all the
+command line options
+
+    $ cat type-a.config
+    # Configuration for Type-A machine series 1, Motors @ 28V
+    --steps-mm 75.075,150.14,800   # x has half the steps than y
+    --max-feedrate 900,900,90
+    --accel 18000,8000,1500
+    --motor-output-mapping X_ZEY   # y on the double-connector
+
+Now, you can invoke `send-gcode` like this
+
+    sudo ./send-gcode $(sed 's/#.*//g' type-a.config) --port 4444
+
+or, simpler, if you don't have any comments in the configuration file:
+
+    sudo ./send-gcode $(cat type-a.config) --port 4444
+
+The `sed` command dumps the configuration, but removes the comment characters.
+
+## Pinout
+
+These are the GPIO bits associated with the motor outputs. The actual physical
+pins are all over the place on the Beaglebone Black extension headers P8 and P9,
+see table below.
+
+Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
+which we're going to use for GPIO. For that, we need to install a device
+tree overlay. Just run the script beagleg-cape-pinmux.sh as root
+
+    sudo ./beagleg-cape-pinmux.sh
+
+Now, all pins are mapped to be used by beagleg. This is the pinout
+
+       Driver channel |  0     1     2     3     4      5     6     7
+    Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20
+           BBB Header |P9-22 P9-21 P9-18 P9-17 P9-42A P9-26 P9-24 P9-41A
+                      |
+    Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
+           BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
+
+Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
+(The mapping right now was done because these are consecutive GPIO pins that
+can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
+probably move to an unambiguated pin)
+
+The mapping from axis to driver channel happens in two steps, see documentation
+in struct MachineControlConfig about the configuration options 'channel_layout'
+and 'logic_layout'. The first controls the mapping of driver channels to
+connector positions on the cape, the second the logical mapping of g-code axes
+(such as 'X' or 'Y') to the connector position. The 'channel_layout' is
+configured internally (and dependent on the cape hardware), the logical layout
+can be set with the `--motor-output-mapping` flag.
+
+In the following bumps cape, the Y axis is on the very right (here I need two
+connectors for two motors), X axis on the very left, second slot empty, third
+is 'Z' and fourth (second-last) is E. That mapping is configured with
+
+        send-gcode --motor-output-mapping "X_ZEY"
+
+![bumps-cape][Bumps output mapping].
+
+For your electrical interface: note this is 3.3V level (and assume not more
+than ~4mA). The RAMPS driver board for instance only works if you power the
+5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
+
+This is an early experimental manual cape interfacing to a RAMPS adapter.
+![Manual Cape][manual-cape]
+
+This allows to plug in a RAMPS driver. At the middle/bottom of the test board
+you see a headpone connector: many of the early experiments didn't have yet a
+stepper motor installed, but just listening to the step-frequency.
+
+## G-Code stats binary
+There is a binary `gcode-print-stats` to extract information from the G-Code
+file e.g. estimated print-time, Object height (=maximum Z-axis), filament
+length.
+
+    Usage: ./gcode-print-stats [options] <gcode-file> [<gcode-file> ..]
+    Options:
+            -m <max-feedrate> : Maximum feedrate in mm/s
+            -f <factor>       : Speedup-factor for print
+    Use filename '-' for stdin.
+
+The output is in column form, so you can use standard tools to process them.
+For instance, from a bunch of gcode files, find the one that takes the longest
+time
+
+    ./gcode-print-stats *.gcode | sort -k2 -n
     
 ## License
 BeagleG is free software: you can redistribute it and/or modify
@@ -204,3 +228,4 @@ the Free Software Foundation, either version 3 of the License, or
    - ...
 
 [manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
+[bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
