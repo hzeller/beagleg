@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "determine-print-stats.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
 #include "motor-interface.h"
@@ -41,13 +40,13 @@
 
 // All these settings are in sequence of enum GCodeParserAxes: XYZEABC
 static const float kMaxFeedrate[GCODE_NUM_AXES] =
-  {  200,  200,  90,     10, 0, 0, 0 };
+  {  200,  200,  90,     10, 1, 0, 0 };
 
 static const float kDefaultAccel[GCODE_NUM_AXES]=
-  { 4000, 4000, 1000, 10000, 0, 0, 0 };
+  { 4000, 4000, 1000, 10000, 1, 0, 0 };
 
 static const float kStepsPerMM[GCODE_NUM_AXES]  =
-  {  160,  160,  160,    40, 0, 0, 0 };
+  {  160,  160,  160,    40, 1, 0, 0 };
 
 static const enum HomeType kHomePos[GCODE_NUM_AXES] =
   { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
@@ -57,23 +56,6 @@ static const float kMoveRange[GCODE_NUM_AXES] =
   { 100, 100, 100, -1, -1, -1, -1 };
 
 static const float kFilamentDiameter = 1.7;  // mm
-
-static void print_file_stats(const char *filename,
-			     struct MachineControlConfig *config) {
-  struct BeagleGPrintStats result;
-  if (determine_print_stats(open(filename, O_RDONLY),
-			    config->max_feedrate[AXIS_X], config->speed_factor,
-			    &result) == 0) {
-    const float filament_volume
-      = kFilamentDiameter*kFilamentDiameter/4 * M_PI * result.filament_len;
-    printf("----------------------------------------------\n");
-    printf("Print time: %.3f seconds; height: %.1fmm; max feedrate: %.1fmm/s; "
-	   "filament length: %.1fmm (volume %.2fcm^3).\n",
-	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
-	   result.filament_len, filament_volume / 1000);
-    printf("----------------------------------------------\n");
-  }
-}
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {
@@ -315,7 +297,6 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    print_file_stats(filename, &config);
     ret = send_file_to_machine(filename, do_file_repeat);
   } else {
     ret = run_server(bind_addr, listen_port);

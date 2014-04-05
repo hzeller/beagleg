@@ -114,6 +114,12 @@ cape - the position in the string represents the position of the connector.
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
 
+    echo "G1 X100 F10000 G1 X0 F1000" | sudo ./machine-control /dev/stdin
+
+This command directly executes some GCode coming from stdin. This is in
+particular useful when you're calibrating your machine and need to work on
+little tweaks.
+
     sudo ./machine-control --port 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
