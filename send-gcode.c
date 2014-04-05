@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
   config.debug_print = 0;
   config.synchronous = 0;
   config.channel_layout = "23140";  // physical bumps layout.
-  config.logic_layout = "XYZEA";    // Interesting for user: where is my axis..
+  config.axis_mapping = "XYZEA";    // Interesting for user: where is my axis..
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case SET_MOTOR_MAPPING:
-      config.logic_layout = strdup(optarg);
+      config.axis_mapping = strdup(optarg);
       break;
     case SET_HOME_POS: {
       float tmp[8];

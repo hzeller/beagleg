@@ -44,17 +44,17 @@ struct MachineControlConfig {
   // on which physical plug location. To make things easier to
   // digest, this is done in two steps.
   //
-  // The 'driver_layout' maps how the driver channels (internally some GPIO
+  // The 'channel_layout' maps how the driver channels (internally some GPIO
   // bits) ends up being mapped into the pysical sequence of connectors on
   // the board. The pysical location is given as position in the string,
   // the value at that point describes the internal channel.
-  // A driver_layout mapping of "021" for instance means, that on the very
+  // A channel_layout mapping of "021" for instance means, that on the very
   // left is channel zero, followed by channel two in the middle and channel
   // 1 at the right. Due to layout reasons, the Bumps board
   // (github.com/hzeller/bumps) has the mapping "23140".
   //
   // The 'axis_mapping' determines how to map a logical axis (e.g. 'X') to
-  // a connector position. So again, the connector position represents the
+  // a connector position. So again, the string position represents the
   // position on the board (sequence of connectors), while the character at
   // that position describes the logical axis. Typicaly, this is just
   // "XZYEABC"; for reasons such as using a double-connector, one might
@@ -68,7 +68,7 @@ struct MachineControlConfig {
                                 // string). This typically is a constant of
                                 // the physical cape used.
                                 // If NULL, default is "23140" (Bumps board).
-  const char *logic_layout;     // Mapping of axis-name (character in string)
+  const char *axis_mapping;     // Mapping of axis-name (character in string)
                                 // to physical location (position in string).
                                 // Assumed "XYZEABC" if NULL.
                                 // Axis name '_' for skipped placeholder.

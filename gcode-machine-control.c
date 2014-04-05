@@ -412,10 +412,10 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
     }
   }
 
-  const char *logic_mapping = config->logic_layout;
-  if (logic_mapping == NULL) logic_mapping = "XYZEABC";
-  for (int pos = 0; *logic_mapping; pos++, logic_mapping++) {
-    switch (toupper(*logic_mapping)) {
+  const char *axis_mapping = config->axis_mapping;
+  if (axis_mapping == NULL) axis_mapping = "XYZEABC";
+  for (int pos = 0; *axis_mapping; pos++, axis_mapping++) {
+    switch (toupper(*axis_mapping)) {
     case 'X': s_mstate->axis_to_driver[AXIS_X] = pos_to_driver[pos]; break;
     case 'Y': s_mstate->axis_to_driver[AXIS_Y] = pos_to_driver[pos]; break;
     case 'Z': s_mstate->axis_to_driver[AXIS_Z] = pos_to_driver[pos]; break;
@@ -425,9 +425,9 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
     case 'C': s_mstate->axis_to_driver[AXIS_C] = pos_to_driver[pos]; break;
     case '_': break;  // skip.
     default:
-      fprintf(stderr, "Illegal axis->driver mapping character '%c' in '%s' "
-	      "(use '_' to skip a driver)\n",
-	      toupper(*logic_mapping), config->logic_layout);
+      fprintf(stderr, "Illegal axis->connector mapping character '%c' in '%s' "
+	      "(Only valid axis letter or '_' to skip a connector)\n",
+	      toupper(*axis_mapping), config->axis_mapping);
       return cleanup_state();
     }
   }
