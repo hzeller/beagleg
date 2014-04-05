@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -35,10 +35,12 @@ struct MachineControlConfig {
   float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.
   float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis])
   enum HomeType home_switch[GCODE_NUM_AXES]; // Home position for axes.
-                        // Axes with HOME_POS_NONE don't participate in homing.
+                 // Axes with HOME_POS_NONE don't participate in homing.
+
   float max_feedrate[GCODE_NUM_AXES];   // Max feedrate for axis (mm/s)
   float acceleration[GCODE_NUM_AXES];   // Max acceleration for axis (mm/s^2)
-  float speed_factor;         // Speed up everything. Should be 1.0 by default.
+
+  float speed_factor;         // Multiply feed with. Should be 1.0 by default.
 
   // The follwing two parameters determine which logical axis ends up
   // on which physical plug location. To make things easier to
@@ -99,4 +101,5 @@ void gcode_machine_control_exit();
 // Only one thread at a time can be using this function.
 // Returns 0 on success.
 int gcode_machine_control_from_stream(int gcode_fd, int output_fd);
+
 #endif //  _BEAGLEG_GCODE_MACHINE_CONTROL_H_

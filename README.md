@@ -21,8 +21,10 @@ planning, while all the real-time critical parts are
 done in the PRU. The host program needs less than 1% CPU-time processing a
 typical G-Code file.
 
-The `send-gcode` program is parsing G-Code, extracting axes moves and
+The `machine-control` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit.
+
+*Note: the formally called `send-gcode` has been renamed to `machine-control`*
 
 ## APIs
 The functionality is encapsulated in independently usable APIs.
@@ -37,7 +39,7 @@ The functionality is encapsulated in independently usable APIs.
    - `gcode-machine-control.h` : highlevel C-API to control a machine via
       G-Code: it reads G-Code and emits the necessary machine commands.
       Depends on the motor-interface and gcode-parser APIs.
-      Provides the functionality provided by the `send-gcode` binary.
+      Provides the functionality provided by the `machine-control` binary.
 
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
@@ -80,16 +82,16 @@ overlay.
  automatically on boot-up, but haven't gotten around to it yet).
 
 ## Machine control binary
-To control a machine with G-Code, use `send-gcode`. This interpreter either
+To control a machine with G-Code, use `machine-control`. This interpreter either
 takes a filename or a TCP port to listen on.
 
-    Usage: ./send-gcode [options] [<gcode-filename>]
+    Usage: ./machine-control [options] [<gcode-filename>]
     Options:
       --steps-mm <axis-steps>   : steps/mm, comma separated (Default 160,160,160,40,0, ...).
-      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,0, ...).
+      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,10,0, ...).
       --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated (Default 4000,4000,1000,10000,0, ...).
-      --motor-output-mapping    : Motor index (=string pos) mapped to which axis.
-                                  Axis letter or '_' for no mapping. (Default: 'XYZEABC')
+      --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
+                                  Use letter or '_' for empty slot. (Default: 'XYZEABC')
       --port <port>         (-p): Listen on this TCP port.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
@@ -97,22 +99,22 @@ takes a filename or a TCP port to listen on.
       -P                        : Verbose: Print motor commands (Default: off).
       -S                        : Synchronous: don't queue (Default: off).
       -R                        : Repeat file forever.
-All comma separated axis values are in the sequence X,Y,Z,E,A,B,C
-You can either specify --port <port> to listen for commands or give a filename
+    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C
+    You can either specify --port <port> to listen for commands or give a filename
 
 The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper channels
-[0..6], which can be changed with the `--motor-output-mapping` flag. This flag
-maps the logical axis (such as 'Y') to a physical location on the cape - the
-position in the string represents the position of the connector.
+[0..6], which can be changed with the `--axis-mapping` flag. This flag
+maps the logical axis (such as 'Y') to a physical connector location on the
+cape - the position in the string represents the position of the connector.
 
 ### Examples
 
-    sudo ./send-gcode -f 10 -m 1000 -R myfile.gcode
+    sudo ./machine-control -f 10 -m 1000 -R myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
 
-    sudo ./send-gcode --port 4444
+    sudo ./machine-control --port 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
@@ -137,15 +139,15 @@ command line options
     --steps-mm 75.075,150.14,800   # x has half the steps than y
     --max-feedrate 900,900,90
     --accel 18000,8000,1500
-    --motor-output-mapping X_ZEY   # y on the double-connector
+    --axis-mapping X_ZEY   # y on the double-connector
 
-Now, you can invoke `send-gcode` like this
+Now, you can invoke `machine-control` like this
 
-    sudo ./send-gcode $(sed 's/#.*//g' type-a.config) --port 4444
+    sudo ./machine-control $(sed 's/#.*//g' type-a.config) --port 4444
 
 or, simpler, if you don't have any comments in the configuration file:
 
-    sudo ./send-gcode $(cat type-a.config) --port 4444
+    sudo ./machine-control $(cat type-a.config) --port 4444
 
 The `sed` command dumps the configuration, but removes the comment characters.
 
@@ -182,7 +184,7 @@ connector positions on the cape (which might differ due to board layout reasons)
 the second the mapping of G-code axes (such as 'X' or 'Y') to the
 connector position. While the 'channel_layout' is
 configured in the code currently (and dependent on the cape hardware), the
-axis mapping can be set with the `--motor-output-mapping` flag.
+axis mapping can be set with the `--axis-mapping` flag.
 
 In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
 in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
@@ -190,7 +192,7 @@ finally the Y axis is on the very right (more space for two connectors which I
 need for my Type-A machine).
 The mapping is configured with:
 
-        send-gcode --motor-output-mapping "X_ZEY"  ...
+        ./machine-control --axis-mapping "X_ZEY"  ...
 
 ![Bumps output mapping][bumps-cape]
 

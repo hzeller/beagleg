@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -38,16 +38,24 @@
 #include "motor-interface.h"
 
 // Some default settings. These are most likely overrridden via flags by user.
-static const float kMaxFeedrate[] = {  200,  200,  90,     10, 0, 0, 0, 0 };
-static const float kDefaultAccel[]= { 4000, 4000, 1000, 10000, 0, 0, 0, 0 };
-static const float kStepsPerMM[]  = {  160,  160,  160,    40, 0, 0, 0, 0 };
-static const enum HomeType kHomePos[] = { HOME_POS_ORIGIN,
-					  HOME_POS_ORIGIN,
-					  HOME_POS_ORIGIN,
-					  HOME_POS_NONE, HOME_POS_NONE,
-					  HOME_POS_NONE, HOME_POS_NONE,
-					  HOME_POS_NONE };
-static const float kMoveRange[]  = { 100, 100, 100, -1, -1, -1, -1, -1 };
+
+// All these settings are in sequence of enum GCodeParserAxes: XYZEABC
+static const float kMaxFeedrate[GCODE_NUM_AXES] =
+  {  200,  200,  90,     10, 0, 0, 0 };
+
+static const float kDefaultAccel[GCODE_NUM_AXES]=
+  { 4000, 4000, 1000, 10000, 0, 0, 0 };
+
+static const float kStepsPerMM[GCODE_NUM_AXES]  =
+  {  160,  160,  160,    40, 0, 0, 0 };
+
+static const enum HomeType kHomePos[GCODE_NUM_AXES] =
+  { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
+    HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE };
+
+static const float kMoveRange[GCODE_NUM_AXES] =
+  { 100, 100, 100, -1, -1, -1, -1 };
+
 static const float kFilamentDiameter = 1.7;  // mm
 
 static void print_file_stats(const char *filename,
@@ -76,11 +84,11 @@ static int usage(const char *prog, const char *msg) {
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated "
 	  "(Default 160,160,160,40,0, ...).\n"
 	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
-	  "comma separated (Default: 200,200,90,0, ...).\n"
+	  "comma separated (Default: 200,200,90,10,0, ...).\n"
 	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
 	  "comma separated (Default 4000,4000,1000,10000,0, ...).\n"
 #if 0   // not yet implemented
-	  "  --home-pos <-1/0/1>,*      : Home positions of axes, comma "
+	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma "
 	  "separated\n"
 	  "                                0 = none, 1 = origin; "
 	  "2 = end-of-range (Default: 1,1,1,0,...).\n"
@@ -89,9 +97,9 @@ static int usage(const char *prog, const char *msg) {
 	  "                               values > 0 are actively clipped. "
 	  "(Default: 100,100,100,-1,-1, ...)\n"
 #endif
-	  "  --motor-output-mapping    : Motor connector index (=string pos) "
-	  "mapped to which logical axis.\n"
-	  "                              Axis letter or '_' for no mapping. "
+	  "  --axis-mapping            : Axis letter mapped to which motor "
+          "connector (=string pos)\n"
+	  "                              Use letter or '_' for empty slot. "
 	  "(Default: 'XYZEABC')\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
@@ -104,8 +112,8 @@ static int usage(const char *prog, const char *msg) {
 	  "(Default: off).\n"
 	  "  -R                        : Repeat file forever.\n",
 	  prog);
-  fprintf(stderr, "All comma separated axis values are in the sequence "
-	  "X,Y,Z,E,A,B,C\n");
+  fprintf(stderr, "All comma separated axis numerical values are in the "
+	  "sequence X,Y,Z,E,A,B,C\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
@@ -205,7 +213,7 @@ int main(int argc, char *argv[]) {
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
-  config.channel_layout = "23140";  // physical bumps layout.
+  config.channel_layout = "23140";  // Bumps layout ( github.com/hzeller/bumps )
   config.axis_mapping = "XYZEA";    // Interesting for user: where is my axis..
 
   // Less common options don't have a short option.
@@ -221,7 +229,7 @@ int main(int argc, char *argv[]) {
     { "range",         required_argument, NULL, 'r' },
     { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
     { "home-pos",      required_argument, NULL, SET_HOME_POS },
-    { "motor-output-mapping",  required_argument, NULL, SET_MOTOR_MAPPING },
+    { "axis-mapping",  required_argument, NULL, SET_MOTOR_MAPPING },
     { "port",          required_argument, NULL, 'p'},
     { "bind-addr",     required_argument, NULL, 'b'},
     { 0,               0,                 0,    0  },

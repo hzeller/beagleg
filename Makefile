@@ -27,15 +27,15 @@ PRU_BIN=motor-interface-pru_bin.h
 
 GCODE_OBJECTS=gcode-parser.o determine-print-stats.o
 OBJECTS=gcode-machine-control.o motor-interface.o $(GCODE_OBJECTS)
-MAIN_OBJECTS=send-gcode.o gcode-print-stats.o
-TARGETS=send-gcode gcode-print-stats
+MAIN_OBJECTS=machine-control.o gcode-print-stats.o
+TARGETS=machine-control gcode-print-stats
 
 all : $(TARGETS)
 
 gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-send-gcode: send-gcode.o $(OBJECTS)
+machine-control: machine-control.o $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 BeagleG-00A0.dtbo: BeagleG.dts

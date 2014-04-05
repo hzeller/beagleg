@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -159,7 +159,7 @@ static void DumpQueueElement(volatile const struct QueueElement *e) {
       fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
     }
 #endif
-  fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
   }	    
 }
 #endif
@@ -243,7 +243,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     // v = a*t -> t = v/a
     // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
     const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
-					    / (2.0 * param->acceleration));
+                                              / (2.0 * param->acceleration));
     if (2 * accel_loops < total_loops) {
       new_element.loops_accel = accel_loops;
       new_element.loops_travel = total_loops - 2*accel_loops;

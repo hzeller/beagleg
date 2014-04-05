@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -34,7 +34,7 @@
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
 
-#define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG " \
+#define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 struct PrinterState {
@@ -43,6 +43,7 @@ struct PrinterState {
   float g0_feedrate_mm_per_sec;          // Highest of all axes; used for G0
                                          // (will be trimmed if needed)
   // Pre-calcualted per axis limits in steps/s, steps/s^2
+  // All arrays are indexed by axis.
   float max_axis_speed[GCODE_NUM_AXES];  // max travel speed hz
   float max_axis_accel[GCODE_NUM_AXES];  // acceleration hz/s
   float highest_accel;                   // hightest accel of all axes.
@@ -376,44 +377,51 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   }
   s_mstate->prog_speed_factor = 1.0f;
 
-  int pos_to_driver[GCODE_NUM_AXES];
+  // Mapping axes to physical motors. We might have a larger set of logical
+  // axes of which we map a subset to actual motors.
+  // We do this in two steps: One identifies which io-pin actually goes to which
+  // physical location (a property of the actual cape), the second maps
+  // logical axes (e.g. 'X') to the location on the board.
+  // This double mapping is done, so that it is intuitive for users to map
+  // (as the first is a hardware property that doesn't really change and the
+  // second the mapping the user wants).
+
+  // Mapping of connector position on cape to driver ID (the axis in the
+  // motor interface). This might differ due to physical board layout reasons.
+  int pos_to_driver[BEAGLEG_NUM_MOTORS];
+  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    pos_to_driver[i] = -1;
+  }
+  const char *physical_mapping = config->channel_layout;
+  if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
+  if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
+    fprintf(stderr, "Physical mapping string longer than available motors. "
+            "('%s', max axes=%d)\n", physical_mapping, BEAGLEG_NUM_MOTORS);
+    return cleanup_state();
+  }
+  for (int pos = 0; *physical_mapping; pos++, physical_mapping++) {
+    const int mapped_driver = *physical_mapping - '0';
+    if (mapped_driver >= 0 && mapped_driver < BEAGLEG_NUM_MOTORS) {
+      pos_to_driver[pos] = mapped_driver;
+    }
+    else {
+      fprintf(stderr, "Invalid character '%c' in channel-layout mapping. "
+              "Can be characters '0'..'%d'\n",
+              *physical_mapping, BEAGLEG_NUM_MOTORS - 1);
+      return cleanup_state();
+    }
+  }
 
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     s_mstate->axis_to_driver[i] = -1;
-    pos_to_driver[i] = -1;
   }
-
-  // Do dual mapping. One identifies which io-pin actually goes to which
-  // physical location (a property of the actual cape), the second maps
-  // logical axes (e.g. 'X') to the location on the board.
-  // This double mapping is done, so that it is intuitive for users to map.
-
-  const char *physical_mapping = config->channel_layout;
-  if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
-  for (int pos = 0; *physical_mapping; pos++, physical_mapping++) {
-    if (pos > GCODE_NUM_AXES) {
-      fprintf(stderr, "Physical mapping string longer than available axes "
-	      "('%s', max axes=%d)\n", config->channel_layout, GCODE_NUM_AXES);
-      return cleanup_state();
-    }
-    switch (*physical_mapping) {
-    case '0': pos_to_driver[pos] = 0; break;
-    case '1': pos_to_driver[pos] = 1; break;
-    case '2': pos_to_driver[pos] = 2; break;
-    case '3': pos_to_driver[pos] = 3; break;
-    case '4': pos_to_driver[pos] = 4; break;
-    case '5': pos_to_driver[pos] = 5; break;
-    case '6': pos_to_driver[pos] = 6; break;
-    case '7': pos_to_driver[pos] = 7; break;
-    default:
-      fprintf(stderr, "Invalid character '%c' in channel-layout mapping. Can "
-	      "be characters '0'..'7'\n", *physical_mapping);
-      return cleanup_state();
-    }
-  }
-
   const char *axis_mapping = config->axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
+  if (strlen(axis_mapping) > BEAGLEG_NUM_MOTORS) {
+    fprintf(stderr, "Axis mapping string longer than available connectors."
+            "('%s', max axes=%d)\n", axis_mapping, BEAGLEG_NUM_MOTORS);
+    return cleanup_state();
+  }
   for (int pos = 0; *axis_mapping; pos++, axis_mapping++) {
     switch (toupper(*axis_mapping)) {
     case 'X': s_mstate->axis_to_driver[AXIS_X] = pos_to_driver[pos]; break;

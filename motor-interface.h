@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -20,6 +20,10 @@
 #define _BEAGLEG_MOTOR_INTERFACE_H_
 #include <stdio.h>
 
+enum {
+  BEAGLEG_NUM_MOTORS = 8
+};
+
 struct bg_movement {
   // Speed is steps/second of the axis with the highest number of steps. All
   // other axes are scaled down accordingly.
@@ -27,9 +31,9 @@ struct bg_movement {
   float travel_speed;
   float end_speed;
 
-  float acceleration;  // steps/s^2
+  float acceleration;        // steps/s^2
 
-  int steps[8];   // number of steps for axis. Negative for 'backwards'.
+  int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
 // Initialize beagleg motor control. Gets min value of acceleration
@@ -56,4 +60,5 @@ int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream);
 
 // Wait, until all elements in the ring-buffer are consumed.
 void beagleg_wait_queue_empty(void);
+
 #endif  // _BEAGLEG_MOTOR_INTERFACE_H_

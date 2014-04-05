@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -100,7 +100,7 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
 
   // Set some reasonable defaults for unprovided callbacks:
   if (!result->callbacks.go_home)
-      result->callbacks.go_home = &dummy_go_home;
+    result->callbacks.go_home = &dummy_go_home;
   if (!result->callbacks.set_fanspeed)
     result->callbacks.set_fanspeed = &dummy_set_fanspeed;
   if (!result->callbacks.set_speed_factor)

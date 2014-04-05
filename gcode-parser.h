@@ -1,4 +1,4 @@
-/*
+/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -107,4 +107,5 @@ void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
 // end-of-string has been reached.
 const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 			      FILE *err_stream);
+
 #endif  // _BEAGLEG_GCODE_PARSER_H_
