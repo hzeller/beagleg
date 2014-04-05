@@ -89,8 +89,8 @@ static int usage(const char *prog, const char *msg) {
 	  "                               values > 0 are actively clipped. "
 	  "(Default: 100,100,100,-1,-1, ...)\n"
 #endif
-	  "  --motor-output-mapping    : Motor index (=string pos) mapped "
-	  "to which axis.\n"
+	  "  --motor-output-mapping    : Motor connector index (=string pos) "
+	  "mapped to which logical axis.\n"
 	  "                              Axis letter or '_' for no mapping. "
 	  "(Default: 'XYZEABC')\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
@@ -205,6 +205,8 @@ int main(int argc, char *argv[]) {
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
+  config.channel_layout = "23140";  // physical bumps layout.
+  config.logic_layout = "XYZEA";    // Interesting for user: where is my axis..
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -252,7 +254,7 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case SET_MOTOR_MAPPING:
-      config.output_mapping = strdup(optarg);
+      config.logic_layout = strdup(optarg);
       break;
     case SET_HOME_POS: {
       float tmp[8];

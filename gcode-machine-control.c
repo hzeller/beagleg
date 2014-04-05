@@ -340,9 +340,11 @@ static void machine_home(void *userdata, unsigned char axes_bitmap) {
 		     machine_pos_differences);
 }
 
-static void cleanup_state() {
+// Cleanup whatever is allocated. Return 1 for convenience in early exit.
+static int cleanup_state() {
   free(s_mstate);
   s_mstate = NULL;
+  return 1;
 }
 
 int gcode_machine_control_init(const struct MachineControlConfig *config) {
@@ -374,27 +376,59 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   }
   s_mstate->prog_speed_factor = 1.0f;
 
+  int pos_to_driver[GCODE_NUM_AXES];
+
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     s_mstate->axis_to_driver[i] = -1;
+    pos_to_driver[i] = -1;
   }
-  const char *output_mapping = config->output_mapping;
-  if (output_mapping == NULL) output_mapping = "XYZEABC";
-  for (int i = 0; *output_mapping; i++, output_mapping++) {
-    switch (toupper(*output_mapping)) {
-    case 'X': s_mstate->axis_to_driver[AXIS_X] = i; break;
-    case 'Y': s_mstate->axis_to_driver[AXIS_Y] = i; break;
-    case 'Z': s_mstate->axis_to_driver[AXIS_Z] = i; break;
-    case 'E': s_mstate->axis_to_driver[AXIS_E] = i; break;
-    case 'A': s_mstate->axis_to_driver[AXIS_A] = i; break;
-    case 'B': s_mstate->axis_to_driver[AXIS_B] = i; break;
-    case 'C': s_mstate->axis_to_driver[AXIS_C] = i; break;
+
+  // Do dual mapping. One identifies which io-pin actually goes to which
+  // physical location (a property of the actual cape), the second maps
+  // logical axes (e.g. 'X') to the location on the board.
+  // This double mapping is done, so that it is intuitive for users to map.
+
+  const char *physical_mapping = config->channel_layout;
+  if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
+  for (int pos = 0; *physical_mapping; pos++, physical_mapping++) {
+    if (pos > GCODE_NUM_AXES) {
+      fprintf(stderr, "Physical mapping string longer than available axes "
+	      "('%s', max axes=%d)\n", config->channel_layout, GCODE_NUM_AXES);
+      return cleanup_state();
+    }
+    switch (*physical_mapping) {
+    case '0': pos_to_driver[pos] = 0; break;
+    case '1': pos_to_driver[pos] = 1; break;
+    case '2': pos_to_driver[pos] = 2; break;
+    case '3': pos_to_driver[pos] = 3; break;
+    case '4': pos_to_driver[pos] = 4; break;
+    case '5': pos_to_driver[pos] = 5; break;
+    case '6': pos_to_driver[pos] = 6; break;
+    case '7': pos_to_driver[pos] = 7; break;
+    default:
+      fprintf(stderr, "Invalid character '%c' in channel-layout mapping. Can "
+	      "be characters '0'..'7'\n", *physical_mapping);
+      return cleanup_state();
+    }
+  }
+
+  const char *logic_mapping = config->logic_layout;
+  if (logic_mapping == NULL) logic_mapping = "XYZEABC";
+  for (int pos = 0; *logic_mapping; pos++, logic_mapping++) {
+    switch (toupper(*logic_mapping)) {
+    case 'X': s_mstate->axis_to_driver[AXIS_X] = pos_to_driver[pos]; break;
+    case 'Y': s_mstate->axis_to_driver[AXIS_Y] = pos_to_driver[pos]; break;
+    case 'Z': s_mstate->axis_to_driver[AXIS_Z] = pos_to_driver[pos]; break;
+    case 'E': s_mstate->axis_to_driver[AXIS_E] = pos_to_driver[pos]; break;
+    case 'A': s_mstate->axis_to_driver[AXIS_A] = pos_to_driver[pos]; break;
+    case 'B': s_mstate->axis_to_driver[AXIS_B] = pos_to_driver[pos]; break;
+    case 'C': s_mstate->axis_to_driver[AXIS_C] = pos_to_driver[pos]; break;
     case '_': break;  // skip.
     default:
       fprintf(stderr, "Illegal axis->driver mapping character '%c' in '%s' "
 	      "(use '_' to skip a driver)\n",
-	      toupper(*output_mapping), config->output_mapping);
-      cleanup_state();
-      return 1;
+	      toupper(*logic_mapping), config->logic_layout);
+      return cleanup_state();
     }
   }
 
@@ -424,12 +458,10 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
       // to just access these GPIOs.
       fprintf(stderr, "Need to run as root to access GPIO pins. "
 	      "(use the dryrun option -n to not write to GPIO)\n");
-      cleanup_state();
-      return 1;
+      return cleanup_state();
     }
     if (beagleg_init(lowest_accel) != 0) {
-      cleanup_state();
-      return 1;
+      return cleanup_state();
     }
   }
 
