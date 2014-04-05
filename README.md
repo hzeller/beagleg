@@ -169,22 +169,23 @@ can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
 probably move to an unambiguated pin)
 
 The mapping from axis to driver channel happens in two steps, see documentation
-in struct MachineControlConfig about the configuration options 'channel_layout'
-and 'logic_layout'. The first controls the mapping of driver channels to
-connector positions on the cape, the second the logical mapping of g-code axes
-(such as 'X' or 'Y') to the connector position. The 'channel_layout' is
-configured internally (and dependent on the cape hardware), the logical layout
-can be set with the `--motor-output-mapping` flag.
+in `struct MachineControlConfig` about the configuration options `channel_layout`
+and `logic_layout`. The first describes the mapping of driver channels to
+connector positions on the cape (which might differ due to board layout reasons),
+the second the logical mapping of g-code axes (such as 'X' or 'Y') to the
+connector position. While the 'channel_layout' is
+configured in the code currently (and dependent on the cape hardware), the
+logical layout can be set with the `--motor-output-mapping` flag.
 
 In the following bumps cape, the Y axis is on the very right (here I need two
 connectors for two motors), X axis on the very left, second slot empty, third
 is 'Z' and fourth (second-last) is E. That mapping is configured with
 
-        send-gcode --motor-output-mapping "X_ZEY"
+        send-gcode --motor-output-mapping "X_ZEY"  ...
 
-![bumps-cape][Bumps output mapping].
+![Bumps output mapping][bumps-cape]
 
-For your electrical interface: note this is 3.3V level (and assume not more
+If you build your own cape: note all logic levels are 3.3V (and assume not more
 than ~4mA). The RAMPS driver board for instance only works if you power the
 5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
 
