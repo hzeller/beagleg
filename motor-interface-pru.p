@@ -137,7 +137,7 @@ PHASE_2_TRAVEL:		; ==================================================
 	QBEQ PHASE_3_DECELERATION, params.loops_travel, 0
 	SUB params.loops_travel, params.loops_travel, 1	        ; loops_travel--
 	MOV output_reg, params.travel_delay_cycles
-	SUB output_reg, output_reg, (4 / 2)
+	SUB output_reg, output_reg, (4 / 2) ; substract cycles spent here
 	JMP DONE_CALCULATE_DELAY
 
 PHASE_3_DECELERATION:	; ==================================================
