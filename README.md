@@ -221,6 +221,7 @@ Not yet supported, coming soon:
        * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors on the [Bumps board][bumps].
        * 3 end-switch inputs on GPIO-0 23, 26, 27
    * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs and the two medium current open drain pwm connectors on the Bumps board.
+   * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
