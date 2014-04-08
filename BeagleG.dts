@@ -18,7 +18,7 @@
 
 /{
     compatible = "ti,beaglebone", "ti,beaglebone-black";
-    part-number = "BeagleG";  /* our 'cape' */
+    part-number = "BeagleG";  /* BeagleG/Bumps 'cape' */
     version = "00A0";
 
     fragment@0 {
@@ -55,6 +55,9 @@
 		    0x074 0x07 /* GPIO0[31]; AUX 2 */
 
 		    /* end-switches: GPIO-0 23, 26, 27 */
+		    0x024 0x37  /* GPIO0[23], pullup; end-x */
+		    0x028 0x37  /* GPIO0[26], pullup; end-y */
+		    0x02c 0x37  /* GPIO0[27], pullup; end-z */
 
 		    /* PWM outputs */
 		    0x090 0x02 /* Timer 4, pull down; PWM_3 */

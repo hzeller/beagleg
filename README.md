@@ -170,6 +170,17 @@ tree overlay. Just run the script beagleg-cape-pinmux.sh as root
 
     sudo ./beagleg-cape-pinmux.sh
 
+This registers the cape, as you can confirm by looking at the slots:
+
+    $ cat /sys/devices/bone_capemgr.*/slots 
+     0: 54:PF--- 
+     1: 55:PF--- 
+     2: 56:PF--- 
+     3: 57:PF--- 
+     4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
+     5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
+     8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
+
 Now, all pins are mapped to be used by beagleg. This is the pinout
 
        Driver channel |  0     1     2     3     4      5     6     7
@@ -222,6 +233,34 @@ Not yet supported, coming soon:
        * 3 end-switch inputs on GPIO-0 23, 26, 27
    * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors on the Bumps board (connector top left).w
    * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
+
+## Load cape at bootup
+While loading the pinmux manually with
+
+    sudo ./beagleg-cape-pinmux.sh
+
+works, loading it at boot-time does not work, though I don't really know why.
+If you add the following as root
+
+   echo 'optargs=capemgr.enable_partno=BeagleG' >> /boot/uboot/uEnv.txt
+
+.. then on next boot, the commandline is read by the kernel (you can see it 
+with `cat /proc/cmdline`), but then you see the following in the kernel log:
+
+    $ dmesg | grep -i beagleg
+    [    1.906466] bone-capemgr bone_capemgr.9: enabled_partno part_number 'BeagleG', version 'N/A', prio '0'
+    [    1.930783] bone-capemgr bone_capemgr.9: slot #7: 'Override Board Name,00A0,Override Manuf,BeagleG'
+    [    1.999476] bone-capemgr bone_capemgr.9: loader: before slot-7 BeagleG:00A0 (prio 0)
+    [    2.007609] bone-capemgr bone_capemgr.9: loader: check slot-7 BeagleG:00A0 (prio 0)
+    [    2.047319] bone-capemgr bone_capemgr.9: loader: after slot-7 BeagleG:00A0 (prio 0)
+    [    2.076670] bone-capemgr bone_capemgr.9: slot #7: Requesting part number/version based 'BeagleG-00A0.dtbo
+    [    2.107154] bone-capemgr bone_capemgr.9: slot #7: Requesting firmware 'BeagleG-00A0.dtbo' for board-name 'Override Board Name', version '00A0'
+    [    2.911423] bone-capemgr bone_capemgr.9: failed to load firmware 'BeagleG-00A0.dtbo'
+    [    2.919637] bone-capemgr bone_capemgr.9: loader: failed to load slot-7 BeagleG:00A0 (prio 0)
+
+Right now I assume this has to do with the fact that I don't provide an EEPROM
+in the [Bumps][bumps] board yet, but maybe it is just some other silly mistake ?
+(the *.dtbo file is in the /lib/firmware).
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
