@@ -33,7 +33,7 @@ echo "BeagleG" > $SLOTS
 cat $SLOTS
 
 echo
-echo "This is how these pins look afterwards. They should all have mode 00000007"
+echo "This is how these pins look afterwards."
 for f in $OFFSETS_800 ; do
     grep $f $PINS
 done

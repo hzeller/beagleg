@@ -28,31 +28,39 @@
                 pinctrl-single,pins = <
 		    /* Offset Mode Description */
 		    /* Motor step pins GPIO-0 */
-		    0x150 0x07 /* GPIO0[2]  step axis 0 */
-		    0x154 0x07 /* GPIO0[3]  step axis 1 */
-		    0x158 0x07 /* GPIO0[4]  step axis 2 */
-		    0x15c 0x07 /* GPIO0[5]  step axis 3 */
-		    0x164 0x07 /* GPIO0[7]  step axis 4 */
-		    0x180 0x07 /* GPIO0[14] step axis 5 */
-		    0x184 0x07 /* GPIO0[15] step axis 5 */
-		    0x1b4 0x07 /* GPIO0[20] step axis 7 */
+		    0x150 0x07 /* GPIO0[2] ; step axis 0 */
+		    0x154 0x07 /* GPIO0[3] ; step axis 1 */
+		    0x158 0x07 /* GPIO0[4] ; step axis 2 */
+		    0x15c 0x07 /* GPIO0[5] ; step axis 3 */
+		    0x164 0x07 /* GPIO0[7] ; step axis 4 */
+		    0x180 0x07 /* GPIO0[14]; step axis 5 */
+		    0x184 0x07 /* GPIO0[15]; step axis 5 */
+		    0x1b4 0x07 /* GPIO0[20]; step axis 7 */
 
 		    /* Motor direction pins; GPIO-1 */
-		    0x030 0x07 /* GPIO1[12] dir axis 0 */
-		    0x034 0x07 /* GPIO1[13] dir axis 1 */
-		    0x038 0x07 /* GPIO1[14] dir axis 2 */
-		    0x03c 0x07 /* GPIO1[15] dir axis 3 */
-		    0x040 0x07 /* GPIO1[16] dir axis 4 */
-		    0x044 0x07 /* GPIO1[17] dir axis 5 */
-		    0x048 0x07 /* GPIO1[18] dir axis 6 */
-		    0x04c 0x07 /* GPIO1[19] dir axis 7 */
+		    0x030 0x07 /* GPIO1[12]; dir axis 0 */
+		    0x034 0x07 /* GPIO1[13]; dir axis 1 */
+		    0x038 0x07 /* GPIO1[14]; dir axis 2 */
+		    0x03c 0x07 /* GPIO1[15]; dir axis 3 */
+		    0x040 0x07 /* GPIO1[16]; dir axis 4 */
+		    0x044 0x07 /* GPIO1[17]; dir axis 5 */
+		    0x048 0x07 /* GPIO1[18]; dir axis 6 */
+		    0x04c 0x07 /* GPIO1[19]; dir axis 7 */
 
 		    /* Motor enable */
-		    0x078 0x07 /* GPIO1[28] Motor Enable */
+		    0x078 0x17 /* GPIO1[28] Motor Enable, pull up */
+		    
+		    /* Aux */
+		    0x070 0x07 /* GPIO0[30]; AUX 1 */
+		    0x074 0x07 /* GPIO0[31]; AUX 2 */
 
 		    /* end-switches: GPIO-0 23, 26, 27 */
 
-		    /* PWM: GPIO-2 2, 3, 4, 5 */
+		    /* PWM outputs */
+		    0x090 0x02 /* Timer 4, pull down; PWM_3 */
+		    0x09c 0x02 /* Timer 5, pull down; PWM_1 */
+		    0x098 0x02 /* Timer 6, pull down; PWM_2 */
+		    0x094 0x02 /* Timer 7, pull down; PWM_4 */
                 >;
             };
         };
