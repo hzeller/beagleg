@@ -242,7 +242,7 @@ While loading the pinmux manually with
 works, loading it at boot-time does not work, though I don't really know why.
 If you add the following as root
 
-   echo 'optargs=capemgr.enable_partno=BeagleG' >> /boot/uboot/uEnv.txt
+    echo 'optargs=capemgr.enable_partno=BeagleG' >> /boot/uboot/uEnv.txt
 
 .. then on next boot, the commandline is read by the kernel (you can see it 
 with `cat /proc/cmdline`), but then you see the following in the kernel log:
