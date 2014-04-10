@@ -20,9 +20,11 @@ by every G-Code interpreter, but BeagleG does:
 
     G1(coordinated move) X10(to this position)
 
+
+##API
 G-code parsing as provided by [the G-Code parse API](./gcode-parser.h) receives
-G-code either from a string or a file-descriptor and calls parse-callbacks that
-contain the more higher-level commands.
+G-code either from a string or a file-descriptor and calls parametrized
+parse-callbacks representing slightly more higher-level commands.
 The callbacks are defined in a struct
 
 ```c
@@ -61,14 +63,17 @@ struct GCodeParserCb {
 ##Supported commands
 
 The following commands are supported. A place-holder of `[coordinates]` means
-a combination of coordinates (such as `X10 Y20`) and an optional feedrate
+a combination of axis koordinates (such as `X10 Y20`) and an optional feedrate
 (`F1000`).
-Calls to functions that take coordinates are _always_ pre-converted to
-machine-absolute and metric (G20/G21 and G90/G91/G92 are handled internally
-to the parser).
+Current set of supported axis-letters is X, Y, Z, E, A, B, C (might add
+U, V, W).
+
+Callbacks that take coordinates are _always_ pre-converted to
+machine-absolute and metric. The codes G20/G21 and G90/G91/G92 as well as
+M82, M83 are handled internally to always output absolute, metric coordinates.
 
 Commands that are not recognized are passed on to the `unprocessed()` callback
-for the user to handle.
+for the user to handle (see description in API).
 
 Line numbers `Nxx` and checksums `*xx` are parsed and discarded, but ignored
 for now.
@@ -93,7 +98,7 @@ Command          | Callback              | Description
 -----------------|-----------------------|-----------------------------
 M17              | `motors_enable()`     | Switch on motors.
 M18              | `motors_enable()`     | Switch off motors.
-M84              | `motors_enable()`     | dito.
+M84              | `motors_enable()`     | Switch off motors.
 M82              | -                     | Set E-axis to absolute.
 M83              | -                     | Set E-axis to relative.
 M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
