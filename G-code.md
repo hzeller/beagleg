@@ -4,8 +4,9 @@ BealgeG G-Code interpretation
 ##Synatx
 
 G-Code is essentially a pair of 'letters' and 'numbers' that tell the machine
-what to do. G-Codes are typically organized in lines.
-This is a typical command:
+what to do. It is well described somewhere else, so this is only a
+quick overview.
+G-Codes are typically organized in lines. This is a typical command:
 
     G1 X10 Y20 ; move to X-coordinate 10 and Y=20
     G1X0Y8     ; no need for spaces between pairs - but readability sucks.
@@ -14,8 +15,8 @@ This is a typical command:
 final move resembles a straight line in the N-dimensional space they are in.
 Comments can be at the end of line and start with a semicolon.
 
-There can be commanets _between_ pairs with parenthesis. This is an extension
-not every G-Code interpreter supports, but BeagleG does
+There can be comments _between_ pairs with parenthesis. This is not supported
+by every G-Code interpreter, but BeagleG does:
 
     G1(coordinated move) X10(to this position)
 
@@ -88,16 +89,16 @@ G92 [coordinates]| -                    | Set position to be the new zero.
 
 ###M Codes
 
-Command          | Callback             | Description
+Command          | Callback              | Description
 ----------------------------------------------------------------------------
-M17              | `motors_enable()`    | Switch on motors.
-M18              | `motors_enable()`    | Switch off motors.
-M84              | `motors_enable()`    | dito.
-M82              | -                    | Set E-axis to absolute.
-M83              | -                    | Set E-axis to relative.
-M104 Snnn        | `set_temperature()`  | Set temperature in celsius.
-M116             | `wait_temperature()` | Wait for temperature to be reached
-M109 Snnn        | `set_t.., wait_t..() | Combination of M105, M116: Set temperature and wait for it to be reached.
-M106             | `set_fanspeed()`     | set speed of fan; 0..255
-M107             | `set_fanspeed(0)`    | switch off fan.
-M220 Snnn        | `set_speed_factor()` | Set output speed factor.
+M17              | `motors_enable()`     | Switch on motors.
+M18              | `motors_enable()`     | Switch off motors.
+M84              | `motors_enable()`     | dito.
+M82              | -                     | Set E-axis to absolute.
+M83              | -                     | Set E-axis to relative.
+M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
+M116             | `wait_temperature()`  | Wait for temperature to be reached
+M109 Snnn        | `set_t.., wait_t..()` | Combination of M105, M116: Set temperature and wait for it to be reached.
+M106             | `set_fanspeed()`      | set speed of fan; 0..255
+M107             | `set_fanspeed(0)`     | switch off fan.
+M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
