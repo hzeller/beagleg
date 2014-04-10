@@ -16,7 +16,7 @@ So: sufficient even for advanced step motors and drivers :)
 The [acceleration - travel - deceleration] motion profile is entirely
 created within the PRU from parameters sent by the host CPU (i.e. BeagleBone ARM)
 via a ring-buffer.
-The host CPU prepares the data, such as parsing the [G-Code][./G-code.md] and
+The host CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
 doing travel planning, while all the real-time critical parts are
 done in the PRU. The host program needs less than 1% CPU-time processing a
 typical G-Code file.
@@ -32,7 +32,7 @@ The functionality is encapsulated in independently usable APIs.
    - [motor-interface.h][src-motor-api] : Low-level motor move C-API to
       enqueue motor moves, that are executed in the PRU.
 
-   - [gcode-parser.h][src-gcode-api] : C-API for parsing [G-Code][./G-code.md]
+   - [gcode-parser.h][src-gcode-api] : C-API for parsing [G-Code](./G-code.md)
       that calls callback parse events, while taking care of many internals,
       e.g. it automatically translates everything into metric, absolute
       coordinates.
@@ -110,7 +110,7 @@ maps the logical axis (such as 'Y') to a physical connector location on the
 cape - the position in the string represents the position of the connector.
 
 More details about the G-Code code understood can be found in the 
-[G-Code documentation][./G-code.md].
+[G-Code documentation](./G-code.md).
 
 ### Examples
 

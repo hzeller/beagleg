@@ -1,6 +1,8 @@
-*BealgeG G-Code interpretation*
+BealgeG G-Code interpretation
+-----------------------------
 
-**Synatx**
+##Synatx
+
 G-Code is essentially a pair of 'letters' and 'numbers' that tell the machine
 what to do. G-Codes are typically organized in lines.
 This is a typical command:
@@ -17,7 +19,7 @@ not every G-Code interpreter supports, but BeagleG does
 
     G1(coordinated move) X10(to this position)
 
-G-code parsing as provided by [the G-Code parse API][./gcode-parser.h] receives
+G-code parsing as provided by [the G-Code parse API](./gcode-parser.h) receives
 G-code either from a string or a file-descriptor and calls parse-callbacks that
 contain the more higher-level commands.
 The callbacks are defined in a struct
@@ -55,7 +57,7 @@ struct GCodeParserCb {
 };
 ```
 
-**Supported commands**
+##Supported commands
 
 The following commands are supported. A place-holder of `[coordinates]` means
 a combination of coordinates (such as `X10 Y20`) and an optional feedrate
@@ -70,7 +72,8 @@ for the user to handle.
 Line numbers `Nxx` and checksums `*xx` are parsed and discarded, but ignored
 for now.
 
-***G Codes***
+###G Codes
+
 Command          | Callback             | Description
 ---------------- |----------------------|------------------------------------
 G0 [coordinates] | `rapid_move()`       | Move to coordinates
@@ -83,7 +86,8 @@ G90              | -                    | Coordinates are absolute.
 G91              | -                    | Coordinates are relative.
 G92 [coordinates]| -                    | Set position to be the new zero.
 
-***M Codes***
+###M Codes
+
 Command          | Callback           | Description
 ----------------------------------------------------------------------------
 M17              | `motors_enable()`    | Switch on motors.
