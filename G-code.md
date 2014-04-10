@@ -90,7 +90,7 @@ G92 [coordinates]| -                    | Set position to be the new zero.
 ###M Codes
 
 Command          | Callback              | Description
-----------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------
 M17              | `motors_enable()`     | Switch on motors.
 M18              | `motors_enable()`     | Switch off motors.
 M84              | `motors_enable()`     | dito.
