@@ -307,6 +307,7 @@ static const char *handle_move(struct GCodeParser *p,
   return line;
 }
 
+// Note: changes here should be documented in G-code.md as well.
 void gcodep_parse_line(struct GCodeParser *p, const char *line,
 		       FILE *err_stream) {
   void *const userdata = p->cb_userdata;

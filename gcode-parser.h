@@ -23,6 +23,8 @@
  * and calls callbacks on changes.
  * All un-implemented G- and M-Codes are sent back via a callback for the
  * user to handle.
+ *
+ * See G-code.md for documentation.
  */
 
 #include <stdio.h>
