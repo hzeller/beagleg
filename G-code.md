@@ -98,7 +98,7 @@ M82              | -                     | Set E-axis to absolute.
 M83              | -                     | Set E-axis to relative.
 M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
 M116             | `wait_temperature()`  | Wait for temperature to be reached
-M109 Snnn        | `set_t.., wait_t..()` | Combination of M105, M116: Set temperature and wait for it to be reached.
+M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
 M106             | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
