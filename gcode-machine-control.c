@@ -93,8 +93,13 @@ static char axis_to_letter(enum GCodeParserAxes axis) {
   case AXIS_A: return 'A';
   case AXIS_B: return 'B';
   case AXIS_C: return 'C';
-  default: return '?';
+  case AXIS_U: return 'U';
+  case AXIS_V: return 'V';
+  case AXIS_W: return 'W';
+  case GCODE_NUM_AXES: return '?';
+    // no default to have compiler warn about new values.
   }
+  return '?';
 }
 
 // Dummy implementations of callbacks not yet handled.

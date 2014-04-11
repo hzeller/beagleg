@@ -27,8 +27,9 @@
 typedef float AxesRegister[GCODE_NUM_AXES];
 
 const AxisBitmap_t kAllAxesBitmap =
-  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)
-   | (1 << AXIS_E) | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C));
+  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
+   | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C)
+   | (1 << AXIS_U) | (1 << AXIS_V) | (1 << AXIS_W));
 
 struct GCodeParser {
   struct GCodeParserCb callbacks;
@@ -201,6 +202,9 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     case 'A': homing_flags |= (1 << AXIS_A); break;
     case 'B': homing_flags |= (1 << AXIS_B); break;
     case 'C': homing_flags |= (1 << AXIS_C); break;
+    case 'U': homing_flags |= (1 << AXIS_U); break;
+    case 'V': homing_flags |= (1 << AXIS_V); break;
+    case 'W': homing_flags |= (1 << AXIS_W); break;
     default:
       done = 1;  // Possibly start of new command.
       break;
@@ -226,16 +230,19 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   float value;
   const char *remaining_line;
   while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
-    const float unit_value = value * p->unit_to_mm_factor;
+    const float unit_val = value * p->unit_to_mm_factor;
     char done = 0;
     switch (axis) {
-    case 'X': p->relative_zero[AXIS_X] = p->axes_pos[AXIS_X] - unit_value; break;
-    case 'Y': p->relative_zero[AXIS_Y] = p->axes_pos[AXIS_Y] - unit_value; break;
-    case 'Z': p->relative_zero[AXIS_Z] = p->axes_pos[AXIS_Z] - unit_value; break;
-    case 'E': p->relative_zero[AXIS_E] = p->axes_pos[AXIS_E] - unit_value; break;
-    case 'A': p->relative_zero[AXIS_A] = p->axes_pos[AXIS_A] - unit_value; break;
-    case 'B': p->relative_zero[AXIS_B] = p->axes_pos[AXIS_B] - unit_value; break;
-    case 'C': p->relative_zero[AXIS_C] = p->axes_pos[AXIS_C] - unit_value; break;
+    case 'X': p->relative_zero[AXIS_X] = p->axes_pos[AXIS_X] - unit_val; break;
+    case 'Y': p->relative_zero[AXIS_Y] = p->axes_pos[AXIS_Y] - unit_val; break;
+    case 'Z': p->relative_zero[AXIS_Z] = p->axes_pos[AXIS_Z] - unit_val; break;
+    case 'E': p->relative_zero[AXIS_E] = p->axes_pos[AXIS_E] - unit_val; break;
+    case 'A': p->relative_zero[AXIS_A] = p->axes_pos[AXIS_A] - unit_val; break;
+    case 'B': p->relative_zero[AXIS_B] = p->axes_pos[AXIS_B] - unit_val; break;
+    case 'C': p->relative_zero[AXIS_C] = p->axes_pos[AXIS_C] - unit_val; break;
+    case 'U': p->relative_zero[AXIS_U] = p->axes_pos[AXIS_U] - unit_val; break;
+    case 'V': p->relative_zero[AXIS_V] = p->axes_pos[AXIS_V] - unit_val; break;
+    case 'W': p->relative_zero[AXIS_W] = p->axes_pos[AXIS_W] - unit_val; break;
     default:
       done = 1;  // Possibly start of new command.
       break;
@@ -283,6 +290,9 @@ static const char *handle_move(struct GCodeParser *p,
     case 'A': update_axis = AXIS_A; break;
     case 'B': update_axis = AXIS_B; break;
     case 'C': update_axis = AXIS_C; break;
+    case 'U': update_axis = AXIS_U; break;
+    case 'V': update_axis = AXIS_V; break;
+    case 'W': update_axis = AXIS_W; break;
     default:
       done = 1;  // Possibly start of new command.
       break;

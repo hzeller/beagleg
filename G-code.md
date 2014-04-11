@@ -65,8 +65,7 @@ struct GCodeParserCb {
 The following commands are supported. A place-holder of `[coordinates]` means
 a combination of axis koordinates (such as `X10 Y20`) and an optional feedrate
 (`F1000`).
-Current set of supported axis-letters is X, Y, Z, E, A, B, C (might add
-U, V, W).
+Current set of supported axis-letters is X, Y, Z, E, A, B, C, U, V, W.
 
 Callbacks that take coordinates are _always_ pre-converted to
 machine-absolute and metric. The codes G20/G21 and G90/G91/G92 as well as
@@ -107,3 +106,13 @@ M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temper
 M106             | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
+
+###M Codes dealt with by machine-control
+The standard M-Code are directly handled by the G-code parser and result
+in callbacks. Other not quite standard G-codes are handled in machine-control.
+
+Command          | Description
+-----------------|----------------------------------------
+M105             | Get current extruder temperature.
+M114             | Get current position; coordinate units in mm.
+M115             | Get firmware version.
