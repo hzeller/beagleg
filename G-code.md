@@ -45,7 +45,7 @@ struct GCodeParserCb {
   // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
-  // by GCodeParserAxes.
+  // by GCodeParserAxis.
   void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
   void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
 

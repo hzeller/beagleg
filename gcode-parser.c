@@ -84,7 +84,7 @@ static void set_all_axis_to_absolute(GCodeParser_t *p, char value) {
   }
 }
 
-char gcodep_axis2letter(enum GCodeParserAxes axis) {
+char gcodep_axis2letter(enum GCodeParserAxis axis) {
   switch (axis) {
   case AXIS_X: return 'X';
   case AXIS_Y: return 'Y';
@@ -102,8 +102,8 @@ char gcodep_axis2letter(enum GCodeParserAxes axis) {
   return '?';
 }
 
-// Returns the GCodeParserAxes value or GCODE_NUM_AXES if out of range.
-enum GCodeParserAxes gcodep_letter2axis(char letter) {
+// Returns the GCodeParserAxis value or GCODE_NUM_AXES if out of range.
+enum GCodeParserAxis gcodep_letter2axis(char letter) {
   switch (letter) {
   case 'X': case 'x': return AXIS_X;
   case 'Y': case 'y': return AXIS_Y;
@@ -228,7 +228,7 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   float dummy;
   const char *remaining_line;
   while ((remaining_line = gcodep_parse_pair(line, &axis_l, &dummy, p->msg))) {
-    const enum GCodeParserAxes axis = gcodep_letter2axis(axis_l);
+    const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
     if (axis == GCODE_NUM_AXES)
       break;  //  Possibly start of new command.
     homing_flags |= (1 << axis);
@@ -253,7 +253,7 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   const char *remaining_line;
   while ((remaining_line = gcodep_parse_pair(line, &axis_l, &value, p->msg))) {
     const float unit_val = value * p->unit_to_mm_factor;
-    const enum GCodeParserAxes axis = gcodep_letter2axis(axis_l);
+    const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
     if (axis == GCODE_NUM_AXES)
       break;    // Possibly start of new command.
     p->relative_zero[axis] = p->axes_pos[axis] - unit_val;
@@ -293,7 +293,7 @@ static const char *handle_move(struct GCodeParser *p,
       any_change = 1;
     }
     else {
-      const enum GCodeParserAxes update_axis = gcodep_letter2axis(axis_l);
+      const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
         break;  // Invalid axis: possibley start of new command.
       if (p->axis_is_absolute[update_axis]) {

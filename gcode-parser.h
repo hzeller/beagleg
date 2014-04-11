@@ -35,7 +35,7 @@ typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
 typedef uint32_t AxisBitmap_t;
 
 // Axis supported by this parser.
-enum GCodeParserAxes {
+enum GCodeParserAxis {
   AXIS_X, AXIS_Y, AXIS_Z,
   AXIS_E,
   AXIS_A, AXIS_B, AXIS_C,
@@ -69,7 +69,7 @@ struct GCodeParserCb {
   // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
-  // by GCodeParserAxes.
+  // by GCodeParserAxis.
   void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
   void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
 
@@ -115,9 +115,9 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 			      FILE *err_stream);
 
 // Maps axis enum to letter.
-char gcodep_axis2letter(enum GCodeParserAxes axis);
+char gcodep_axis2letter(enum GCodeParserAxis axis);
 
-// Returns the GCodeParserAxes value or GCODE_NUM_AXES if out of range.
-enum GCodeParserAxes gcodep_letter2axis(char letter);
+// Returns the GCodeParserAxis value or GCODE_NUM_AXES if out of range.
+enum GCodeParserAxis gcodep_letter2axis(char letter);
 
 #endif  // _BEAGLEG_GCODE_PARSER_H_

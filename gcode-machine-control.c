@@ -160,10 +160,10 @@ static void move_machine_steps(struct PrinterState *state,
 
   // The defining axis is the axis that requires to go the most number of steps.
   // it defines the frequency to go.
-  enum GCodeParserAxes defining_axis = AXIS_X;
+  enum GCodeParserAxis defining_axis = AXIS_X;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (abs(axis_steps[i]) > abs(axis_steps[defining_axis]))
-      defining_axis = (enum GCodeParserAxes) i;
+      defining_axis = (enum GCodeParserAxis) i;
   }
 
   command.travel_speed
