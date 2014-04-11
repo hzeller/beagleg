@@ -101,13 +101,14 @@ takes a filename or a TCP port to listen on.
       -P                        : Verbose: Print motor commands (Default: off).
       -S                        : Synchronous: don't queue (Default: off).
       -R                        : Repeat file forever.
-    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C
+    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
     You can either specify --port <port> to listen for commands or give a filename
 
-The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper channels
-[0..6], which can be changed with the `--axis-mapping` flag. This flag
-maps the logical axis (such as 'Y') to a physical connector location on the
-cape - the position in the string represents the position of the connector.
+The G-Code understands axes X, Y, Z, E, A, B, C, U, V, W and `machine-control`
+maps them to output connectors, by default "XYZEA". This can be changed with
+the `--axis-mapping` flag. This flag maps the logical axis (such as 'Y') to a
+physical connector location on the cape - the position in the string
+represents the position of the connector.
 
 More details about the G-Code code understood can be found in the 
 [G-Code documentation](./G-code.md).
