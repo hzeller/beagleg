@@ -116,8 +116,8 @@ understood as representing coordinates in an Euclidian space (not entirely
 unwarranted :) ) and thus applies a feedrate in a way that the resulting
 path sees the given speed in space:
 
-    G28 G1 X100 F100   ; moves X with feedrate 100mm/s
-    G28 G1 X100 Y100   ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/s
+    G28 G1 X100      F100  ; moves X with feedrate 100mm/s
+    G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/s
 
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).
