@@ -30,7 +30,7 @@ The callbacks are defined in a struct
 ```c
 struct GCodeParserCb {
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  void (*go_home)(void *, unsigned char axis_bitmap);
+  void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
