@@ -26,7 +26,7 @@
 
 typedef float AxesRegister[GCODE_NUM_AXES];
 
-const unsigned char kAllAxesBitmap = 
+const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)
    | (1 << AXIS_E) | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C));
 
@@ -67,8 +67,8 @@ static void dummy_move(void *user, float feed, const float *axes) {
   else
     fprintf(stderr, "\n");
 }
-static void dummy_go_home(void *user, unsigned char flags) {
-  fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", flags);
+static void dummy_go_home(void *user, AxisBitmap_t axes) {
+  fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
 }
 static const char *dummy_unprocessed(void *user, char letter, float value,
 				     const char *remaining) {

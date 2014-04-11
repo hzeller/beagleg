@@ -319,7 +319,7 @@ static void machine_set_speed_factor(void *userdata, float value) {
   state->prog_speed_factor = value;
 }
 
-static void machine_home(void *userdata, unsigned char axes_bitmap) {
+static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));

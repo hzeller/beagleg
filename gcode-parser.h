@@ -27,9 +27,12 @@
  * See G-code.md for documentation.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 
-typedef struct GCodeParser GCodeParser_t;  // Opaque type with the parser object.
+typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
+
+typedef uint32_t AxisBitmap_t;
 
 // Axis supported by this parser.
 enum GCodeParserAxes {
@@ -50,7 +53,7 @@ enum GCodeParserAxes {
 // in the constructor in gcodep_new().
 struct GCodeParserCb {
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  void (*go_home)(void *, unsigned char axis_bitmap);
+  void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
