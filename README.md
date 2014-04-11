@@ -80,12 +80,11 @@ overlay.
 
     sudo ./beagleg-cape-pinmux.sh
 
-(Right now, this is needed after every boot of the BBB. It is simple to do that
- automatically on boot-up, but haven't gotten around to it yet).
+See below to enable the cape at boot time.
 
 ## Machine control binary
-To control a machine with G-Code, use `machine-control`. This interpreter either
-takes a filename or a TCP port to listen on.
+To control a machine with G-Code, use the `machine-control` binary.
+This either takes a filename or a TCP port to listen on.
 
     Usage: ./machine-control [options] [<gcode-filename>]
     Options:
@@ -110,14 +109,6 @@ by default "XYZEA".
 This can be changed with the `--axis-mapping` flag. This flag maps the
 logical axis (such as 'Y') to a physical connector location on the
 cape -- the position in the string represents the position of the connector.
-
-The axes X, Y, and Z are dealt with specially by `machine-control`: they are
-understood as representing coordinates in an Euclidian space (not entirely
-unwarranted :) ) and thus applies a feedrate in a way that the resulting
-path sees the given speed in space:
-
-    G28 G1 X100      F100  ; moves X with feedrate 100mm/min
-    G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
 
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).

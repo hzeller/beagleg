@@ -116,3 +116,12 @@ Command          | Description
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
+
+###Feedrate in Euclidian space
+The axes X, Y, and Z are dealt with specially by `machine-control`: they are
+understood as representing coordinates in an Euclidian space (not entirely
+unwarranted :) ) and thus applies a feedrate in a way that the resulting
+path sees the given speed in space, not each individual axis:
+
+    G28 G1 X100      F100  ; moves X with feedrate 100mm/min
+    G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
