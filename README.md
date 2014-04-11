@@ -253,28 +253,28 @@ While loading the pinmux manually with
 
     sudo ./beagleg-cape-pinmux.sh
 
-works, loading it at boot-time does not work, though I don't really know why.
-If you add the following as root
+initializes the pinmux now, we have to do this every time after boot. Also,
+we'd like to have the cape installed as early as possible in the boot process
+to properly set all the output values to safe values.
 
-    echo 'optargs=capemgr.enable_partno=BeagleG' >> /boot/uboot/uEnv.txt
+For that, we essentially have to add
 
-.. then on next boot, the commandline is read by the kernel (you can see it 
-with `cat /proc/cmdline`), but then you see the following in the kernel log:
+    optargs=capemgr.enable_partno=BeagleG
 
-    $ dmesg | grep -i beagleg
-    [    1.906466] bone-capemgr bone_capemgr.9: enabled_partno part_number 'BeagleG', version 'N/A', prio '0'
-    [    1.930783] bone-capemgr bone_capemgr.9: slot #7: 'Override Board Name,00A0,Override Manuf,BeagleG'
-    [    1.999476] bone-capemgr bone_capemgr.9: loader: before slot-7 BeagleG:00A0 (prio 0)
-    [    2.007609] bone-capemgr bone_capemgr.9: loader: check slot-7 BeagleG:00A0 (prio 0)
-    [    2.047319] bone-capemgr bone_capemgr.9: loader: after slot-7 BeagleG:00A0 (prio 0)
-    [    2.076670] bone-capemgr bone_capemgr.9: slot #7: Requesting part number/version based 'BeagleG-00A0.dtbo
-    [    2.107154] bone-capemgr bone_capemgr.9: slot #7: Requesting firmware 'BeagleG-00A0.dtbo' for board-name 'Override Board Name', version '00A0'
-    [    2.911423] bone-capemgr bone_capemgr.9: failed to load firmware 'BeagleG-00A0.dtbo'
-    [    2.919637] bone-capemgr bone_capemgr.9: loader: failed to load slot-7 BeagleG:00A0 (prio 0)
+To the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
 
-Right now I assume this has to do with the fact that I don't provide an EEPROM
-in the [Bumps][bumps] board yet, but maybe it is just some other silly mistake ?
-(the *.dtbo file is in the /lib/firmware).
+The kernel looks for the firmware in /lib/firmware - since at boot time the
+root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
+to have it in the uInitrd filesystem.
+
+There is a script that does both of these things. This might depend on your
+distribution, so take a look at the script first to check that it does what
+it should do (it will abort on the first error, so probably it won't do damage).
+
+    sudo ./beagleg-install-cape.sh BeagleG-00A0.dtbo
+
+After a reboot, you should see the cape to be enabled early on in the boot
+process (Power PWM LEDs switch off).
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
