@@ -43,6 +43,14 @@ enum GCodeParserAxis {
   GCODE_NUM_AXES
 };
 
+// Maps axis enum to letter. AXIS_Z -> 'Z'
+char gcodep_axis2letter(enum GCodeParserAxis axis);
+
+// Case-insensitively maps an axis letter to the GCodeParserAxis enumeration 
+// value.
+// Returns GCODE_NUM_AXES on invalid character.
+enum GCodeParserAxis gcodep_letter2axis(char letter);
+
 // Callbacks called by the parser and to be implemented by the user
 // with meaningful actions.
 //
@@ -113,11 +121,5 @@ void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
 // end-of-string has been reached.
 const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 			      FILE *err_stream);
-
-// Maps axis enum to letter.
-char gcodep_axis2letter(enum GCodeParserAxis axis);
-
-// Returns the GCodeParserAxis value or GCODE_NUM_AXES if out of range.
-enum GCodeParserAxis gcodep_letter2axis(char letter);
 
 #endif  // _BEAGLEG_GCODE_PARSER_H_

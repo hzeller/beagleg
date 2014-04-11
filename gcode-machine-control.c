@@ -436,27 +436,28 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
   }
   const char *axis_mapping = cfg.axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
-  if (strlen(axis_mapping) > BEAGLEG_NUM_MOTORS) {
-    fprintf(stderr, "Axis mapping string longer than available connectors."
-            "('%s', max axes=%d)\n", axis_mapping, BEAGLEG_NUM_MOTORS);
-    return cleanup_state();
-  }
   for (int pos = 0; *axis_mapping; pos++, axis_mapping++) {
-    switch (toupper(*axis_mapping)) {
-    case 'X': s_mstate->axis_to_driver[AXIS_X] = pos_to_driver[pos]; break;
-    case 'Y': s_mstate->axis_to_driver[AXIS_Y] = pos_to_driver[pos]; break;
-    case 'Z': s_mstate->axis_to_driver[AXIS_Z] = pos_to_driver[pos]; break;
-    case 'E': s_mstate->axis_to_driver[AXIS_E] = pos_to_driver[pos]; break;
-    case 'A': s_mstate->axis_to_driver[AXIS_A] = pos_to_driver[pos]; break;
-    case 'B': s_mstate->axis_to_driver[AXIS_B] = pos_to_driver[pos]; break;
-    case 'C': s_mstate->axis_to_driver[AXIS_C] = pos_to_driver[pos]; break;
-    case '_': break;  // skip.
-    default:
-      fprintf(stderr, "Illegal axis->connector mapping character '%c' in '%s' "
-	      "(Only valid axis letter or '_' to skip a connector)\n",
-	      toupper(*axis_mapping), cfg.axis_mapping);
+    if (pos > BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
+      fprintf(stderr, "Axis mapping string has more elements than available %d "
+              "connectors (remaining=\"..%s\").\n", pos, axis_mapping);
       return cleanup_state();
     }
+    if (*axis_mapping == '_')
+      continue;
+    const enum GCodeParserAxis axis = gcodep_letter2axis(*axis_mapping);
+    if (axis == GCODE_NUM_AXES) {
+      fprintf(stderr,
+              "Illegal axis->connector mapping character '%c' in '%s' "
+              "(Only valid axis letter or '_' to skip a connector).\n",
+              toupper(*axis_mapping), cfg.axis_mapping);
+      return cleanup_state();
+    }
+    if (s_mstate->axis_to_driver[axis] > -1) {
+      fprintf(stderr, "Axis '%c' given multiple times, "
+              "can only be mapped once.\n", toupper(*axis_mapping));
+      return cleanup_state();
+    }
+    s_mstate->axis_to_driver[axis] = pos_to_driver[pos];
   }
 
   // Now let's see what motors are mapped to any useful output.
