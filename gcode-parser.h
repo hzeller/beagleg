@@ -114,4 +114,10 @@ void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
 const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 			      FILE *err_stream);
 
+// Maps axis enum to letter.
+char gcodep_axis2letter(enum GCodeParserAxes axis);
+
+// Returns the GCodeParserAxes value or GCODE_NUM_AXES if out of range.
+enum GCodeParserAxes gcodep_letter2axis(char letter);
+
 #endif  // _BEAGLEG_GCODE_PARSER_H_

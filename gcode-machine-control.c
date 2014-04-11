@@ -84,24 +84,6 @@ static void disarm_signal_handler() {
   signal(SIGINT, SIG_DFL);   // Ctrl-C
 }
 
-static char axis_to_letter(enum GCodeParserAxes axis) {
-  switch (axis) {
-  case AXIS_X: return 'X';
-  case AXIS_Y: return 'Y';
-  case AXIS_Z: return 'Z';
-  case AXIS_E: return 'E';
-  case AXIS_A: return 'A';
-  case AXIS_B: return 'B';
-  case AXIS_C: return 'C';
-  case AXIS_U: return 'U';
-  case AXIS_V: return 'V';
-  case AXIS_W: return 'W';
-  case GCODE_NUM_AXES: return '?';
-    // no default to have compiler warn about new values.
-  }
-  return '?';
-}
-
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
   struct PrinterState *state = (struct PrinterState*)userdata;
@@ -385,12 +367,12 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
     cfg.steps_per_mm[i] = fabs(cfg.steps_per_mm[i]);
     if (cfg.max_feedrate[i] < 0) {
       fprintf(stderr, "Invalid negative feedrate %.1f for axis %c\n",
-              cfg.max_feedrate[i], axis_to_letter(i));
+              cfg.max_feedrate[i], gcodep_axis2letter(i));
       return cleanup_state();
     }
     if (cfg.acceleration[i] < 0) {
       fprintf(stderr, "Invalid negative acceleration %.1f for axis %c\n",
-              cfg.acceleration[i], axis_to_letter(i));
+              cfg.acceleration[i], gcodep_axis2letter(i));
       return cleanup_state();
     }
   }
@@ -487,7 +469,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
                      || s_mstate->cfg.max_feedrate[i] <= 0);
     if (s_mstate->cfg.debug_print || is_error) {
       fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %7.3f steps/mm%s\n",
-              axis_to_letter(i), s_mstate->cfg.max_feedrate[i],
+              gcodep_axis2letter(i), s_mstate->cfg.max_feedrate[i],
               s_mstate->cfg.acceleration[i],
               s_mstate->cfg.steps_per_mm[i],
               s_mstate->direction_flip[i] < 0 ? " (reversed)" : "");

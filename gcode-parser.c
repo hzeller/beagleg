@@ -84,6 +84,41 @@ static void set_all_axis_to_absolute(GCodeParser_t *p, char value) {
   }
 }
 
+char gcodep_axis2letter(enum GCodeParserAxes axis) {
+  switch (axis) {
+  case AXIS_X: return 'X';
+  case AXIS_Y: return 'Y';
+  case AXIS_Z: return 'Z';
+  case AXIS_E: return 'E';
+  case AXIS_A: return 'A';
+  case AXIS_B: return 'B';
+  case AXIS_C: return 'C';
+  case AXIS_U: return 'U';
+  case AXIS_V: return 'V';
+  case AXIS_W: return 'W';
+  case GCODE_NUM_AXES: return '?';
+    // no default to have compiler warn about new values.
+  }
+  return '?';
+}
+
+// Returns the GCodeParserAxes value or GCODE_NUM_AXES if out of range.
+enum GCodeParserAxes gcodep_letter2axis(char letter) {
+  switch (letter) {
+  case 'X': case 'x': return AXIS_X;
+  case 'Y': case 'y': return AXIS_Y;
+  case 'Z': case 'z': return AXIS_Z;
+  case 'E': case 'e': return AXIS_E;
+  case 'A': case 'a': return AXIS_A;
+  case 'B': case 'b': return AXIS_B;
+  case 'C': case 'c': return AXIS_C;
+  case 'U': case 'u': return AXIS_U;
+  case 'V': case 'v': return AXIS_V;
+  case 'W': case 'w': return AXIS_W;
+  }
+  return GCODE_NUM_AXES;
+}
+
 struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
 			       void *userdata) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
@@ -188,28 +223,15 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
 }
 
 static const char *handle_home(struct GCodeParser *p, const char *line) {
-  unsigned char homing_flags = 0;
-  char axis;
+  AxisBitmap_t homing_flags = 0;
+  char axis_l;
   float dummy;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &dummy, p->msg))) {
-    char done = 0;
-    switch (axis) {
-    case 'X': homing_flags |= (1 << AXIS_X); break;
-    case 'Y': homing_flags |= (1 << AXIS_Y); break;
-    case 'Z': homing_flags |= (1 << AXIS_Z); break;
-    case 'E': homing_flags |= (1 << AXIS_E); break;
-    case 'A': homing_flags |= (1 << AXIS_A); break;
-    case 'B': homing_flags |= (1 << AXIS_B); break;
-    case 'C': homing_flags |= (1 << AXIS_C); break;
-    case 'U': homing_flags |= (1 << AXIS_U); break;
-    case 'V': homing_flags |= (1 << AXIS_V); break;
-    case 'W': homing_flags |= (1 << AXIS_W); break;
-    default:
-      done = 1;  // Possibly start of new command.
-      break;
-    }
-    if (done) break;
+  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &dummy, p->msg))) {
+    const enum GCodeParserAxes axis = gcodep_letter2axis(axis_l);
+    if (axis == GCODE_NUM_AXES)
+      break;  //  Possibly start of new command.
+    homing_flags |= (1 << axis);
     line = remaining_line;
   }
   if (homing_flags == 0) homing_flags = kAllAxesBitmap;
@@ -226,29 +248,16 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
 }
 
 static const char *handle_rebase(struct GCodeParser *p, const char *line) {
-  char axis;
+  char axis_l;
   float value;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &value, p->msg))) {
     const float unit_val = value * p->unit_to_mm_factor;
-    char done = 0;
-    switch (axis) {
-    case 'X': p->relative_zero[AXIS_X] = p->axes_pos[AXIS_X] - unit_val; break;
-    case 'Y': p->relative_zero[AXIS_Y] = p->axes_pos[AXIS_Y] - unit_val; break;
-    case 'Z': p->relative_zero[AXIS_Z] = p->axes_pos[AXIS_Z] - unit_val; break;
-    case 'E': p->relative_zero[AXIS_E] = p->axes_pos[AXIS_E] - unit_val; break;
-    case 'A': p->relative_zero[AXIS_A] = p->axes_pos[AXIS_A] - unit_val; break;
-    case 'B': p->relative_zero[AXIS_B] = p->axes_pos[AXIS_B] - unit_val; break;
-    case 'C': p->relative_zero[AXIS_C] = p->axes_pos[AXIS_C] - unit_val; break;
-    case 'U': p->relative_zero[AXIS_U] = p->axes_pos[AXIS_U] - unit_val; break;
-    case 'V': p->relative_zero[AXIS_V] = p->axes_pos[AXIS_V] - unit_val; break;
-    case 'W': p->relative_zero[AXIS_W] = p->axes_pos[AXIS_W] - unit_val; break;
-    default:
-      done = 1;  // Possibly start of new command.
-      break;
-    }
-    if (done)
-      break;
+    const enum GCodeParserAxes axis = gcodep_letter2axis(axis_l);
+    if (axis == GCODE_NUM_AXES)
+      break;    // Possibly start of new command.
+    p->relative_zero[axis] = p->axes_pos[axis] - unit_val;
+ 
     line = remaining_line;
   }
   return line;
@@ -272,45 +281,29 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
 static const char *handle_move(struct GCodeParser *p,
 			       void (*fun_move)(void *, float, const float *),
 			       const char *line) {
-  char axis;
+  char axis_l;
   float value;
   int any_change = 0;
   float feedrate = -1;
   const char *remaining_line;
-  char done = 0;
-  int update_axis = -1;
-  while ((remaining_line = gcodep_parse_pair(line, &axis, &value, p->msg))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &value, p->msg))) {
     const float unit_value = value * p->unit_to_mm_factor;
-    switch (axis) {
-    case 'F': feedrate = unit_value / 60.0; any_change = 1; break;
-    case 'X': update_axis = AXIS_X; break;
-    case 'Y': update_axis = AXIS_Y; break;
-    case 'Z': update_axis = AXIS_Z; break;
-    case 'E': update_axis = AXIS_E; break;
-    case 'A': update_axis = AXIS_A; break;
-    case 'B': update_axis = AXIS_B; break;
-    case 'C': update_axis = AXIS_C; break;
-    case 'U': update_axis = AXIS_U; break;
-    case 'V': update_axis = AXIS_V; break;
-    case 'W': update_axis = AXIS_W; break;
-    default:
-      done = 1;  // Possibly start of new command.
-      break;
+    if (axis_l == 'F') {
+      feedrate = unit_value / 60.0;  // feedrates are per minute.
+      any_change = 1;
     }
-
-    if (update_axis >= 0) {
+    else {
+      const enum GCodeParserAxes update_axis = gcodep_letter2axis(axis_l);
+      if (update_axis == GCODE_NUM_AXES)
+        break;  // Invalid axis: possibley start of new command.
       if (p->axis_is_absolute[update_axis]) {
-	p->axes_pos[update_axis] = p->relative_zero[update_axis] + unit_value;
-      }
-      else {
-	p->axes_pos[update_axis] += unit_value;
+        p->axes_pos[update_axis] = p->relative_zero[update_axis] + unit_value;
+      } else {
+        p->axes_pos[update_axis] += unit_value;
       }
       any_change = 1;
     }
-    if (done)
-      break;
     line = remaining_line;
-    update_axis = -1;
   }
 
   if (any_change) fun_move(p->cb_userdata, feedrate, p->axes_pos);
