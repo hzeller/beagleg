@@ -38,6 +38,10 @@
 
 #define MOTOR_COUNT 8
 
+// Cycles we need to do other stuff in the update loop, thus take it out
+// of the delay.
+#define LOOP_OVERHEAD_CYCLES 11
+
 struct QueueElement {
   uint8_t state;
   uint8_t direction_bits;
@@ -126,7 +130,7 @@ static uint32_t speed_2_delay(float steps_per_second) {
   // Roughly, we neexd 4 * cycle-time delay. At 200Mhz, we have 5ns cycles.
   // There is some overhead for each toplevel loop, but we ignore that for now.
   const float kLoopTimeSeconds = 5e-9 * 4;
-  return (1/steps_per_second) / kLoopTimeSeconds;
+  return (1/steps_per_second) / kLoopTimeSeconds - LOOP_OVERHEAD_CYCLES;
 }
 
 int beagleg_enqueue(const struct bg_movement *param) {
