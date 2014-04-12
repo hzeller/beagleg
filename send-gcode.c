@@ -84,7 +84,7 @@ void determine_duration(const char *filename) {
     gcodep_parse_line(parser, buffer);
   }
   gcodep_delete(parser);
-  printf("Total original print time: ~%.1f seconds; height: %.1fmm; "
+  printf("Total original print time: ~%.3f seconds; height: %.1fmm; "
 	 "%.1fmm filament used.\n",
 	 state.total_time, state.last_z, state.filament_len);
 }
@@ -195,13 +195,9 @@ static void printer_dwell(void *userdata, float value) {
   usleep((int) (value * 1000));
 }
 
-void send_to_printer(const char *filename,
+void send_to_printer(const char *filename, char do_loop,
 		     struct PrintConfig *config) {
   if (!config->dry_run) beagleg_init();
-
-  struct PrinterState state;
-  bzero(&state, sizeof(state));
-  state.config = *config;
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
@@ -211,13 +207,19 @@ void send_to_printer(const char *filename,
   callbacks.go_home = &dummy_home;
   callbacks.dwell = &printer_dwell;
 
-  GCodeParser_t *parser = gcodep_new(&callbacks, &state);
-  FILE *f = fopen(filename, "r");
-  char buffer[1024];
-  while (fgets(buffer, sizeof(buffer), f)) {
-    gcodep_parse_line(parser, buffer);
-  }
-  gcodep_delete(parser);
+  do {
+    struct PrinterState state;
+    bzero(&state, sizeof(state));
+    state.config = *config;
+    GCodeParser_t *parser = gcodep_new(&callbacks, &state);
+    FILE *f = fopen(filename, "r");
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), f)) {
+      gcodep_parse_line(parser, buffer);
+    }
+    gcodep_delete(parser);
+    fclose(f);
+  } while (do_loop);
 
   if (!config->dry_run) beagleg_exit();
 }
@@ -229,7 +231,8 @@ static int usage(const char *prog) {
 	   "  -m <rate>   : Max. feedrate. (Default %dmm/s)\n"
 	   "  -p          : Toggle printing motor steps. (Default:on)\n"
 	   "  -n          : dryrun; don't send to motors. (Default:off)\n"
-	   "  -s          : synchronous: don't queue (useful only for debug)\n",
+	   "  -s          : synchronous: don't queue (useful only for debug)\n"
+	   "  -l          : Loop forever.\n",
 	   prog, DEFAULT_MAX_FEEDRATE_MM_PER_SEC);
    return 1;
 }
@@ -241,8 +244,9 @@ int main(int argc, char *argv[]) {
   print_config.dry_run = 0;
   print_config.debug_print = 0;
   print_config.synchronous = 0;
+  char do_loop = 0;
   int opt;
-  while ((opt = getopt(argc, argv, "spnf:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "spnlf:m:")) != -1) {
     switch (opt) {
     case 'f':
       print_config.speed_factor = atof(optarg);
@@ -261,6 +265,9 @@ int main(int argc, char *argv[]) {
     case 's':
       print_config.synchronous = 1;
       break;
+    case 'l':
+      do_loop = 1;
+      break;
     default:
       return usage(argv[0]);
     }
@@ -277,5 +284,5 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  send_to_printer(filename, &print_config);
+  send_to_printer(filename, do_loop, &print_config);
 }
