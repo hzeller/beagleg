@@ -51,10 +51,11 @@
 #define DIRECTION_OUT_BITS 0xFFFFFFFF ^ (0xFF << MOTOR_DIR_GPIO1_SHIFT)
 
 #define PARAM_START r8
-#define PARAM_END  r16
+#define PARAM_END  r17
 .struct TravelParameters
 	.u16 steps         // Total number of steps.
-	.u16 travel_delay  // delay-loop count.
+	.u16 dummy	   // for later.
+	.u32 travel_delay  // delay-loop count.
 	.u32 fraction_1    // Fixed point increments.
 	.u32 fraction_2    // (Array would be good :) )
 	.u32 fraction_3
@@ -71,8 +72,8 @@
 .ends
 
 	;; counter states of the motors
-#define STATE_START r17   	; after PARAM_END
-#define STATE_END r24
+#define STATE_START r18   	; after PARAM_END
+#define STATE_END r25
 .struct MotorState
 	.u32 m1
 	.u32 m2
@@ -167,7 +168,7 @@ STEP_GEN:
 	;; TODO: figure out the number of steps according to acceleration.
 	;; now, we just do the travel speed loop time.
 	MOV r1, travel_params.travel_delay
-STEP_DELAY:			; TODO: LOOP instruction ?
+STEP_DELAY:			; TODO: LOOP instruction ? Does it >16bit ?
 	SUB r1, r1, 1
 	QBNE STEP_DELAY, r1, 0
 
