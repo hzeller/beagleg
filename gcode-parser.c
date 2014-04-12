@@ -126,8 +126,7 @@ static const char *skip_white(const char *line) {
 
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
-static const char *parse_next_pair(const char *line,
-				   char *letter, float *value) {
+const char *gcodep_parse_pair(const char *line, char *letter, float *value) {
   // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
@@ -136,7 +135,7 @@ static const char *parse_next_pair(const char *line,
   if (*line == '\0' || *line == ';' || *line == '%')
     return NULL;
 
-  if (*line == '(') {  // mid-of-line comment.
+  if (*line == '(') {  // Comment between words; e.g. G0(move) X1(this axis)
     while (*line && *line != ')')
       line++;
     line = skip_white(line + 1);
@@ -184,7 +183,7 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   char axis;
   float dummy;
   const char *remaining_line;
-  while ((remaining_line = parse_next_pair(line, &axis, &dummy))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &dummy))) {
     char done = 0;
     switch (axis) {
     case 'X': homing_flags |= (1 << AXIS_X); break;
@@ -210,7 +209,7 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   char axis;
   float value;
   const char *remaining_line;
-  while ((remaining_line = parse_next_pair(line, &axis, &value))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     char done = 0;
     switch (axis) {
@@ -237,7 +236,7 @@ static const char *set_param(char param_letter, void *userdata,
 			     const char *line) {
   char letter;
   float value;
-  const char *remaining_line = parse_next_pair(line, &letter, &value);
+  const char *remaining_line = gcodep_parse_pair(line, &letter, &value);
   if (remaining_line != NULL && letter == param_letter) {
     value_setter(userdata, value);
     return remaining_line;
@@ -255,7 +254,7 @@ static const char *handle_move(struct GCodeParser *p,
   const char *remaining_line;
   char done = 0;
   int update_axis = -1;
-  while ((remaining_line = parse_next_pair(line, &axis, &value))) {
+  while ((remaining_line = gcodep_parse_pair(line, &axis, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     switch (axis) {
     case 'F': {
@@ -301,7 +300,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line) {
   struct GCodeParserCb *cb = &p->callbacks;
   char letter;
   float value;
-  while ((line = parse_next_pair(line, &letter, &value))) {
+  while ((line = gcodep_parse_pair(line, &letter, &value))) {
     if (letter == 'G') {
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;

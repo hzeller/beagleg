@@ -25,55 +25,74 @@
 
 typedef struct GCodeParser GCodeParser_t;  // Opaque type with the parser object.
 
-enum GGodeParserAxes {
+// Axis supported by this parser.
+enum GCodeParserAxes {
   AXIS_X, AXIS_Y, AXIS_Z,
   AXIS_E,
   AXIS_A, AXIS_B, AXIS_C,
   GCODE_NUM_AXES
 };
 
-// Callbacks called by the parser.
-// The units in these callbacks are alway mm and always absolute. The parser
-// takes care of interpreting G20/G21, G90/G91/G92; the output units are always
-// in absolute millimeter. (TODO: rotational axes are probably to be handled
-// differently).
+// Callbacks called by the parser and to be implemented by the user
+// with meaningful actions.
+//
+// The units in these callbacks are always mm and always absolute: the parser
+// takes care of interpreting G20/G21, G90/G91/G92 internally.
+// (TODO: rotational axes are probably to be handled differently).
+//
+// The first parameter in any callback is the "userdata" pointer passed
+// in the constructor in gcodep_new().
 struct GCodeParserCb {
-  // Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
+  // M28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, unsigned char axis_bitmap);
 
-  // Set feedrate for the following G-commands. Parameter is in mm/min
+  // Set feedrate for the following G-commands. Parameter is normalized to mm/min
   void (*set_feedrate)(void *, float);
+  void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
+  void (*set_temperature)(void *, float);  // M104, M109: Set temp. in Celsius.
+  void (*wait_temperature)(void *);        // M109, M116: Wait for temp. reached.
+  void (*dwell)(void *, float);            // G4: dwell for milliseconds.
+  void (*disable_motors)(void *);          // M84: Switch off motors
 
-  void (*set_fanspeed)(void *, float);  // 0 == off; 255 == full speed
+  // G1 (coordinated move) and G0 (rapid move).
+  // Move to absolute coordinates. The given float[] is indexed by
+  // GCodeParserAxes.
+  void (*coordinated_move)(void *, const float *);  // G1
+  void (*rapid_move)(void *, const float *);        // G0
 
-  // Set temperature to given temperature in Celsius.
-  void (*set_temperature)(void *, float);
-  void (*wait_temperature)(void *);
-  void (*dwell)(void *, float);
-
-  void (*disable_motors)(void *);
-
-  // Coordinated move to absolute coordinates of motor vector.
-  // (Unused axes always stay at 0).
-  // Parameter: vector, number of elements (Axes are: X, Y, Z, E, A, B, C)
-  void (*coordinated_move)(void *, const float *);
-  void (*rapid_move)(void *, const float *);   // like coordinated_move()
-
-  // Parameters: letter + value of the command that could not be processed.
+  // Hand out G-code command that could not be interpreted.
+  // Parameters: letter + value of the command that was not understood,
   // string of rest of line.
   // Should return pointer to remaining line after processed or NULL if it
   // consumed it all.
+  // Implementors might want to use gcodep_parse_pair() if they need to read
+  // G-code words from the remaining line.
   const char *(*unprocessed)(void *, char letter, float value, const char *);
 };
 
 
-// Initialize parser. It gets a string of maximum 8 characters naming the
-// axis and their correspondence to the output array. E.g. "XYZEABC"
-// Returns an opaque type used in the parse functions.
-// Does not take ownership of the axes string or callbacks.
+// Initialize parser.
+// The "callbacks"-struct contains the functions the parser calls on parsing,
+// the "callback_context" is passed to the void* in these callbacks.
+// Returns an opaque type used in the parse function.
+// Does not take ownership of the provided pointers.
 GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks,
 			  void *callback_context);
-void gcodep_delete(GCodeParser_t *object);
+void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 
-// Parse a gcode line, call callbacks if needed.
+// Main workhorse: Parse a gcode line, call callbacks if needed.
 void gcodep_parse_line(GCodeParser_t *obj, const char *line);
+
+// Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
+// a pair of the letter 'P' and the value '123').
+// Takes care of skipping whitespace, comments etc.
+//
+// Can be used by implementors of unprocessed() to parse the remainder of the
+// line they received.
+//
+// Parses "line". If a pair could be parsed, returns non-NULL value and
+// fills in variables pointed to by "letter" and "value".
+//
+// Returns the remainder of the line or NULL if no pair has been found and the
+// end-of-string has been reached.
+const char *gcodep_parse_pair(const char *line, char *letter, float *value);
