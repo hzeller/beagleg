@@ -40,6 +40,11 @@
 #define MOTOR_7_STEP_BIT 15
 #define MOTOR_8_STEP_BIT 20
 
+// GPIO-0 - input bits.
+#define STOP_1_BIT 23
+#define STOP_2_BIT 26
+#define STOP_3_BIT 27
+
 // GPIO-1 - the direction bits are mapped on GPIO-1, starting from bit 12
 // as that is a contiguous region accessible as IO pins.
 #define DIRECTION_GPIO1_SHIFT 12
