@@ -59,6 +59,8 @@ struct PrinterState {
   float prog_speed_factor;               // Speed factor set by program (M220)
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
   int direction_flip[GCODE_NUM_AXES];    // 1 or -1 for direction flip
+  unsigned int aux_bits;                 // set with M42
+
   FILE *msg_stream;
 };
 
@@ -114,26 +116,50 @@ static void motors_enable(void *userdata, char b) {
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->msg_stream)
-    return NULL;
-  switch ((int) value) {
-  case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
-  case 114:
-    fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
-	    (1.0f * state->machine_position[AXIS_X]
-	     / state->cfg.steps_per_mm[AXIS_X]),
-	    (1.0f * state->machine_position[AXIS_Y]
-	     / state->cfg.steps_per_mm[AXIS_Y]),
-	    (1.0f * state->machine_position[AXIS_Z]
-	     / state->cfg.steps_per_mm[AXIS_Z]),
-	    (1.0f * state->machine_position[AXIS_E]
-	     / state->cfg.steps_per_mm[AXIS_E]));
-    break;
-  case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
-  default:  fprintf(state->msg_stream,
-		    "// BeagleG: didn't understand ('%c', %d, '%s')\n",
-		    letter, (int) value, remaining);
-    break;
+  if (letter == 'M') {
+
+    if ((int) value == 42) {
+      int pin = 0;
+      int aux_bit = 0;
+      for (;;) {
+        remaining = gcodep_parse_pair(remaining, &letter, &value,
+                                      state->msg_stream);
+        if (remaining == NULL) break;
+        if (letter == 'P') pin = value; 
+        else if (letter == 'S') aux_bit = value;
+        else break;
+      }
+      if (aux_bit) {
+        state->aux_bits |= 1 << pin;
+      } else {
+        state->aux_bits &= ~(1 << pin);
+      }
+      fprintf(stderr, "Setting bits to 0x%02x\n", state->aux_bits);
+      return remaining;
+    }
+
+    // The remaining codes are only useful when we have an output stream.
+    if (!state->msg_stream)
+      return NULL;
+    switch ((int) value) {
+    case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
+    case 114:
+      fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
+              (1.0f * state->machine_position[AXIS_X]
+               / state->cfg.steps_per_mm[AXIS_X]),
+              (1.0f * state->machine_position[AXIS_Y]
+               / state->cfg.steps_per_mm[AXIS_Y]),
+              (1.0f * state->machine_position[AXIS_Z]
+               / state->cfg.steps_per_mm[AXIS_Z]),
+              (1.0f * state->machine_position[AXIS_E]
+               / state->cfg.steps_per_mm[AXIS_E]));
+      break;
+    case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
+    default:  fprintf(state->msg_stream,
+                      "// BeagleG: didn't understand ('%c', %d, '%s')\n",
+                      letter, (int) value, remaining);
+      break;
+    }
   }
   return NULL;
 }
@@ -157,6 +183,9 @@ static void move_machine_steps(struct PrinterState *state,
   if (!any_work) {
     return;  // Nothing to do.
   }
+
+  // Aux bits are set synchronously with what we need.
+  command.aux_bits = state->aux_bits;
 
   // The defining axis is the axis that requires to go the most number of steps.
   // it defines the frequency to go.

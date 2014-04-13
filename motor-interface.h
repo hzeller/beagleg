@@ -33,6 +33,8 @@ struct bg_movement {
 
   float acceleration;        // steps/s^2
 
+  unsigned char aux_bits;   // Aux-bits to switch.
+
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 

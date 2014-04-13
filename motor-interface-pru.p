@@ -45,7 +45,7 @@
 	.u16 loops_travel	 // Phase 2: steps spent in travel.
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 
-	.u16 padding		 // not used right now.
+	.u16 aux		 // lowest two bits only used.
 	
 	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
@@ -254,6 +254,7 @@ STEP_GEN:
 	;; is some time after we set the direction bit. Good, because the Allegro
 	;; chip requires this time delay.
 	ZERO &r1, 4
+	LSL r1, travel_params.aux, AUX_1_BIT
 	UpdateMotor r1, r5, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
 	UpdateMotor r1, r5, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
 	UpdateMotor r1, r5, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT

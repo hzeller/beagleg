@@ -40,6 +40,9 @@
 #define MOTOR_7_STEP_BIT 15
 #define MOTOR_8_STEP_BIT 20
 
+#define AUX_1_BIT 30
+#define AUX_2_BIT 31
+
 // GPIO-0 - input bits.
 #define STOP_1_BIT 23
 #define STOP_2_BIT 26

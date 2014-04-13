@@ -51,19 +51,19 @@
 		    0x078 0x17 /* GPIO1[28] Motor Enable, pull up */
 		    
 		    /* Aux */
-		    0x070 0x07 /* GPIO0[30]; AUX 1 */
-		    0x074 0x07 /* GPIO0[31]; AUX 2 */
+		    0x070 0x07 /* GPIO0[30], pull-down; AUX 1 */
+		    0x074 0x07 /* GPIO0[31], pull-down; AUX 2 */
 
 		    /* end-switches: GPIO-0 23, 26, 27 */
-		    0x024 0x37  /* GPIO0[23], pullup; end-x */
-		    0x028 0x37  /* GPIO0[26], pullup; end-y */
-		    0x02c 0x37  /* GPIO0[27], pullup; end-z */
+		    0x024 0x37  /* GPIO0[23], pull-up; end-x */
+		    0x028 0x37  /* GPIO0[26], pull-up; end-y */
+		    0x02c 0x37  /* GPIO0[27], pull-up; end-z */
 
 		    /* PWM outputs */
-		    0x090 0x02 /* Timer 4, pull down; PWM_3 */
-		    0x09c 0x02 /* Timer 5, pull down; PWM_1 */
-		    0x098 0x02 /* Timer 6, pull down; PWM_2 */
-		    0x094 0x02 /* Timer 7, pull down; PWM_4 */
+		    0x090 0x02 /* Timer 4, pull-down; PWM_3 */
+		    0x09c 0x02 /* Timer 5, pull-down; PWM_1 */
+		    0x098 0x02 /* Timer 6, pull-down; PWM_2 */
+		    0x094 0x02 /* Timer 7, pull-down; PWM_4 */
                 >;
             };
         };

@@ -116,6 +116,7 @@ Command          | Description
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
+M42 Pnn Sxx      | Set AUX Pin nn (range: 0..1) to value xx (binary value 0..1); happens synchronously with next move.
 
 ###Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `machine-control`: they are

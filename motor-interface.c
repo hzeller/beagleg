@@ -79,7 +79,7 @@ struct QueueElement {
   uint16_t loops_accel;    // Phase 1: loops spent in acceleration
   uint16_t loops_travel;   // Phase 2: lops spent in travel
   uint16_t loops_decel;    // Phase 3: loops spent in deceleration
-  uint16_t padding;
+  uint16_t aux;            // right now: only lowest 2 bits.
   uint32_t accel_series_index;  // index in taylor
 
   uint32_t hires_accel_cycles;  // acceleration delay cycles.
@@ -287,6 +287,8 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   new_element.travel_delay_cycles = cycles_per_second() 
     / (LOOPS_PER_STEP * travel_speed);
 
+  new_element.aux = param->aux_bits;
+
   new_element.state = STATE_FILLED;
   enqueue_element(&new_element);
   return 0;
@@ -334,7 +336,7 @@ int beagleg_init(float min_accel) {
 
   // Prepare all the pins we need for output. All the other bits are inputs,
   // so the STOP bits are automatically prepared for input.
-  gpio_0[GPIO_OE/4] = ~MOTOR_OUT_BITS;  // contains stop bits.
+  gpio_0[GPIO_OE/4] = ~(MOTOR_OUT_BITS | (1 << AUX_1_BIT) | (1 << AUX_2_BIT));
   gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
 
   beagleg_motor_enable_internal_nowait(0);  // motors off initially.
