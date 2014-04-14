@@ -67,7 +67,7 @@
 // more than one bit output per step (probably only with hand-built drivers).
 #define LOOPS_PER_STEP (1 << 1)
 
-#define DEBUG_QUEUE
+//#define DEBUG_QUEUE
 #define PRU_NUM 0
 
 struct QueueElement {
