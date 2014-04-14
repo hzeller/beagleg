@@ -25,13 +25,13 @@ enum {
 };
 
 struct bg_movement {
-  // Speed is steps/second of the axis with the highest number of steps. All
-  // other axes are scaled down accordingly.
+  // Speed is steps/second of the axis with the highest number of steps, which
+  // is the fastest axis. All other axes are scaled down accordingly.
   float start_speed;
   float travel_speed;
   float end_speed;
 
-  float acceleration;        // steps/s^2
+  float acceleration;       // steps/s^2 for fastest axis.
 
   unsigned char aux_bits;   // Aux-bits to switch.
 

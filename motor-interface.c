@@ -108,7 +108,7 @@ struct PRUCommunication {
 
 // State of motor interface. TODO: put all in one struct instead of storing
 // multiple toplevel fields.
-static float max_speed_;
+static float hardware_frequency_limit_;
 static volatile struct PRUCommunication *pru_data_;
 static unsigned int queue_pos_;
 
@@ -197,9 +197,9 @@ static void enqueue_element(struct QueueElement *element) {
 #endif
 }
 
-// Clip speed to maximum we can reach.
-static float clip_speed(float v) {
-  return v < max_speed_ ? v : max_speed_;
+// Clip speed to maximum we can reach with hardware.
+static float clip_hardware_frequency_limit(float v) {
+  return v < hardware_frequency_limit_ ? v : hardware_frequency_limit_;
 }
 
 // Is acceleration in acceptable range ?
@@ -243,7 +243,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     new_element.fractions[i] = delta * max_fraction / defining_axis_steps;
   }
 
-  const float travel_speed = clip_speed(param->travel_speed);
+  const float travel_speed = clip_hardware_frequency_limit(param->travel_speed);
 
   // Calculate speeds
   // First step while exerpimenting: assume start/endspeed always 0.
@@ -327,7 +327,7 @@ static void beagleg_motor_enable_internal_nowait(char on) {
 int beagleg_init(float min_accel) {
   if (!test_acceleration_ok(min_accel))
     return 1;
-  max_speed_ = 1e6;    // Don't go over 1 Mhz
+  hardware_frequency_limit_ = 1e6;    // Don't go over 1 Mhz
 
   if (!map_gpio()) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
