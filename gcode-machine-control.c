@@ -483,7 +483,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
     }
     if (s_mstate->axis_to_driver[axis] > -1) {
       fprintf(stderr, "Axis '%c' given multiple times, "
-              "can only be mapped once.\n", toupper(*axis_mapping));
+              "but mirroring not yet supported.\n", toupper(*axis_mapping));
       return cleanup_state();
     }
     s_mstate->axis_to_driver[axis] = pos_to_driver[pos];
