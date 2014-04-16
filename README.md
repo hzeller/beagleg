@@ -56,16 +56,18 @@ which provides the pasm PRU assembler and the library to push this code to the
 PRU.
 
     # Check out and build am335 package
-    git clone git@github.com:beagleboard/am335x_pru_package.git
+    git clone https://github.com/beagleboard/am335x_pru_package.git
     cd am335x_pru_package/
     cd pru_sw/utils/pasm_source ; ./linuxbuild ; cd -
     CROSS_COMPILE="" make -C pru_sw/app_loader/interface/
     cd ..
 
     # Check out BeagleG and build
-    git clone git@github.com:hzeller/beagleg.git
+    git clone https://github.com/hzeller/beagleg.git
     cd beagleg
     make
+
+(If you are a github user, you might want to use the git protocol).
 
 If you run into compile problems, make sure to have both, am335x_pru_package and
 beagleg up-to-date from git.
