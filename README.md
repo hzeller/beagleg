@@ -16,8 +16,8 @@ So: sufficient even for advanced step motors and drivers :)
 The [acceleration - travel - deceleration] motion profile is entirely
 created within the PRU from parameters sent by the host CPU (i.e. BeagleBone ARM)
 via a ring-buffer.
-The host CPU prepares the data, such as parsing the G-Code and doing travel
-planning, while all the real-time critical parts are
+The host CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
+doing travel planning, while all the real-time critical parts are
 done in the PRU. The host program needs less than 1% CPU-time processing a
 typical G-Code file.
 
@@ -29,15 +29,17 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - `motor-interface.h` : Low-level motor move C-API to enqueue motor moves,
-      that are executed in the PRU.
+   - [motor-interface.h](./motor-interface.h) : Low-level motor move C-API to
+      enqueue motor moves, that are executed in the PRU.
 
-   - `gcode-parser.h` : C-API for parsing G-Code and calls callbacks, while
-      taking care of many internals, e.g. it automatically translates everything
-      into metric, absolute coordinates.
+   - [gcode-parser.h](./gcode-parser.h) : C-API for parsing
+      [G-Code](./G-code.md) that calls callback parse events, while taking
+      care of many internals, e.g. it automatically translates
+      everything into metric, absolute coordinates.
 
-   - `gcode-machine-control.h` : highlevel C-API to control a machine via
-      G-Code: it reads G-Code and emits the necessary machine commands.
+   - [gcode-machine-control.h](./machine-control.h) : highlevel C-API to
+      control a machine via G-Code: it reads G-Code from a stream and emits
+      the necessary machine commands.
       Depends on the motor-interface and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
@@ -80,12 +82,11 @@ overlay.
 
     sudo ./beagleg-cape-pinmux.sh
 
-(Right now, this is needed after every boot of the BBB. It is simple to do that
- automatically on boot-up, but haven't gotten around to it yet).
+See below to enable the cape at boot time.
 
 ## Machine control binary
-To control a machine with G-Code, use `machine-control`. This interpreter either
-takes a filename or a TCP port to listen on.
+To control a machine with G-Code, use the `machine-control` binary.
+This either takes a filename or a TCP port to listen on.
 
     Usage: ./machine-control [options] [<gcode-filename>]
     Options:
@@ -101,13 +102,18 @@ takes a filename or a TCP port to listen on.
       -P                        : Verbose: Print motor commands (Default: off).
       -S                        : Synchronous: don't queue (Default: off).
       -R                        : Repeat file forever.
-    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C
+    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
     You can either specify --port <port> to listen for commands or give a filename
 
-The G-Code understands axes X, Y, Z, E, A, B, C and maps them to stepper channels
-[0..6], which can be changed with the `--axis-mapping` flag. This flag
-maps the logical axis (such as 'Y') to a physical connector location on the
-cape - the position in the string represents the position of the connector.
+The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
+while `machine-control` maps these to physical output connectors,
+by default "XYZEA".
+This can be changed with the `--axis-mapping` flag. This flag maps the
+logical axis (such as 'Y') to a physical connector location on the
+cape -- the position in the string represents the position of the connector.
+
+More details about the G-Code code parsed and handled can be found in the
+[G-Code documentation](./G-code.md).
 
 ### Examples
 
@@ -115,6 +121,12 @@ cape - the position in the string represents the position of the connector.
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
+
+    echo "G1 X100 F10000 G1 X0 F1000" | sudo ./machine-control /dev/stdin
+
+This command directly executes some GCode coming from stdin. This is in
+particular useful when you're calibrating your machine and need to work on
+little tweaks.
 
     sudo ./machine-control --port 4444
 
@@ -165,6 +177,17 @@ tree overlay. Just run the script beagleg-cape-pinmux.sh as root
 
     sudo ./beagleg-cape-pinmux.sh
 
+This registers the cape, as you can confirm by looking at the slots:
+
+    $ cat /sys/devices/bone_capemgr.*/slots 
+     0: 54:PF--- 
+     1: 55:PF--- 
+     2: 56:PF--- 
+     3: 57:PF--- 
+     4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
+     5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
+     8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
+
 Now, all pins are mapped to be used by beagleg. This is the pinout
 
        Driver channel |  0     1     2     3     4      5     6     7
@@ -211,6 +234,41 @@ At the middle/bottom of the test board you see a headpone connector: many of
 the early experiments didn't have yet a stepper motor installed, but just
 listening to the step-frequency.
 
+Not yet supported, coming soon:
+   * More PINS of GPIO-0 will be used
+       * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors at the bottom left on the [Bumps board][bumps].
+       * 3 end-switch inputs on GPIO-0 23, 26, 27
+   * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors on the Bumps board (connector top left).w
+   * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
+
+## Load cape device tree at bootup
+While loading the pinmux manually with
+
+    sudo ./beagleg-cape-pinmux.sh
+
+initializes the pinmux now, we have to do this every time after boot. Also,
+we'd like to have the cape installed as early as possible in the boot process
+to properly set all the output values to safe values.
+
+For that, we essentially have to add
+
+    optargs=capemgr.enable_partno=BeagleG
+
+To the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
+
+The kernel looks for the firmware in /lib/firmware - since at boot time the
+root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
+to have it in the uInitrd filesystem.
+
+There is a script that does both of these things. This might depend on your
+distribution, so take a look at the script first to check that it does what
+it should do (it will abort on the first error, so probably it won't do damage).
+
+    sudo ./beagleg-install-cape.sh BeagleG-00A0.dtbo
+
+After a reboot, you should see the cape to be enabled early on in the boot
+process (Power PWM LEDs switch off).
+
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
 file e.g. estimated print-time, Object height (=maximum Z-axis), filament
@@ -227,7 +285,10 @@ For instance, from a bunch of gcode files, find the one that takes the longest
 time
 
     ./gcode-print-stats *.gcode | sort -k2 -n
-    
+   
+*Note: this binary is currently not taking acceleration into account, so the
+ estimated times are off*
+
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

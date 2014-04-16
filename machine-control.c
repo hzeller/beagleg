@@ -32,7 +32,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "determine-print-stats.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
 #include "motor-interface.h"
@@ -41,13 +40,13 @@
 
 // All these settings are in sequence of enum GCodeParserAxes: XYZEABC
 static const float kMaxFeedrate[GCODE_NUM_AXES] =
-  {  200,  200,  90,     10, 0, 0, 0 };
+  {  200,  200,  90,     10, 1, 0, 0 };
 
 static const float kDefaultAccel[GCODE_NUM_AXES]=
-  { 4000, 4000, 1000, 10000, 0, 0, 0 };
+  { 4000, 4000, 1000, 10000, 1, 0, 0 };
 
 static const float kStepsPerMM[GCODE_NUM_AXES]  =
-  {  160,  160,  160,    40, 0, 0, 0 };
+  {  160,  160,  160,    40, 1, 0, 0 };
 
 static const enum HomeType kHomePos[GCODE_NUM_AXES] =
   { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
@@ -56,24 +55,12 @@ static const enum HomeType kHomePos[GCODE_NUM_AXES] =
 static const float kMoveRange[GCODE_NUM_AXES] =
   { 100, 100, 100, -1, -1, -1, -1 };
 
-static const float kFilamentDiameter = 1.7;  // mm
+// This is the channel layout on the Bumps-board ( github.com/hzeller/bumps ),
+// currently the only cape existing for BeagleG, so we can as well hardcode it.
+static const char kChannelLayout[] = "23140";
 
-static void print_file_stats(const char *filename,
-			     struct MachineControlConfig *config) {
-  struct BeagleGPrintStats result;
-  if (determine_print_stats(open(filename, O_RDONLY),
-			    config->max_feedrate[AXIS_X], config->speed_factor,
-			    &result) == 0) {
-    const float filament_volume
-      = kFilamentDiameter*kFilamentDiameter/4 * M_PI * result.filament_len;
-    printf("----------------------------------------------\n");
-    printf("Print time: %.3f seconds; height: %.1fmm; max feedrate: %.1fmm/s; "
-	   "filament length: %.1fmm (volume %.2fcm^3).\n",
-	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
-	   result.filament_len, filament_volume / 1000);
-    printf("----------------------------------------------\n");
-  }
-}
+// Output mapping from left to right.
+static const char kAxisMapping[] = "XYZEA";
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {
@@ -113,7 +100,7 @@ static int usage(const char *prog, const char *msg) {
 	  "  -R                        : Repeat file forever.\n",
 	  prog);
   fprintf(stderr, "All comma separated axis numerical values are in the "
-	  "sequence X,Y,Z,E,A,B,C\n");
+	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands "
 	  "or give a filename\n");
   return 1;
@@ -213,8 +200,8 @@ int main(int argc, char *argv[]) {
   config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
-  config.channel_layout = "23140";  // Bumps layout ( github.com/hzeller/bumps )
-  config.axis_mapping = "XYZEA";    // Interesting for user: where is my axis..
+  config.channel_layout = kChannelLayout;
+  config.axis_mapping = kAxisMapping;
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -249,32 +236,34 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
     case 'm':
-      parse_count = parse_float_array(optarg, config.max_feedrate, 8);
+      parse_count = parse_float_array(optarg, config.max_feedrate,
+                                      GCODE_NUM_AXES);
       if (!parse_count) return usage(argv[0], "max-feedrate missing.");
       break;
     case 'a':
-      parse_count = parse_float_array(optarg, config.acceleration, 8);
+      parse_count = parse_float_array(optarg, config.acceleration,
+                                      GCODE_NUM_AXES);
       if (!parse_count) return usage(argv[0], "Acceleration missing.");
       // Negative or 0 means: 'infinite'.
       break;
     case SET_STEPS_MM:
-      if (!parse_float_array(optarg, config.steps_per_mm, 8))
+      if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
     case SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);
       break;
     case SET_HOME_POS: {
-      float tmp[8];
+      float tmp[GCODE_NUM_AXES];
       bzero(tmp, sizeof(tmp));
-      if (!parse_float_array(optarg, tmp, 8))
+      if (!parse_float_array(optarg, tmp, GCODE_NUM_AXES))
 	return usage(argv[0], "Failed to parse home switch.");
-      for (int i = 0; i < 8; ++i)
+      for (int i = 0; i < GCODE_NUM_AXES; ++i)
 	config.home_switch[i] = (enum HomeType) tmp[i];
     }
       break;
     case 'r':
-      if (!parse_float_array(optarg, config.move_range_mm, 8))
+      if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "Failed to parse ranges.");
       break;
     case 'n':
@@ -315,7 +304,6 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    print_file_stats(filename, &config);
     ret = send_file_to_machine(filename, do_file_repeat);
   } else {
     ret = run_server(bind_addr, listen_port);

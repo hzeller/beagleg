@@ -23,19 +23,33 @@
  * and calls callbacks on changes.
  * All un-implemented G- and M-Codes are sent back via a callback for the
  * user to handle.
+ *
+ * See G-code.md for documentation.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 
-typedef struct GCodeParser GCodeParser_t;  // Opaque type with the parser object.
+typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
+
+typedef uint32_t AxisBitmap_t;
 
 // Axis supported by this parser.
-enum GCodeParserAxes {
+enum GCodeParserAxis {
   AXIS_X, AXIS_Y, AXIS_Z,
   AXIS_E,
   AXIS_A, AXIS_B, AXIS_C,
+  AXIS_U, AXIS_V, AXIS_W,
   GCODE_NUM_AXES
 };
+
+// Maps axis enum to letter. AXIS_Z -> 'Z'
+char gcodep_axis2letter(enum GCodeParserAxis axis);
+
+// Case-insensitively maps an axis letter to the GCodeParserAxis enumeration 
+// value.
+// Returns GCODE_NUM_AXES on invalid character.
+enum GCodeParserAxis gcodep_letter2axis(char letter);
 
 // Callbacks called by the parser and to be implemented by the user
 // with meaningful actions.
@@ -48,7 +62,7 @@ enum GCodeParserAxes {
 // in the constructor in gcodep_new().
 struct GCodeParserCb {
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  void (*go_home)(void *, unsigned char axis_bitmap);
+  void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
@@ -63,7 +77,7 @@ struct GCodeParserCb {
   // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
-  // by GCodeParserAxes.
+  // by GCodeParserAxis.
   void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
   void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
 

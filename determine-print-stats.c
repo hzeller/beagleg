@@ -32,7 +32,7 @@ struct StatsData {
   struct BeagleGPrintStats *stats;
 };
 
-static void dummy_home(void *userdata, unsigned char x) {}
+static void dummy_home(void *userdata, AxisBitmap_t x) {}
 static const char *dummy_unprocessed(void *userdata, char letter, float value,
 				     const char *remaining) { return remaining; }
 static void dummy_setvalue(void *userdata, float v) {}

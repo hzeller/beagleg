@@ -4,6 +4,7 @@
 # video http://www.youtube.com/watch?v=wui_wU1AeQc
 ##
 
+VERBOSE=0
 BIN_DTB=BeagleG-00A0.dtbo
 
 if [ ! -e $BIN_DTB ] ; then
@@ -20,10 +21,12 @@ OFFSETS_800=$(for f in $(cat BeagleG.dts | grep 0x | awk '{print $1}') ; do \
                  printf "%0d" $f | awk '{printf("44e10%03x\n", $1 + 2048)}'; \
               done)
 
-echo "This is how these pins look before."
-for f in $OFFSETS_800 ; do
-    grep $f $PINS
-done
+if [ $VERBOSE -ne 0 ] ; then
+    echo "This is how these pins look before."
+    for f in $OFFSETS_800 ; do
+	grep $f $PINS
+    done
+fi
 
 cp $BIN_DTB /lib/firmware
 
@@ -32,9 +35,12 @@ echo "Adding BeagleG overlay"
 echo "BeagleG" > $SLOTS
 cat $SLOTS
 
-echo
-echo "This is how these pins look afterwards. They should all have mode 00000007"
-for f in $OFFSETS_800 ; do
-    grep $f $PINS
-done
+if [ $VERBOSE -ne 0 ] ; then
+    echo
+    echo "This is how these pins look afterwards."
+    for f in $OFFSETS_800 ; do
+	grep $f $PINS
+    done
+fi
+
 

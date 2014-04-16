@@ -58,6 +58,9 @@ struct PrinterState {
   float current_feedrate_mm_per_sec;
   float prog_speed_factor;               // Speed factor set by program (M220)
   int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
+  int direction_flip[GCODE_NUM_AXES];    // 1 or -1 for direction flip
+  unsigned int aux_bits;                 // set with M42
+
   FILE *msg_stream;
 };
 
@@ -113,26 +116,50 @@ static void motors_enable(void *userdata, char b) {
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->msg_stream)
-    return NULL;
-  switch ((int) value) {
-  case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
-  case 114:
-    fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
-	    (1.0f * state->machine_position[AXIS_X]
-	     / state->cfg.steps_per_mm[AXIS_X]),
-	    (1.0f * state->machine_position[AXIS_Y]
-	     / state->cfg.steps_per_mm[AXIS_Y]),
-	    (1.0f * state->machine_position[AXIS_Z]
-	     / state->cfg.steps_per_mm[AXIS_Z]),
-	    (1.0f * state->machine_position[AXIS_E]
-	     / state->cfg.steps_per_mm[AXIS_E]));
-    break;
-  case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
-  default:  fprintf(state->msg_stream,
-		    "// BeagleG: didn't understand ('%c', %d, '%s')\n",
-		    letter, (int) value, remaining);
-    break;
+  if (letter == 'M') {
+
+    if ((int) value == 42) {
+      int pin = 0;
+      int aux_bit = 0;
+      for (;;) {
+        remaining = gcodep_parse_pair(remaining, &letter, &value,
+                                      state->msg_stream);
+        if (remaining == NULL) break;
+        if (letter == 'P') pin = value; 
+        else if (letter == 'S') aux_bit = value;
+        else break;
+      }
+      if (aux_bit) {
+        state->aux_bits |= 1 << pin;
+      } else {
+        state->aux_bits &= ~(1 << pin);
+      }
+      fprintf(stderr, "Setting bits to 0x%02x\n", state->aux_bits);
+      return remaining;
+    }
+
+    // The remaining codes are only useful when we have an output stream.
+    if (!state->msg_stream)
+      return NULL;
+    switch ((int) value) {
+    case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
+    case 114:
+      fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
+              (1.0f * state->machine_position[AXIS_X]
+               / state->cfg.steps_per_mm[AXIS_X]),
+              (1.0f * state->machine_position[AXIS_Y]
+               / state->cfg.steps_per_mm[AXIS_Y]),
+              (1.0f * state->machine_position[AXIS_Z]
+               / state->cfg.steps_per_mm[AXIS_Z]),
+              (1.0f * state->machine_position[AXIS_E]
+               / state->cfg.steps_per_mm[AXIS_E]));
+      break;
+    case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
+    default:  fprintf(state->msg_stream,
+                      "// BeagleG: didn't understand ('%c', %d, '%s')\n",
+                      letter, (int) value, remaining);
+      break;
+    }
   }
   return NULL;
 }
@@ -157,12 +184,15 @@ static void move_machine_steps(struct PrinterState *state,
     return;  // Nothing to do.
   }
 
+  // Aux bits are set synchronously with what we need.
+  command.aux_bits = state->aux_bits;
+
   // The defining axis is the axis that requires to go the most number of steps.
   // it defines the frequency to go.
-  enum GCodeParserAxes defining_axis = AXIS_X;
+  enum GCodeParserAxis defining_axis = AXIS_X;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (abs(axis_steps[i]) > abs(axis_steps[defining_axis]))
-      defining_axis = (enum GCodeParserAxes) i;
+      defining_axis = (enum GCodeParserAxis) i;
   }
 
   command.travel_speed
@@ -217,7 +247,7 @@ static void move_machine_steps(struct PrinterState *state,
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     const int motor_for_axis = state->axis_to_driver[i];
     if (motor_for_axis < 0) continue;  // no mapping.
-    command.steps[motor_for_axis] = axis_steps[i];
+    command.steps[motor_for_axis] = state->direction_flip[i] * axis_steps[i];
   }
 
   if (!state->cfg.dry_run) {
@@ -305,7 +335,7 @@ static void machine_set_speed_factor(void *userdata, float value) {
   state->prog_speed_factor = value;
 }
 
-static void machine_home(void *userdata, unsigned char axes_bitmap) {
+static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
@@ -348,7 +378,7 @@ static int cleanup_state() {
   return 1;
 }
 
-int gcode_machine_control_init(const struct MachineControlConfig *config) {
+int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
   if (s_mstate != NULL) {
     fprintf(stderr, "gcode_machine_control_init(): already initialized.\n");
     return 1;
@@ -357,18 +387,36 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   // Initialize basic state and derived configuration.
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
   bzero(s_mstate, sizeof(*s_mstate));
+
+  // Always keep the steps_per_mm positive, but extract direction for
+  // final assignment to motor.
+  struct MachineControlConfig cfg = *config_in;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    s_mstate->direction_flip[i] = cfg.steps_per_mm[i] < 0 ? -1 : 1;
+    cfg.steps_per_mm[i] = fabs(cfg.steps_per_mm[i]);
+    if (cfg.max_feedrate[i] < 0) {
+      fprintf(stderr, "Invalid negative feedrate %.1f for axis %c\n",
+              cfg.max_feedrate[i], gcodep_axis2letter(i));
+      return cleanup_state();
+    }
+    if (cfg.acceleration[i] < 0) {
+      fprintf(stderr, "Invalid negative acceleration %.1f for axis %c\n",
+              cfg.acceleration[i], gcodep_axis2letter(i));
+      return cleanup_state();
+    }
+  }
+
   // Here we assign it to the 'const' cfg, all other accesses will check for
   // the readonly ness. So some nasty override here: we know what we're doing.
-  *((struct MachineControlConfig*) &s_mstate->cfg) = *config;
-  s_mstate->current_feedrate_mm_per_sec = config->max_feedrate[AXIS_X] / 10;
-  float lowest_accel
-    = config->max_feedrate[AXIS_X] * config->steps_per_mm[AXIS_X];
+  *((struct MachineControlConfig*) &s_mstate->cfg) = cfg;
+  s_mstate->current_feedrate_mm_per_sec = cfg.max_feedrate[AXIS_X] / 10;
+  float lowest_accel = cfg.max_feedrate[AXIS_X] * cfg.steps_per_mm[AXIS_X];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (config->max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec)
-      s_mstate->g0_feedrate_mm_per_sec = config->max_feedrate[i];
-    s_mstate->max_axis_speed[i]
-      = config->max_feedrate[i] * config->steps_per_mm[i];
-    float accel = config->acceleration[i] * config->steps_per_mm[i];
+    if (cfg.max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec) {
+      s_mstate->g0_feedrate_mm_per_sec = cfg.max_feedrate[i];
+    }
+    s_mstate->max_axis_speed[i] = cfg.max_feedrate[i] * cfg.steps_per_mm[i];
+    const float accel = cfg.acceleration[i] * cfg.steps_per_mm[i];
     s_mstate->max_axis_accel[i] = accel;
     if (accel > s_mstate->highest_accel)
       s_mstate->highest_accel = accel;
@@ -392,7 +440,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
     pos_to_driver[i] = -1;
   }
-  const char *physical_mapping = config->channel_layout;
+  const char *physical_mapping = cfg.channel_layout;
   if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
   if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
     fprintf(stderr, "Physical mapping string longer than available motors. "
@@ -415,30 +463,54 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     s_mstate->axis_to_driver[i] = -1;
   }
-  const char *axis_mapping = config->axis_mapping;
+  const char *axis_mapping = cfg.axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
-  if (strlen(axis_mapping) > BEAGLEG_NUM_MOTORS) {
-    fprintf(stderr, "Axis mapping string longer than available connectors."
-            "('%s', max axes=%d)\n", axis_mapping, BEAGLEG_NUM_MOTORS);
-    return cleanup_state();
-  }
   for (int pos = 0; *axis_mapping; pos++, axis_mapping++) {
-    switch (toupper(*axis_mapping)) {
-    case 'X': s_mstate->axis_to_driver[AXIS_X] = pos_to_driver[pos]; break;
-    case 'Y': s_mstate->axis_to_driver[AXIS_Y] = pos_to_driver[pos]; break;
-    case 'Z': s_mstate->axis_to_driver[AXIS_Z] = pos_to_driver[pos]; break;
-    case 'E': s_mstate->axis_to_driver[AXIS_E] = pos_to_driver[pos]; break;
-    case 'A': s_mstate->axis_to_driver[AXIS_A] = pos_to_driver[pos]; break;
-    case 'B': s_mstate->axis_to_driver[AXIS_B] = pos_to_driver[pos]; break;
-    case 'C': s_mstate->axis_to_driver[AXIS_C] = pos_to_driver[pos]; break;
-    case '_': break;  // skip.
-    default:
-      fprintf(stderr, "Illegal axis->connector mapping character '%c' in '%s' "
-	      "(Only valid axis letter or '_' to skip a connector)\n",
-	      toupper(*axis_mapping), config->axis_mapping);
+    if (pos > BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
+      fprintf(stderr, "Axis mapping string has more elements than available %d "
+              "connectors (remaining=\"..%s\").\n", pos, axis_mapping);
       return cleanup_state();
     }
+    if (*axis_mapping == '_')
+      continue;
+    const enum GCodeParserAxis axis = gcodep_letter2axis(*axis_mapping);
+    if (axis == GCODE_NUM_AXES) {
+      fprintf(stderr,
+              "Illegal axis->connector mapping character '%c' in '%s' "
+              "(Only valid axis letter or '_' to skip a connector).\n",
+              toupper(*axis_mapping), cfg.axis_mapping);
+      return cleanup_state();
+    }
+    if (s_mstate->axis_to_driver[axis] > -1) {
+      fprintf(stderr, "Axis '%c' given multiple times, "
+              "but mirroring not yet supported.\n", toupper(*axis_mapping));
+      return cleanup_state();
+    }
+    s_mstate->axis_to_driver[axis] = pos_to_driver[pos];
   }
+
+  // Now let's see what motors are mapped to any useful output.
+  if (s_mstate->cfg.debug_print) fprintf(stderr, "-- Config --\n");
+  int error_count = 0;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (s_mstate->axis_to_driver[i] < 0)
+      continue;
+    char is_error = (s_mstate->cfg.steps_per_mm[i] <= 0
+                     || s_mstate->cfg.max_feedrate[i] <= 0);
+    if (s_mstate->cfg.debug_print || is_error) {
+      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %7.3f steps/mm%s\n",
+              gcodep_axis2letter(i), s_mstate->cfg.max_feedrate[i],
+              s_mstate->cfg.acceleration[i],
+              s_mstate->cfg.steps_per_mm[i],
+              s_mstate->direction_flip[i] < 0 ? " (reversed)" : "");
+    }
+    if (is_error) {
+      fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
+      ++error_count;
+    }
+  }
+  if (error_count)
+    return cleanup_state();
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
@@ -460,7 +532,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config) {
   s_mstate->parser = gcodep_new(&callbacks, s_mstate);
 
   // Init motor control.
-  if (!config->dry_run) {
+  if (!cfg.dry_run) {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
       // to just access these GPIOs.

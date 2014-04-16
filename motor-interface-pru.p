@@ -28,6 +28,7 @@
 #define GPIO_1 0x4804c000	; memory space mapped to GPIO-1
 
 #define GPIO_DATAOUT 0x13c      ; Set all the bits
+#define GPIO_DATAIN  0x138
 
 #define PRU0_ARM_INTERRUPT 19
 #define CONST_PRUDRAM	   C24
@@ -44,7 +45,7 @@
 	.u16 loops_travel	 // Phase 2: steps spent in travel.
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 
-	.u16 padding		 // not used right now.
+	.u16 aux		 // lowest two bits only used.
 	
 	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
@@ -137,7 +138,7 @@ PHASE_2_TRAVEL:		; ==================================================
 	QBEQ PHASE_3_DECELERATION, params.loops_travel, 0
 	SUB params.loops_travel, params.loops_travel, 1	        ; loops_travel--
 	MOV output_reg, params.travel_delay_cycles
-	SUB output_reg, output_reg, (4 / 2)
+	SUB output_reg, output_reg, (4 / 2) ; substract cycles spent here
 	JMP DONE_CALCULATE_DELAY
 
 PHASE_3_DECELERATION:	; ==================================================
@@ -171,6 +172,22 @@ calc_decel:
 DONE_CALCULATE_DELAY:
 .endm
 
+// Only used once, just macro.
+// Preliminary, not yet really useful.
+.macro CheckStopSwitches
+.mparam output_register, scratch, input_location
+	LBBO scratch, input_location, 0, 4
+	QBBS switch_1_handled, scratch, STOP_1_BIT
+	ZERO &output_register, 4  ; todo set proper value
+switch_1_handled:
+	QBBS switch_2_handled, scratch, STOP_2_BIT
+	ZERO &output_register, 4   ; todo set proper value
+switch_2_handled:
+	QBBS switch_3_handled, scratch, STOP_3_BIT
+	ZERO &output_register, 4   ; todo: set proper value
+switch_3_handled:
+.endm
+	
 ;;; Update the state register of a motor with its 1.31 resolution fraction.
 ;;; The 31st bit contains the overflow that we're interested in.
 ;;; Uses a fixed number of 4 cycles
@@ -237,6 +254,7 @@ STEP_GEN:
 	;; is some time after we set the direction bit. Good, because the Allegro
 	;; chip requires this time delay.
 	ZERO &r1, 4
+	LSL r1, travel_params.aux, AUX_1_BIT
 	UpdateMotor r1, r5, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
 	UpdateMotor r1, r5, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
 	UpdateMotor r1, r5, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT
@@ -246,6 +264,9 @@ STEP_GEN:
 	UpdateMotor r1, r5, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
 	UpdateMotor r1, r5, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
+	MOV r6, GPIO_0 | GPIO_DATAIN
+	CheckStopSwitches r1, r5, r6
+	
 	SBBO r1, r4, 0, 4	; motor bits to GPIO-0
 
 	CalculateDelay r1, travel_params, r3, r5, r6
