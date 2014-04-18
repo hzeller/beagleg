@@ -134,7 +134,6 @@ static const char *special_commands(void *userdata, char letter, float value,
       } else {
         state->aux_bits &= ~(1 << pin);
       }
-      fprintf(stderr, "Setting bits to 0x%02x\n", state->aux_bits);
       return remaining;
     }
 
