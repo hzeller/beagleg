@@ -35,7 +35,7 @@ The functionality is encapsulated in independently usable APIs.
       care of many internals, e.g. it automatically translates
       everything into metric, absolute coordinates.
 
-   - [gcode-machine-control.h](./machine-control.h) : highlevel C-API to
+   - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C-API to
       control a machine via G-Code: it reads G-Code from a stream and emits
       the necessary machine commands.
       Depends on the motor-interface and gcode-parser APIs.
