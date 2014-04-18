@@ -24,8 +24,6 @@ typical G-Code file.
 The `machine-control` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit.
 
-*Note: the formally called `send-gcode` has been renamed to `machine-control`*
-
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
@@ -179,11 +177,11 @@ tree overlay. Just run the script beagleg-cape-pinmux.sh as root
 
 This registers the cape, as you can confirm by looking at the slots:
 
-    $ cat /sys/devices/bone_capemgr.*/slots 
-     0: 54:PF--- 
-     1: 55:PF--- 
-     2: 56:PF--- 
-     3: 57:PF--- 
+    $ cat /sys/devices/bone_capemgr.*/slots
+     0: 54:PF---
+     1: 55:PF---
+     2: 56:PF---
+     3: 57:PF---
      4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
      5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
      8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
@@ -263,6 +261,8 @@ to have it in the uInitrd filesystem.
 There is a script that does both of these things. This might depend on your
 distribution, so take a look at the script first to check that it does what
 it should do (it will abort on the first error, so probably it won't do damage).
+In particular the unpacking/repacking of the initrd file might be specific to
+your distribution.
 
     sudo ./beagleg-install-cape.sh BeagleG-00A0.dtbo
 
@@ -285,7 +285,7 @@ For instance, from a bunch of gcode files, find the one that takes the longest
 time
 
     ./gcode-print-stats *.gcode | sort -k2 -n
-   
+
 *Note: this binary is currently not taking acceleration into account, so the
  estimated times are off*
 
