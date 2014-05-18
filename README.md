@@ -113,6 +113,10 @@ cape -- the position in the string represents the position of the connector.
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).
 
+If you get an Bus error, have a look at this [Bus Error FYI][buserror] - this
+seems to happen on some machines and this needs to be fixed in the pinmux script,
+but have a look at the workaorund there.
+
 ### Examples
 
     sudo ./machine-control -f 10 -m 1000 -R myfile.gcode
@@ -307,3 +311,4 @@ the Free Software Foundation, either version 3 of the License, or
 [manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
 [bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
 [bumps]: https://github.com/hzeller/bumps
+[buserror]: https://github.com/hzeller/beagleg/issues/4
