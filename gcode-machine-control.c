@@ -86,6 +86,11 @@ static void disarm_signal_handler() {
   signal(SIGINT, SIG_DFL);   // Ctrl-C
 }
 
+static void send_ok(struct PrinterState *state) {
+  if (state && state->msg_stream)
+    fprintf(state->msg_stream, "ok\n");
+}
+
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
   struct PrinterState *state = (struct PrinterState*)userdata;
@@ -93,6 +98,7 @@ static void dummy_set_temperature(void *userdata, float f) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
   }
+  send_ok(state);
 }
 static void dummy_set_fanspeed(void *userdata, float speed) {
   struct PrinterState *state = (struct PrinterState*)userdata;
@@ -100,6 +106,7 @@ static void dummy_set_fanspeed(void *userdata, float speed) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
   }
+  send_ok(state);
 }
 static void dummy_wait_temperature(void *userdata) {
   struct PrinterState *state = (struct PrinterState*)userdata;
@@ -107,10 +114,12 @@ static void dummy_wait_temperature(void *userdata) {
     fprintf(state->msg_stream,
 	    "// BeagleG: wait_temperature() not implemented.\n");
   }
+  send_ok(state);
 }
 static void motors_enable(void *userdata, char b) {  
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (!state->cfg.dry_run) beagleg_motor_enable(b);
+  send_ok(state);
 }
 
 static const char *special_commands(void *userdata, char letter, float value,
@@ -143,7 +152,7 @@ static const char *special_commands(void *userdata, char letter, float value,
     switch ((int) value) {
     case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
     case 114:
-      fprintf(state->msg_stream, "ok C: X:%.3f Y:%.3f Z%.3f E%.3f\n",
+      fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\nok\n",
               (1.0f * state->machine_position[AXIS_X]
                / state->cfg.steps_per_mm[AXIS_X]),
               (1.0f * state->machine_position[AXIS_Y]
@@ -304,6 +313,7 @@ static void machine_G1(void *userdata, float feed, const float *axis) {
   }
   float feedrate = state->prog_speed_factor * state->current_feedrate_mm_per_sec;
   machine_move(userdata, feedrate, axis);
+  send_ok(state);
 }
 
 static void machine_G0(void *userdata, float feed, const float *axis) {
@@ -311,12 +321,14 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
   float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   machine_move(userdata, given > 0 ? given : rapid_feed, axis);
+  send_ok(state);
 }
 
 static void machine_dwell(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
   if (!state->cfg.dry_run) beagleg_wait_queue_empty();
   usleep((int) (value * 1000));
+  send_ok(state);
 }
 
 static void machine_set_speed_factor(void *userdata, float value) {
@@ -332,6 +344,7 @@ static void machine_set_speed_factor(void *userdata, float value) {
     return;
   }
   state->prog_speed_factor = value;
+  send_ok(state);
 }
 
 static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
@@ -368,6 +381,7 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   }
   move_machine_steps(state, state->g0_feedrate_mm_per_sec,
 		     machine_pos_differences);
+  send_ok(state);
 }
 
 // Cleanup whatever is allocated. Return 1 for convenience in early exit.

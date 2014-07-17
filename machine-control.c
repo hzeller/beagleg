@@ -70,6 +70,7 @@ static int usage(const char *prog, const char *msg) {
 	  "Options:\n"
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated "
 	  "(Default 160,160,160,40,0, ...).\n"
+	  "                              (negative for reverse)\n"
 	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
 	  "comma separated (Default: 200,200,90,10,0, ...).\n"
 	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
@@ -101,8 +102,10 @@ static int usage(const char *prog, const char *msg) {
 	  prog);
   fprintf(stderr, "All comma separated axis numerical values are in the "
 	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
-  fprintf(stderr, "You can either specify --port <port> to listen for commands "
-	  "or give a filename\n");
+  fprintf(stderr, "(the actual mapping to a connector happens with "
+          "--axis-mapping)\n");
+  fprintf(stderr, "You can either specify --port <port> to listen "
+          "for commands or give a GCode-filename\n");
   return 1;
 }
 
