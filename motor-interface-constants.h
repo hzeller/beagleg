@@ -18,9 +18,9 @@
 
 // To be read by *.c and *.p file, so only // comments and simple defines.
 
-#define STATE_EMPTY  0
-#define STATE_FILLED 1
-#define STATE_EXIT   2
+#define STATE_EMPTY  0   // Queue element empty, ready to be filled by host
+#define STATE_FILLED 1   // Queue element filled by host, to be picked up by PRU
+#define STATE_EXIT   2   // Filled by host, no parameters; tells PRU to exit.
 
 #define QUEUE_LEN 16
 

@@ -52,7 +52,7 @@
 	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
 	.u32 travel_delay_cycles // Exact cycle value for travel (do not rely
-	                         // on approximation to exactly reach that)
+	                         // on accel approx to exactly reach that)
 	
 	// 1.31 Fixed point increments for each motor
 	.u32 fraction_1

@@ -72,7 +72,7 @@
 
 struct QueueElement {
   // Queue header
-  uint8_t state;
+  uint8_t state;           // see motor-interface-constants.h STATE_* constants.
   uint8_t direction_bits;
 
   // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
@@ -246,7 +246,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   const float travel_speed = clip_hardware_frequency_limit(param->travel_speed);
 
   // Calculate speeds
-  // First step while exerpimenting: assume start/endspeed always 0.
+  // First step while experimenting: assume start/endspeed always 0.
   // TODO: take these into account (requires acceleration planning)
   const int total_loops = LOOPS_PER_STEP * defining_axis_steps;
 
@@ -335,7 +335,7 @@ int beagleg_init(float min_accel) {
   }
 
   // Prepare all the pins we need for output. All the other bits are inputs,
-  // so the STOP bits are automatically prepared for input.
+  // so the STOP switch bits are automatically prepared for input.
   gpio_0[GPIO_OE/4] = ~(MOTOR_OUT_BITS | (1 << AUX_1_BIT) | (1 << AUX_2_BIT));
   gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
 

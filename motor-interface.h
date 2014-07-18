@@ -48,7 +48,7 @@ void beagleg_exit(void);  // shutdown motor control. Waits for queue to empty.
 void beagleg_exit_nowait(void);
 
 // Waits for the queue to be empty and Enables/disables motors according to
-// the given boolean value.
+// the given boolean value (Right now, motors cannot be individually addressed).
 void beagleg_motor_enable(char on);
 
 // Enqueue a coordinated move command.
