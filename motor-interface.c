@@ -67,7 +67,7 @@
 // more than one bit output per step (probably only with hand-built drivers).
 #define LOOPS_PER_STEP (1 << 1)
 
-//#define DEBUG_QUEUE
+#define DEBUG_QUEUE
 #define PRU_NUM 0
 
 struct QueueElement {
@@ -115,6 +115,8 @@ static unsigned int queue_pos_;
 // GPIO registers.
 volatile uint32_t *gpio_0 = NULL;
 volatile uint32_t *gpio_1 = NULL;
+
+static float sq(float x) { return x * x; }  // square a number
 
 // delay loops per second.
 static double cycles_per_second() { return 100e6; } // two cycles per loop.
@@ -202,6 +204,14 @@ static float clip_hardware_frequency_limit(float v) {
   return v < hardware_frequency_limit_ ? v : hardware_frequency_limit_;
 }
 
+static double calcAccelerationCurveValueAt(int index, double acceleration) {
+  // counter_freq * sqrt(2 / accleration)
+  const double accel_factor = cycles_per_second()
+    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration)) / LOOPS_PER_STEP;
+  const double c0 = accel_factor * 0.67605;
+  return c0 * (sqrt(index + 1) - sqrt(index));
+}
+
 // Is acceleration in acceptable range ?
 static char test_acceleration_ok(float acceleration) {
   if (acceleration <= 0)
@@ -211,10 +221,8 @@ static char test_acceleration_ok(float acceleration) {
   // DELAY_CYCLE_SHIFT) fits into 32 bit.
   // Also 2 additional bits headroom because we need to shift it by 2 in the
   // division.
-  const double accel_factor = cycles_per_second()
-    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration));
   const double start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
-    * accel_factor * 0.67605 / LOOPS_PER_STEP;
+    * calcAccelerationCurveValueAt(0, acceleration);
   if (start_accel_cycle_value > 0xFFFFFFFF) {
     fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
 	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
@@ -243,7 +251,15 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     new_element.fractions[i] = delta * max_fraction / defining_axis_steps;
   }
 
+  // TODO: clamp acceleration to be a minimum value.
   const float travel_speed = clip_hardware_frequency_limit(param->travel_speed);
+  const float v0 = param->start_speed;
+  const float v1 = param->end_speed;
+  if (v0 > travel_speed || v1 > travel_speed) {
+    fprintf(stderr, "Invalid parameters; v0=%.1f or v1=%.1f > than vt=%.1f\n",
+            v0, v1, travel_speed);
+    return 2;
+  }
 
   // Calculate speeds
   // First step while experimenting: assume start/endspeed always 0.
@@ -257,33 +273,38 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   }
   else {
     // Steps to reach requested speed at acceleration
-    // v = a*t -> t = v/a
-    // s = a/2 * t^2; subsitution t from above: s = v^2/(2*a)
-    const int accel_loops = LOOPS_PER_STEP * (travel_speed*travel_speed
-                                              / (2.0 * param->acceleration));
-    if (2 * accel_loops < total_loops) {
-      new_element.loops_accel = accel_loops;
-      new_element.loops_travel = total_loops - 2*accel_loops;
-      new_element.loops_decel = accel_loops;
-    }
-    else {
-      // We don't want deceleration have more steps than acceleration (the
-      // iterative approximation will not be happy), so let's make sure to have
-      // accel_steps >= decel_steps by using the fact that integer div
-      // essentially does floor()
-      new_element.loops_decel = total_loops / 2;
-      new_element.loops_travel = 0;
-      new_element.loops_accel = total_loops - new_element.loops_decel;
+    // v = v0 + a*t -> t = (v - v0)/a
+    // s = a/2 * t^2; subsitution t from above: s = (v - v0)^2/(2*a)
+    const int accel_loops_from_zero = LOOPS_PER_STEP *
+      (sq(travel_speed - 0) / (2.0 * param->acceleration));
+    const int accel_loops = LOOPS_PER_STEP *
+      (sq(travel_speed - v0) / (2.0 * param->acceleration));
+    const int decel_loops = LOOPS_PER_STEP *
+      (sq(travel_speed - v1) / (2.0 * param->acceleration));
+
+    // Check if we can reach the travel speed within the alotted time. If
+    // not, then this cannot really be handled here, but should've done
+    // in the planner already.
+    if (accel_loops + decel_loops > total_loops) {
+      fprintf(stderr, "Invalid parameters; steps: accel=%d decel=%d total=%d\n",
+              accel_loops, decel_loops, total_loops);
+      return 2;
     }
 
-    double accel_factor = cycles_per_second()
-      * (sqrt(LOOPS_PER_STEP * 2.0 / param->acceleration));
+    new_element.loops_accel = accel_loops;
+    new_element.loops_travel = total_loops - accel_loops - decel_loops;
+    new_element.loops_decel = decel_loops;
 
-    new_element.accel_series_index = 0;   // zero speed start
-    new_element.hires_accel_cycles = ((1 << DELAY_CYCLE_SHIFT)
-				      * accel_factor * 0.67605 / LOOPS_PER_STEP);
+    assert(accel_loops_from_zero >= new_element.loops_accel);
+    assert(accel_loops_from_zero >= new_element.loops_decel);
+    new_element.accel_series_index
+      = accel_loops_from_zero - new_element.loops_accel;
+    new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
+      * calcAccelerationCurveValueAt(new_element.accel_series_index,
+                                     param->acceleration);
   }
 
+  // Higher accuracy travel speed delay loop
   new_element.travel_delay_cycles = cycles_per_second() 
     / (LOOPS_PER_STEP * travel_speed);
 
@@ -324,6 +345,8 @@ static void beagleg_motor_enable_internal_nowait(char on) {
   gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
 }
 
+// TODO(hzeller): we shouldn't have min accel; we should just clamp it to the
+// value the machine can do. Doing that for incoming
 int beagleg_init(float min_accel) {
   if (!test_acceleration_ok(min_accel))
     return 1;

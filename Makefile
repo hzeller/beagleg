@@ -52,3 +52,4 @@ $(PRU_BIN) : motor-interface-constants.h
 
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN)
+

@@ -3,7 +3,7 @@ BeagleG
 
 Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
-acceleration and travel.
+acceleration and travel (right now: trapezoidal motion profile).
 
 See example here: http://www.youtube.com/watch?v=hIEY9077D64
 
