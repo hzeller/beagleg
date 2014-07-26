@@ -163,6 +163,7 @@ static const char *special_commands(void *userdata, char letter, float value,
                / state->cfg.steps_per_mm[AXIS_E]));
       break;
     case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
+    case 117: fprintf(state->msg_stream, "ok Msg: %s\n", remaining); break;
     default:  fprintf(state->msg_stream,
                       "// BeagleG: didn't understand ('%c', %d, '%s')\n",
                       letter, (int) value, remaining);
@@ -598,7 +599,7 @@ int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
   }
 
   arm_signal_handler();
-  char buffer[1024];
+  char buffer[8192];
   while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
     gcodep_parse_line(s_mstate->parser, buffer, s_mstate->msg_stream);
   }

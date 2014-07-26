@@ -33,8 +33,6 @@ struct StatsData {
 };
 
 static void dummy_home(void *userdata, AxisBitmap_t x) {}
-static const char *dummy_unprocessed(void *userdata, char letter, float value,
-				     const char *remaining) { return remaining; }
 static void dummy_setvalue(void *userdata, float v) {}
 static void dummy_noparam(void *userdata) {}
 static void dummy_motors_enable(void *userdata, char b) {}
@@ -94,6 +92,12 @@ static void duration_dwell(void *userdata, float value) {
   data->stats->total_time_seconds += value / 1000.0f;
 }
 
+static const char *ignore_other_commands(void *userdata,
+                                         char letter, float value,
+                                         const char *remaining) {
+  return NULL;
+}
+
 int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 			  struct BeagleGPrintStats *result) {
   struct StatsData data;
@@ -114,7 +118,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 
   // Not implemented
   callbacks.go_home = &dummy_home;
-  callbacks.unprocessed = &dummy_unprocessed;
+  callbacks.unprocessed = &ignore_other_commands;
   callbacks.set_fanspeed = &dummy_setvalue;
   callbacks.set_temperature = &dummy_setvalue;
   callbacks.motors_enable = &dummy_motors_enable;
@@ -126,7 +130,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
     return 1;
   }
   GCodeParser_t *parser = gcodep_new(&callbacks, &data);
-  char buffer[1024];
+  char buffer[8192];
   while (fgets(buffer, sizeof(buffer), f)) {
     gcodep_parse_line(parser, buffer, stderr);
   }
