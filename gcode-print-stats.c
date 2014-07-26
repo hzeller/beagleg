@@ -45,8 +45,8 @@ static void print_file_stats(const char *filename, int indentation,
 			    max_feedrate, speed_factor, &result) == 0) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s\t%9.3fs\t%6.1fmm\t%5.1fmm/s\t%7.1fmm", indentation, filename,
-	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
-	   result.filament_len);
+	   result.total_time_seconds, result.last_z_with_extrusion,
+           result.max_G1_feedrate, result.filament_len);
     printf("\n");
   } else {
     printf("#%s not-processed\n", filename);

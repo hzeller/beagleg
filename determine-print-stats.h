@@ -23,6 +23,7 @@ struct BeagleGPrintStats {
   // seen, that was capped to the provided max feedrate.
   float max_G1_feedrate;         // Max feedrate for G1 seen.
   float last_x, last_y, last_z;  // last coordinate.
+  float last_z_with_extrusion;   // Last z with extrusion = printed height.
   float filament_len;            // total filament length
 
 };

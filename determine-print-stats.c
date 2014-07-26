@@ -48,6 +48,9 @@ static void duration_move(struct BeagleGPrintStats *stats,
   stats->last_x = axis[AXIS_X];
   stats->last_y = axis[AXIS_Y];
   stats->last_z = axis[AXIS_Z];
+  if (axis[AXIS_E] > stats->filament_len) {
+    stats->last_z_with_extrusion = stats->last_z;
+  }
   stats->filament_len = axis[AXIS_E];
 }
 
