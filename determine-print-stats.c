@@ -49,7 +49,7 @@ static void duration_move(struct BeagleGPrintStats *stats,
   stats->last_y = axis[AXIS_Y];
   stats->last_z = axis[AXIS_Z];
   if (axis[AXIS_E] > stats->filament_len) {
-    stats->last_z_with_extrusion = stats->last_z;
+    stats->last_z_extruding = stats->last_z;
   }
   stats->filament_len = axis[AXIS_E];
 }
@@ -86,6 +86,10 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
   }
   if (feedrate > data->stats->max_G1_feedrate) {
     data->stats->max_G1_feedrate = feedrate;
+  }
+  if (axis[AXIS_E] > data->stats->filament_len
+      && feedrate > data->stats->max_G1_feedrate_extruding) {
+    data->stats->max_G1_feedrate_extruding = feedrate;
   }
   duration_move(data->stats, feedrate, axis);
 }
