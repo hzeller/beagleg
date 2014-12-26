@@ -38,7 +38,9 @@
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 struct PrinterState {
+  struct MotorControl *motor_control;
   const struct MachineControlConfig cfg;
+  
   // Derived configuration
   float g0_feedrate_mm_per_sec;          // Highest of all axes; used for G0
                                          // (will be trimmed if needed)
@@ -118,7 +120,7 @@ static void dummy_wait_temperature(void *userdata) {
 }
 static void motors_enable(void *userdata, char b) {  
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->cfg.dry_run) beagleg_motor_enable(b);
+  if (!state->cfg.dry_run) state->motor_control->motor_enable(b);
   send_ok(state);
 }
 
@@ -259,8 +261,8 @@ static void move_machine_steps(struct PrinterState *state,
   }
 
   if (!state->cfg.dry_run) {
-    if (state->cfg.synchronous) beagleg_wait_queue_empty();
-    beagleg_enqueue(&command, state->msg_stream);
+    if (state->cfg.synchronous) state->motor_control->wait_queue_empty();
+    state->motor_control->enqueue(&command, state->msg_stream);
   }
   
   if (state->cfg.debug_print && state->msg_stream) {
@@ -326,7 +328,7 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
 
 static void machine_dwell(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->cfg.dry_run) beagleg_wait_queue_empty();
+  if (!state->cfg.dry_run) state->motor_control->wait_queue_empty();
   usleep((int) (value * 1000));
   send_ok(state);
 }
@@ -391,7 +393,8 @@ static int cleanup_state() {
   return 1;
 }
 
-int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
+int gcode_machine_control_init(const struct MachineControlConfig *config_in,
+                               struct MotorControl *motor_control) {
   if (s_mstate != NULL) {
     fprintf(stderr, "gcode_machine_control_init(): already initialized.\n");
     return 1;
@@ -400,6 +403,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
   // Initialize basic state and derived configuration.
   s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
   bzero(s_mstate, sizeof(*s_mstate));
+  s_mstate->motor_control = motor_control;
 
   // Always keep the steps_per_mm positive, but extract direction for
   // final assignment to motor.
@@ -418,7 +422,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
       return cleanup_state();
     }
   }
-
+  
   // Here we assign it to the 'const' cfg, all other accesses will check for
   // the readonly ness. So some nasty override here: we know what we're doing.
   *((struct MachineControlConfig*) &s_mstate->cfg) = cfg;
@@ -544,20 +548,6 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in) {
   // track of the machine coordinates (steps). So it has the same life-cycle.
   s_mstate->parser = gcodep_new(&callbacks, s_mstate);
 
-  // Init motor control.
-  if (!cfg.dry_run) {
-    if (geteuid() != 0) {
-      // TODO: running as root is generally not a good idea. Setup permissions
-      // to just access these GPIOs.
-      fprintf(stderr, "Need to run as root to access GPIO pins. "
-	      "(use the dryrun option -n to not write to GPIO)\n");
-      return cleanup_state();
-    }
-    if (beagleg_init(lowest_accel) != 0) {
-      return cleanup_state();
-    }
-  }
-
   return 0;
 }
 
@@ -565,14 +555,6 @@ void gcode_machine_control_exit() {
   if (!s_mstate) {
     fprintf(stderr, "gcode_machine_control_exit() called without init.\n");
     return;
-  }
-  if (!s_mstate->cfg.dry_run) {
-    if (caught_signal) {
-      fprintf(stderr, "Skipping potential remaining queue.\n");
-      beagleg_exit_nowait();
-    } else {
-      beagleg_exit();
-    }
   }
   gcodep_delete(s_mstate->parser);
   cleanup_state();

@@ -318,7 +318,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   return 0;
 }
 
-int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
+static int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
   // TODO: this function should automatically split this into multiple segments
   // each with the maximum number of steps.
   int biggest_value = abs(param->steps[0]);
@@ -348,9 +348,23 @@ static void beagleg_motor_enable_internal_nowait(char on) {
   gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
 }
 
-// TODO(hzeller): we shouldn't have min accel; we should just clamp it to the
-// value the machine can do. Doing that for incoming
-int beagleg_init(float min_accel) {
+static void beagleg_wait_queue_empty(void) {
+  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
+  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
+    prussdrv_pru_wait_event(PRU_EVTOUT_0);
+    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
+  }
+}
+
+static void beagleg_motor_enable(char on) {
+  beagleg_wait_queue_empty();
+  beagleg_motor_enable_internal_nowait(on);
+}
+
+int beagleg_pru_init_motor_control(struct MotorControl *control) {
+  const float min_accel = 10;
+  // TODO(hzeller): we shouldn't have min accel; we should just clamp it to the
+  // value the machine can do. Doing that for incoming
   if (!test_acceleration_ok(min_accel))
     return 1;
   hardware_frequency_limit_ = 1e6;    // Don't go over 1 Mhz
@@ -385,34 +399,40 @@ int beagleg_init(float min_accel) {
   prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, PRUcode, sizeof(PRUcode));
   prussdrv_pru_enable(0);
 
+  // Set up operations.
+  control->motor_enable = beagleg_motor_enable;
+  control->enqueue = beagleg_enqueue;
+  control->wait_queue_empty = beagleg_wait_queue_empty;
+  
   return 0;
 }
 
-void beagleg_motor_enable(char on) {
-  beagleg_wait_queue_empty();
-  beagleg_motor_enable_internal_nowait(on);
-}
-
-void beagleg_wait_queue_empty(void) {
-  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
-  }
-}
-
-void beagleg_exit_nowait(void) {
+void beagleg_pru_exit_nowait(void) {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
   beagleg_motor_enable_internal_nowait(0);
   unmap_gpio();
 }
 
-void beagleg_exit(void) {
+void beagleg_pru_exit(void) {
   struct QueueElement end_element;
   bzero(&end_element, sizeof(end_element));
   end_element.state = STATE_EXIT;
   enqueue_element(&end_element);
   beagleg_wait_queue_empty();
-  beagleg_exit_nowait();
+  beagleg_pru_exit_nowait();
 }
+
+
+// Dummy for dry-run
+static void dummy_motor_enable(char on) {}
+static int dummy_enqueue(const struct bg_movement *param, FILE *err_stream) {
+  return 0;
+}
+static void dummy_wait_queue_empty(void) {}
+void init_dummy_motor_control(struct MotorControl *control) {
+  control->motor_enable = dummy_motor_enable;
+  control->enqueue = dummy_enqueue;
+  control->wait_queue_empty = dummy_wait_queue_empty;
+}
+

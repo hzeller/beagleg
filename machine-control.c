@@ -114,8 +114,9 @@ static int usage(const char *prog, const char *msg) {
 static int send_file_to_machine(const char *gcode_filename, char do_loop) {
   do {
     int fd = open(gcode_filename, O_RDONLY);
-    if (gcode_machine_control_from_stream(fd, STDERR_FILENO) != 0)
-      return 1;
+    int ret;
+    if ((ret = gcode_machine_control_from_stream(fd, STDERR_FILENO)) != 0)
+      return ret;
   } while (do_loop);
   return 0;
 }
@@ -175,7 +176,7 @@ static int run_server(const char *bind_addr, int port) {
   close(s);
   fprintf(stderr, "Last gcode_machine_control_from_stream() == %d. Exiting\n",
 	  process_result);
-  return 0;
+  return process_result;
 }
 
 // Parse comma (or other character) separated array of up to "count" float
@@ -300,7 +301,21 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "-R (repeat) only makes sense with a filename.");
   }
 
-  if (gcode_machine_control_init(&config) != 0) {
+  struct MotorControl motor_control;
+  if (config.dry_run) {
+    init_dummy_motor_control(&motor_control);
+  } else {
+    if (geteuid() != 0) {
+      // TODO: running as root is generally not a good idea. Setup permissions
+      // to just access these GPIOs.
+      fprintf(stderr, "Need to run as root to access GPIO pins. "
+	      "(use the dryrun option -n to not write to GPIO)\n");
+      return 1;
+    }
+    beagleg_pru_init_motor_control(&motor_control);
+  }
+  
+  if (gcode_machine_control_init(&config, &motor_control) != 0) {
     return 1;
   }
 
@@ -313,6 +328,17 @@ int main(int argc, char *argv[]) {
   }
 
   gcode_machine_control_exit();
+
+  const char caught_signal = (ret == 2);
+  if (!config.dry_run) {
+    if (caught_signal) {
+      fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
+      beagleg_pru_exit_nowait();
+    } else {
+      beagleg_pru_exit();
+    }
+  }
+
   free(bind_addr);
   return ret;
 }

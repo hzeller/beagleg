@@ -38,29 +38,36 @@ struct bg_movement {
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
-// Initialize beagleg motor control. Gets min value of acceleration
-// expected to do range-checks.
+struct MotorControl {
+  // Waits for the queue to be empty and Enables/disables motors according to the
+  // given boolean value (Right now, motors cannot be individually addressed).
+  void (*motor_enable)(char on);
+  
+  // Enqueue a coordinated move command.
+  // If there is space in the ringbuffer, this function returns immediately,
+  // otherwise it waits until a slot frees up.
+  // Returns 0 on success, 1 if this is a no-op with no steps to move and 2 on
+  // invalid parameters.
+  // If "err_stream" is non-NULL, prints error message there.
+  // Automatically enables motors if not already.
+  int (*enqueue)(const struct bg_movement *param, FILE *err_stream);
+
+  // Wait, until all elements in the ring-buffer are consumed.
+  void (*wait_queue_empty)(void);
+};
+
+// Initialize beagleg pru motor control. Initializes operations in
+// the given struct.
+// This is essentially a singleton.
+// Gets min value of acceleration expected to do range-checks.
 //  Returns 0 on success, 1 on some error.
-int beagleg_init(float min_accel);
+int beagleg_pru_init_motor_control(struct MotorControl *control);
 
-void beagleg_exit(void);  // shutdown motor control. Waits for queue to empty.
-// shutdown motor control immediately, don't wait for current queue to empty.
-void beagleg_exit_nowait(void);
+// Shutdown motor control for good.
+void beagleg_pru_exit();
+void beagleg_pru_exit_nowait();
 
-// Waits for the queue to be empty and Enables/disables motors according to
-// the given boolean value (Right now, motors cannot be individually addressed).
-void beagleg_motor_enable(char on);
-
-// Enqueue a coordinated move command.
-// If there is space in the ringbuffer, this function returns immediately,
-// otherwise it waits until a slot frees up.
-// Returns 0 on success, 1 if this is a no-op with no steps to move and 2 on
-// invalid parameters.
-// If "err_stream" is non-NULL, prints error message there.
-// Automatically enables motors if not already.
-int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream);
-
-// Wait, until all elements in the ring-buffer are consumed.
-void beagleg_wait_queue_empty(void);
+// Create a dummy motor control
+void init_dummy_motor_control(struct MotorControl *control);
 
 #endif  // _BEAGLEG_MOTOR_INTERFACE_H_

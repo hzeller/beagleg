@@ -20,6 +20,8 @@
 #define _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 #include "gcode-parser.h"
 
+struct MotorControl;
+
 enum HomeType {
   HOME_POS_NONE     = 0,  // Axis does not do homing.
   HOME_POS_ORIGIN   = 1,  // Home position is at origin '0' for this axis
@@ -82,11 +84,16 @@ struct MachineControlConfig {
 };
 
 
-// Initialize the motor control with the given configuration.
-// This internally creates a copy of the configuration, so no need for
-// the value to stay around after this call.
+// Initialize the motor control with the given configuration and backend
+// motor control operations.
+// This internally creates a copy of the configuration so no need for
+// the value to stay around after this call (also, the configuration might
+// change internally depending on GCode commands.)
+//
+// The MotorControl struct provide the low-level motor control ops.
 // Returns 0 on success.
-int gcode_machine_control_init(const struct MachineControlConfig *config);
+int gcode_machine_control_init(const struct MachineControlConfig *config,
+                               struct MotorControl *motor_control);
 
 // To be called after use.
 void gcode_machine_control_exit();
@@ -99,7 +106,7 @@ void gcode_machine_control_exit();
 // file-descriptor is _not_ closed.
 //
 // Only one thread at a time can be using this function.
-// Returns 0 on success.
+// Returns 0 on success, 1 on filedescriptor trouble, 2 on exit due to signal.
 int gcode_machine_control_from_stream(int gcode_fd, int output_fd);
 
 #endif //  _BEAGLEG_GCODE_MACHINE_CONTROL_H_
