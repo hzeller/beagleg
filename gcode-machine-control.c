@@ -120,7 +120,7 @@ static void dummy_wait_temperature(void *userdata) {
 }
 static void motors_enable(void *userdata, char b) {  
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->cfg.dry_run) state->motor_control->motor_enable(b);
+  state->motor_control->motor_enable(b);
   send_ok(state);
 }
 
@@ -260,10 +260,10 @@ static void move_machine_steps(struct PrinterState *state,
     command.steps[motor_for_axis] = state->direction_flip[i] * axis_steps[i];
   }
 
-  if (!state->cfg.dry_run) {
-    if (state->cfg.synchronous) state->motor_control->wait_queue_empty();
-    state->motor_control->enqueue(&command, state->msg_stream);
+  if (state->cfg.synchronous) {
+    state->motor_control->wait_queue_empty();
   }
+  state->motor_control->enqueue(&command, state->msg_stream);
   
   if (state->cfg.debug_print && state->msg_stream) {
     float defining_feedrate
@@ -328,7 +328,7 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
 
 static void machine_dwell(void *userdata, float value) {
   struct PrinterState *state = (struct PrinterState*)userdata;
-  if (!state->cfg.dry_run) state->motor_control->wait_queue_empty();
+  state->motor_control->wait_queue_empty();
   usleep((int) (value * 1000));
   send_ok(state);
 }

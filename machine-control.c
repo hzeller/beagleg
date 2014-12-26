@@ -201,12 +201,13 @@ int main(int argc, char *argv[]) {
   memcpy(config.max_feedrate, kMaxFeedrate, sizeof(config.max_feedrate));
   memcpy(config.acceleration, kDefaultAccel, sizeof(config.acceleration));
   config.speed_factor = 1;
-  config.dry_run = 0;
   config.debug_print = 0;
   config.synchronous = 0;
   config.channel_layout = kChannelLayout;
   config.axis_mapping = kAxisMapping;
 
+  char dry_run = 0;
+  
   // Less common options don't have a short option.
   enum LongOptionsOnly {
     SET_STEPS_MM = 1000,
@@ -271,7 +272,7 @@ int main(int argc, char *argv[]) {
 	return usage(argv[0], "Failed to parse ranges.");
       break;
     case 'n':
-      config.dry_run = 1;
+      dry_run = 1;
       break;
     case 'P':
       config.debug_print = 1;
@@ -302,7 +303,7 @@ int main(int argc, char *argv[]) {
   }
 
   struct MotorControl motor_control;
-  if (config.dry_run) {
+  if (dry_run) {
     init_dummy_motor_control(&motor_control);
   } else {
     if (geteuid() != 0) {
@@ -330,7 +331,7 @@ int main(int argc, char *argv[]) {
   gcode_machine_control_exit();
 
   const char caught_signal = (ret == 2);
-  if (!config.dry_run) {
+  if (!dry_run) {
     if (caught_signal) {
       fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
       beagleg_pru_exit_nowait();

@@ -78,7 +78,6 @@ struct MachineControlConfig {
                                 // Axis name '_' for skipped placeholder.
                                 // Not mentioned axes are not handled.
 
-  char dry_run;                 // Don't actually send motor commands if 1.
   char debug_print;             // Print step-tuples to output_fd if 1.
   char synchronous;             // Don't queue, wait for command to finish if 1.
 };
