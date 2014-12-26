@@ -171,7 +171,7 @@ static const char *special_commands(void *userdata, char letter, float value,
   }
   return NULL;
 }
-static double euklid_distance(double x, double y, double z) {
+static double euclid_distance(double x, double y, double z) {
   return sqrt(x*x + y*y + z*z);
 }
 
@@ -207,7 +207,7 @@ static void move_machine_steps(struct PrinterState *state,
     = requested_feedrate_mm_s * state->cfg.steps_per_mm[defining_axis];
   command.acceleration = state->highest_accel;  // Trimmed below.
 
-  // If we're in the euklidian space, choose the step-frequency according to
+  // If we're in the euclidian space, choose the step-frequency according to
   // the relative feedrate of the defining axis.
   // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
   if (defining_axis == AXIS_X
@@ -216,13 +216,13 @@ static void move_machine_steps(struct PrinterState *state,
     // We need to calculate the feedrate in real-world coordinates as each
     // axis can have a different amount of steps/mm
     const float total_xyz_length = 
-      euklid_distance(axis_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
+      euclid_distance(axis_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
 		      axis_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
 		      axis_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
     const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
     const float defining_axis_length = axis_steps[defining_axis]/steps_per_mm;
-    const float euklid_fraction = fabsf(defining_axis_length) / total_xyz_length;
-    command.travel_speed *= euklid_fraction;
+    const float euclid_fraction = fabsf(defining_axis_length) / total_xyz_length;
+    command.travel_speed *= euclid_fraction;
   }
 
   // Now: range limiting. We trim speed and acceleration to what the weakest

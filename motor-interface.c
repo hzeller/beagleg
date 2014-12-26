@@ -275,8 +275,6 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     // Steps to reach requested speed at acceleration
     // v = v0 + a*t -> t = (v - v0)/a
     // s = a/2 * t^2; subsitution t from above: s = (v - v0)^2/(2*a)
-    const int accel_loops_from_zero = LOOPS_PER_STEP *
-      (sq(travel_speed - 0) / (2.0 * param->acceleration));
     const int accel_loops = LOOPS_PER_STEP *
       (sq(travel_speed - v0) / (2.0 * param->acceleration));
     const int decel_loops = LOOPS_PER_STEP *
@@ -294,6 +292,11 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     new_element.loops_accel = accel_loops;
     new_element.loops_travel = total_loops - accel_loops - decel_loops;
     new_element.loops_decel = decel_loops;
+
+    // To prime our accel_series_index, we need to know how far we are in
+    // acclerating from zero speed.
+    const int accel_loops_from_zero = LOOPS_PER_STEP *
+      (sq(travel_speed - 0) / (2.0 * param->acceleration));
 
     assert(accel_loops_from_zero >= new_element.loops_accel);
     assert(accel_loops_from_zero >= new_element.loops_decel);
