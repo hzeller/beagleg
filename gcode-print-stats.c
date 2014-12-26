@@ -44,9 +44,11 @@ static void print_file_stats(const char *filename, int indentation,
   if (determine_print_stats(fd,
 			    max_feedrate, speed_factor, &result) == 0) {
     // Filament length looks a bit high, is this input or extruded ?
-    printf("%-*s\t%9.3fs\t%6.1fmm\t%5.1fmm/s\t%7.1fmm", indentation, filename,
-	   result.total_time_seconds, result.last_z, result.max_G1_feedrate,
-	   result.filament_len);
+    printf("%-*s %10.0f %12.1f %21.1f %21.1f %14.1f",
+           indentation, filename,
+           result.total_time_seconds, result.last_z_extruding,
+           result.max_G1_feedrate,
+           result.max_G1_feedrate_extruding, result.filament_len);
     printf("\n");
   } else {
     printf("#%s not-processed\n", filename);
@@ -82,8 +84,10 @@ int main(int argc, char *argv[]) {
     if (len > longest_filename) longest_filename = len;
   }
   // Print table header
-  printf("%-*s\t%10s\t%8s\t%9s\t%9s\n", longest_filename,
-	 "#[filename]", "[time]", "[height]", "[max-feed]", "[filament]");
+  printf("%-*s %10s %12s %21s %21s %14s\n", longest_filename,
+	 "#[filename]", "[time{s}]", "[height{mm}]",
+         "[max-feed{mm/s}]", "[max-printfeed{mm/s}]",
+         "[filament{mm}]");
   for (int i = optind; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, factor, max_feedrate);
   }

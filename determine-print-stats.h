@@ -22,7 +22,9 @@ struct BeagleGPrintStats {
   // If feedrate was too high after speed-factor: this was the highest feedrate
   // seen, that was capped to the provided max feedrate.
   float max_G1_feedrate;         // Max feedrate for G1 seen.
+  float max_G1_feedrate_extruding;
   float last_x, last_y, last_z;  // last coordinate.
+  float last_z_extruding;        // Last z with extrusion = printed height.
   float filament_len;            // total filament length
 
 };

@@ -33,8 +33,6 @@ struct StatsData {
 };
 
 static void dummy_home(void *userdata, AxisBitmap_t x) {}
-static const char *dummy_unprocessed(void *userdata, char letter, float value,
-				     const char *remaining) { return remaining; }
 static void dummy_setvalue(void *userdata, float v) {}
 static void dummy_noparam(void *userdata) {}
 static void dummy_motors_enable(void *userdata, char b) {}
@@ -50,6 +48,9 @@ static void duration_move(struct BeagleGPrintStats *stats,
   stats->last_x = axis[AXIS_X];
   stats->last_y = axis[AXIS_Y];
   stats->last_z = axis[AXIS_Z];
+  if (axis[AXIS_E] > stats->filament_len) {
+    stats->last_z_extruding = stats->last_z;
+  }
   stats->filament_len = axis[AXIS_E];
 }
 
@@ -86,12 +87,22 @@ static void duration_G1(void *userdata, float feed, const float axis[]) {
   if (feedrate > data->stats->max_G1_feedrate) {
     data->stats->max_G1_feedrate = feedrate;
   }
+  if (axis[AXIS_E] > data->stats->filament_len
+      && feedrate > data->stats->max_G1_feedrate_extruding) {
+    data->stats->max_G1_feedrate_extruding = feedrate;
+  }
   duration_move(data->stats, feedrate, axis);
 }
 
 static void duration_dwell(void *userdata, float value) {
   struct StatsData *data = (struct StatsData*)userdata;
   data->stats->total_time_seconds += value / 1000.0f;
+}
+
+static const char *ignore_other_commands(void *userdata,
+                                         char letter, float value,
+                                         const char *remaining) {
+  return NULL;
 }
 
 int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
@@ -114,7 +125,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 
   // Not implemented
   callbacks.go_home = &dummy_home;
-  callbacks.unprocessed = &dummy_unprocessed;
+  callbacks.unprocessed = &ignore_other_commands;
   callbacks.set_fanspeed = &dummy_setvalue;
   callbacks.set_temperature = &dummy_setvalue;
   callbacks.motors_enable = &dummy_motors_enable;
@@ -126,7 +137,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
     return 1;
   }
   GCodeParser_t *parser = gcodep_new(&callbacks, &data);
-  char buffer[1024];
+  char buffer[8192];
   while (fgets(buffer, sizeof(buffer), f)) {
     gcodep_parse_line(parser, buffer, stderr);
   }

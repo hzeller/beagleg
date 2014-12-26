@@ -35,6 +35,7 @@ struct GCodeParser {
   struct GCodeParserCb callbacks;
   void *cb_userdata;
   FILE *msg;
+  int line_number;
   int provided_axes;
   float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
   char axis_is_absolute[GCODE_NUM_AXES];
@@ -171,8 +172,10 @@ static const char *skip_white(const char *line) {
 
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
-const char *gcodep_parse_pair(const char *line, char *letter, float *value,
-			      FILE *err_stream) {
+static const char *gcodep_parse_pair_with_linenumber(int line_num,
+                                                     const char *line,
+                                                     char *letter, float *value,
+                                                     FILE *err_stream) {
   // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
@@ -191,7 +194,8 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
   *letter = toupper(*line++);
   if (*line == '\0') {
     fprintf(err_stream ? err_stream : stderr,
-	    "// G-Code Syntax Error: expected value after '%c'\n", *letter);
+	    "// Line %d G-Code Syntax Error: expected value after '%c'\n",
+            line_num, *letter);
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
@@ -212,8 +216,9 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
   if (repair_x) *repair_x = 'X';  // Put the 'X' back.
 
   if (line == endptr) {
-    fprintf(err_stream ? err_stream : stderr, "// G-Code Syntax Error: "
-	    "Letter '%c' is not followed by a number.\n", *letter);
+    fprintf(err_stream ? err_stream : stderr, "// Line %d G-Code Syntax Error:"
+	    " Letter '%c' is not followed by a number `%s`.\n",
+            line_num, *letter, line);
     return NULL;
   }
   line = endptr;
@@ -222,12 +227,27 @@ const char *gcodep_parse_pair(const char *line, char *letter, float *value,
   return line;  // We parsed something; return whatever is remaining.
 }
 
+// Internally used version
+static const char *gparse_pair(struct GCodeParser *p, const char *line,
+                               char *letter, float *value) {
+  return gcodep_parse_pair_with_linenumber(p->line_number, line,
+                                           letter, value, p->msg);
+}
+
+// public version.
+const char *gcodep_parse_pair(const char *line,
+                              char *letter, float *value,
+                              FILE *err_stream) {
+  return gcodep_parse_pair_with_linenumber(-1, line, letter, value, err_stream);
+}
+
+
 static const char *handle_home(struct GCodeParser *p, const char *line) {
   AxisBitmap_t homing_flags = 0;
   char axis_l;
   float dummy;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &dummy, p->msg))) {
+  while ((remaining_line = gparse_pair(p, line, &axis_l, &dummy))) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
     if (axis == GCODE_NUM_AXES)
       break;  //  Possibly start of new command.
@@ -251,7 +271,7 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
   char axis_l;
   float value;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &value, p->msg))) {
+  while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
     const float unit_val = value * p->unit_to_mm_factor;
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
     if (axis == GCODE_NUM_AXES)
@@ -270,7 +290,7 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
 			     const char *line) {
   char letter;
   float value;
-  const char *remaining_line = gcodep_parse_pair(line, &letter, &value, p->msg);
+  const char *remaining_line = gparse_pair(p, line, &letter, &value);
   if (remaining_line != NULL && letter == param_letter) {
     value_setter(p->cb_userdata, factor * value);   // value on a user-callback
     return remaining_line;
@@ -286,7 +306,7 @@ static const char *handle_move(struct GCodeParser *p,
   int any_change = 0;
   float feedrate = -1;
   const char *remaining_line;
-  while ((remaining_line = gcodep_parse_pair(line, &axis_l, &value, p->msg))) {
+  while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     if (axis_l == 'F') {
       feedrate = unit_value / 60.0;  // feedrates are per minute.
@@ -313,12 +333,13 @@ static const char *handle_move(struct GCodeParser *p,
 // Note: changes here should be documented in G-code.md as well.
 void gcodep_parse_line(struct GCodeParser *p, const char *line,
 		       FILE *err_stream) {
+  ++p->line_number;
   void *const userdata = p->cb_userdata;
   struct GCodeParserCb *cb = &p->callbacks;
   p->msg = err_stream;  // remember as 'instance' variable.
   char letter;
   float value;
-  while ((line = gcodep_parse_pair(line, &letter, &value, p->msg))) {
+  while ((line = gparse_pair(p, line, &letter, &value))) {
     if (letter == 'G') {
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;
