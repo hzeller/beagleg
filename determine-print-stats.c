@@ -19,32 +19,48 @@
 #include "determine-print-stats.h"
 
 #include <math.h>
-#include <strings.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
 
+#include "gcode-machine-control.h"
 #include "gcode-parser.h"
+#include "motor-interface.h"
 
 struct StatsData {
-  float max_feedrate;
-  float cfg_speed_factor;   // speed factor set from commandline
-  float prog_speed_factor;  // factor set from program
-  float current_G1_feedrate;   // mm/s
   struct BeagleGPrintStats *stats;
+  struct GCodeParserCb machine_delegatee;
 };
 
-static void dummy_home(void *userdata, AxisBitmap_t x) {}
-static void dummy_setvalue(void *userdata, float v) {}
-static void dummy_noparam(void *userdata) {}
-static void dummy_motors_enable(void *userdata, char b) {}
+static void forwarding_set_speed_factor(void *userdata, float f) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->machine_delegatee.set_speed_factor(data->machine_delegatee.user_data, f);
+}
+static void forwarding_set_temperature(void *userdata, float f) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->machine_delegatee.set_temperature(data->machine_delegatee.user_data, f);
+}
+static void forwarding_set_fanspeed(void *userdata, float speed) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->machine_delegatee.set_fanspeed(data->machine_delegatee.user_data, speed);
+}
+static void forwarding_wait_temperature(void *userdata) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->machine_delegatee.wait_temperature(data->machine_delegatee.user_data);
+}
+static void forwarding_dwell(void *userdata, float value) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->stats->total_time_seconds += value / 1000.0f;
+  // We call the original dell() with zero time as we don't want to spend _real_ time.
+  data->machine_delegatee.dwell(data->machine_delegatee.user_data, 0);
+}
+static void forwarding_motors_enable(void *userdata, char b) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  data->machine_delegatee.motors_enable(data->machine_delegatee.user_data, b);
+}
 
-static void duration_move(struct BeagleGPrintStats *stats,
-			  float feedrate, const float axis[]) {
-  const float distance
-    = sqrtf((axis[AXIS_X] - stats->last_x)*(axis[AXIS_X] - stats->last_x)
-	    + (axis[AXIS_Y] - stats->last_y)*(axis[AXIS_Y] - stats->last_y)
-	    + (axis[AXIS_Z] - stats->last_z)*(axis[AXIS_Z] - stats->last_z));
-  // We're ignoring acceleration and assume full feedrate
-  stats->total_time_seconds += distance / feedrate;
+static void update_coordinate_stats(struct BeagleGPrintStats *stats,
+                                    const float *axis) {
   stats->last_x = axis[AXIS_X];
   stats->last_y = axis[AXIS_Y];
   stats->last_z = axis[AXIS_Z];
@@ -54,84 +70,84 @@ static void duration_move(struct BeagleGPrintStats *stats,
   stats->filament_len = axis[AXIS_E];
 }
 
-static void duration_set_speed_factor(void *userdata, float value) {
+static void forwarding_rapid_move(void *userdata, float feed, const float *axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  if (value < 0) {
-    value = 1.0f + value;   // M220 S-10 interpreted as: 90%
-  }
-  if (value < 0.005) return;
-  data->prog_speed_factor = value;
+  data->machine_delegatee.rapid_move(data->machine_delegatee.user_data, feed, axes);
+  update_coordinate_stats(data->stats, axes);
 }
-
-static void duration_G0(void *userdata, float feed, const float axis[]) {
+static void forwarding_coordinated_move(void *userdata, float feed, const float *axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  float rapid_feed = data->max_feedrate;
-  const float given = data->cfg_speed_factor * data->prog_speed_factor * feed;
-  if (feed > 0 && given < data->max_feedrate)
-    rapid_feed = given;
-
-  // Feedrate for G0 we only obey once, but don't remember
-  duration_move(data->stats, rapid_feed, axis);
+  data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
+  update_coordinate_stats(data->stats, axes);
 }
-
-static void duration_G1(void *userdata, float feed, const float axis[]) {
+static void forwarding_go_home(void *userdata, AxisBitmap_t axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  if (feed > 0) {
-    // Change current feedrate.
-    data->current_G1_feedrate = data->cfg_speed_factor * feed;
-  }
-  float feedrate = data->current_G1_feedrate * data->prog_speed_factor;
-  if (feedrate > data->max_feedrate) {
-    feedrate = data->max_feedrate;  // limit.
-  }
-  if (feedrate > data->stats->max_G1_feedrate) {
-    data->stats->max_G1_feedrate = feedrate;
-  }
-  if (axis[AXIS_E] > data->stats->filament_len
-      && feedrate > data->stats->max_G1_feedrate_extruding) {
-    data->stats->max_G1_feedrate_extruding = feedrate;
-  }
-  duration_move(data->stats, feedrate, axis);
+  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes);
 }
-
-static void duration_dwell(void *userdata, float value) {
+static const char *forwarding_unprocessed(void *userdata, char letter, float value,
+                                          const char *remaining) {
   struct StatsData *data = (struct StatsData*)userdata;
-  data->stats->total_time_seconds += value / 1000.0f;
+  return data->machine_delegatee.unprocessed(data->machine_delegatee.user_data,
+                                             letter, value, remaining);
 }
 
-static const char *ignore_other_commands(void *userdata,
-                                         char letter, float value,
-                                         const char *remaining) {
-  return NULL;
+static void stats_motor_enable(void *ctx, char on) {}
+static int stats_enqueue(void *ctx, const struct bg_movement *param, FILE *err_stream) {
+  struct BeagleGPrintStats *stats = (struct BeagleGPrintStats*)ctx;
+  int max_steps = 0;
+  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    int steps = abs(param->steps[i]);
+    if (steps > max_steps)
+      max_steps = steps;
+  }
+  if (max_steps > 0) {
+    // Speed is given as frequency.
+    // TODO: take acceleration into account.
+    stats->total_time_seconds += max_steps / param->travel_speed;
+  }
+  return 0;
+}
+static void stats_wait_queue_empty(void *ctx) {}
+
+static void init_stats_motor_control(struct StatsData *data,
+                                     struct MotorControl *control) {
+  control->user_data = data->stats;
+  control->motor_enable = &stats_motor_enable;
+  control->enqueue = &stats_enqueue;
+  control->wait_queue_empty = &stats_wait_queue_empty;
 }
 
-int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
+int determine_print_stats(int input_fd, struct MachineControlConfig *config,
 			  struct BeagleGPrintStats *result) {
   struct StatsData data;
   bzero(&data, sizeof(data));
-  data.max_feedrate = max_feedrate;
-  data.cfg_speed_factor = speed_factor;
-  data.prog_speed_factor = 1.0f;
-  data.current_G1_feedrate = max_feedrate / 10; // some reasonable default.
   bzero(result, sizeof(*result));
   data.stats = result;
 
+  // Motor control that just determines the time spent turning the motor.
+  struct MotorControl stats_motor_control;
+  init_stats_motor_control(&data, &stats_motor_control);
+
+  GCodeMachineControl_t *machine_control
+    = gcode_machine_control_new(config, &stats_motor_control, NULL);
+
+  data.machine_delegatee = *gcode_machine_control_get_input(machine_control);
+
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
-
+  
   callbacks.user_data = &data;
-  callbacks.rapid_move = &duration_G0;
-  callbacks.coordinated_move = &duration_G1;
-  callbacks.dwell = &duration_dwell;
-  callbacks.set_speed_factor = &duration_set_speed_factor;
-
-  // Not implemented
-  callbacks.go_home = &dummy_home;
-  callbacks.unprocessed = &ignore_other_commands;
-  callbacks.set_fanspeed = &dummy_setvalue;
-  callbacks.set_temperature = &dummy_setvalue;
-  callbacks.motors_enable = &dummy_motors_enable;
-  callbacks.wait_temperature = &dummy_noparam;
+  
+  callbacks.go_home = &forwarding_go_home;
+  callbacks.set_speed_factor = forwarding_set_speed_factor;
+  callbacks.set_fanspeed = forwarding_set_fanspeed;
+  callbacks.set_temperature = forwarding_set_temperature;
+  callbacks.wait_temperature = forwarding_wait_temperature;
+  callbacks.rapid_move = &forwarding_rapid_move;
+  callbacks.coordinated_move = &forwarding_coordinated_move;
+  callbacks.dwell = &forwarding_dwell;
+  callbacks.motors_enable = &forwarding_motors_enable;
+  callbacks.unprocessed = &forwarding_unprocessed;
 
   gcodep_parse_stream(input_fd, &callbacks, stderr);
 

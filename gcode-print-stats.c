@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "determine-print-stats.h"
+#include "gcode-machine-control.h"
 
 int usage(const char *prog) {
   fprintf(stderr, "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
@@ -38,17 +39,15 @@ int usage(const char *prog) {
 }
 
 static void print_file_stats(const char *filename, int indentation,
-			     float speed_factor, float max_feedrate) {
+			     struct MachineControlConfig *config) {
   struct BeagleGPrintStats result;
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
-  if (determine_print_stats(fd,
-			    max_feedrate, speed_factor, &result) == 0) {
+  if (determine_print_stats(fd, config, &result) == 0) {
     // Filament length looks a bit high, is this input or extruded ?
-    printf("%-*s %10.0f %12.1f %21.1f %21.1f %14.1f",
+    printf("%-*s %10.0f %12.1f %14.1f",
            indentation, filename,
            result.total_time_seconds, result.last_z_extruding,
-           result.max_G1_feedrate,
-           result.max_G1_feedrate_extruding, result.filament_len);
+           result.filament_len);
     printf("\n");
   } else {
     printf("#%s not-processed\n", filename);
@@ -56,6 +55,9 @@ static void print_file_stats(const char *filename, int indentation,
 }
 
 int main(int argc, char *argv[]) {
+  struct MachineControlConfig config;
+  gcode_machine_control_default_config(&config);
+
   int max_feedrate = 200;  // mm/s
   int factor = 1.0;        // print speed factor.
 
@@ -84,12 +86,11 @@ int main(int argc, char *argv[]) {
     if (len > longest_filename) longest_filename = len;
   }
   // Print table header
-  printf("%-*s %10s %12s %21s %21s %14s\n", longest_filename,
+  printf("%-*s %10s %12s %14s\n", longest_filename,
 	 "#[filename]", "[time{s}]", "[height{mm}]",
-         "[max-feed{mm/s}]", "[max-printfeed{mm/s}]",
          "[filament{mm}]");
   for (int i = optind; i < argc; ++i) {
-    print_file_stats(argv[i], longest_filename, factor, max_feedrate);
+    print_file_stats(argv[i], longest_filename, &config);
   }
   return 0;
 }

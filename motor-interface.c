@@ -318,7 +318,8 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   return 0;
 }
 
-static int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
+static int beagleg_enqueue(void *ctx,
+                           const struct bg_movement *param, FILE *err_stream) {
   // TODO: this function should automatically split this into multiple segments
   // each with the maximum number of steps.
   int biggest_value = abs(param->steps[0]);
@@ -347,7 +348,7 @@ static void beagleg_motor_enable_internal_nowait(char on) {
   gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
 }
 
-static void beagleg_wait_queue_empty(void) {
+static void beagleg_wait_queue_empty(void *ctx) {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
@@ -355,8 +356,8 @@ static void beagleg_wait_queue_empty(void) {
   }
 }
 
-static void beagleg_motor_enable(char on) {
-  beagleg_wait_queue_empty();
+static void beagleg_motor_enable(void *ctx, char on) {
+  beagleg_wait_queue_empty(ctx);
   beagleg_motor_enable_internal_nowait(on);
 }
 
@@ -399,6 +400,7 @@ int beagleg_pru_init_motor_control(struct MotorControl *control) {
   prussdrv_pru_enable(0);
 
   // Set up operations.
+  control->user_data = NULL;  // not needed.
   control->motor_enable = beagleg_motor_enable;
   control->enqueue = beagleg_enqueue;
   control->wait_queue_empty = beagleg_wait_queue_empty;
@@ -418,18 +420,19 @@ void beagleg_pru_exit(void) {
   bzero(&end_element, sizeof(end_element));
   end_element.state = STATE_EXIT;
   enqueue_element(&end_element);
-  beagleg_wait_queue_empty();
+  beagleg_wait_queue_empty(NULL);
   beagleg_pru_exit_nowait();
 }
 
 
 // Dummy for dry-run
-static void dummy_motor_enable(char on) {}
-static int dummy_enqueue(const struct bg_movement *param, FILE *err_stream) {
+static void dummy_motor_enable(void *ctx, char on) {}
+static int dummy_enqueue(void *ctx, const struct bg_movement *param, FILE *err_stream) {
   return 0;
 }
-static void dummy_wait_queue_empty(void) {}
+static void dummy_wait_queue_empty(void *ctx) {}
 void init_dummy_motor_control(struct MotorControl *control) {
+  control->user_data = NULL;
   control->motor_enable = dummy_motor_enable;
   control->enqueue = dummy_enqueue;
   control->wait_queue_empty = dummy_wait_queue_empty;

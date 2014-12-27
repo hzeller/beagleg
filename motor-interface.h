@@ -39,9 +39,11 @@ struct bg_movement {
 };
 
 struct MotorControl {
+  void *user_data;
+  
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
-  void (*motor_enable)(char on);
+  void (*motor_enable)(void *user, char on);
   
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
@@ -50,10 +52,10 @@ struct MotorControl {
   // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  int (*enqueue)(const struct bg_movement *param, FILE *err_stream);
+  int (*enqueue)(void *user, const struct bg_movement *param, FILE *err_stream);
 
   // Wait, until all elements in the ring-buffer are consumed.
-  void (*wait_queue_empty)(void);
+  void (*wait_queue_empty)(void *user);
 };
 
 // Initialize beagleg pru motor control. Initializes operations in

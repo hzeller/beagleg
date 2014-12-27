@@ -36,32 +36,6 @@
 #include "gcode-parser.h"
 #include "motor-interface.h"
 
-// Some default settings. These are most likely overrridden via flags by user.
-
-// All these settings are in sequence of enum GCodeParserAxes: XYZEABC
-static const float kMaxFeedrate[GCODE_NUM_AXES] =
-  {  200,  200,  90,     10, 1, 0, 0 };
-
-static const float kDefaultAccel[GCODE_NUM_AXES]=
-  { 4000, 4000, 1000, 10000, 1, 0, 0 };
-
-static const float kStepsPerMM[GCODE_NUM_AXES]  =
-  {  160,  160,  160,    40, 1, 0, 0 };
-
-static const enum HomeType kHomePos[GCODE_NUM_AXES] =
-  { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
-    HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE };
-
-static const float kMoveRange[GCODE_NUM_AXES] =
-  { 100, 100, 100, -1, -1, -1, -1 };
-
-// This is the channel layout on the Bumps-board ( github.com/hzeller/bumps ),
-// currently the only cape existing for BeagleG, so we can as well hardcode it.
-static const char kChannelLayout[] = "23140";
-
-// Output mapping from left to right.
-static const char kAxisMapping[] = "XYZEA";
-
 static int usage(const char *prog, const char *msg) {
   if (msg) {
     fprintf(stderr, "%s\n\n", msg);
@@ -210,17 +184,7 @@ static int parse_float_array(const char *input, float result[], int count) {
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
-  bzero(&config, sizeof(config));
-  memcpy(config.steps_per_mm, kStepsPerMM, sizeof(config.steps_per_mm));
-  memcpy(config.home_switch, kHomePos, sizeof(config.home_switch));
-  memcpy(config.move_range_mm, kMoveRange, sizeof(config.move_range_mm));
-  memcpy(config.max_feedrate, kMaxFeedrate, sizeof(config.max_feedrate));
-  memcpy(config.acceleration, kDefaultAccel, sizeof(config.acceleration));
-  config.speed_factor = 1;
-  config.debug_print = 0;
-  config.synchronous = 0;
-  config.channel_layout = kChannelLayout;
-  config.axis_mapping = kAxisMapping;
+  gcode_machine_control_default_config(&config);
 
   char dry_run = 0;
   

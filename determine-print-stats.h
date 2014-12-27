@@ -16,13 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
+#ifndef _BEAGLEG_DETERMINE_PRINT_STATS_H
+#define _BEAGLEG_DETERMINE_PRINT_STATS_H
+
+struct MachineControlConfig;
 
 struct BeagleGPrintStats {
   float total_time_seconds;      // Total time real execution would take.
-  // If feedrate was too high after speed-factor: this was the highest feedrate
-  // seen, that was capped to the provided max feedrate.
-  float max_G1_feedrate;         // Max feedrate for G1 seen.
-  float max_G1_feedrate_extruding;
   float last_x, last_y, last_z;  // last coordinate.
   float last_z_extruding;        // Last z with extrusion = printed height.
   float filament_len;            // total filament length
@@ -32,5 +32,6 @@ struct BeagleGPrintStats {
 // Given the input file-descriptor (which is read to EOF and then closed)
 // and the given constraints, determine statistics about the gcode-file.
 // Returns 0 on success.
-int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
+int determine_print_stats(int input_fd, struct MachineControlConfig *config,
 			  struct BeagleGPrintStats *result);
+#endif // _BEAGLEG_DETERMINE_PRINT_STATS_H

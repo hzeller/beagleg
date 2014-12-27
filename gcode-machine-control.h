@@ -86,6 +86,9 @@ struct MachineControlConfig {
 
 typedef struct GCodeMachineControl GCodeMachineControl_t;  // Opaque type.
 
+// Initializes configuration with default values.
+void gcode_machine_control_default_config(struct MachineControlConfig *cfg);
+
 // Initialize the motor control with the given configuration and backend
 // motor control operations.
 // This internally creates a copy of the configuration so no need for
