@@ -283,7 +283,7 @@ filament length.
     Options:
             -m <max-feedrate> : Maximum feedrate in mm/s
             -f <factor>       : Speedup-factor for print
-	    -H                : Toggle print header line
+            -H                : Toggle print header line
     Use filename '-' for stdin.
 
 The output is in column form, so you can use standard tools to process them.
