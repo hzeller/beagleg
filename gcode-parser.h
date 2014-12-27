@@ -58,11 +58,9 @@ enum GCodeParserAxis gcodep_letter2axis(char letter);
 // takes care of interpreting G20/G21, G90/G91/G92 internally.
 // (TODO: rotational axes are probably to be handled differently).
 //
-// The first parameter in any callback is the "userdata" pointer passed
-// in the constructor in gcodep_new().
+// The first parameter in any callback is the "user_data" data pointer member.
 struct GCodeParserCb {
-  // Context which is passed in each call of these functions.
-  void *user_data;
+  void *user_data;  // Context which is passed in each call of these functions.
   
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
@@ -96,10 +94,9 @@ struct GCodeParserCb {
 
 
 // Initialize parser.
-// The "callbacks"-struct contains the functions the parser calls on parsing,
-// the "callback_context" is passed to the void* in these callbacks.
+// The "callbacks"-struct contains the functions the parser calls on parsing.
 // Returns an opaque type used in the parse function.
-// Does not take ownership of the provided pointers.
+// Does not take ownership of the provided pointer.
 GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
 
 void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
