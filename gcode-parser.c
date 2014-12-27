@@ -33,7 +33,6 @@ const AxisBitmap_t kAllAxesBitmap =
 
 struct GCodeParser {
   struct GCodeParserCb callbacks;
-  void *cb_userdata;
   FILE *msg;
   int line_number;
   int provided_axes;
@@ -120,8 +119,7 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
-struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
-			       void *userdata) {
+struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
@@ -133,7 +131,6 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks,
   if (callbacks) {
     memcpy(&result->callbacks, callbacks, sizeof(*callbacks));
   }
-  result->cb_userdata = userdata;
 
   // Set some reasonable defaults for unprovided callbacks:
   if (!result->callbacks.go_home)
@@ -255,7 +252,7 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     line = remaining_line;
   }
   if (homing_flags == 0) homing_flags = kAllAxesBitmap;
-  p->callbacks.go_home(p->cb_userdata, homing_flags);
+  p->callbacks.go_home(p->callbacks.user_data, homing_flags);
 
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (homing_flags & (1 << i)) {
@@ -292,7 +289,7 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
   float value;
   const char *remaining_line = gparse_pair(p, line, &letter, &value);
   if (remaining_line != NULL && letter == param_letter) {
-    value_setter(p->cb_userdata, factor * value);   // value on a user-callback
+    value_setter(p->callbacks.user_data, factor * value);
     return remaining_line;
   }
   return line;
@@ -326,7 +323,7 @@ static const char *handle_move(struct GCodeParser *p,
     line = remaining_line;
   }
 
-  if (any_change) fun_move(p->cb_userdata, feedrate, p->axes_pos);
+  if (any_change) fun_move(p->callbacks.user_data, feedrate, p->axes_pos);
   return line;
 }
 
@@ -334,7 +331,7 @@ static const char *handle_move(struct GCodeParser *p,
 void gcodep_parse_line(struct GCodeParser *p, const char *line,
 		       FILE *err_stream) {
   ++p->line_number;
-  void *const userdata = p->cb_userdata;
+  void *const userdata = p->callbacks.user_data;
   struct GCodeParserCb *cb = &p->callbacks;
   p->msg = err_stream;  // remember as 'instance' variable.
   char letter;

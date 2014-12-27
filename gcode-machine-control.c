@@ -532,6 +532,9 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
+  
+  callbacks.user_data = s_mstate;
+    
   callbacks.coordinated_move = &machine_G1;
   callbacks.rapid_move = &machine_G0;
   callbacks.go_home = &machine_home;
@@ -547,7 +550,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
 
   // The parser keeps track of the real-world coordinates (mm), while we keep
   // track of the machine coordinates (steps). So it has the same life-cycle.
-  s_mstate->parser = gcodep_new(&callbacks, s_mstate);
+  s_mstate->parser = gcodep_new(&callbacks);
 
   return 0;
 }

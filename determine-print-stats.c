@@ -118,6 +118,8 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
+
+  callbacks.user_data = &data;
   callbacks.rapid_move = &duration_G0;
   callbacks.coordinated_move = &duration_G1;
   callbacks.dwell = &duration_dwell;
@@ -136,7 +138,7 @@ int determine_print_stats(int input_fd, float max_feedrate, float speed_factor,
     perror("Couldn't determine print stats");
     return 1;
   }
-  GCodeParser_t *parser = gcodep_new(&callbacks, &data);
+  GCodeParser_t *parser = gcodep_new(&callbacks);
   char buffer[8192];
   while (fgets(buffer, sizeof(buffer), f)) {
     gcodep_parse_line(parser, buffer, stderr);
