@@ -284,7 +284,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
     // not, then this cannot really be handled here, but should've done
     // in the planner already.
     if (accel_loops + decel_loops > total_loops) {
-      fprintf(stderr, "Invalid parameters; steps: accel=%d decel=%d total=%d\n",
+      fprintf(stderr, "Invalid parameters; accel=%d + decel=%d > total=%d\n",
               accel_loops, decel_loops, total_loops);
       return 2;
     }
@@ -339,8 +339,7 @@ static int beagleg_enqueue(const struct bg_movement *param, FILE *err_stream) {
 	    65535 / LOOPS_PER_STEP, biggest_value);
     return 2;
   }
-  beagleg_enqueue_internal(param, biggest_value);
-  return 0;
+  return beagleg_enqueue_internal(param, biggest_value);
 }
 
 static void beagleg_motor_enable_internal_nowait(char on) {
