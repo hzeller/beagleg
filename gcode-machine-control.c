@@ -20,7 +20,6 @@
 
 #include <ctype.h>
 #include <math.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +36,8 @@
 #define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
-struct PrinterState {
+struct GCodeMachineControl {
+  struct GCodeParserCb event_input;
   struct MotorControl *motor_control;
   const struct MachineControlConfig cfg;
   
@@ -54,8 +54,6 @@ struct PrinterState {
                                          // physical output driver. This allows
                                          // to have a logical axis (e.g. X, Y,
                                          // Z) output to any physical driver.
-  GCodeParser_t *parser;
-
   // Current machine state
   float current_feedrate_mm_per_sec;
   float prog_speed_factor;               // Speed factor set by program (M220)
@@ -66,36 +64,14 @@ struct PrinterState {
   FILE *msg_stream;
 };
 
-// Since there is only one machine, we just keep this as a singleton.
-static struct PrinterState *s_mstate = NULL;
-
-// It is usually good to shut down gracefully, otherwise the PRU keeps running.
-// So we're intercepting signals and exit gcode_machine_control_from_stream()
-// cleanly.
-static volatile char caught_signal = 0;
-static void receive_signal() {
-  caught_signal = 1;
-  static char msg[] = "Caught signal. Shutting down ASAP.\n";
-  (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
-}
-static void arm_signal_handler() {
-  caught_signal = 0;
-  signal(SIGTERM, &receive_signal);  // Regular kill
-  signal(SIGINT, &receive_signal);   // Ctrl-C
-}
-static void disarm_signal_handler() {
-  signal(SIGTERM, SIG_DFL);  // Regular kill
-  signal(SIGINT, SIG_DFL);   // Ctrl-C
-}
-
-static void send_ok(struct PrinterState *state) {
+static void send_ok(GCodeMachineControl_t *state) {
   if (state && state->msg_stream)
     fprintf(state->msg_stream, "ok\n");
 }
 
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
@@ -103,7 +79,7 @@ static void dummy_set_temperature(void *userdata, float f) {
   send_ok(state);
 }
 static void dummy_set_fanspeed(void *userdata, float speed) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
@@ -111,7 +87,7 @@ static void dummy_set_fanspeed(void *userdata, float speed) {
   send_ok(state);
 }
 static void dummy_wait_temperature(void *userdata) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (state->msg_stream) {
     fprintf(state->msg_stream,
 	    "// BeagleG: wait_temperature() not implemented.\n");
@@ -119,14 +95,14 @@ static void dummy_wait_temperature(void *userdata) {
   send_ok(state);
 }
 static void motors_enable(void *userdata, char b) {  
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   state->motor_control->motor_enable(b);
   send_ok(state);
 }
 
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (letter == 'M') {
 
     if ((int) value == 42) {
@@ -179,7 +155,7 @@ static double euclid_distance(double x, double y, double z) {
 }
 
 // Move the given number of machine steps for each axis.
-static void move_machine_steps(struct PrinterState *state,
+static void move_machine_steps(GCodeMachineControl_t *state,
 			       float requested_feedrate_mm_s,
 			       int machine_steps[]) {
   struct bg_movement command;
@@ -290,7 +266,7 @@ static void move_machine_steps(struct PrinterState *state,
 }
 
 static void machine_move(void *userdata, float feedrate, const float axis[]) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
 
   // Real world -> machine coordinates
   int new_machine_position[GCODE_NUM_AXES];
@@ -310,7 +286,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
 }
 
 static void machine_G1(void *userdata, float feed, const float *axis) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (feed > 0) {
     state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
   }
@@ -320,7 +296,7 @@ static void machine_G1(void *userdata, float feed, const float *axis) {
 }
 
 static void machine_G0(void *userdata, float feed, const float *axis) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   machine_move(userdata, given > 0 ? given : rapid_feed, axis);
@@ -328,14 +304,14 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
 }
 
 static void machine_dwell(void *userdata, float value) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   state->motor_control->wait_queue_empty();
   usleep((int) (value * 1000));
   send_ok(state);
 }
 
 static void machine_set_speed_factor(void *userdata, float value) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (value < 0) {
     value = 1.0f + value;   // M220 S-10 interpreted as: 90%
   }
@@ -351,7 +327,7 @@ static void machine_set_speed_factor(void *userdata, float value) {
 }
 
 static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
-  struct PrinterState *state = (struct PrinterState*)userdata;
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
 
@@ -387,61 +363,58 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   send_ok(state);
 }
 
-// Cleanup whatever is allocated. Return 1 for convenience in early exit.
-static int cleanup_state() {
-  free(s_mstate);
-  s_mstate = NULL;
-  return 1;
+// Cleanup whatever is allocated. Return NULL for convenience.
+static GCodeMachineControl_t *cleanup_state(GCodeMachineControl_t *object) {
+  free(object);
+  return NULL;
 }
 
-int gcode_machine_control_init(const struct MachineControlConfig *config_in,
-                               struct MotorControl *motor_control) {
-  if (s_mstate != NULL) {
-    fprintf(stderr, "gcode_machine_control_init(): already initialized.\n");
-    return 1;
-  }
-
+GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConfig *config_in,
+                                                 struct MotorControl *motor_control,
+                                                 FILE *msg_stream) {
+  GCodeMachineControl_t *result;
   // Initialize basic state and derived configuration.
-  s_mstate = (struct PrinterState*) malloc(sizeof(struct PrinterState));
-  bzero(s_mstate, sizeof(*s_mstate));
-  s_mstate->motor_control = motor_control;
-
+  result = (GCodeMachineControl_t*) malloc(sizeof(GCodeMachineControl_t));
+  bzero(result, sizeof(*result));
+  result->motor_control = motor_control;
+  result->msg_stream = msg_stream;
+  
   // Always keep the steps_per_mm positive, but extract direction for
   // final assignment to motor.
   struct MachineControlConfig cfg = *config_in;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    s_mstate->direction_flip[i] = cfg.steps_per_mm[i] < 0 ? -1 : 1;
+    result->direction_flip[i] = cfg.steps_per_mm[i] < 0 ? -1 : 1;
     cfg.steps_per_mm[i] = fabs(cfg.steps_per_mm[i]);
     if (cfg.max_feedrate[i] < 0) {
       fprintf(stderr, "Invalid negative feedrate %.1f for axis %c\n",
               cfg.max_feedrate[i], gcodep_axis2letter(i));
-      return cleanup_state();
+      return cleanup_state(result);
     }
     if (cfg.acceleration[i] < 0) {
       fprintf(stderr, "Invalid negative acceleration %.1f for axis %c\n",
               cfg.acceleration[i], gcodep_axis2letter(i));
-      return cleanup_state();
+      return cleanup_state(result);
     }
   }
   
   // Here we assign it to the 'const' cfg, all other accesses will check for
   // the readonly ness. So some nasty override here: we know what we're doing.
-  *((struct MachineControlConfig*) &s_mstate->cfg) = cfg;
-  s_mstate->current_feedrate_mm_per_sec = cfg.max_feedrate[AXIS_X] / 10;
+  *((struct MachineControlConfig*) &result->cfg) = cfg;
+  result->current_feedrate_mm_per_sec = cfg.max_feedrate[AXIS_X] / 10;
   float lowest_accel = cfg.max_feedrate[AXIS_X] * cfg.steps_per_mm[AXIS_X];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (cfg.max_feedrate[i] > s_mstate->g0_feedrate_mm_per_sec) {
-      s_mstate->g0_feedrate_mm_per_sec = cfg.max_feedrate[i];
+    if (cfg.max_feedrate[i] > result->g0_feedrate_mm_per_sec) {
+      result->g0_feedrate_mm_per_sec = cfg.max_feedrate[i];
     }
-    s_mstate->max_axis_speed[i] = cfg.max_feedrate[i] * cfg.steps_per_mm[i];
+    result->max_axis_speed[i] = cfg.max_feedrate[i] * cfg.steps_per_mm[i];
     const float accel = cfg.acceleration[i] * cfg.steps_per_mm[i];
-    s_mstate->max_axis_accel[i] = accel;
-    if (accel > s_mstate->highest_accel)
-      s_mstate->highest_accel = accel;
+    result->max_axis_accel[i] = accel;
+    if (accel > result->highest_accel)
+      result->highest_accel = accel;
     if (accel < lowest_accel)
       lowest_accel = accel;
   }
-  s_mstate->prog_speed_factor = 1.0f;
+  result->prog_speed_factor = 1.0f;
 
   // Mapping axes to physical motors. We might have a larger set of logical
   // axes of which we map a subset to actual motors.
@@ -463,7 +436,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
   if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
     fprintf(stderr, "Physical mapping string longer than available motors. "
             "('%s', max axes=%d)\n", physical_mapping, BEAGLEG_NUM_MOTORS);
-    return cleanup_state();
+    return cleanup_state(result);
   }
   for (int pos = 0; *physical_mapping; pos++, physical_mapping++) {
     const int mapped_driver = *physical_mapping - '0';
@@ -474,12 +447,12 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
       fprintf(stderr, "Invalid character '%c' in channel-layout mapping. "
               "Can be characters '0'..'%d'\n",
               *physical_mapping, BEAGLEG_NUM_MOTORS - 1);
-      return cleanup_state();
+      return cleanup_state(result);
     }
   }
 
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    s_mstate->axis_to_driver[i] = -1;
+    result->axis_to_driver[i] = -1;
   }
   const char *axis_mapping = cfg.axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
@@ -487,7 +460,7 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
     if (pos > BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
       fprintf(stderr, "Axis mapping string has more elements than available %d "
               "connectors (remaining=\"..%s\").\n", pos, axis_mapping);
-      return cleanup_state();
+      return cleanup_state(result);
     }
     if (*axis_mapping == '_')
       continue;
@@ -497,30 +470,30 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
               "Illegal axis->connector mapping character '%c' in '%s' "
               "(Only valid axis letter or '_' to skip a connector).\n",
               toupper(*axis_mapping), cfg.axis_mapping);
-      return cleanup_state();
+      return cleanup_state(result);
     }
-    if (s_mstate->axis_to_driver[axis] > -1) {
+    if (result->axis_to_driver[axis] > -1) {
       fprintf(stderr, "Axis '%c' given multiple times, "
               "but mirroring not yet supported.\n", toupper(*axis_mapping));
-      return cleanup_state();
+      return cleanup_state(result);
     }
-    s_mstate->axis_to_driver[axis] = pos_to_driver[pos];
+    result->axis_to_driver[axis] = pos_to_driver[pos];
   }
 
   // Now let's see what motors are mapped to any useful output.
-  if (s_mstate->cfg.debug_print) fprintf(stderr, "-- Config --\n");
+  if (result->cfg.debug_print) fprintf(stderr, "-- Config --\n");
   int error_count = 0;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (s_mstate->axis_to_driver[i] < 0)
+    if (result->axis_to_driver[i] < 0)
       continue;
-    char is_error = (s_mstate->cfg.steps_per_mm[i] <= 0
-                     || s_mstate->cfg.max_feedrate[i] <= 0);
-    if (s_mstate->cfg.debug_print || is_error) {
+    char is_error = (result->cfg.steps_per_mm[i] <= 0
+                     || result->cfg.max_feedrate[i] <= 0);
+    if (result->cfg.debug_print || is_error) {
       fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %7.3f steps/mm%s\n",
-              gcodep_axis2letter(i), s_mstate->cfg.max_feedrate[i],
-              s_mstate->cfg.acceleration[i],
-              s_mstate->cfg.steps_per_mm[i],
-              s_mstate->direction_flip[i] < 0 ? " (reversed)" : "");
+              gcodep_axis2letter(i), result->cfg.max_feedrate[i],
+              result->cfg.acceleration[i],
+              result->cfg.steps_per_mm[i],
+              result->direction_flip[i] < 0 ? " (reversed)" : "");
     }
     if (is_error) {
       fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
@@ -528,73 +501,29 @@ int gcode_machine_control_init(const struct MachineControlConfig *config_in,
     }
   }
   if (error_count)
-    return cleanup_state();
-
-  struct GCodeParserCb callbacks;
-  bzero(&callbacks, sizeof(callbacks));
+    return cleanup_state(result);
   
-  callbacks.user_data = s_mstate;
-    
-  callbacks.coordinated_move = &machine_G1;
-  callbacks.rapid_move = &machine_G0;
-  callbacks.go_home = &machine_home;
-  callbacks.dwell = &machine_dwell;
-  callbacks.set_speed_factor = &machine_set_speed_factor;
-  callbacks.motors_enable = &motors_enable;
-  callbacks.unprocessed = &special_commands;
+  result->event_input.user_data = result;    
+  result->event_input.coordinated_move = &machine_G1;
+  result->event_input.rapid_move = &machine_G0;
+  result->event_input.go_home = &machine_home;
+  result->event_input.dwell = &machine_dwell;
+  result->event_input.set_speed_factor = &machine_set_speed_factor;
+  result->event_input.motors_enable = &motors_enable;
+  result->event_input.unprocessed = &special_commands;
 
   // Not yet implemented
-  callbacks.set_fanspeed = &dummy_set_fanspeed;
-  callbacks.set_temperature = &dummy_set_temperature;
-  callbacks.wait_temperature = &dummy_wait_temperature;
+  result->event_input.set_fanspeed = &dummy_set_fanspeed;
+  result->event_input.set_temperature = &dummy_set_temperature;
+  result->event_input.wait_temperature = &dummy_wait_temperature;
 
-  // The parser keeps track of the real-world coordinates (mm), while we keep
-  // track of the machine coordinates (steps). So it has the same life-cycle.
-  s_mstate->parser = gcodep_new(&callbacks);
-
-  return 0;
+  return result;
 }
 
-void gcode_machine_control_exit() {
-  if (!s_mstate) {
-    fprintf(stderr, "gcode_machine_control_exit() called without init.\n");
-    return;
-  }
-  gcodep_delete(s_mstate->parser);
-  cleanup_state();
+struct GCodeParserCb *gcode_machine_control_get_input(GCodeMachineControl_t *object) {
+  return &object->event_input;
 }
 
-int gcode_machine_control_from_stream(int gcode_fd, int output_fd) {
-  if (!s_mstate) {
-    fprintf(stderr, "Machine control not initialized.\n");
-    return 1;
-  }
-
-  if (output_fd >= 0) {
-    s_mstate->msg_stream = fdopen(output_fd, "w");
-    if (s_mstate->msg_stream) {
-      // Output needs to be unbuffered, otherwise they'll never make it.
-      setvbuf(s_mstate->msg_stream, NULL, _IONBF, 0);
-    }
-  }
-  FILE *gcode_stream = fdopen(gcode_fd, "r");
-  if (gcode_stream == NULL) {
-    perror("Opening gcode stream");
-    return 1;
-  }
-
-  arm_signal_handler();
-  char buffer[8192];
-  while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
-    gcodep_parse_line(s_mstate->parser, buffer, s_mstate->msg_stream);
-  }
-  disarm_signal_handler();
-
-  if (s_mstate->msg_stream) {
-    fflush(s_mstate->msg_stream);
-    s_mstate->msg_stream = NULL;
-  }
-  fclose(gcode_stream);
-
-  return caught_signal ? 2 : 0;
+void gcode_machine_control_delete(GCodeMachineControl_t *object) {
+  cleanup_state(object);
 }

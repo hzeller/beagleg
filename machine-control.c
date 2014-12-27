@@ -111,20 +111,28 @@ static int usage(const char *prog, const char *msg) {
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "do_loop" is 1, repeats this forever (e.g. for stress test).
-static int send_file_to_machine(const char *gcode_filename, char do_loop) {
+static int send_file_to_machine(struct MachineControlConfig *config,
+                                struct MotorControl *motor_control,
+                                const char *gcode_filename, char do_loop) {
+  int ret;
   do {
     int fd = open(gcode_filename, O_RDONLY);
-    int ret;
-    if ((ret = gcode_machine_control_from_stream(fd, STDERR_FILENO)) != 0)
-      return ret;
-  } while (do_loop);
-  return 0;
+    GCodeMachineControl_t *machine_control
+      = gcode_machine_control_new(config, motor_control, stderr);
+    ret = gcodep_parse_stream(fd,
+                              gcode_machine_control_get_input(machine_control),
+                              stderr);
+    gcode_machine_control_delete(machine_control);
+  } while (ret == 0 && do_loop);
+  return ret;
 }
 
 // Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
 // Interprets GCode coming from a connection. Only one connection at a
 // time can be active.
-static int run_server(const char *bind_addr, int port) {
+static int run_server(struct MachineControlConfig *config,
+                      struct MotorControl *motor_control,
+                      const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
     return 1;
@@ -169,7 +177,15 @@ static int run_server(const char *bind_addr, int port) {
     const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
 				     ip_buffer, sizeof(ip_buffer));
     printf("Accepting new connection from %s\n", print_ip);
-    process_result = gcode_machine_control_from_stream(connection, connection);
+    FILE *msg_stream = fdopen(connection, "w");
+    GCodeMachineControl_t *machine_control
+      = gcode_machine_control_new(config, motor_control, msg_stream);
+    process_result
+      = gcodep_parse_stream(connection,
+                            gcode_machine_control_get_input(machine_control),
+                            msg_stream);
+    gcode_machine_control_delete(machine_control);
+    fclose(msg_stream);
     printf("Connection to %s closed.\n", print_ip);
   } while (process_result == 0);
 
@@ -315,20 +331,15 @@ int main(int argc, char *argv[]) {
     }
     beagleg_pru_init_motor_control(&motor_control);
   }
-  
-  if (gcode_machine_control_init(&config, &motor_control) != 0) {
-    return 1;
-  }
 
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    ret = send_file_to_machine(filename, do_file_repeat);
+    ret = send_file_to_machine(&config, &motor_control,
+                               filename, do_file_repeat);
   } else {
-    ret = run_server(bind_addr, listen_port);
+    ret = run_server(&config, &motor_control, bind_addr, listen_port);
   }
-
-  gcode_machine_control_exit();
 
   const char caught_signal = (ret == 2);
   if (!dry_run) {

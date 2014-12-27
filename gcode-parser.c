@@ -19,10 +19,31 @@
 
 #include "gcode-parser.h"
 
+#include <ctype.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+//-- This is the more detailed public API. If it ever is needed (e.g.
+//   to keep track of multiple streams at once, put in gcode-parser.h.
+//   Till then, gcode_parse_stream is sufficient.
+typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
+
+// Initialize parser.
+// The "callbacks"-struct contains the functions the parser calls on parsing.
+// Returns an opaque type used in the parse function.
+// Does not take ownership of the provided pointer.
+GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
+
+void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
+
+// Main workhorse: Parse a gcode line, call callbacks if needed.
+// If "err_stream" is non-NULL, sends error messages that way.
+void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
+// -- End public API
 
 typedef float AxesRegister[GCODE_NUM_AXES];
 
@@ -380,4 +401,54 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
     }
   }
   p->msg = NULL;
+}
+
+// It is usually good to shut down gracefully, otherwise the PRU keeps running.
+// So we're intercepting signals and exit gcode_machine_control_from_stream()
+// cleanly.
+static volatile char caught_signal = 0;
+static void receive_signal() {
+  caught_signal = 1;
+  static char msg[] = "Caught signal. Shutting down ASAP.\n";
+  (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
+}
+static void arm_signal_handler() {
+  caught_signal = 0;
+  signal(SIGTERM, &receive_signal);  // Regular kill
+  signal(SIGINT, &receive_signal);   // Ctrl-C
+}
+static void disarm_signal_handler() {
+  signal(SIGTERM, SIG_DFL);  // Regular kill
+  signal(SIGINT, SIG_DFL);   // Ctrl-C
+}
+
+// Public facade function.
+int gcodep_parse_stream(int input_fd,
+                        struct GCodeParserCb *parse_events, FILE *err_stream) {
+  if (err_stream) {
+    // Output needs to be unbuffered, otherwise they'll never make it.
+    setvbuf(err_stream, NULL, _IONBF, 0);
+  }
+
+  FILE *gcode_stream = fdopen(input_fd, "r");
+  if (gcode_stream == NULL) {
+    perror("Opening gcode stream");
+    return 1;
+  }
+
+  GCodeParser_t *parser = gcodep_new(parse_events);
+  arm_signal_handler();
+  char buffer[8192];
+  while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
+    gcodep_parse_line(parser, buffer, err_stream);
+  }
+  disarm_signal_handler();
+
+  if (err_stream) {
+    fflush(err_stream);
+  }
+  fclose(gcode_stream);
+  gcodep_delete(parser);
+  
+  return caught_signal ? 2 : 0;
 }

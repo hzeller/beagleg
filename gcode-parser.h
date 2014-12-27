@@ -30,8 +30,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
-
 typedef uint32_t AxisBitmap_t;
 
 // Axis supported by this parser.
@@ -92,18 +90,11 @@ struct GCodeParserCb {
   const char *(*unprocessed)(void *, char letter, float value, const char *);
 };
 
-
-// Initialize parser.
-// The "callbacks"-struct contains the functions the parser calls on parsing.
-// Returns an opaque type used in the parse function.
-// Does not take ownership of the provided pointer.
-GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
-
-void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
-
-// Main workhorse: Parse a gcode line, call callbacks if needed.
-// If "err_stream" is non-NULL, sends error messages that way.
-void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
+// Read and parse GCode from input_fd and call callbacks
+// in "parse_events". Error messages are sent to "err_stream" if non-NULL.
+// Reads until EOF. The input file descriptor is closed.
+int gcodep_parse_stream(int input_fd,
+                        struct GCodeParserCb *parse_events, FILE *err_stream);
 
 // Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
 // a pair of the letter 'P' and the value '123').
