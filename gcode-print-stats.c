@@ -34,6 +34,7 @@ int usage(const char *prog) {
 	  "Options:\n"
 	  "\t-m <max-feedrate> : Maximum feedrate in mm/s\n"
 	  "\t-f <factor>       : Speedup-factor for print\n"
+          "\t-H                : Toggle print header line\n"
 	  "Use filename '-' for stdin.\n", prog);
   return 1;
 }
@@ -60,9 +61,12 @@ int main(int argc, char *argv[]) {
 
   int max_feedrate = 200;  // mm/s
   int factor = 1.0;        // print speed factor.
+  char print_header = 1;
 
+  // TODO: read other parameters for the MachineControlConfig from long options.
+ 
   int opt;
-  while ((opt = getopt(argc, argv, "f:m:")) != -1) {
+  while ((opt = getopt(argc, argv, "f:m:H")) != -1) {
     switch (opt) {
     case 'f':
       factor = atof(optarg);
@@ -72,6 +76,9 @@ int main(int argc, char *argv[]) {
       max_feedrate = atoi(optarg);
       if (max_feedrate <= 0) return usage(argv[0]);
       break;
+    case 'H':
+      print_header = !print_header;
+      break;
     default:
       return usage(argv[0]);
     }
@@ -80,15 +87,20 @@ int main(int argc, char *argv[]) {
   if (optind >= argc)
     return usage(argv[0]);
 
+  config.max_feedrate[AXIS_X] = max_feedrate;
+  config.max_feedrate[AXIS_Y] = max_feedrate;
+  config.speed_factor = factor;
+  
   int longest_filename = strlen("#[filename]"); // table header
   for (int i = optind; i < argc; ++i) {
     int len = strlen(argv[i]);
     if (len > longest_filename) longest_filename = len;
   }
-  // Print table header
-  printf("%-*s %10s %12s %14s\n", longest_filename,
-	 "#[filename]", "[time{s}]", "[height{mm}]",
-         "[filament{mm}]");
+  if (print_header) {
+    printf("%-*s %10s %12s %14s\n", longest_filename,
+           "#[filename]", "[time{s}]", "[height{mm}]",
+           "[filament{mm}]");
+  }
   for (int i = optind; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, &config);
   }

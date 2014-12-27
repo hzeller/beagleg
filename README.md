@@ -28,7 +28,8 @@ enqueues them to the realtime unit.
 The functionality is encapsulated in independently usable APIs.
 
    - [motor-interface.h](./motor-interface.h) : Low-level motor move C-API to
-      enqueue motor moves, that are executed in the PRU.
+      enqueue motor moves. The implementation provided is using the
+      PRU to generate fast and realtime accurate steps.
 
    - [gcode-parser.h](./gcode-parser.h) : C-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
@@ -36,8 +37,8 @@ The functionality is encapsulated in independently usable APIs.
       everything into metric, absolute coordinates.
 
    - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C-API to
-      control a machine via G-Code: it reads G-Code from a stream and emits
-      the necessary machine commands.
+      control a machine via G-Code: it receives G-Code events and emits
+      the necessary machine commands to MachineControl.
       Depends on the motor-interface and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
@@ -275,13 +276,14 @@ process (Power PWM LEDs switch off).
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
-file e.g. estimated print-time, Object height (=maximum Z-axis), filament
-length.
+file e.g. accurate expected print-time, Object height (=maximum Z-axis),
+filament length.
 
     Usage: ./gcode-print-stats [options] <gcode-file> [<gcode-file> ..]
     Options:
             -m <max-feedrate> : Maximum feedrate in mm/s
             -f <factor>       : Speedup-factor for print
+	    -H                : Toggle print header line
     Use filename '-' for stdin.
 
 The output is in column form, so you can use standard tools to process them.
@@ -289,9 +291,6 @@ For instance, from a bunch of gcode files, find the one that takes the longest
 time
 
     ./gcode-print-stats *.gcode | sort -k2 -n
-
-*Note: this binary is currently not taking acceleration into account, so the
- estimated times are off*
 
 ## License
 BeagleG is free software: you can redistribute it and/or modify
