@@ -86,13 +86,13 @@ static int usage(const char *prog, const char *msg) {
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "do_loop" is 1, repeats this forever (e.g. for stress test).
 static int send_file_to_machine(struct MachineControlConfig *config,
-                                struct MotorControl *motor_control,
+                                struct MotorOperations *motor_ops,
                                 const char *gcode_filename, char do_loop) {
   int ret;
   do {
     int fd = open(gcode_filename, O_RDONLY);
     GCodeMachineControl_t *machine_control
-      = gcode_machine_control_new(config, motor_control, stderr);
+      = gcode_machine_control_new(config, motor_ops, stderr);
     ret = gcodep_parse_stream(fd,
                               gcode_machine_control_get_input(machine_control),
                               stderr);
@@ -105,7 +105,7 @@ static int send_file_to_machine(struct MachineControlConfig *config,
 // Interprets GCode coming from a connection. Only one connection at a
 // time can be active.
 static int run_server(struct MachineControlConfig *config,
-                      struct MotorControl *motor_control,
+                      struct MotorOperations *motor_ops,
                       const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
@@ -153,7 +153,7 @@ static int run_server(struct MachineControlConfig *config,
     printf("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
     GCodeMachineControl_t *machine_control
-      = gcode_machine_control_new(config, motor_control, msg_stream);
+      = gcode_machine_control_new(config, motor_ops, msg_stream);
     process_result
       = gcodep_parse_stream(connection,
                             gcode_machine_control_get_input(machine_control),
@@ -282,9 +282,9 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "-R (repeat) only makes sense with a filename.");
   }
 
-  struct MotorControl motor_control;
+  struct MotorOperations motor_operations;
   if (dry_run) {
-    init_dummy_motor_control(&motor_control);
+    init_dummy_motor_ops(&motor_operations);
   } else {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
@@ -293,16 +293,16 @@ int main(int argc, char *argv[]) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    beagleg_pru_init_motor_control(&motor_control);
+    beagleg_pru_init_motor_ops(&motor_operations);
   }
 
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    ret = send_file_to_machine(&config, &motor_control,
+    ret = send_file_to_machine(&config, &motor_operations,
                                filename, do_file_repeat);
   } else {
-    ret = run_server(&config, &motor_control, bind_addr, listen_port);
+    ret = run_server(&config, &motor_operations, bind_addr, listen_port);
   }
 
   const char caught_signal = (ret == 2);

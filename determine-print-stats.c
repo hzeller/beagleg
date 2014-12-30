@@ -110,7 +110,7 @@ static int stats_enqueue(void *ctx, const struct bg_movement *param, FILE *err_s
 static void stats_wait_queue_empty(void *ctx) {}
 
 static void init_stats_motor_control(struct StatsData *data,
-                                     struct MotorControl *control) {
+                                     struct MotorOperations *control) {
   control->user_data = data->stats;
   control->motor_enable = &stats_motor_enable;
   control->enqueue = &stats_enqueue;
@@ -125,7 +125,7 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
   data.stats = result;
 
   // Motor control that just determines the time spent turning the motor.
-  struct MotorControl stats_motor_control;
+  struct MotorOperations stats_motor_control;
   init_stats_motor_control(&data, &stats_motor_control);
 
   GCodeMachineControl_t *machine_control

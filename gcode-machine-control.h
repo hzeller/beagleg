@@ -21,7 +21,7 @@
 
 #include "gcode-parser.h"
 
-struct MotorControl;
+struct MotorOperations;
 
 enum HomeType {
   HOME_POS_NONE     = 0,  // Axis does not do homing.
@@ -95,12 +95,12 @@ void gcode_machine_control_default_config(struct MachineControlConfig *cfg);
 // the value to stay around after this call (also, the configuration might
 // change internally depending on GCode commands.)
 //
-// The MotorControl struct provide the low-level motor control ops.
+// The MotorOperations struct provide the low-level motor control ops.
 // msg_stream, if non-NULL, sends back return messages on the GCode channel.
 // Returns 0 on success.
 GCodeMachineControl_t *gcode_machine_control_new(
                        const struct MachineControlConfig *config,
-                       struct MotorControl *motor_control,
+                       struct MotorOperations *motor_ops,
                        FILE *msg_stream);
 
 // Get the struct to receive events.

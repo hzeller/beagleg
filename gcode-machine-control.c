@@ -64,7 +64,7 @@ static const char kAxisMapping[] = "XYZEA";
 
 struct GCodeMachineControl {
   struct GCodeParserCb event_input;
-  struct MotorControl *motor_control;
+  struct MotorOperations *motor_ops;
   const struct MachineControlConfig cfg;
   
   // Derived configuration
@@ -122,7 +122,7 @@ static void dummy_wait_temperature(void *userdata) {
 }
 static void motors_enable(void *userdata, char b) {  
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  state->motor_control->motor_enable(state->motor_control->user_data, b);
+  state->motor_ops->motor_enable(state->motor_ops->user_data, b);
   send_ok(state);
 }
 
@@ -264,9 +264,9 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   }
 
   if (state->cfg.synchronous) {
-    state->motor_control->wait_queue_empty(state->motor_control->user_data);
+    state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
   }
-  state->motor_control->enqueue(state->motor_control->user_data,
+  state->motor_ops->enqueue(state->motor_ops->user_data,
                                 &command, state->msg_stream);
   
   if (state->cfg.debug_print && state->msg_stream) {
@@ -332,7 +332,7 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
 
 static void machine_dwell(void *userdata, float value) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  state->motor_control->wait_queue_empty(state->motor_control->user_data);
+  state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
   usleep((int) (value * 1000));
   send_ok(state);
 }
@@ -397,13 +397,13 @@ static GCodeMachineControl_t *cleanup_state(GCodeMachineControl_t *object) {
 }
 
 GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConfig *config_in,
-                                                 struct MotorControl *motor_control,
+                                                 struct MotorOperations *motor_ops,
                                                  FILE *msg_stream) {
   GCodeMachineControl_t *result;
   // Initialize basic state and derived configuration.
   result = (GCodeMachineControl_t*) malloc(sizeof(GCodeMachineControl_t));
   bzero(result, sizeof(*result));
-  result->motor_control = motor_control;
+  result->motor_ops = motor_ops;
   result->msg_stream = msg_stream;
   
   // Always keep the steps_per_mm positive, but extract direction for

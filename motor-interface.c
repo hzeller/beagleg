@@ -361,7 +361,7 @@ static void beagleg_motor_enable(void *ctx, char on) {
   beagleg_motor_enable_internal_nowait(on);
 }
 
-int beagleg_pru_init_motor_control(struct MotorControl *control) {
+int beagleg_pru_init_motor_ops(struct MotorOperations *ops) {
   const float min_accel = 10;
   // TODO(hzeller): we shouldn't have min accel; we should just clamp it to the
   // value the machine can do. Doing that for incoming
@@ -400,10 +400,10 @@ int beagleg_pru_init_motor_control(struct MotorControl *control) {
   prussdrv_pru_enable(0);
 
   // Set up operations.
-  control->user_data = NULL;  // not needed.
-  control->motor_enable = beagleg_motor_enable;
-  control->enqueue = beagleg_enqueue;
-  control->wait_queue_empty = beagleg_wait_queue_empty;
+  ops->user_data = NULL;  // not needed.
+  ops->motor_enable = beagleg_motor_enable;
+  ops->enqueue = beagleg_enqueue;
+  ops->wait_queue_empty = beagleg_wait_queue_empty;
   
   return 0;
 }
@@ -431,10 +431,10 @@ static int dummy_enqueue(void *ctx, const struct bg_movement *param, FILE *err_s
   return 0;
 }
 static void dummy_wait_queue_empty(void *ctx) {}
-void init_dummy_motor_control(struct MotorControl *control) {
-  control->user_data = NULL;
-  control->motor_enable = dummy_motor_enable;
-  control->enqueue = dummy_enqueue;
-  control->wait_queue_empty = dummy_wait_queue_empty;
+void init_dummy_motor_ops(struct MotorOperations *ops) {
+  ops->user_data = NULL;
+  ops->motor_enable = dummy_motor_enable;
+  ops->enqueue = dummy_enqueue;
+  ops->wait_queue_empty = dummy_wait_queue_empty;
 }
 

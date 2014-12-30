@@ -38,7 +38,7 @@ struct bg_movement {
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
-struct MotorControl {
+struct MotorOperations {
   void *user_data;
   
   // Waits for the queue to be empty and Enables/disables motors according to the
@@ -63,13 +63,13 @@ struct MotorControl {
 // This is essentially a singleton.
 // Gets min value of acceleration expected to do range-checks.
 //  Returns 0 on success, 1 on some error.
-int beagleg_pru_init_motor_control(struct MotorControl *control);
+int beagleg_pru_init_motor_ops(struct MotorOperations *control);
 
 // Shutdown motor control for good.
 void beagleg_pru_exit();
 void beagleg_pru_exit_nowait();
 
-// Create a dummy motor control
-void init_dummy_motor_control(struct MotorControl *control);
+// Create a dummy motor control; motor operations are discarded.
+void init_dummy_motor_ops(struct MotorOperations *control);
 
 #endif  // _BEAGLEG_MOTOR_INTERFACE_H_
