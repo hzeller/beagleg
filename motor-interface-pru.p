@@ -126,7 +126,7 @@ accel_calc_done:
 	SUB params.loops_accel, params.loops_accel, 1		; loops_accel--
 
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
-	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
+	;; more bits. Shift back: output_reg = hires_cycles >> DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
 
 	;; Correct Timing: Substract the number of cycles we have spent in this
@@ -163,7 +163,7 @@ calc_decel:
 	SUB params.loops_decel, params.loops_decel, 1	        ; loops_decel--
 
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
-	;; more bits. Shift back: output_reg = hires_cycles << DELAY_CYCLE_SHIFT
+	;; more bits. Shift back: output_reg = hires_cycles >> DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
 	
 	;; Correct timing: Substract the number of cycles we have spent here.
@@ -272,7 +272,7 @@ STEP_GEN:
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
 STEP_DELAY:				; Create time delay between steps.
-	SUB r1, r1, 1
+	SUB r1, r1, 1                   ; two cycles per loop.
 	QBNE STEP_DELAY, r1, 0
 
 	JMP STEP_GEN

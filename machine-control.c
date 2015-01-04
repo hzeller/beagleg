@@ -37,6 +37,8 @@
 #include "motor-operations.h"
 #include "motion-queue.h"
 
+#include "sim-firmware.h"
+
 static int usage(const char *prog, const char *msg) {
   if (msg) {
     fprintf(stderr, "%s\n\n", msg);
@@ -287,7 +289,9 @@ int main(int argc, char *argv[]) {
   // just ignore them on dummy.
   struct MotionQueue motion_backend;
   if (dry_run) {
-    init_dummy_motion_queue(&motion_backend);
+    //init_dummy_motion_queue(&motion_backend);
+    // For now, a dry-run runs the simulation.
+    init_sim_motion_queue(&motion_backend);
   } else {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions

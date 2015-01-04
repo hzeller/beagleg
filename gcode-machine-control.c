@@ -139,8 +139,9 @@ struct GCodeMachineControl {
 static void bring_path_to_halt(GCodeMachineControl_t *state);
 
 static void send_ok(GCodeMachineControl_t *state) {
-  if (state && state->msg_stream)
+  if (state && state->msg_stream) {
     fprintf(state->msg_stream, "ok\n");
+  }
 }
 
 // Dummy implementations of callbacks not yet handled.
@@ -324,7 +325,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 #endif
     next_speed = 0;
   }
-  
+
   float decel_fraction = 0;
   if (next_speed < target_pos->speed) {
     decel_fraction = 0.25;  // TODO: calculate proper number of steps.
