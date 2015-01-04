@@ -34,7 +34,7 @@
 
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
-#include "motor-interface.h"
+#include "motor-operations.h"
 #include "motion-queue.h"
 
 static int usage(const char *prog, const char *msg) {

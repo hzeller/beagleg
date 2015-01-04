@@ -25,7 +25,7 @@
 
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
-#include "motor-interface.h"
+#include "motor-operations.h"
 
 struct StatsData {
   struct BeagleGPrintStats *stats;

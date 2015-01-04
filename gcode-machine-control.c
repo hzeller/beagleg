@@ -16,6 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
+// TODO: this is motion planner and 'other stuff printers do' in one. Separate.
+
 #include "gcode-machine-control.h"
 
 #include <assert.h>
@@ -28,7 +30,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "motor-interface.h"
+#include "motor-operations.h"
 #include "gcode-parser.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.

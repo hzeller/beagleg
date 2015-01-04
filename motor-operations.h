@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _BEAGLEG_MOTOR_INTERFACE_H_
-#define _BEAGLEG_MOTOR_INTERFACE_H_
+#ifndef _BEAGLEG_MOTOR_OPERATIONS_H_
+#define _BEAGLEG_MOTOR_OPERATIONS_H_
 
 #include <stdio.h>
 
@@ -74,4 +74,4 @@ struct MotorOperations {
 int beagleg_init_motor_ops(struct MotionQueue *backend,
                            struct MotorOperations *control);
 
-#endif  // _BEAGLEG_MOTOR_INTERFACE_H_
+#endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

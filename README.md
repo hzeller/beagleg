@@ -38,8 +38,9 @@ The functionality is encapsulated in independently usable APIs.
       Depends on the motor-interface and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
-   - [motor-interface.h](./motor-interface.h) : Low-level motor motion C-API.
-      Prepares parameters to the even lower-level motion-queue.
+   - [motor-operations.h](./motor-operations.h) : Low-level motor motion C-API.
+      Prepares parameters to the even lower-level motion-queue, or can be
+      mocked out (which is what the print-stats program does).
 
    - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
       between motor-interface and hardware creating motion profiles in realtime.

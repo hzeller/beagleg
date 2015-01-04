@@ -26,7 +26,7 @@ PRUSS_LIBS=-Wl,-rpath=$(LIBDIR_APP_LOADER) -L$(LIBDIR_APP_LOADER) -lprussdrv
 PRU_BIN=motor-interface-pru_bin.h
 
 GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o
-OBJECTS=motor-interface.o pru-motion-queue.o $(GCODE_OBJECTS)
+OBJECTS=motor-operations.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TARGETS=machine-control gcode-print-stats
 
