@@ -39,13 +39,17 @@ The functionality is encapsulated in independently usable APIs.
       Provides the functionality provided by the `machine-control` binary.
 
    - [motor-operations.h](./motor-operations.h) : Low-level motor motion C-API.
-      Prepares parameters to the even lower-level motion-queue, or can be
+      Prepares parameters to the motion-queue backend, or can be
       mocked out (which is what the print-stats program does).
 
    - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
-      between motor-interface and hardware creating motion profiles in realtime.
-      The implementation is done in PRU, but is simplified enough to be able to
-      implement in any microcontroller or FPGA.
+      between motor-operations and hardware creating motion profiles in realtime.
+      The implementation is done in the BeagleBone-PRU, but is separated out
+      enough that it is not dependent on it: The required operations could be
+      implemented in microcontrollers or FPGAs (32 bit operations help...).
+      There is a simulation implementation (sim-firmware.c) that illustrates
+      what to do with the parameters. This one just outputs the would-be
+      result as CSV file (good for debugging).
      
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
