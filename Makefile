@@ -47,7 +47,7 @@ BeagleG-00A0.dtbo: BeagleG.dts
 %_bin.h : %.p
 	$(PASM) -V3 -c $<
 
-motor-interface.o : motor-interface-constants.h $(PRU_BIN)
+pru-motion-queue.o : motor-interface-constants.h $(PRU_BIN)
 $(PRU_BIN) : motor-interface-constants.h
 
 clean:
