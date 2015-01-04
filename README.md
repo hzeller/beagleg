@@ -7,13 +7,13 @@ acceleration and travel (right now: trapezoidal motion profile).
 
 See example here: http://www.youtube.com/watch?v=hIEY9077D64
 
-The motor-interface API allows to enqueue
-step-{count, {start,travel,end}-frequency}
-of 8 steppers that are controlled in a coordinated move (G1), with real-time
+The motor-operations API allows to enqueue operations with speed changes
+(transition between segments) or fixed speed (travel) of 8 steppers that are
+controlled in a coordinated move (G1), with real-time
 controlled steps at rates that can go beyond 500kHz.
 So: sufficient even for advanced step motors and drivers :)
 
-The [acceleration - travel - deceleration] motion profile is entirely
+The jerk/{accl-,decel-}eration motion profile is entirely
 created within the PRU from parameters sent by the host CPU (i.e. BeagleBone ARM)
 via a ring-buffer.
 The host CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
@@ -33,14 +33,18 @@ The functionality is encapsulated in independently usable APIs.
       everything into metric, absolute coordinates.
 
    - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C-API to
-      control a machine via G-Code: it receives G-Code events and emits
-      the necessary machine commands to MachineControl.
-      Depends on the motor-interface and gcode-parser APIs.
+      control a machine via G-Code: it receives G-Code events (implementing the
+      callbacks called by the parser), does motion
+      planning, axis mapping, speed/accleration segment joining and emits
+      the necessary machine commands to MotorOperations.
+      Depends on the motor-operations and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
    - [motor-operations.h](./motor-operations.h) : Low-level motor motion C-API.
-      Prepares parameters to the motion-queue backend, or can be
-      mocked out (which is what the print-stats program does).
+      Receives travel speeds or speed transitions and prepares parameters
+      for the discrete approximation in the motion-queue backend.
+      The print-stats binary has a different implementation that uses it to
+      determine print-time calculations.
 
    - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
       between motor-operations and hardware creating motion profiles in realtime.
@@ -48,7 +52,7 @@ The functionality is encapsulated in independently usable APIs.
       enough that it is not dependent on it: The required operations could be
       implemented in microcontrollers or FPGAs (32 bit operations help...).
       There is a simulation implementation (sim-firmware.c) that illustrates
-      what to do with the parameters. This one just outputs the would-be
+      what to do with the parameters. The simulation just outputs the would-be
       result as CSV file (good for debugging).
      
    - `determine-print-stats.h`: C-API to determine some basic stats about
