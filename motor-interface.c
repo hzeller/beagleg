@@ -252,69 +252,55 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   }
 
   // TODO: clamp acceleration to be a minimum value.
-  const float travel_speed = clip_hardware_frequency_limit(param->travel_speed);
-  const float v0 = param->start_speed;
-  const float v1 = param->end_speed;
-  if (v0 > travel_speed || v1 > travel_speed) {
-    fprintf(stderr, "Invalid parameters; v0=%.1f or v1=%.1f > than vt=%.1f\n",
-            v0, v1, travel_speed);
-    return 2;
-  }
-
-  // Calculate speeds
-  // First step while experimenting: assume start/endspeed always 0.
-  // TODO: take these into account (requires acceleration planning)
   const int total_loops = LOOPS_PER_STEP * defining_axis_steps;
-
-  if (param->acceleration <= 0) {
-    // Acceleration set to 0 or negative: we assume 'infinite' acceleration.
+  // There are three cases: either we accelerate, travel or decelerate.
+  if (param->v0 == param->v1) {
+    // Travel
     new_element.loops_accel = new_element.loops_decel = 0;
     new_element.loops_travel = total_loops;
-  }
-  else {
-    // Steps to reach requested speed at acceleration
-    // v = v0 + a*t -> t = (v - v0)/a
-    // s = a/2 * t^2; subsitution t from above: s = (v - v0)^2/(2*a)
-    const int accel_loops = LOOPS_PER_STEP *
-      (sq(travel_speed - v0) / (2.0 * param->acceleration));
-    const int decel_loops = LOOPS_PER_STEP *
-      (sq(travel_speed - v1) / (2.0 * param->acceleration));
+    const float travel_speed = clip_hardware_frequency_limit(param->v0);
+    new_element.travel_delay_cycles = cycles_per_second()
+      / (LOOPS_PER_STEP * travel_speed);
+  } else if (param->v0 < param->v1) {
+    // acclereate
+    new_element.loops_travel = new_element.loops_decel = 0;
+    new_element.loops_accel = total_loops;
 
-    // Check if we can reach the travel speed within the alotted time. If
-    // not, then this cannot really be handled here, but should've done
-    // in the planner already.
-    if (accel_loops + decel_loops > total_loops) {
-      fprintf(stderr, "Invalid parameters; accel=%d + decel=%d > total=%d\n",
-              accel_loops, decel_loops, total_loops);
-      return 2;
-    }
-
-    new_element.loops_accel = accel_loops;
-    new_element.loops_travel = total_loops - accel_loops - decel_loops;
-    new_element.loops_decel = decel_loops;
-
-    // To prime our accel_series_index, we need to know how far we are in
-    // acclerating from zero speed.
+    // v1 = v0 + a*t -> t = (v1 - v0)/a
+    // s = a/2 * t^2; subsitution t from above: s = (v1 - v0)^2/(2*a)
+    // a = (v1-v0)^2/(2*s)
+    float acceleration = sq(param->v1 - param->v0) / (2.0 * defining_axis_steps);
+    // If we accelerated from zero to our first speed, this is how many steps
+    // we needed. We need to go this index into our taylor series.
     const int accel_loops_from_zero = LOOPS_PER_STEP *
-      (sq(travel_speed - 0) / (2.0 * param->acceleration));
+      (sq(param->v0 - 0) / (2.0 * acceleration));
 
-    assert(accel_loops_from_zero >= new_element.loops_accel);
-    assert(accel_loops_from_zero >= new_element.loops_decel);
-    new_element.accel_series_index
-      = accel_loops_from_zero - new_element.loops_accel;
+    new_element.accel_series_index = accel_loops_from_zero;
     new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
-      * calcAccelerationCurveValueAt(new_element.accel_series_index,
-                                     param->acceleration);
+      * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration);
+  } else {  // v0 > v1
+    // decelerate
+    new_element.loops_travel = new_element.loops_accel = 0;
+    new_element.loops_decel = total_loops;
+
+    // v1 = v0 + a*t -> t = (v1 - v0)/a
+    // s = a/2 * t^2; subsitution t from above: s = (v1 - v0)^2/(2*a)
+    // a = (v1-v0)^2/(2*s)
+    float acceleration = sq(param->v0 - param->v1) / (2.0 * defining_axis_steps);
+
+    // We are into the taylor sequence this value up and reduce from there.
+    const int accel_loops_from_zero = LOOPS_PER_STEP *
+      (sq(param->v0 - 0) / (2.0 * acceleration));
+
+    new_element.accel_series_index = accel_loops_from_zero;
+    new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
+      * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration);
   }
-
-  // Higher accuracy travel speed delay loop
-  new_element.travel_delay_cycles = cycles_per_second() 
-    / (LOOPS_PER_STEP * travel_speed);
-
+  
   new_element.aux = param->aux_bits;
-
   new_element.state = STATE_FILLED;
   enqueue_element(&new_element);
+
   return 0;
 }
 

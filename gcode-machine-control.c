@@ -18,6 +18,7 @@
  */
 #include "gcode-machine-control.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -62,6 +63,45 @@ static const char kChannelLayout[] = "23140";
 // Output mapping from left to right.
 static const char kAxisMapping[] = "XYZEA";
 
+// The vector is ssentially a position in the GCODE_NUM_AXES dimensional
+// space. An AxisTarget has a position vector, in absolute machine coordinates, and a
+// speed when arriving at that position.
+// The speed is generally an aimed goal; if it cannot be reached, the AxisTarget will
+// be modified
+struct AxisTarget {
+  int position[GCODE_NUM_AXES];  // Absolute position at end of segment. In steps.
+
+  // Derived values
+  int delta[GCODE_NUM_AXES];     // Difference to previous position.
+  enum GCodeParserAxis defining_axis;  // index into defining axis.
+  float speed;                  // speed in steps/s on defining axis.
+  unsigned int aux_bits;        // Auxiliarry bits in this segment; set with M42
+};
+
+struct TargetBuffer {
+  unsigned write_pos;
+  unsigned read_pos;
+  struct AxisTarget ring_buffer[4];
+};
+
+// Initialize a new buffer.
+static void target_buffer_init(struct TargetBuffer *b);
+
+// Add a new target and return pointer. Makes sure that we never override
+static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b);
+
+// Get the last item written.
+static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b);
+
+// Returns number of available read items.
+static int buffer_peek_available(struct TargetBuffer *b);
+
+// Get the given target, delta 0 up to buffer_peek_available();
+static struct AxisTarget *buffer_peek(struct TargetBuffer *b, int delta);
+
+// Move on to the next read position.
+static void buffer_next(struct TargetBuffer *b);
+
 struct GCodeMachineControl {
   struct GCodeParserCb event_input;
   struct MotorOperations *motor_ops;
@@ -80,15 +120,21 @@ struct GCodeMachineControl {
                                          // physical output driver. This allows
                                          // to have a logical axis (e.g. X, Y,
                                          // Z) output to any physical driver.
-  // Current machine state
-  float current_feedrate_mm_per_sec;
-  float prog_speed_factor;               // Speed factor set by program (M220)
-  int machine_position[GCODE_NUM_AXES];  // Absolute position in steps.
   int direction_flip[GCODE_NUM_AXES];    // 1 or -1 for direction flip
-  unsigned int aux_bits;                 // set with M42
-
+  
+  // Current machine configuration
+  float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
+  float prog_speed_factor;               // Speed factor set by program (M220)
+  unsigned int aux_bits;                 // Set via M42.
+  
+  // Next buffered positions. Written by incoming gcode, read by outgoing
+  // motor movements.
+  struct TargetBuffer buffer;
+  
   FILE *msg_stream;
 };
+
+static void bring_path_to_halt(GCodeMachineControl_t *state);
 
 static void send_ok(GCodeMachineControl_t *state) {
   if (state && state->msg_stream)
@@ -122,6 +168,7 @@ static void dummy_wait_temperature(void *userdata) {
 }
 static void motors_enable(void *userdata, char b) {  
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  bring_path_to_halt(state);
   state->motor_ops->motor_enable(state->motor_ops->user_data, b);
   send_ok(state);
 }
@@ -156,15 +203,16 @@ static const char *special_commands(void *userdata, char letter, float value,
     switch ((int) value) {
     case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
     case 114:
-      fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\nok\n",
-              (1.0f * state->machine_position[AXIS_X]
-               / state->cfg.steps_per_mm[AXIS_X]),
-              (1.0f * state->machine_position[AXIS_Y]
-               / state->cfg.steps_per_mm[AXIS_Y]),
-              (1.0f * state->machine_position[AXIS_Z]
-               / state->cfg.steps_per_mm[AXIS_Z]),
-              (1.0f * state->machine_position[AXIS_E]
-               / state->cfg.steps_per_mm[AXIS_E]));
+      if (buffer_peek_available(&state->buffer)) {
+        struct AxisTarget *current = buffer_peek(&state->buffer, 0);
+        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\nok\n",
+                (1.0f * current->position[AXIS_X] / state->cfg.steps_per_mm[AXIS_X]),
+                (1.0f * current->position[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y]),
+                (1.0f * current->position[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]),
+                (1.0f * current->position[AXIS_E] / state->cfg.steps_per_mm[AXIS_E]));
+      } else {
+        fprintf(state->msg_stream, "// no current pos\nok\n");
+      }
       break;
     case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
     case 117: fprintf(state->msg_stream, "ok Msg: %s\n", remaining); break;
@@ -176,60 +224,153 @@ static const char *special_commands(void *userdata, char letter, float value,
   }
   return NULL;
 }
+
 static double euclid_distance(double x, double y, double z) {
   return sqrt(x*x + y*y + z*z);
 }
 
+static char same_sign(int a, int b) {
+  return !((a < 0) ^ (b < 0));
+}
+
+// Get the fractional speed for a particular axis.
+static float get_speed_for_axis(const struct AxisTarget *target,
+                                enum GCodeParserAxis request_axis) {
+  float speed = 0;
+  // The requested axis might be different than the defining axis,
+  // so get the relative speed of the defining axis.
+  if (target->delta[target->defining_axis] != 0) {
+    speed = fabsf(target->speed * target->delta[request_axis]
+                  / target->delta[target->defining_axis]);
+  }
+  return speed;
+}
+
 // Move the given number of machine steps for each axis.
 static void move_machine_steps(GCodeMachineControl_t *state,
-			       float requested_feedrate_mm_s,
-			       int machine_steps[]) {
+                               const struct AxisTarget *last_pos,
+                               struct AxisTarget *target_pos,
+                               const struct AxisTarget *upcoming) {
+  if (target_pos->delta[target_pos->defining_axis] == 0) {
+    //printf("HZ: skipping entry; last speed=%f\n", last_pos->speed);
+    assert(last_pos->speed == 0);  // Last segment should've slowed down to 0
+    return;
+  }
   struct bg_movement command;
   bzero(&command, sizeof(command));
-  char any_work = 0;
+
+  assert(target_pos->speed > 0);  // Speed is always a positive scalar.
+  
+  // Aux bits are set synchronously with what we need.
+  command.aux_bits = target_pos->aux_bits;
+  const enum GCodeParserAxis defining_axis = target_pos->defining_axis;
+  
+  // Let's see what our defining axis had as speed in the previous segment. The
+  // last segment might have had a different defining axis, so we calculate what the
+  // the fraction of the speed that our _current_ defining axis had.
+  const float last_speed = get_speed_for_axis(last_pos, defining_axis);
+
+  // If we turn around, the last step should've slowed down to zero first.
+  char assert_cond = last_speed == 0 || same_sign(last_pos->delta[defining_axis],
+                                                  target_pos->delta[defining_axis]);
+  if (!assert_cond) {
+    printf("HZ: speed is %f; delta[%d]=%d --> delta[%d]=%d (speed=%f)\n",
+           last_speed,
+           defining_axis, last_pos->delta[defining_axis],
+           defining_axis, target_pos->delta[defining_axis],
+           last_pos->speed);
+  }
+  assert(assert_cond);
+
+  // We are going to manipulate the delta values, do that on a copy.
   int axis_steps[GCODE_NUM_AXES];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    axis_steps[i] = machine_steps[i];
-    if (axis_steps[i] != 0) any_work = 1;
+    axis_steps[i] = target_pos->delta[i];
   }
 
-  if (!any_work) {
-    return;  // Nothing to do.
+  if (last_speed != target_pos->speed) {
+    command.v0 = last_speed;
+    command.v1 = target_pos->speed;
+    printf("<<< %7.2f -> %7.2f (accel)\n", command.v0, command.v1);
+    
+    // Now map axis steps to actual motor driver
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      int accel_steps = 0.25 * axis_steps[i];   // TODO: properly calculate number of steps.
+      axis_steps[i] -= accel_steps;  // remaining steps.
+      const int motor_for_axis = state->axis_to_driver[i];
+      if (motor_for_axis < 0) continue;  // no mapping.
+      command.steps[motor_for_axis] = state->direction_flip[i] * accel_steps;
+    }
+
+    if (state->cfg.synchronous) {
+      state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    }
+    state->motor_ops->enqueue(state->motor_ops->user_data,
+                              &command, state->msg_stream);
   }
 
-  // Aux bits are set synchronously with what we need.
-  command.aux_bits = state->aux_bits;
-
-  // The defining axis is the axis that requires to go the most number of steps.
-  // it defines the frequency to go.
-  enum GCodeParserAxis defining_axis = AXIS_X;
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (abs(axis_steps[i]) > abs(axis_steps[defining_axis]))
-      defining_axis = (enum GCodeParserAxis) i;
+  // What is the speed of our current defining axis in the next step ? If it is
+  // less than current, we try to match that.
+  // If it turns around (i.e. the sign of the axis in question changes), we need
+  // to slow down to zero and let the next segment accelerate from there.
+  float next_speed = get_speed_for_axis(upcoming, defining_axis);
+  if (!same_sign(target_pos->delta[upcoming->defining_axis],
+                 upcoming->delta[upcoming->defining_axis])) {
+#if 0
+    printf("HZ: next: change of direction in upcoming axis: %d vs. %d\n",
+           target_pos->delta[upcoming->defining_axis], upcoming->delta[upcoming->defining_axis]);
+#endif
+    next_speed = 0;
+  }
+  
+  float decel_fraction = 0;
+  if (next_speed < target_pos->speed) {
+    decel_fraction = 0.25;  // TODO: calculate proper number of steps.
+  }
+  
+  {  // regular move.
+    command.v0 = target_pos->speed;
+    command.v1 = target_pos->speed;
+    printf("=== %7.2f; axis=%d steps=%d\n", target_pos->speed, defining_axis, target_pos->delta[defining_axis]);
+    
+    // Now map axis steps to actual motor driver
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      int decel_steps = decel_fraction * axis_steps[i];
+      const int motor_for_axis = state->axis_to_driver[i];
+      if (motor_for_axis < 0) continue;  // no mapping.
+      command.steps[motor_for_axis] = state->direction_flip[i] * (axis_steps[i] - decel_steps);
+      axis_steps[i] = decel_steps;
+    }
+    
+    if (state->cfg.synchronous) {
+      state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    }
+    state->motor_ops->enqueue(state->motor_ops->user_data,
+                              &command, state->msg_stream);
   }
 
-  command.travel_speed
-    = requested_feedrate_mm_s * state->cfg.steps_per_mm[defining_axis];
-  command.acceleration = state->highest_accel;  // Trimmed below.
+  if (next_speed < target_pos->speed) {
+    command.v0 = target_pos->speed;
+    command.v1 = next_speed;
+    printf(">>> %7.2f -> %7.2f (decel)\n", command.v0, command.v1);
+    
+    // Now map axis steps to actual motor driver
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      const int motor_for_axis = state->axis_to_driver[i];
+      if (motor_for_axis < 0) continue;  // no mapping.
+      command.steps[motor_for_axis] = state->direction_flip[i] * axis_steps[i];
+    }
+    
+    if (state->cfg.synchronous) {
+      state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    }
+    state->motor_ops->enqueue(state->motor_ops->user_data,
+                              &command, state->msg_stream);
 
-  // If we're in the euclidian space, choose the step-frequency according to
-  // the relative feedrate of the defining axis.
-  // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
-  if (defining_axis == AXIS_X
-      || defining_axis == AXIS_Y
-      || defining_axis == AXIS_Z) {
-    // We need to calculate the feedrate in real-world coordinates as each
-    // axis can have a different amount of steps/mm
-    const float total_xyz_length = 
-      euclid_distance(axis_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
-		      axis_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
-		      axis_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
-    const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
-    const float defining_axis_length = axis_steps[defining_axis]/steps_per_mm;
-    const float euclid_fraction = fabsf(defining_axis_length) / total_xyz_length;
-    command.travel_speed *= euclid_fraction;
+    target_pos->speed = command.v1;  // The speed we leave this segment.
   }
 
+#if NEW_CONTROL
   // Now: range limiting. We trim speed and acceleration to what the weakest
   // involved axis can handle.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -255,12 +396,12 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     }
     command.travel_speed = ZERO_FEEDRATE_OVERRIDE_HZ;
   }
-
+  
   // Now map axis steps to actual motor driver
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     const int motor_for_axis = state->axis_to_driver[i];
     if (motor_for_axis < 0) continue;  // no mapping.
-    command.steps[motor_for_axis] = state->direction_flip[i] * axis_steps[i];
+    command.steps[motor_for_axis] = state->direction_flip[i] * target_pos->delta[i];
   }
 
   if (state->cfg.synchronous) {
@@ -268,7 +409,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   }
   state->motor_ops->enqueue(state->motor_ops->user_data,
                                 &command, state->msg_stream);
-  
+
   if (state->cfg.debug_print && state->msg_stream) {
     float defining_feedrate
       = command.travel_speed / state->cfg.steps_per_mm[defining_axis];
@@ -290,26 +431,90 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 	      defining_feedrate, defining_accel);
     }
   }
+#endif
+}
+
+// If we have enough data in the queue, issue motor move.
+static void issue_motor_move_if_possible(GCodeMachineControl_t *state) {
+  struct TargetBuffer *buffer = &state->buffer;
+  if (buffer_peek_available(buffer) >= 3) {
+    move_machine_steps(state,
+                       buffer_peek(buffer, 0),  // Current machine position
+                       buffer_peek(buffer, 1),  // Position we want to move to.
+                       buffer_peek(buffer, 2)); // next upcoming.
+    buffer_next(buffer);
+  }
 }
 
 static void machine_move(void *userdata, float feedrate, const float axis[]) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  struct TargetBuffer *buffer = &state->buffer;
 
-  // Real world -> machine coordinates
-  int new_machine_position[GCODE_NUM_AXES];
-  int differences[GCODE_NUM_AXES];
+  // We always have a previous position.
+  struct AxisTarget *previous = buffer_get_last_written(buffer);
+  struct AxisTarget *new_pos = buffer_add_next_target(buffer);
+  int max_steps = -1;
+  enum GCodeParserAxis defining_axis = AXIS_X;
+  
+  // Real world -> machine coordinates. Here, we are rounding to the next full
+  // step, but we never accumulate the error, as we always use the absolute position
+  // as reference.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    new_machine_position[i] = roundf(axis[i] * state->cfg.steps_per_mm[i]);
-    differences[i] = new_machine_position[i] - state->machine_position[i];
+    new_pos->position[i] = roundf(axis[i] * state->cfg.steps_per_mm[i]);
+    new_pos->delta[i] = new_pos->position[i] - previous->position[i];
+
+    // The defining axis is the one that has to travel the most steps. It defines
+    // the frequency to go.
+    // All the other axes are doing a fraction of the defining axis.
+    if (abs(new_pos->delta[i]) > max_steps) {
+      max_steps = abs(new_pos->delta[i]);
+      defining_axis = (enum GCodeParserAxis) i;
+    }
   }
+  new_pos->aux_bits = state->aux_bits;
+  new_pos->defining_axis = defining_axis;
+  
+  // Now let's calculate the travel speed in steps/s on the defining axis.
+  if (max_steps > 0) {
+    float travel_speed;
+    travel_speed = feedrate * state->cfg.steps_per_mm[defining_axis];
 
-  // TODO: for acceleration planning, we need to do a whole bunch more here.
+    // If we're in the euclidian space, choose the step-frequency according to
+    // the relative feedrate of the defining axis.
+    // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
+    if (defining_axis == AXIS_X || defining_axis == AXIS_Y || defining_axis == AXIS_Z) {
+      // We need to calculate the feedrate in real-world coordinates as each
+      // axis can have a different amount of steps/mm
+      const float total_xyz_len_mm =
+        euclid_distance(new_pos->delta[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
+                        new_pos->delta[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
+                        new_pos->delta[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
+      const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
+      const float defining_axis_len_mm = new_pos->delta[defining_axis] / steps_per_mm;
+      const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
+      travel_speed *= euclid_fraction;
+    }
+    new_pos->speed = travel_speed;
+  } else {
+    new_pos->speed = 0;
+  }
+  
+  issue_motor_move_if_possible(state);
+}
 
-  move_machine_steps(state, feedrate, differences);
-
-  // This is now our new position.
-  memcpy(state->machine_position, new_machine_position,
-	 sizeof(state->machine_position));
+static void bring_path_to_halt(GCodeMachineControl_t *state) {
+  // TODO: enqueue a new position that is the same position as the last
+  // one seen, but zero speed. That will allow the previous segment to
+  // slow down. Enqueue.
+  struct AxisTarget *previous = buffer_get_last_written(&state->buffer);
+  struct AxisTarget *new_pos = buffer_add_next_target(&state->buffer);
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    new_pos->position[i] = previous->position[i];
+    new_pos->delta[i] = 0;
+  }
+  new_pos->speed = 0;
+  new_pos->aux_bits = state->aux_bits;
+  issue_motor_move_if_possible(state);
 }
 
 static void machine_G1(void *userdata, float feed, const float *axis) {
@@ -332,6 +537,7 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
 
 static void machine_dwell(void *userdata, float value) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  bring_path_to_halt(state);
   state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
   usleep((int) (value * 1000));
   send_ok(state);
@@ -358,9 +564,10 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
 
+#if NEW_TARGET
   // TODO(hzeller): use home_switch info.
   // Goal is to bring back the machine the negative amount of steps.
-  for (int i = 0; i <= GCODE_NUM_AXES; ++i) {
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if ((1 << i) & axes_bitmap) {
       if (i != AXIS_E) {  // 'homing' of filament never makes sense.
 	machine_pos_differences[i] = -state->machine_position[i];
@@ -387,6 +594,7 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   }
   move_machine_steps(state, state->g0_feedrate_mm_per_sec,
 		     machine_pos_differences);
+#endif
   send_ok(state);
 }
 
@@ -484,7 +692,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   const char *axis_mapping = cfg.axis_mapping;
   if (axis_mapping == NULL) axis_mapping = "XYZEABC";
   for (int pos = 0; *axis_mapping; pos++, axis_mapping++) {
-    if (pos > BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
+    if (pos >= BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
       fprintf(stderr, "Axis mapping string has more elements than available %d "
               "connectors (remaining=\"..%s\").\n", pos, axis_mapping);
       return cleanup_state(result);
@@ -529,6 +737,15 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   }
   if (error_count)
     return cleanup_state(result);
+
+  target_buffer_init(&result->buffer);
+
+  // Initial position.
+  struct AxisTarget *init_axis = buffer_add_next_target(&result->buffer);
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    init_axis->position[i] = 0;
+  }
+  init_axis->speed = 0;
   
   result->event_input.user_data = result;    
   result->event_input.coordinated_move = &machine_G1;
@@ -567,4 +784,33 @@ void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   config->synchronous = 0;
   config->channel_layout = kChannelLayout;
   config->axis_mapping = kAxisMapping;
+}
+
+
+// TargetBuffer implementation
+static void target_buffer_init(struct TargetBuffer *b) {
+  bzero(b, sizeof(*b));
+}
+static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b) {
+  assert(buffer_peek_available(b) < 3);
+  struct AxisTarget *result = &b->ring_buffer[b->write_pos];
+  b->write_pos = (b->write_pos + 1) % 4;
+  return result;
+}
+static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b) {
+  assert(buffer_peek_available(b) > 0);
+  return &b->ring_buffer[(b->write_pos + 3) % 4];
+}
+static int buffer_peek_available(struct TargetBuffer *b) {
+  return (b->write_pos + 4 - b->read_pos) % 4;
+}
+static struct AxisTarget *buffer_peek(struct TargetBuffer *b, int i) {
+  assert(buffer_peek_available(b) > i);
+  return &b->ring_buffer[(b->read_pos + i) % 4];
+}
+
+// Move on to the next read position.
+static void buffer_next(struct TargetBuffer *b) {
+  assert(buffer_peek_available(b) > 0);
+  b->read_pos = (b->read_pos + 1) % 4;
 }

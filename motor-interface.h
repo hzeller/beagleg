@@ -24,15 +24,21 @@ enum {
   BEAGLEG_NUM_MOTORS = 8
 };
 
+// The movement command send to motor operations either changes speed, or
+// provides a steady speed.
 struct bg_movement {
-  // Speed is steps/second of the axis with the highest number of steps, which
-  // is the fastest axis. All other axes are scaled down accordingly.
-  float start_speed;
-  float travel_speed;
-  float end_speed;
+  // Speed is steps/s. If initial speed and final speed differ, the motor will
+  // accelerate or decelerate to reach the final speed within the given number of
+  // alotted steps of the axis with the most number of steps; all other axes are
+  // scaled accordingly.
+  float v0;     // initial speed
+  float v1;     // final speed
 
-  float acceleration;       // steps/s^2 for fastest axis.
-
+  // Not used yet.
+  //float jerk;   // jerk in steps/s^3; Only needed if speeds are different.
+  
+  // Bits that are set in parallel with the motor control that should be set at the
+  // beginning of the motor movement.
   unsigned char aux_bits;   // Aux-bits to switch.
 
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.

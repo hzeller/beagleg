@@ -32,6 +32,8 @@ struct StatsData {
   struct GCodeParserCb machine_delegatee;
 };
 
+// GCode parser event receivers, that forward calls to the delegate
+// but also determine relevant height information.
 static void forwarding_set_speed_factor(void *userdata, float f) {
   struct StatsData *data = (struct StatsData*)userdata;
   data->machine_delegatee.set_speed_factor(data->machine_delegatee.user_data, f);
@@ -91,7 +93,9 @@ static const char *forwarding_unprocessed(void *userdata, char letter, float val
                                              letter, value, remaining);
 }
 
+// Motor operation simulation that determines the time spent.
 static void stats_motor_enable(void *ctx, char on) {}
+
 static int stats_enqueue(void *ctx, const struct bg_movement *param, FILE *err_stream) {
   struct BeagleGPrintStats *stats = (struct BeagleGPrintStats*)ctx;
   int max_steps = 0;
@@ -100,11 +104,10 @@ static int stats_enqueue(void *ctx, const struct bg_movement *param, FILE *err_s
     if (steps > max_steps)
       max_steps = steps;
   }
-  if (max_steps > 0) {
-    // Speed is given as frequency.
-    // TODO: take acceleration into account.
-    stats->total_time_seconds += max_steps / param->travel_speed;
-  }
+
+  // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
+  stats->total_time_seconds += 2 * max_steps / (param->v0 + param->v1);
+  //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param->v0, param->v1, max_steps);
   return 0;
 }
 static void stats_wait_queue_empty(void *ctx) {}
