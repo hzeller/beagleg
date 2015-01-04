@@ -291,7 +291,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   if (last_speed != target_pos->speed) {
     command.v0 = last_speed;
     command.v1 = target_pos->speed;
-    printf("<<< %7.2f -> %7.2f (accel)\n", command.v0, command.v1);
+    //printf("<<< %7.2f -> %7.2f (accel)\n", command.v0, command.v1);
     
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -331,7 +331,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   {  // regular move.
     command.v0 = target_pos->speed;
     command.v1 = target_pos->speed;
-    printf("=== %7.2f; axis=%d steps=%d\n", target_pos->speed, defining_axis, target_pos->delta[defining_axis]);
+    //printf("=== %7.2f; axis=%d steps=%d\n", target_pos->speed, defining_axis, target_pos->delta[defining_axis]);
     
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -352,7 +352,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   if (next_speed < target_pos->speed) {
     command.v0 = target_pos->speed;
     command.v1 = next_speed;
-    printf(">>> %7.2f -> %7.2f (decel)\n", command.v0, command.v1);
+    //printf(">>> %7.2f -> %7.2f (decel)\n", command.v0, command.v1);
     
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {

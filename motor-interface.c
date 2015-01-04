@@ -23,43 +23,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
-#include <pruss_intc_mapping.h>
-#include <prussdrv.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "motor-interface-constants.h"
-
-// Generated PRU code from motor-interface-pru.p
-#include "motor-interface-pru_bin.h"
-
-#define GPIO_0_ADDR 0x44e07000	// memory space mapped to GPIO-0	
-#define GPIO_1_ADDR 0x4804c000	// memory space mapped to GPIO-1
-#define GPIO_MMAP_SIZE 0x2000
-
-#define GPIO_OE 0x134           // setting direction.
-#define GPIO_DATAOUT 0x13c      // Set all the bits
-
-#define MOTOR_COUNT 8
-
-#define MOTOR_OUT_BITS				\
-  ((uint32_t) ( (1<<MOTOR_1_STEP_BIT)		\
-		| (1<<MOTOR_2_STEP_BIT)		\
-		| (1<<MOTOR_3_STEP_BIT)		\
-		| (1<<MOTOR_4_STEP_BIT)		\
-		| (1<<MOTOR_5_STEP_BIT)		\
-		| (1<<MOTOR_6_STEP_BIT)		\
-		| (1<<MOTOR_7_STEP_BIT)		\
-		| (1<<MOTOR_8_STEP_BIT) ))
-
-// Direction bits are a contiguous chunk, just a bit shifted.
-#define DIRECTION_OUT_BITS ((uint32_t) (0xFF << DIRECTION_GPIO1_SHIFT))
+#include "motion-queue.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2
@@ -67,137 +37,13 @@
 // more than one bit output per step (probably only with hand-built drivers).
 #define LOOPS_PER_STEP (1 << 1)
 
-#define DEBUG_QUEUE
-#define PRU_NUM 0
-
-struct QueueElement {
-  // Queue header
-  uint8_t state;           // see motor-interface-constants.h STATE_* constants.
-  uint8_t direction_bits;
-
-  // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
-  uint16_t loops_accel;    // Phase 1: loops spent in acceleration
-  uint16_t loops_travel;   // Phase 2: lops spent in travel
-  uint16_t loops_decel;    // Phase 3: loops spent in deceleration
-  uint16_t aux;            // right now: only lowest 2 bits.
-  uint32_t accel_series_index;  // index in taylor
-
-  uint32_t hires_accel_cycles;  // acceleration delay cycles.
-  uint32_t travel_delay_cycles; // travel delay cycles.
-
-  uint32_t fractions[MOTOR_COUNT];  // fixed point fractions to add each step.
-} __attribute__((packed));
-
-struct EndswitchMask {
-  // Mask for the output map when a particular endswitch hits. The first array
-  // element is the switch in question. The second the direction we are turning.
-  // This is important, because we want a switch e.g. on the left be stopping
-  // the stepper if it goes left, but we want to allow it to 'escape' going
-  // to the right.
-  uint32_t mask[3][2];
-};
-
-// The communication with the PRU. We memory map the static RAM in the PRU
-// and write stuff into it from here. Mostly this is a ring-buffer with
-// commands to execute, but also configuration data, such as what to do when
-// an endswitch fires.
-struct PRUCommunication {
-  volatile struct QueueElement ring_buffer[QUEUE_LEN];
-  volatile struct EndswitchMask endswitch;
-};
-
-// State of motor interface. TODO: put all in one struct instead of storing
-// multiple toplevel fields.
+// TODO: don't store this singleton like, but keep in user_data of the MotorOperations
 static float hardware_frequency_limit_;
-static volatile struct PRUCommunication *pru_data_;
-static unsigned int queue_pos_;
-
-// GPIO registers.
-volatile uint32_t *gpio_0 = NULL;
-volatile uint32_t *gpio_1 = NULL;
 
 static float sq(float x) { return x * x; }  // square a number
 
 // delay loops per second.
 static double cycles_per_second() { return 100e6; } // two cycles per loop.
-
-static int map_gpio() {
-  int fd = open("/dev/mem", O_RDWR);
-  gpio_0 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
-				     MAP_SHARED, fd, GPIO_0_ADDR);
-  if (gpio_0 == MAP_FAILED) { perror("mmap() GPIO-0"); return 0; }
-  gpio_1 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
-				     MAP_SHARED, fd, GPIO_1_ADDR);
-  if (gpio_1 == MAP_FAILED) { perror("mmap() GPIO-1"); return 0; }
-  close(fd);
-  return 1;
-}
-
-static void unmap_gpio() {
-  munmap((void*)gpio_0, GPIO_MMAP_SIZE); gpio_0 = NULL;
-  munmap((void*)gpio_1, GPIO_MMAP_SIZE); gpio_1 = NULL;
-}
-
-static volatile struct PRUCommunication *map_pru_communication() {
-  void *result;
-  prussdrv_map_prumem(PRUSS0_PRU0_DATARAM, &result);
-  bzero(result, sizeof(*pru_data_));
-  pru_data_ = (struct PRUCommunication*) result;
-  for (int i = 0; i < QUEUE_LEN; ++i) {
-    pru_data_->ring_buffer[i].state = STATE_EMPTY;
-  }
-  queue_pos_ = 0;
-  return pru_data_;
-}
-
-static volatile struct QueueElement *next_queue_element() {
-  queue_pos_ %= QUEUE_LEN;
-  while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
-  }
-  return &pru_data_->ring_buffer[queue_pos_++];
-}
-
-#ifdef DEBUG_QUEUE
-static void DumpQueueElement(volatile const struct QueueElement *e) {
-  if (e->state == STATE_EXIT) {
-    fprintf(stderr, "enqueue[%02td]: EXIT\n", e - pru_data_->ring_buffer);
-  } else {
-    struct QueueElement copy = *e;
-    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d "
-	    "ad: %d; td: %d ",
-	    e - pru_data_->ring_buffer, copy.direction_bits,
-	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
-	    copy.loops_accel + copy.loops_travel + copy.loops_decel,
-	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
-	    copy.travel_delay_cycles);
-#if 1
-    for (int i = 0; i < MOTOR_COUNT; ++i) {
-      if (copy.fractions[i] == 0) continue;  // not interesting.
-      fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
-    }
-#endif
-    fprintf(stderr, "\n");
-  }	    
-}
-#endif
-
-static void enqueue_element(struct QueueElement *element) {
-  const uint8_t state_to_send = element->state;
-  assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
-  // Initially, we copy everything with 'STATE_EMPTY', then flip the state
-  // to avoid a race condition while copying.
-  element->state = STATE_EMPTY; 
-  volatile struct QueueElement *queue_element = next_queue_element();
-  *queue_element = *element;
-
-  // Fully initialized. Tell busy-waiting PRU by flipping the state.
-  queue_element->state = state_to_send;
-#ifdef DEBUG_QUEUE
-  DumpQueueElement(queue_element);
-#endif
-}
 
 // Clip speed to maximum we can reach with hardware.
 static float clip_hardware_frequency_limit(float v) {
@@ -212,6 +58,7 @@ static double calcAccelerationCurveValueAt(int index, double acceleration) {
   return c0 * (sqrt(index + 1) - sqrt(index));
 }
 
+#if 0
 // Is acceleration in acceptable range ?
 static char test_acceleration_ok(float acceleration) {
   if (acceleration <= 0)
@@ -230,10 +77,12 @@ static char test_acceleration_ok(float acceleration) {
   }
   return 1;
 }
+#endif
 
-static int beagleg_enqueue_internal(const struct bg_movement *param,
+static int beagleg_enqueue_internal(struct MotionQueue *backend,
+                                    const struct bg_movement *param,
 				    int defining_axis_steps) {
-  struct QueueElement new_element;
+  struct MotionSegment new_element;
   new_element.direction_bits = 0;
 
   // The defining_axis_steps is the number of steps of the axis that requires
@@ -243,7 +92,7 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   // cycles for a 0 1 transition. So in that case we have 31 bit fraction
   // and 1 bit that overflows and toggles for the steps we want to generate.
   const uint64_t max_fraction = 0xFFFFFFFF / LOOPS_PER_STEP;
-  for (int i = 0; i < MOTOR_COUNT; ++i) {
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
     if (param->steps[i] < 0) {
       new_element.direction_bits |= (1 << i);
     }
@@ -299,17 +148,19 @@ static int beagleg_enqueue_internal(const struct bg_movement *param,
   
   new_element.aux = param->aux_bits;
   new_element.state = STATE_FILLED;
-  enqueue_element(&new_element);
+  backend->enqueue(&new_element);
 
   return 0;
 }
 
-static int beagleg_enqueue(void *ctx,
-                           const struct bg_movement *param, FILE *err_stream) {
+static int beagleg_enqueue(void *ctx, const struct bg_movement *param,
+                           FILE *err_stream) {
+  struct MotionQueue *backend = (struct MotionQueue*)ctx;
+  
   // TODO: this function should automatically split this into multiple segments
   // each with the maximum number of steps.
   int biggest_value = abs(param->steps[0]);
-  for (int i = 0; i < MOTOR_COUNT; ++i) {
+  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
     if (abs(param->steps[i]) > biggest_value) {
       biggest_value = abs(param->steps[i]);
     }
@@ -326,101 +177,29 @@ static int beagleg_enqueue(void *ctx,
 	    65535 / LOOPS_PER_STEP, biggest_value);
     return 2;
   }
-  return beagleg_enqueue_internal(param, biggest_value);
-}
-
-static void beagleg_motor_enable_internal_nowait(char on) {
-  // Enable pin is inverse logic: -EN
-  gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
-}
-
-static void beagleg_wait_queue_empty(void *ctx) {
-  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
-  }
+  return beagleg_enqueue_internal(backend, param, biggest_value);
 }
 
 static void beagleg_motor_enable(void *ctx, char on) {
-  beagleg_wait_queue_empty(ctx);
-  beagleg_motor_enable_internal_nowait(on);
+  struct MotionQueue *backend = (struct MotionQueue*)ctx;
+  backend->wait_queue_empty();
+  backend->motor_enable(on);
 }
 
-int beagleg_pru_init_motor_ops(struct MotorOperations *ops) {
-  const float min_accel = 10;
-  // TODO(hzeller): we shouldn't have min accel; we should just clamp it to the
-  // value the machine can do. Doing that for incoming
-  if (!test_acceleration_ok(min_accel))
-    return 1;
+static void beagleg_wait_queue_empty(void *ctx) {
+  struct MotionQueue *backend = (struct MotionQueue*)ctx;
+  backend->wait_queue_empty();
+}
+
+int beagleg_init_motor_ops(struct MotionQueue *backend,
+                           struct MotorOperations *ops) {
   hardware_frequency_limit_ = 1e6;    // Don't go over 1 Mhz
-
-  if (!map_gpio()) {
-    fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
-    return 1;
-  }
-
-  // Prepare all the pins we need for output. All the other bits are inputs,
-  // so the STOP switch bits are automatically prepared for input.
-  gpio_0[GPIO_OE/4] = ~(MOTOR_OUT_BITS | (1 << AUX_1_BIT) | (1 << AUX_2_BIT));
-  gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
-
-  beagleg_motor_enable_internal_nowait(0);  // motors off initially.
-
-  tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
-  prussdrv_init();
-
-  /* Get the interrupt initialized */
-  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
-  if (ret) {
-    fprintf(stderr, "prussdrv_open() failed (%d)\n", ret);
-    return ret;
-  }
-  prussdrv_pruintc_init(&pruss_intc_initdata);
-  if (map_pru_communication() == NULL) {
-    fprintf(stderr, "Couldn't map PRU memory for queue.\n");
-    return 1;
-  }
-
-  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, PRUcode, sizeof(PRUcode));
-  prussdrv_pru_enable(0);
-
+  
   // Set up operations.
-  ops->user_data = NULL;  // not needed.
+  ops->user_data = backend;
   ops->motor_enable = beagleg_motor_enable;
   ops->enqueue = beagleg_enqueue;
   ops->wait_queue_empty = beagleg_wait_queue_empty;
   
   return 0;
 }
-
-void beagleg_pru_exit_nowait(void) {
-  prussdrv_pru_disable(PRU_NUM);
-  prussdrv_exit();
-  beagleg_motor_enable_internal_nowait(0);
-  unmap_gpio();
-}
-
-void beagleg_pru_exit(void) {
-  struct QueueElement end_element;
-  bzero(&end_element, sizeof(end_element));
-  end_element.state = STATE_EXIT;
-  enqueue_element(&end_element);
-  beagleg_wait_queue_empty(NULL);
-  beagleg_pru_exit_nowait();
-}
-
-
-// Dummy for dry-run
-static void dummy_motor_enable(void *ctx, char on) {}
-static int dummy_enqueue(void *ctx, const struct bg_movement *param, FILE *err_stream) {
-  return 0;
-}
-static void dummy_wait_queue_empty(void *ctx) {}
-void init_dummy_motor_ops(struct MotorOperations *ops) {
-  ops->user_data = NULL;
-  ops->motor_enable = dummy_motor_enable;
-  ops->enqueue = dummy_enqueue;
-  ops->wait_queue_empty = dummy_wait_queue_empty;
-}
-

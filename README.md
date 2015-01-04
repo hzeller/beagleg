@@ -27,10 +27,6 @@ enqueues them to the realtime unit.
 ## APIs
 The functionality is encapsulated in independently usable APIs.
 
-   - [motor-interface.h](./motor-interface.h) : Low-level motor move C-API to
-      enqueue motor moves. The implementation provided is using the
-      PRU to generate fast and realtime accurate steps.
-
    - [gcode-parser.h](./gcode-parser.h) : C-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
       care of many internals, e.g. it automatically translates
@@ -42,11 +38,22 @@ The functionality is encapsulated in independently usable APIs.
       Depends on the motor-interface and gcode-parser APIs.
       Provides the functionality provided by the `machine-control` binary.
 
+   - [motor-interface.h](./motor-interface.h) : Low-level motor motion C-API.
+      Prepares parameters to the even lower-level motion-queue.
+
+   - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
+      between motor-interface and hardware creating motion profiles in realtime.
+      The implementation is done in PRU, but is simplified enough to be able to
+      implement in any microcontroller or FPGA.
+     
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
       print time, filament used etc. Implementation is mostly an example using
       gcode-parser.h.
       Used in the `gcode-print-stats` binary.
+
+The interfaces are typically C-structs with function pointers which allows for
+easy testing or simple translation into languages such as Go or C++.
 
 ## Build
 The Makefile is assuming that you build this either on the Beaglebone Black

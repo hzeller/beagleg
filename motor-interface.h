@@ -18,7 +18,10 @@
  */
 #ifndef _BEAGLEG_MOTOR_INTERFACE_H_
 #define _BEAGLEG_MOTOR_INTERFACE_H_
+
 #include <stdio.h>
+
+struct MotionQueue;
 
 enum {
   BEAGLEG_NUM_MOTORS = 8
@@ -64,18 +67,11 @@ struct MotorOperations {
   void (*wait_queue_empty)(void *user);
 };
 
-// Initialize beagleg pru motor control. Initializes operations in
-// the given struct.
-// This is essentially a singleton.
-// Gets min value of acceleration expected to do range-checks.
-//  Returns 0 on success, 1 on some error.
-int beagleg_pru_init_motor_ops(struct MotorOperations *control);
-
-// Shutdown motor control for good.
-void beagleg_pru_exit();
-void beagleg_pru_exit_nowait();
-
-// Create a dummy motor control; motor operations are discarded.
-void init_dummy_motor_ops(struct MotorOperations *control);
+// Initialize beagleg motor control that writes MotionSegments into
+// a MotorQueue. Takes MotorQueue backend and initializes the operations in
+// MotorOperations.
+// Returns 0 on success, != 0 on some error.
+int beagleg_init_motor_ops(struct MotionQueue *backend,
+                           struct MotorOperations *control);
 
 #endif  // _BEAGLEG_MOTOR_INTERFACE_H_

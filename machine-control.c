@@ -35,6 +35,7 @@
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
 #include "motor-interface.h"
+#include "motion-queue.h"
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {
@@ -282,9 +283,11 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "-R (repeat) only makes sense with a filename.");
   }
 
-  struct MotorOperations motor_operations;
+  // The backend for our stepmotor control. We either talk to the PRU or
+  // just ignore them on dummy.
+  struct MotionQueue motion_backend;
   if (dry_run) {
-    init_dummy_motor_ops(&motor_operations);
+    init_dummy_motion_queue(&motion_backend);
   } else {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
@@ -293,9 +296,12 @@ int main(int argc, char *argv[]) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    beagleg_pru_init_motor_ops(&motor_operations);
+    init_pru_motion_queue(&motion_backend);
   }
 
+  struct MotorOperations motor_operations;
+  beagleg_init_motor_ops(&motion_backend, &motor_operations);
+  
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
@@ -306,14 +312,10 @@ int main(int argc, char *argv[]) {
   }
 
   const char caught_signal = (ret == 2);
-  if (!dry_run) {
-    if (caught_signal) {
-      fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
-      beagleg_pru_exit_nowait();
-    } else {
-      beagleg_pru_exit();
-    }
+  if (caught_signal) {
+    fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
   }
+  motion_backend.shutdown(!caught_signal);
 
   free(bind_addr);
   return ret;
