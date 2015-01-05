@@ -17,6 +17,20 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+Gnuplot, showing speed and steps on the left axis, acceleration on
+the right axis.
+
+set grid       # easier to follow
+set xtics 0.5
+set yrange  [0:3000]  # Accleration is on different scale.
+set ytics 1000
+set y2range [-1500:1500]  # Accleration is on different scale.
+set y2tics 1000
+set ytics nomirror  # Don't intervene with y2tics
+plot "/tmp/foo.x" using 1:2 title "speed" with lines, '' using 1:3 title "acceleration" with lines axes x1y2, '' using 1:4 title "steps" with lines
+
+ */
 #include "sim-firmware.h"
 
 #include <stdint.h>
@@ -26,6 +40,9 @@
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
 
+#define CPU_CYCLES_PER_LOOP 2
+#define CPU_FREQUENCY 200e6
+
 struct HardwareState {
   // Internal state
   uint32_t m[MOTION_MOTOR_COUNT];
@@ -33,6 +50,7 @@ struct HardwareState {
 
 static double sim_time;
 static int sim_steps[MOTION_MOTOR_COUNT];  // we are only looking at the defining axis steps.
+static double previous_velocity = 0;
 
 static struct HardwareState state;
 
@@ -44,6 +62,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
   
   bzero(&state, sizeof(state));
 
+  char is_first = 1;
   for (;;) {
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       int before = (state.m[i] & 0x80000000) != 0;
@@ -60,6 +79,11 @@ static void sim_enqueue(struct MotionSegment *segment) {
     uint32_t delay_loops = 0;
     uint32_t remainder = 0;
     if (segment->loops_accel > 0) {
+      if (is_first) {
+        fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-cycles=%u\n",
+                segment->accel_series_index, segment->hires_accel_cycles);
+        is_first = 0;
+      }
       if (segment->accel_series_index != 0) {
         const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
         const uint32_t divisor = (segment->accel_series_index << 2) + 1;
@@ -69,12 +93,21 @@ static void sim_enqueue(struct MotionSegment *segment) {
       ++segment->accel_series_index;
       --segment->loops_accel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
+      if (segment->loops_accel == 0) {
+        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-cycles=%u\n",
+                segment->accel_series_index, segment->hires_accel_cycles);
+      }
     }
     else if (segment->loops_travel > 0) {
       --segment->loops_travel;
       delay_loops = segment->travel_delay_cycles;
     }
     else if (segment->loops_decel > 0) {
+      if (is_first) {
+        fprintf(stderr, "Decel start: accel-series-idx=%5u, accel-cycles=%u\n",
+                segment->accel_series_index, segment->hires_accel_cycles);
+        is_first = 0;
+      }
       const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
       const uint32_t divisor = (segment->accel_series_index << 2) - 1;
       segment->hires_accel_cycles += divident / divisor;
@@ -82,14 +115,21 @@ static void sim_enqueue(struct MotionSegment *segment) {
       --segment->accel_series_index;
       --segment->loops_decel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
+      if (segment->loops_decel == 0) {
+        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-cycles=%u\n",
+                segment->accel_series_index, segment->hires_accel_cycles);
+      }
     }
     else {
       break;  // done.
     }
-    double wait_time = (1/300e6) * delay_loops * 2;  // each delay loops consumes two cycles.
+    double wait_time = (1/CPU_FREQUENCY) * delay_loops * CPU_CYCLES_PER_LOOP;
+    double velocity = (1 / wait_time) / 2;  // in Hz. One wave is two sleep-cycles, so div 2.
+    double acceleration = (velocity - previous_velocity) / wait_time;
+    previous_velocity = velocity;
     sim_time += wait_time;
-    // Total time; frequency; steps walked for all motors.
-    printf("%f %f ", sim_time, 2 / wait_time);
+    // Total time; frequency=speed; steps walked for all motors.
+    printf("%f %f %f ", sim_time, velocity, acceleration);
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       printf("%d ", sim_steps[i]);
     }

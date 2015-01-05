@@ -40,8 +40,8 @@ struct bg_movement {
   // Not used yet.
   //float jerk;   // jerk in steps/s^3; Only needed if speeds are different.
   
-  // Bits that are set in parallel with the motor control that should be set at the
-  // beginning of the motor movement.
+  // Bits that are set in parallel with the motor control that should be
+  // set at the beginning of the motor movement.
   unsigned char aux_bits;   // Aux-bits to switch.
 
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
