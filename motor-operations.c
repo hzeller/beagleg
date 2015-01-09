@@ -54,7 +54,8 @@ static double calcAccelerationCurveValueAt(int index, double acceleration) {
   // counter_freq * sqrt(2 / accleration)
   const double accel_factor = cycles_per_second()
     * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration)) / LOOPS_PER_STEP;
-  const double c0 = accel_factor * 0.67605;
+  // The approximation is pretty far off in the first step; adjust.
+  const double c0 = (index == 0) ? accel_factor * 0.67605 : accel_factor;
   return c0 * (sqrt(index + 1) - sqrt(index));
 }
 
@@ -116,14 +117,14 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
     new_element.loops_accel = total_loops;
 
     // v1 = v0 + a*t -> t = (v1 - v0)/a
-    // s = a/2 * t^2; subsitution t from above: s = (v1 - v0)^2/(2*a)
-    // a = (v1-v0)^2/(2*s)
-    float acceleration = sq(param->v1 - param->v0) / (2.0 * defining_axis_steps);
+    // s = a/2 * t^2 + v0 * t; subsitution t from above.
+    // a = (v1^2-v0^2)/(2*s)
+    float acceleration = (sq(param->v1) - sq(param->v0)) / (2.0 * defining_axis_steps);
     // If we accelerated from zero to our first speed, this is how many steps
     // we needed. We need to go this index into our taylor series.
     const int accel_loops_from_zero = LOOPS_PER_STEP *
       (sq(param->v0 - 0) / (2.0 * acceleration));
-
+ 
     new_element.accel_series_index = accel_loops_from_zero;
     new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
       * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration);
@@ -132,11 +133,7 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
     new_element.loops_travel = new_element.loops_accel = 0;
     new_element.loops_decel = total_loops;
 
-    // v1 = v0 + a*t -> t = (v1 - v0)/a
-    // s = a/2 * t^2; subsitution t from above: s = (v1 - v0)^2/(2*a)
-    // a = (v1-v0)^2/(2*s)
-    float acceleration = sq(param->v0 - param->v1) / (2.0 * defining_axis_steps);
-
+    float acceleration = (sq(param->v0) - sq(param->v1)) / (2.0 * defining_axis_steps);
     // We are into the taylor sequence this value up and reduce from there.
     const int accel_loops_from_zero = LOOPS_PER_STEP *
       (sq(param->v0 - 0) / (2.0 * acceleration));
