@@ -28,7 +28,7 @@ set ytics 1000
 set y2range [-1500:1500]  # Accleration is on different scale.
 set y2tics 1000
 set ytics nomirror  # Don't intervene with y2tics
-plot "/tmp/foo.x" using 1:2 title "speed" with lines, '' using 1:3 title "acceleration" with lines axes x1y2, '' using 1:5 title "steps" with lines
+plot "/tmp/foo.data" using 1:3 title "acceleration steps/s^2" with lines axes x1y2, '' using 1:2 title "speed steps/s" with lines, '' using 1:5 title "steps" with lines;
 
  */
 #include "sim-firmware.h"
@@ -186,9 +186,9 @@ static void sim_enqueue(struct MotionSegment *segment) {
     sim_time += wait_time;
     double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
     // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
-    printf("%f %f %f %d ", sim_time, velocity, acceleration, delay_loops);
+    printf("%12.6f %12.4f %12.4f %10d      ", sim_time, velocity, acceleration, delay_loops);
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-      printf("%d ", sim_steps[i]);
+      printf("%3d ", sim_steps[i]);
     }
     printf("\n");
   }
@@ -206,4 +206,8 @@ void init_sim_motion_queue(struct MotionQueue *queue) {
   queue->wait_queue_empty = &sim_wait_queue_empty;
   queue->motor_enable = &sim_motor_enable;
   queue->shutdown = &sim_shutdown;
+
+  // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
+  printf("#%11s %12s %12s %10s      ax0 ax1 ax2 ax3 ax4 ax5 ax6 ax7\n",
+         "time", "speed", "accel", "timercnt");
 }
