@@ -62,6 +62,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
   bzero(&state, sizeof(state));
 
   char is_first = 1;
+  uint32_t remainder = 0;
   for (;;) {
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       int before = (state.m[i] & 0x80000000) != 0;
@@ -76,47 +77,54 @@ static void sim_enqueue(struct MotionSegment *segment) {
     sim_time += 160e-9;  // Updating the motor takes this time.
     
     uint32_t delay_loops = 0;
-    uint32_t remainder = 0;
     if (segment->loops_accel > 0) {
       if (is_first) {
-        fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-cycles=%u\n",
-                segment->accel_series_index, segment->hires_accel_cycles);
+        fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
+                segment->accel_series_index,
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
         is_first = 0;
       }
       if (segment->accel_series_index != 0) {
         const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
         const uint32_t divisor = (segment->accel_series_index << 2) + 1;
-        segment->hires_accel_cycles -= divident / divisor;
+        segment->hires_accel_cycles -= (divident / divisor);
         remainder = divident % divisor;
       }
       ++segment->accel_series_index;
       --segment->loops_accel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       if (segment->loops_accel == 0) {
-        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-cycles=%u\n",
-                segment->accel_series_index, segment->hires_accel_cycles);
+        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
+                segment->accel_series_index,
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
     }
     else if (segment->loops_travel > 0) {
       --segment->loops_travel;
       delay_loops = segment->travel_delay_cycles;
+      if (is_first) {
+        fprintf(stderr, "travel. timer-cycles=%u\n", delay_loops);
+        is_first = 0;
+      }
     }
     else if (segment->loops_decel > 0) {
       if (is_first) {
-        fprintf(stderr, "Decel start: accel-series-idx=%5u, accel-cycles=%u\n",
-                segment->accel_series_index, segment->hires_accel_cycles);
+        fprintf(stderr, "Decel start: accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
+                segment->accel_series_index,
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
         is_first = 0;
       }
       const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
       const uint32_t divisor = (segment->accel_series_index << 2) - 1;
-      segment->hires_accel_cycles += divident / divisor;
+      segment->hires_accel_cycles += (divident / divisor);
       remainder = divident % divisor;
       --segment->accel_series_index;
       --segment->loops_decel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       if (segment->loops_decel == 0) {
-        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-cycles=%u\n",
-                segment->accel_series_index, segment->hires_accel_cycles);
+        fprintf(stderr, "Decel end  : accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
+                segment->accel_series_index,
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
     }
     else {
