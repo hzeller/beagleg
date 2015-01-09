@@ -40,8 +40,7 @@ plot "/tmp/foo.x" using 1:2 title "speed" with lines, '' using 1:3 title "accele
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
 
-#define CPU_CYCLES_PER_LOOP 2
-#define CPU_FREQUENCY 200e6
+#define LOOPS_PER_STEP (1 << 1)
 
 struct HardwareState {
   // Internal state
@@ -123,8 +122,8 @@ static void sim_enqueue(struct MotionSegment *segment) {
     else {
       break;  // done.
     }
-    double wait_time = (1/CPU_FREQUENCY) * delay_loops * CPU_CYCLES_PER_LOOP;
-    double velocity = (1 / wait_time) / 2;  // in Hz. One wave is two sleep-cycles, so div 2.
+    double wait_time = 1.0 * delay_loops / TIMER_FREQUENCY;
+    double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
     double acceleration = (velocity - previous_velocity) / wait_time;
     previous_velocity = velocity;
     sim_time += wait_time;
