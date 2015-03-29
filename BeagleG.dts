@@ -21,7 +21,10 @@
     part-number = "BeagleG";  /* BeagleG/Bumps 'cape' */
     version = "00A0";
 
-    exclusive-use = "pruss";   /* TODO: mention all the GPIO pins */
+    exclusive-use = "pruss",  // Programmable realtime unit
+    		  "P9.22", "P9.21", "P9.18", "P9.17", "P9.42A", "P9.26", "P9.24", "P9.41A", // step
+		  "P8.12", "P8.11", "P8.16", "P8.15", "P9.15",  "P9.23", "P9.14", "P9.16",  // dir
+		  "tscadc";   // Analog digital converter
 
     fragment@0 {
         target = <&am33xx_pinmux>;
@@ -71,6 +74,8 @@
         };
     };
 
+    // TODO: some other fragment mentioning adc 0, 1, 2 ?
+    
     fragment@1 {
         target = <&ocp>;
         __overlay__ {

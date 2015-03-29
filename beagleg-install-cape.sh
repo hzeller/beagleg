@@ -1,4 +1,9 @@
 #!/bin/bash
+# TODO: make more robust - this might change depending on the distribution.
+#
+# Essentially what we are doing is to embed the DTBO file in the initrd file, so that it
+# is available right away on boot-up. That is the quickest way to enable the cape at boot-up
+# short of compiling the device-tree file into the kernel.
 ##
 
 set -e
