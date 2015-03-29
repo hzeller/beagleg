@@ -39,7 +39,7 @@ machine-control: machine-control.o $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 BeagleG-00A0.dtbo: BeagleG.dts
-	dtc -O dtb -o $@ -b 0 -@ $^
+	dtc -I dts -O dtb -o $@ -b 0 -@ $^
 
 %.o: %.c
 	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $< 
