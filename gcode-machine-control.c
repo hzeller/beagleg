@@ -299,13 +299,13 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   }
 
   if (last_speed != target_pos->speed) {
-    command.v0 = last_speed;
-    command.v1 = target_pos->speed;
+    command.v0 = last_speed;           // Last speed of defining axis
+    command.v1 = target_pos->speed;    // New speed of defining axis
     //printf("<<< %7.2f -> %7.2f (accel)\n", command.v0, command.v1);
     
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      int accel_steps = 0.25 * axis_steps[i];   // TODO: properly calculate number of steps.
+      int accel_steps = 0.4 * axis_steps[i];   // TODO: properly calculate number of steps.
       axis_steps[i] -= accel_steps;  // remaining steps.
       const int motor_for_axis = state->axis_to_driver[i];
       if (motor_for_axis < 0) continue;  // no mapping.
@@ -335,7 +335,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 
   float decel_fraction = 0;
   if (next_speed < target_pos->speed) {
-    decel_fraction = 0.25;  // TODO: calculate proper number of steps.
+    decel_fraction = 0.4;  // TODO: calculate proper number of steps.
   }
   
   {  // regular move.
@@ -345,7 +345,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      int decel_steps = decel_fraction * axis_steps[i];
+      int decel_steps = decel_fraction * axis_steps[i];   // we take care of these later.
       const int motor_for_axis = state->axis_to_driver[i];
       if (motor_for_axis < 0) continue;  // no mapping.
       command.steps[motor_for_axis] = state->direction_flip[i] * (axis_steps[i] - decel_steps);
@@ -359,6 +359,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
                               &command, state->msg_stream);
   }
 
+  // We guarantee the next segment, that we are not faster than it requests.
   if (next_speed < target_pos->speed) {
     command.v0 = target_pos->speed;
     command.v1 = next_speed;
@@ -448,7 +449,6 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 static void issue_motor_move_if_possible(GCodeMachineControl_t *state) {
   struct TargetBuffer *buffer = &state->buffer;
   if (buffer_peek_available(buffer) >= 3) {
-    fprintf(stderr, "HZ: motor move possible\n");
     move_machine_steps(state,
                        buffer_peek(buffer, 0),  // Current machine position
                        buffer_peek(buffer, 1),  // Position we want to move to.

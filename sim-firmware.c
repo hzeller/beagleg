@@ -25,7 +25,7 @@ set grid       # easier to follow
 set ytics nomirror  # Don't intervene with y2tics
 set y2tics
 # X axis shows up at 7ths place
-plot "/tmp/foo.data" using 1:3 title "acceleration: steps/s^2" with lines axes x1y2 lw 2, '' using 1:2 title "speed: steps/s" with lines lw 2, '' using 1:7 title "steps" with lines lw 2;
+plot "/tmp/foo.data" using 1:3 title "acceleration: steps/s^2" with lines axes x1y2 lw 3, '' using 1:2 title "speed: steps/s" with lines lw 3, '' using 1:7 title "steps" with lines lw 3;
  */
 #include "sim-firmware.h"
 
