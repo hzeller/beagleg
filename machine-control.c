@@ -45,13 +45,13 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  --steps-mm <axis-steps>   : steps/mm, comma separated "
+	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] "
 	  "(Default 160,160,160,40,0, ...).\n"
 	  "                              (negative for reverse)\n"
 	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
-	  "comma separated (Default: 200,200,90,10,0, ...).\n"
+	  "comma separated[*] (Default: 200,200,90,10,0, ...).\n"
 	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
-	  "comma separated (Default 4000,4000,1000,10000,0, ...).\n"
+	  "comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
 #if 0   // not yet implemented
 	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma "
 	  "separated\n"
@@ -62,8 +62,8 @@ static int usage(const char *prog, const char *msg) {
 	  "                               values > 0 are actively clipped. "
 	  "(Default: 100,100,100,-1,-1, ...)\n"
 #endif
-	  "  --axis-mapping            : Axis letter mapped to which motor "
-          "connector (=string pos)\n"
+	  "  --axis-mapping            : Axis letter mapped to which "
+          "motor connector (=string pos)\n"
 	  "                              Use letter or '_' for empty slot. "
 	  "(Default: 'XYZEABC')\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
@@ -77,7 +77,7 @@ static int usage(const char *prog, const char *msg) {
 	  "(Default: off).\n"
 	  "  -R                        : Repeat file forever.\n",
 	  prog);
-  fprintf(stderr, "All comma separated axis numerical values are in the "
+  fprintf(stderr, "[*] All comma separated axis numerical values are in the "
 	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
   fprintf(stderr, "(the actual mapping to a connector happens with "
           "--axis-mapping)\n");
@@ -97,7 +97,7 @@ static int send_file_to_machine(struct MachineControlConfig *config,
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, stderr);
     ret = gcodep_parse_stream(fd,
-                              gcode_machine_control_get_input(machine_control),
+                              gcode_machine_control_event_receiver(machine_control),
                               stderr);
     gcode_machine_control_delete(machine_control);
   } while (ret == 0 && do_loop);
@@ -159,7 +159,7 @@ static int run_server(struct MachineControlConfig *config,
       = gcode_machine_control_new(config, motor_ops, msg_stream);
     process_result
       = gcodep_parse_stream(connection,
-                            gcode_machine_control_get_input(machine_control),
+                            gcode_machine_control_event_receiver(machine_control),
                             msg_stream);
     gcode_machine_control_delete(machine_control);
     fclose(msg_stream);

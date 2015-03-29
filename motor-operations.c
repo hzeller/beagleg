@@ -78,7 +78,7 @@ static char test_acceleration_ok(float acceleration) {
 #endif
 
 static int beagleg_enqueue_internal(struct MotionQueue *backend,
-                                    const struct bg_movement *param,
+                                    const struct MotorMovement *param,
 				    int defining_axis_steps) {
   struct MotionSegment new_element;
   new_element.direction_bits = 0;
@@ -146,7 +146,7 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
   return 0;
 }
 
-static int beagleg_enqueue(void *ctx, const struct bg_movement *param,
+static int beagleg_enqueue(void *ctx, const struct MotorMovement *param,
                            FILE *err_stream) {
   struct MotionQueue *backend = (struct MotionQueue*)ctx;
   

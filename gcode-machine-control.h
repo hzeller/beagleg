@@ -104,7 +104,7 @@ GCodeMachineControl_t *gcode_machine_control_new(
                        FILE *msg_stream);
 
 // Get the struct to receive events.
-struct GCodeParserCb *gcode_machine_control_get_input(GCodeMachineControl_t *object);
+struct GCodeParserCb *gcode_machine_control_event_receiver(GCodeMachineControl_t *object);
 
 void gcode_machine_control_delete(GCodeMachineControl_t *object);
 

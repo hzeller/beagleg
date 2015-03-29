@@ -59,7 +59,10 @@ enum GCodeParserAxis gcodep_letter2axis(char letter);
 // The first parameter in any callback is the "user_data" data pointer member.
 struct GCodeParserCb {
   void *user_data;  // Context which is passed in each call of these functions.
-  
+
+  void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
+  void (*gcode_finished)(void *);          // FYI: Finished parsing.
+
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 

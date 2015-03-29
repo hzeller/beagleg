@@ -96,7 +96,7 @@ static const char *forwarding_unprocessed(void *userdata, char letter, float val
 // Motor operation simulation that determines the time spent.
 static void stats_motor_enable(void *ctx, char on) {}
 
-static int stats_enqueue(void *ctx, const struct bg_movement *param, FILE *err_stream) {
+static int stats_enqueue(void *ctx, const struct MotorMovement *param, FILE *err_stream) {
   struct BeagleGPrintStats *stats = (struct BeagleGPrintStats*)ctx;
   int max_steps = 0;
   for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
@@ -134,7 +134,7 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
   GCodeMachineControl_t *machine_control
     = gcode_machine_control_new(config, &stats_motor_control, NULL);
 
-  data.machine_delegatee = *gcode_machine_control_get_input(machine_control);
+  data.machine_delegatee = *gcode_machine_control_event_receiver(machine_control);
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));

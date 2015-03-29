@@ -63,6 +63,12 @@ struct GCodeParser {
   AxesRegister axes_pos;
 };
 
+static void dummy_gcode_start(void *user) {
+  fprintf(stderr, "Start parsing.\n");
+}
+static void dummy_gcode_finished(void *user) {
+  fprintf(stderr, "Finish parsing.\n");
+}
 static void dummy_set_speed_factor(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_speed_factor(%.1f)\n", f);
 }
@@ -154,6 +160,10 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   }
 
   // Set some reasonable defaults for unprovided callbacks:
+  if (!result->callbacks.gcode_start)
+    result->callbacks.gcode_start = &dummy_gcode_start;
+  if (!result->callbacks.gcode_finished)
+    result->callbacks.gcode_finished = &dummy_gcode_finished;
   if (!result->callbacks.go_home)
     result->callbacks.go_home = &dummy_go_home;
   if (!result->callbacks.set_fanspeed)
@@ -439,6 +449,7 @@ int gcodep_parse_stream(int input_fd,
   GCodeParser_t *parser = gcodep_new(parse_events);
   arm_signal_handler();
   char buffer[8192];
+  parser->callbacks.gcode_start(parse_events->user_data);
   while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
     gcodep_parse_line(parser, buffer, err_stream);
   }
@@ -449,6 +460,8 @@ int gcodep_parse_stream(int input_fd,
   }
   fclose(gcode_stream);
   gcodep_delete(parser);
-  
+
+  parser->callbacks.gcode_finished(parse_events->user_data);
+
   return caught_signal ? 2 : 0;
 }

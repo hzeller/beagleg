@@ -29,16 +29,16 @@ enum {
 
 // The movement command send to motor operations either changes speed, or
 // provides a steady speed.
-struct bg_movement {
+struct MotorMovement {
   // Speed is steps/s. If initial speed and final speed differ, the motor will
   // accelerate or decelerate to reach the final speed within the given number of
   // alotted steps of the axis with the most number of steps; all other axes are
-  // scaled accordingly.
+  // scaled accordingly. Uses jerk-settings to increase/decrease acceleration; the
+  // acceleration is zero at the end of the move.
   float v0;     // initial speed
   float v1;     // final speed
 
-  // Not used yet.
-  //float jerk;   // jerk in steps/s^3; Only needed if speeds are different.
+  float jerk;   // jerk in steps/s^3; Only needed if speeds are different.
   
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.
@@ -61,15 +61,17 @@ struct MotorOperations {
   // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  int (*enqueue)(void *user, const struct bg_movement *param, FILE *err_stream);
+  int (*enqueue)(void *user, const struct MotorMovement *param, FILE *err_stream);
 
   // Wait, until all elements in the ring-buffer are consumed.
   void (*wait_queue_empty)(void *user);
 };
 
-// Initialize beagleg motor control that writes MotionSegments into
-// a MotorQueue. Takes MotorQueue backend and initializes the operations in
-// MotorOperations.
+// Initialize beagleg motor operations.
+// The MotorOperations struct is initialized with functions to enqueue MotorMovement requests.
+// The implementation connects that with the MotionQueue that accepts lower level
+// MotionSegments. MotionQueue is our backend.
+//
 // Returns 0 on success, != 0 on some error.
 int beagleg_init_motor_ops(struct MotionQueue *backend,
                            struct MotorOperations *control);

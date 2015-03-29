@@ -22,14 +22,10 @@ Gnuplot, showing speed and steps on the left axis, acceleration on
 the right axis.
 
 set grid       # easier to follow
-set xtics 0.5
-set yrange  [0:3000]  # Accleration is on different scale.
-set ytics 1000
-set y2range [-1500:1500]  # Accleration is on different scale.
-set y2tics 1000
 set ytics nomirror  # Don't intervene with y2tics
-plot "/tmp/foo.data" using 1:3 title "acceleration steps/s^2" with lines axes x1y2, '' using 1:2 title "speed steps/s" with lines, '' using 1:5 title "steps" with lines;
-
+set y2tics
+# X axis shows up at 7ths place
+plot "/tmp/foo.data" using 1:3 title "acceleration: steps/s^2" with lines axes x1y2 lw 2, '' using 1:2 title "speed: steps/s" with lines lw 2, '' using 1:7 title "steps" with lines lw 2;
  */
 #include "sim-firmware.h"
 
@@ -103,6 +99,9 @@ static void sim_enqueue(struct MotionSegment *segment) {
   
   bzero(&state, sizeof(state));
 
+#if JERK_EXPERIMENT
+  uint32_t jerk_index = 1;
+#endif
   char is_first = 1;
   uint32_t remainder = 0;
   for (;;) {
@@ -119,12 +118,39 @@ static void sim_enqueue(struct MotionSegment *segment) {
     sim_time += 160e-9;  // Updating the motor takes this time.
     
     uint32_t delay_loops = 0;
-
+    
     // Higher resolution delay if we had fractional counts. Used to better calculate acceleration
     // for display purposes.
     double hires_delay = 0;
 
-    if (segment->loops_accel > 0) {
+#if JERK_EXPERIMENT
+    if (segment->jerk_start > 0) {
+      if (is_first) {
+        fprintf(stderr, "jerk start: jerk-timer-cycles=%.3f\n",
+                segment->jerk_motion);
+        is_first = 0;
+      }
+      // TODO: index 0 ?
+      // TODO: is it 2* ?
+      segment->jerk_motion -= 2*segment->jerk_motion / ((3 * jerk_index) + 1);
+      --segment->jerk_start;
+      ++jerk_index;
+      delay_loops = segment->jerk_motion;
+      hires_delay = segment->jerk_motion;
+      if (hires_delay < 0) {
+        fprintf(stderr, "Got less than 0 at index %d\n", jerk_index);
+        segment->jerk_start = 0;
+        hires_delay = delay_loops = 30000;
+      }
+      if (segment->jerk_start == 0) {
+        fprintf(stderr, "jerk end  : jerk-timer-cycles=%.3f\n",
+                segment->jerk_motion);
+        is_first = 1;
+      }
+    }
+    else
+#endif
+      if (segment->loops_accel > 0) {
       if (is_first) {
         fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
                 segment->accel_series_index,

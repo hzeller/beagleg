@@ -26,15 +26,20 @@
 #define MOTION_MOTOR_COUNT 8
 
 // Lowlevel interface allowing to enqueue MotionSegments to the hardware.
-// The regular scheduled motion planning connects to the realtime hardware
-// using this queue.
+// The motion planning running on the host-OS prepares these parameters
+// to be interpreted by some realtime hardware.
+// Both systems are connected by this queue.
 //
 // This contains the pre-calculated parameters for efficient hardware-generation
 // of the accleration profile.
 // These are the parameters enqueued between motor-interface and the
 // processor/hardware unit creating the realtime accurate motion profile.
 //
-// We have one implementation here, which uses the BeagleBone PRU, but the
+// There are different implementations
+//  - The main implementation uses the BeagleBone PRU.
+//  - There is a simulation implementation that mimicks the operation in the hardware
+//    and outputs some graphs (sim-firmware.{h,c})
+//  - A 'dummy' implementation does nothing. Good for dry-run situations.
 // operations are basic enough to be executed by any realtime implementation
 // using a microcontroller or FPGA.
 // Also useful for testing.
@@ -42,8 +47,9 @@
 struct MotionSegment {
   // Queue header
   uint8_t state;           // see motor-interface-constants.h STATE_* constants.
-  uint8_t direction_bits;
 
+  uint8_t direction_bits;
+  
   // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
   uint16_t loops_accel;    // Phase 1: loops spent in acceleration
   uint16_t loops_travel;   // Phase 2: lops spent in travel
@@ -55,6 +61,15 @@ struct MotionSegment {
   uint32_t travel_delay_cycles; // travel delay cycles.
 
   uint32_t fractions[MOTION_MOTOR_COUNT]; // fixed point fractions to add each step.
+
+#if JERK_EXPERIMENT
+  /*
+   * The following not handled yet in PRU, just experimental in sim right now.
+   */
+  uint16_t jerk_start;
+  uint16_t jerk_stop;
+  float jerk_motion;
+#endif
 } __attribute__((packed));
 
 // Available operations towards the queue.
