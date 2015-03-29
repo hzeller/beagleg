@@ -67,29 +67,25 @@ The interfaces are typically C-structs with function pointers which allows for
 easy testing or simple translation into languages such as Go or C++.
 
 ## Build
-The Makefile is assuming that you build this either on the Beaglebone Black
-directly, or using a cross compiler (see Makefile).
+To build, we need the BeagleG code and the PRU assembler with supporting library.
+The BeagleG repository is set up in a way that the PRU assembler is checked out via
+a sub-module to make these things simple.
 
-You need to have checked out https://github.com/beagleboard/am335x_pru_package
-which provides the pasm PRU assembler and the library to push this code to the
-PRU.
+Clone the BeagleG repository with the `--recursive` flag to get this sub-module
 
-    # Check out and build am335 package
-    git clone https://github.com/beagleboard/am335x_pru_package.git
-    cd am335x_pru_package/
-    cd pru_sw/utils/pasm_source ; ./linuxbuild ; cd -
-    CROSS_COMPILE="" make -C pru_sw/app_loader/interface/
-    cd ..
-
-    # Check out BeagleG and build
-    git clone https://github.com/hzeller/beagleg.git
-    cd beagleg
-    make
+     git clone --recursive https://github.com/hzeller/beagleg.git
 
 (If you are a github user, you might want to use the git protocol).
 
-If you run into compile problems, make sure to have both, am335x_pru_package and
-beagleg up-to-date from git.
+Then just
+
+     cd beagleg
+     make
+
+If you are looking at the code and developing on a non-Beaglebone machine, pass an empty
+`ARM_COMPILE_FLAGS` environment variable:
+
+     ARM_COMPILE_FLAGS="" make
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,

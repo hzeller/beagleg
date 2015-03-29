@@ -9,14 +9,15 @@
 # and set the prefix
 #CROSS_COMPILE?=arm-arago-linux-gnueabi-
 
-# Tuning options for ARM CPU.
-ARM_OPTIONS?=-mtune=cortex-a8 -march=armv7-a
+# Tuning options for ARM CPU. Unset this in an environment variable if compiled on
+# a different system.
+ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 
 # Location of am335x package https://github.com/beagleboard/am335x_pru_package
-AM335_BASE=../am335x_pru_package/pru_sw
-PASM=$(AM335_BASE)/utils/pasm
-LIBDIR_APP_LOADER?=$(AM335_BASE)/app_loader/lib
-INCDIR_APP_LOADER?=$(AM335_BASE)/app_loader/include
+AM335_BASE=am335x_pru_package
+PASM=$(AM335_BASE)/pru_sw/utils/pasm
+LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
+INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D_XOPEN_SOURCE=500 -O3 $(ARM_OPTIONS)
 LDFLAGS+=-lpthread -lm
@@ -44,8 +45,11 @@ BeagleG-00A0.dtbo: BeagleG.dts
 %.o: %.c
 	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $< 
 
-%_bin.h : %.p
+%_bin.h : %.p $(PASM)
 	$(PASM) -V3 -c $<
+
+$(PASM):
+	make -C $(AM335_BASE)
 
 pru-motion-queue.o : motor-interface-constants.h $(PRU_BIN)
 motor-operations.o : motor-interface-constants.h
