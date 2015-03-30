@@ -104,7 +104,10 @@ static void sim_enqueue(struct MotionSegment *segment) {
 #endif
   char is_first = 1;
   uint32_t remainder = 0;
+  const char *msg = "";
+
   for (;;) {
+    // Increment by motor fraction.
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       int before = (state.m[i] & 0x80000000) != 0;
       state.m[i] += segment->fractions[i];
@@ -115,6 +118,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
       }
     }
 
+    msg = "";
     sim_time += 160e-9;  // Updating the motor takes this time.
     
     uint32_t delay_loops = 0;
@@ -126,6 +130,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
 #if JERK_EXPERIMENT
     if (segment->jerk_start > 0) {
       if (is_first) {
+        msg = "# jerk";
         fprintf(stderr, "jerk start: jerk-timer-cycles=%.3f\n",
                 segment->jerk_motion);
         is_first = 0;
@@ -152,6 +157,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
 #endif
       if (segment->loops_accel > 0) {
       if (is_first) {
+        msg = "# accel.";
         fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
@@ -178,12 +184,14 @@ static void sim_enqueue(struct MotionSegment *segment) {
       delay_loops = segment->travel_delay_cycles;
       hires_delay = segment->travel_delay_cycles;
       if (is_first) {
+        msg = "# travel.";
         fprintf(stderr, "travel. timer-cycles=%u\n", delay_loops);
         is_first = 0;
       }
     }
     else if (segment->loops_decel > 0) {
       if (is_first) {
+        msg = "# decel.";
         fprintf(stderr, "Decel start: accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
@@ -216,7 +224,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       printf("%3d ", sim_steps[i]);
     }
-    printf("\n");
+    printf("%s\n", msg);
   }
 }
 
