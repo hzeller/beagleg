@@ -103,9 +103,10 @@ This either takes a filename or a TCP port to listen on.
 
     Usage: ./machine-control [options] [<gcode-filename>]
     Options:
-      --steps-mm <axis-steps>   : steps/mm, comma separated (Default 160,160,160,40,0, ...).
-      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated (Default: 200,200,90,10,0, ...).
-      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated (Default 4000,4000,1000,10000,0, ...).
+      --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).
+                                  (negative for reverse)
+      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).
+      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
                                   Use letter or '_' for empty slot. (Default: 'XYZEABC')
       --port <port>         (-p): Listen on this TCP port.
@@ -114,9 +115,10 @@ This either takes a filename or a TCP port to listen on.
       -n                        : Dryrun; don't send to motors (Default: off).
       -P                        : Verbose: Print motor commands (Default: off).
       -S                        : Synchronous: don't queue (Default: off).
-      -R                        : Repeat file forever.
-    All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
-    You can either specify --port <port> to listen for commands or give a filename
+      --loop[=count]            : Loop file number of times (no value: forever)
+    [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
+    (the actual mapping to a connector happens with --axis-mapping)
+    You can either specify --port <port> to listen for commands or give a GCode-filename
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
 while `machine-control` maps these to physical output connectors,
@@ -134,7 +136,7 @@ but have a look at the workaorund there.
 
 ### Examples
 
-    sudo ./machine-control -f 10 -m 1000 -R myfile.gcode
+    sudo ./machine-control -f 10 -m 1000 --loop myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).

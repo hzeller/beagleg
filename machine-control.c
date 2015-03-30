@@ -75,7 +75,7 @@ static int usage(const char *prog, const char *msg) {
 	  "(Default: off).\n"
 	  "  -S                        : Synchronous: don't queue "
 	  "(Default: off).\n"
-	  "  -R                        : Repeat file forever.\n",
+	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
 	  prog);
   fprintf(stderr, "[*] All comma separated axis numerical values are in the "
 	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
@@ -87,12 +87,12 @@ static int usage(const char *prog, const char *msg) {
 }
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
-// If "do_loop" is 1, repeats this forever (e.g. for stress test).
+// If "loop_count" is >= 0, repeats this number after the first execution.
 static int send_file_to_machine(struct MachineControlConfig *config,
                                 struct MotorOperations *motor_ops,
-                                const char *gcode_filename, char do_loop) {
+                                const char *gcode_filename, int loop_count) {
   int ret;
-  do {
+  while (loop_count < 0 || loop_count-- > 0) {
     int fd = open(gcode_filename, O_RDONLY);
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, stderr);
@@ -100,7 +100,9 @@ static int send_file_to_machine(struct MachineControlConfig *config,
                               gcode_machine_control_event_receiver(machine_control),
                               stderr);
     gcode_machine_control_delete(machine_control);
-  } while (ret == 0 && do_loop);
+    if (ret != 0)
+      break;
+  }
   return ret;
 }
 
@@ -193,29 +195,31 @@ int main(int argc, char *argv[]) {
   
   // Less common options don't have a short option.
   enum LongOptionsOnly {
-    SET_STEPS_MM = 1000,
-    SET_HOME_POS,
-    SET_MOTOR_MAPPING,
+    OPT_SET_STEPS_MM = 1000,
+    OPT_SET_HOME_POS,
+    OPT_SET_MOTOR_MAPPING,
+    OPT_LOOP,
   };
 
   static struct option long_options[] = {
     { "max-feedrate",  required_argument, NULL, 'm'},
     { "accel",         required_argument, NULL, 'a'},
     { "range",         required_argument, NULL, 'r' },
-    { "steps-mm",      required_argument, NULL, SET_STEPS_MM },
-    { "home-pos",      required_argument, NULL, SET_HOME_POS },
-    { "axis-mapping",  required_argument, NULL, SET_MOTOR_MAPPING },
+    { "steps-mm",      required_argument, NULL, OPT_SET_STEPS_MM },
+    { "home-pos",      required_argument, NULL, OPT_SET_HOME_POS },
+    { "axis-mapping",  required_argument, NULL, OPT_SET_MOTOR_MAPPING },
     { "port",          required_argument, NULL, 'p'},
     { "bind-addr",     required_argument, NULL, 'b'},
+    { "loop",          optional_argument, NULL, OPT_LOOP },
     { 0,               0,                 0,    0  },
   };
 
   int listen_port = -1;
-  char do_file_repeat = 0;
+  int file_loop_count = 1;
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPRnf:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnf:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -234,14 +238,14 @@ int main(int argc, char *argv[]) {
       if (!parse_count) return usage(argv[0], "Acceleration missing.");
       // Negative or 0 means: 'infinite'.
       break;
-    case SET_STEPS_MM:
+    case OPT_SET_STEPS_MM:
       if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
-    case SET_MOTOR_MAPPING:
+    case OPT_SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);
       break;
-    case SET_HOME_POS: {
+    case OPT_SET_HOME_POS: {
       float tmp[GCODE_NUM_AXES];
       bzero(tmp, sizeof(tmp));
       if (!parse_float_array(optarg, tmp, GCODE_NUM_AXES))
@@ -263,8 +267,8 @@ int main(int argc, char *argv[]) {
     case 'S':
       config.synchronous = 1;
       break;
-    case 'R':
-      do_file_repeat = 1;
+    case OPT_LOOP:
+      file_loop_count = (optarg) ? atoi(optarg) : -1;
       break;
     case 'p':
       listen_port = atoi(optarg);
@@ -281,8 +285,8 @@ int main(int argc, char *argv[]) {
   if (! (has_filename ^ (listen_port > 0))) {
     return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
   }
-  if (!has_filename && do_file_repeat) {
-    return usage(argv[0], "-R (repeat) only makes sense with a filename.");
+  if (!has_filename && file_loop_count != 1) {
+    return usage(argv[0], "--loop only makes sense with a filename.");
   }
 
   // The backend for our stepmotor control. We either talk to the PRU or
@@ -310,7 +314,7 @@ int main(int argc, char *argv[]) {
   if (has_filename) {
     const char *filename = argv[optind];
     ret = send_file_to_machine(&config, &motor_operations,
-                               filename, do_file_repeat);
+                               filename, file_loop_count);
   } else {
     ret = run_server(&config, &motor_operations, bind_addr, listen_port);
   }
