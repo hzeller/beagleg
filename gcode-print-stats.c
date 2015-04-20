@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
   gcode_machine_control_default_config(&config);
 
   int max_feedrate = 200;  // mm/s
-  int factor = 1.0;        // print speed factor.
+  float factor = 1.0;        // print speed factor.
   char print_header = 1;
 
   // TODO: read other parameters for the MachineControlConfig from long options.
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
   while ((opt = getopt(argc, argv, "f:m:H")) != -1) {
     switch (opt) {
     case 'f':
-      factor = atof(optarg);
+      factor = (float)atof(optarg);
       if (factor <= 0) return usage(argv[0]);
       break;
     case 'm':

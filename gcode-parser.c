@@ -63,12 +63,9 @@ struct GCodeParser {
   AxesRegister axes_pos;
 };
 
-static void dummy_gcode_start(void *user) {
-  fprintf(stderr, "Start parsing.\n");
-}
-static void dummy_gcode_finished(void *user) {
-  fprintf(stderr, "Finish parsing.\n");
-}
+static void dummy_gcode_start(void *user) {}
+static void dummy_gcode_finished(void *user) {}
+
 static void dummy_set_speed_factor(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_speed_factor(%.1f)\n", f);
 }
@@ -337,7 +334,7 @@ static const char *handle_move(struct GCodeParser *p,
   while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     if (axis_l == 'F') {
-      feedrate = unit_value / 60.0;  // feedrates are per minute.
+      feedrate = unit_value / 60.0f;  // feedrates are per minute.
       any_change = 1;
     }
     else {

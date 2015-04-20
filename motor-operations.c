@@ -40,20 +40,21 @@
 // TODO: don't store this singleton like, but keep in user_data of the MotorOperations
 static float hardware_frequency_limit_;
 
-static float sq(float x) { return x * x; }  // square a number
+static inline float sq(float x) { return x * x; }  // square a number
+static inline int round2int(float x) { return (int) roundf(x); }
 
 // Clip speed to maximum we can reach with hardware.
 static float clip_hardware_frequency_limit(float v) {
   return v < hardware_frequency_limit_ ? v : hardware_frequency_limit_;
 }
 
-static double calcAccelerationCurveValueAt(int index, double acceleration) {
+static float calcAccelerationCurveValueAt(int index, float acceleration) {
   // counter_freq * sqrt(2 / accleration)
-  const double accel_factor = TIMER_FREQUENCY
-    * (sqrt(LOOPS_PER_STEP * 2.0 / acceleration)) / LOOPS_PER_STEP;
+  const float accel_factor = TIMER_FREQUENCY
+    * (sqrtf(LOOPS_PER_STEP * 2.0f / acceleration)) / LOOPS_PER_STEP;
   // The approximation is pretty far off in the first step; adjust.
-  const double c0 = (index == 0) ? accel_factor * 0.67605 : accel_factor;
-  return c0 * (sqrt(index + 1) - sqrt(index));
+  const float c0 = (index == 0) ? accel_factor * 0.67605f : accel_factor;
+  return c0 * (sqrtf(index + 1) - sqrtf(index));
 }
 
 #if 0
@@ -66,7 +67,7 @@ static char test_acceleration_ok(float acceleration) {
   // DELAY_CYCLE_SHIFT) fits into 32 bit.
   // Also 2 additional bits headroom because we need to shift it by 2 in the
   // division.
-  const double start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
+  const float start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
     * calcAccelerationCurveValueAt(0, acceleration);
   if (start_accel_cycle_value > 0xFFFFFFFF) {
     fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
@@ -106,37 +107,39 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
     new_element.loops_accel = new_element.loops_decel = 0;
     new_element.loops_travel = total_loops;
     const float travel_speed = clip_hardware_frequency_limit(param->v0);
-    new_element.travel_delay_cycles = TIMER_FREQUENCY / (LOOPS_PER_STEP * travel_speed);
+    new_element.travel_delay_cycles = round2int(TIMER_FREQUENCY / (LOOPS_PER_STEP * travel_speed));
   } else if (param->v0 < param->v1) {
     // acclereate
-    new_element.loops_travel = new_element.loops_decel = 0;
+    new_element.loops_travel = new_element.loops_decel = new_element.travel_delay_cycles = 0;
     new_element.loops_accel = total_loops;
 
     // v1 = v0 + a*t -> t = (v1 - v0)/a
     // s = a/2 * t^2 + v0 * t; subsitution t from above.
     // a = (v1^2-v0^2)/(2*s)
-    float acceleration = (sq(param->v1) - sq(param->v0)) / (2.0 * defining_axis_steps);
+    float acceleration = (sq(param->v1) - sq(param->v0)) / (2.0f * defining_axis_steps);
+    //fprintf(stderr, "M-OP HZ: defining=%d ; accel=%.2f\n", defining_axis_steps, acceleration);
     // If we accelerated from zero to our first speed, this is how many steps
     // we needed. We need to go this index into our taylor series.
-    const int accel_loops_from_zero = LOOPS_PER_STEP *
-      (sq(param->v0 - 0) / (2.0 * acceleration));
+    const int accel_loops_from_zero =
+      round2int(LOOPS_PER_STEP * (sq(param->v0 - 0) / (2.0f * acceleration)));
  
     new_element.accel_series_index = accel_loops_from_zero;
-    new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
-      * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration);
+    new_element.hires_accel_cycles =
+      round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
   } else {  // v0 > v1
     // decelerate
-    new_element.loops_travel = new_element.loops_accel = 0;
+    new_element.loops_travel = new_element.loops_accel = new_element.travel_delay_cycles = 0;
     new_element.loops_decel = total_loops;
 
-    float acceleration = (sq(param->v0) - sq(param->v1)) / (2.0 * defining_axis_steps);
+    float acceleration = (sq(param->v0) - sq(param->v1)) / (2.0f * defining_axis_steps);
+    //fprintf(stderr, "M-OP HZ: defining=%d ; decel=%.2f\n", defining_axis_steps, acceleration);
     // We are into the taylor sequence this value up and reduce from there.
-    const int accel_loops_from_zero = LOOPS_PER_STEP *
-      (sq(param->v0 - 0) / (2.0 * acceleration));
+    const int accel_loops_from_zero =
+      round2int(LOOPS_PER_STEP * (sq(param->v0 - 0) / (2.0f * acceleration)));
 
     new_element.accel_series_index = accel_loops_from_zero;
-    new_element.hires_accel_cycles = (1 << DELAY_CYCLE_SHIFT)
-      * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration);
+    new_element.hires_accel_cycles =
+      round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
   }
   
   new_element.aux = param->aux_bits;

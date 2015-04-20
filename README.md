@@ -1,7 +1,8 @@
 BeagleG
 =======
 
-(expect some instabilities as Jerk is being added right now)
+(I am experimenting with the acceleration planning and jerk right now, so don't expect
+ everything 100% to work every time)
 
 Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
@@ -108,7 +109,8 @@ This either takes a filename or a TCP port to listen on.
       --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).
       --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
-                                  Use letter or '_' for empty slot. (Default: 'XYZEABC')
+                                  Use letter or '_' for empty slot.
+                                  Use lowercase to reverse. (Default: 'XYZEABC')
       --port <port>         (-p): Listen on this TCP port.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
@@ -125,7 +127,13 @@ while `machine-control` maps these to physical output connectors,
 by default "XYZEA".
 This can be changed with the `--axis-mapping` flag. This flag maps the
 logical axis (such as 'Y') to a physical connector location on the
-cape -- the position in the string represents the position of the connector.
+cape -- the position in the string represents the position of the connector. The
+first letter in that string corresponds to the first connector, the second
+to the second and so on.
+
+Use lower-case axis names to invese the axis; this is
+useful for mirroring axes, e.g. `--axis-mapping=XxYZ` has three axes, with
+two motors connected to the first two connectors with a mirrored X-axis.
 
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).

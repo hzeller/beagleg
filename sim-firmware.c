@@ -46,7 +46,7 @@ plot "/tmp/foo.data" using 1:3 title "acceleration: steps/s^2" with lines axes x
  * a couple of measurements.
  * The minimum is 2 to look at two adjacent values.
  */
-#define AVERAGE_RINBGUFFER_SIZE 5
+#define AVERAGE_RINBGUFFER_SIZE 10
 static double avg_ringbuffer[AVERAGE_RINBGUFFER_SIZE];
 static double avg_dt_sum = 0;
 static uint32_t avg_pos = 0;
@@ -158,9 +158,11 @@ static void sim_enqueue(struct MotionSegment *segment) {
       if (segment->loops_accel > 0) {
       if (is_first) {
         msg = "# accel.";
-        fprintf(stderr, "Accel start: accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Accel start: accel-series-idx=%5u, "
+                "accel-timer-cycles=%.3f (%d half-steps)\n",
                 segment->accel_series_index,
-                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
+                segment->loops_accel);
         is_first = 0;
       }
       if (segment->accel_series_index != 0) {
@@ -174,27 +176,30 @@ static void sim_enqueue(struct MotionSegment *segment) {
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       hires_delay = 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT);
       if (segment->loops_accel == 0) {
-        fprintf(stderr, "Accel end  : accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Accel end  : accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
     }
     else if (segment->loops_travel > 0) {
-      --segment->loops_travel;
       delay_loops = segment->travel_delay_cycles;
       hires_delay = segment->travel_delay_cycles;
       if (is_first) {
         msg = "# travel.";
-        fprintf(stderr, "travel. timer-cycles=%u\n", delay_loops);
+        fprintf(stderr, "SIM: travel. timer-delay-cycles=%u (%d half-steps)\n", delay_loops,
+                segment->loops_travel);
         is_first = 0;
       }
+      --segment->loops_travel;
     }
     else if (segment->loops_decel > 0) {
       if (is_first) {
         msg = "# decel.";
-        fprintf(stderr, "Decel start: accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Decel start: accel-series-idx=%5u, "
+                "decel-timer-cycles=%.3f (%d half-steps)\n",
                 segment->accel_series_index,
-                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
+                1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
+                segment->loops_decel);
         is_first = 0;
       }
       const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
@@ -206,7 +211,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       hires_delay = 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT);
       if (segment->loops_decel == 0) {
-        fprintf(stderr, "Decel end  : accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Decel end  : accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
@@ -242,6 +247,6 @@ void init_sim_motion_queue(struct MotionQueue *queue) {
   queue->shutdown = &sim_shutdown;
 
   // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
-  printf("#%11s %12s %12s %10s      ax0 ax1 ax2 ax3 ax4 ax5 ax6 ax7\n",
+  printf("#%11s %12s %12s %10s      dr0 dr1 dr2 dr3 dr4 dr5 dr6 dr7\n",
          "time", "speed", "accel", "timercnt");
 }

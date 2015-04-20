@@ -64,7 +64,8 @@ static int usage(const char *prog, const char *msg) {
 #endif
 	  "  --axis-mapping            : Axis letter mapped to which "
           "motor connector (=string pos)\n"
-	  "                              Use letter or '_' for empty slot. "
+	  "                              Use letter or '_' for empty slot.\n"
+	  "                              Use lowercase to reverse. "
 	  "(Default: 'XYZEABC')\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
@@ -179,7 +180,7 @@ static int run_server(struct MachineControlConfig *config,
 static int parse_float_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = strtod(input, &end);
+    result[i] = strtof(input, &end);
     if (end == input) return 0;  // parse error.
     if (*end == '\0') return i + 1;
     input = end + 1;
@@ -223,7 +224,7 @@ int main(int argc, char *argv[]) {
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
-      config.speed_factor = atof(optarg);
+      config.speed_factor = (float)atof(optarg);
       if (config.speed_factor <= 0)
 	return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
