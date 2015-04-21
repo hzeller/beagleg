@@ -251,6 +251,13 @@ static char same_sign(int a, int b) {
   return !((a < 0) ^ (b < 0));
 }
 
+static char same_sign_array(const int *a, const int *b, int count) {
+  for (int i = 0; i < count; ++i) {
+    if (!same_sign(a[i], b[i])) return 0;
+  }
+  return 1;
+}
+
 // Number of steps to accelerate or decelerate (negative "a") from speed
 // v0 to speed v1. Modifies v1 if we can't reach the speed with the allocated
 // number of steps.
@@ -363,8 +370,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   // less than current, we try to match that.
   // If it turns around (i.e. the sign of the axis in question changes), we need
   // to slow down to zero and let the next segment accelerate from there.
-  if (!same_sign(target_pos->delta_steps[upcoming->defining_axis],
-                 upcoming->delta_steps[upcoming->defining_axis])) {
+  if (!same_sign_array(target_pos->delta_steps, upcoming->delta_steps, GCODE_NUM_AXES)) {
 #if 0
     printf("HZ: next: change of direction in upcoming axis: %d vs. %d\n",
            target_pos->delta_steps[upcoming->defining_axis], upcoming->delta_steps[upcoming->defining_axis]);
