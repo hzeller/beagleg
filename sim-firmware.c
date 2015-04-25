@@ -43,8 +43,8 @@ set grid       # easier to follow
 set ytics nomirror  # Don't intervene with y2tics
 set y2tics
 
-set ylabel "speed & velocity"
-set y2label "acceleration"
+set ylabel "steps & steps/s (velocity)"
+set y2label "steps/s^2 (acceleration)"
 
 # euclid axis
 set style line 1 linetype 1 linecolor rgb "black" lw 2  # velocity
