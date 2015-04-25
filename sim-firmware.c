@@ -18,15 +18,67 @@
  */
 
 /*
+Gnuplot X11 output does not do dashes by default, so this
+should be in the ~/.Xdefaults
+
+! gnuplot settings
+gnuplot*dashed: on
+gnuplot*borderDashes:   0
+gnuplot*axisDashes:    16
+gnuplot*line1Dashes:    0
+gnuplot*line2Dashes:   42
+gnuplot*line3Dashes:   13
+gnuplot*line4Dashes:   44
+gnuplot*line5Dashes:   15
+gnuplot*line6Dashes: 4441
+gnuplot*line7Dashes:   42
+gnuplot*line8Dashes:   13
+*/
+
+/*
 Gnuplot, showing speed and steps on the left axis, acceleration on
 the right axis.
 
 set grid       # easier to follow
 set ytics nomirror  # Don't intervene with y2tics
 set y2tics
-# X axis shows up at 7ths place
-plot "/tmp/foo.data" using 1:3 title "acceleration: steps/s^2" with lines axes x1y2 lw 3, '' using 1:2 title "speed: steps/s" with lines lw 3, '' using 1:7 title "steps" with lines lw 3;
- */
+
+set ylabel "speed & velocity"
+set y2label "acceleration"
+
+# euclid axis
+set style line 1 linetype 1 linecolor rgb "black" lw 2  # velocity
+set style line 2 linetype 2 linecolor rgb "black" lw 1  # accel
+
+# first axis steps/speed/velocity (X)
+set style line 10 linetype 5 linecolor rgb "red" lw 1  # steps
+set style line 11 linetype 1 linecolor rgb "red" lw 2  # velocity
+set style line 12 linetype 2 linecolor rgb "red" lw 1  # accel
+# Y
+set style line 20 linetype 5 linecolor rgb "blue" lw 1
+set style line 21 linetype 1 linecolor rgb "blue" lw 2
+set style line 22 linetype 2 linecolor rgb "blue" lw 1
+# Z
+set style line 30 linetype 5 linecolor rgb "green" lw 1
+set style line 31 linetype 1 linecolor rgb "green" lw 2
+set style line 32 linetype 2 linecolor rgb "green" lw 1
+
+# Plotting X,Y axis
+plot "/tmp/foo.data" \
+        using 1:11 title "steps X" with lines ls 10, \
+        '' using 1:12 title "velocity X" with lines ls 11,\
+        '' using 1:13 title "accel X" axes x1y2 with lines ls 12, \
+        '' using 1:14 title "steps Y" with lines ls 20, \
+        '' using 1:15 title "velocity Y" with lines ls 21,\
+        '' using 1:16 title "accel Y" axes x1y2 with lines ls 23
+
+#.. as one-liner
+plot "/tmp/foo.data" using 1:11 title "steps X" with lines ls 10, '' using 1:12 title "velocity X" with lines ls 11, '' using 1:13 title "accel X" axes x1y2 with lines ls 12,'' using 1:14 title "steps Y" with lines ls 20,'' using 1:15 title "velocity Y" with lines ls 21,'' using 1:16 title "accel Y" axes x1y2 with lines ls 23
+
+# Euclid space
+plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using 1:4 title "accel Euclid" axes x1y2 with lines ls 2
+
+*/
 #include "sim-firmware.h"
 
 #include <math.h>
@@ -91,6 +143,17 @@ static int sim_steps[MOTION_MOTOR_COUNT];  // we are only looking at the definin
 
 static struct HardwareState state;
 
+// Default mapping of our motors to axis (see kChannelLayout)
+enum {
+  X_MOTOR = 2,
+  Y_MOTOR = 3,
+  Z_MOTOR = 1,
+};
+
+static double euclid(double x, double y, double z) {
+  return sqrt(x*x + y*y + z*z);
+}
+
 // This simulates what happens in the PRU. For testing purposes.
 static void sim_enqueue(struct MotionSegment *segment) {
   if (segment->state == STATE_EXIT)
@@ -99,6 +162,16 @@ static void sim_enqueue(struct MotionSegment *segment) {
   
   bzero(&state, sizeof(state));
 
+  // For convenience, this is the relative speed of each motor.
+  double motor_speeds[MOTION_MOTOR_COUNT];
+  double div = 1.0 * 2147483647u;
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    motor_speeds[i] = segment->fractions[i] / div;
+  }
+  const double euklid_factor = euclid(motor_speeds[X_MOTOR],
+                                      motor_speeds[Y_MOTOR],
+                                      motor_speeds[Z_MOTOR]);
+  
 #if JERK_EXPERIMENT
   uint32_t jerk_index = 1;
 #endif
@@ -224,10 +297,16 @@ static void sim_enqueue(struct MotionSegment *segment) {
     double acceleration = avg_get_acceleration();
     sim_time += wait_time;
     double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
+
     // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
-    printf("%12.6f %12.4f %12.4f %10d      ", sim_time, velocity, acceleration, delay_loops);
+    printf("%12.8f %10d %12.4f %12.4f      ",
+           sim_time, delay_loops,
+           euklid_factor * velocity,
+           euklid_factor * acceleration);
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-      printf("%3d ", sim_steps[i]);
+      printf("%5d %8.4f %8.4f ", sim_steps[i],
+             motor_speeds[i] * velocity,
+             motor_speeds[i] * acceleration);
     }
     printf("%s\n", msg);
   }
@@ -247,6 +326,9 @@ void init_sim_motion_queue(struct MotionQueue *queue) {
   queue->shutdown = &sim_shutdown;
 
   // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
-  printf("#%11s %12s %12s %10s      dr0 dr1 dr2 dr3 dr4 dr5 dr6 dr7\n",
-         "time", "speed", "accel", "timercnt");
+  printf("%12s %10s %12s %12s      ", "time", "timer-loop", "Euclid-speed", "Euclid-accel");
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    printf("%4s%d %7s%d %7s%d ", "s", i, "v", i, "a", i);
+  }
+  printf("\n");
 }
