@@ -99,10 +99,10 @@ static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b);
 static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b);
 
 // Returns number of available read items.
-static int buffer_peek_available(struct TargetBuffer *b);
+static int buffer_available(struct TargetBuffer *b);
 
 // Get the given target, delta 0 up to buffer_peek_available();
-static struct AxisTarget *buffer_peek(struct TargetBuffer *b, int delta);
+static struct AxisTarget *buffer_at(struct TargetBuffer *b, int delta);
 
 // Move on to the next read position.
 static void buffer_next(struct TargetBuffer *b);
@@ -212,8 +212,8 @@ static const char *special_commands(void *userdata, char letter, float value,
     switch ((int) value) {
     case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
     case 114:
-      if (buffer_peek_available(&state->buffer)) {
-        struct AxisTarget *current = buffer_peek(&state->buffer, 0);
+      if (buffer_available(&state->buffer)) {
+        struct AxisTarget *current = buffer_at(&state->buffer, 0);
         fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\nok\n",
                 (1.0f * current->position_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X]),
                 (1.0f * current->position_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y]),
@@ -261,7 +261,7 @@ static float steps_for_speed_change(float a, float v0, float *v1, int max_steps)
 }
 
 static float acceleration_for_move(const GCodeMachineControl_t *state,
-                                   int *axis_steps,
+                                   const int *axis_steps,
                                    enum GCodeParserAxis defining_axis) {
   return state->max_axis_accel[defining_axis];
   // TODO: we need to scale the acceleration if one of the other axes could't
@@ -298,9 +298,9 @@ static char within_acceptable_range(float new, float old, float fraction) {
 
 // Determine the fraction of the speed that "from" should decelerate
 // to at the end of its travel.
-// Only slowdowns factor 0.0-1.0 are considered. If there is any axis
-// reversal, that means slowdown to 0; if the next axis is faster, we
-// keep the speed at one.
+// The way trapezoidal moves work, be still have to decelerate to zero in
+// most times, which is inconvenient. TODO(hzeller): speed matching is not
+// cutting it :)
 static float determine_joining_speed(const struct AxisTarget *from,
                                      const struct AxisTarget *to) {
   // Our goal is to figure out what our from defining speed should
@@ -321,11 +321,6 @@ static float determine_joining_speed(const struct AxisTarget *from,
     // What would this speed translated to our defining axis be ?
     float speed_conversion = 1.0f * from->delta_steps[from->defining_axis] / from->delta_steps[axis];
     float goal = to_speed * speed_conversion;
-#if 0
-    fprintf(stderr, "HZ: axis %c %.1f -> %.1f\n",
-            gcodep_axis2letter(axis), get_speed_for_axis(from, axis),
-            goal);
-#endif
     if (goal < 0.0f) return 0.0f;
     if (is_first || within_acceptable_range(goal, from_defining_speed, 0.001)) {
       if (goal < from_defining_speed) from_defining_speed = goal;
@@ -363,13 +358,20 @@ static uint8_t substract_steps(struct MotorMovement *value,
 }
 
 // Move the given number of machine steps for each axis.
-// Modifies the target_pos speed to the actual speed at the end of the move.
+//
+// This will be up to three segments: accelerating from last_pos speed to
+// target speed, regular travel, and decelerating to the speed that the
+// next segment is never forced to decelerate, but stays at speed or accelerate.
+//
+// The segments are sent to the motor operations backend.
+//
+// Since we calculate the deceleration, this modifies the speed of target_pos
+// to reflect what the last speed was at the end of the move.
 static void move_machine_steps(GCodeMachineControl_t *state,
                                const struct AxisTarget *last_pos,
                                struct AxisTarget *target_pos,
                                const struct AxisTarget *upcoming) {
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
-    //fprintf(stderr, "HZ: skipping entry; last speed=%f\n", last_pos->speed);
     assert(last_pos->speed == 0);  // Last segment should've slowed down to 0
     return;
   }
@@ -394,22 +396,17 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   move_command.v1 = target_pos->speed;
 
   // Let's see what our defining axis had as speed in the previous segment. The
-  // last segment might have had a different defining axis, so we calculate what the
-  // the fraction of the speed that our _current_ defining axis had.
+  // last segment might have had a different defining axis, so we calculate
+  // what the the fraction of the speed that our _current_ defining axis had.
   const float last_speed = fabsf(get_speed_for_axis(last_pos, defining_axis));
-#if 0
-  fprintf(stderr, "hz: last speed=%.2f; joining speed: %f\n",
-          last_speed, determine_joining_speed(target_pos, upcoming));
-#endif
+
+  // We need to arrive at a speed that the upcoming move does not have
+  // to decelerate further (after all, it has a fixed feed-rate it should not
+  // go over).
   float next_speed = determine_joining_speed(target_pos, upcoming);
 
-  // We are going to manipulate the delta values, do that on a copy.
-  int axis_steps[GCODE_NUM_AXES];
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    axis_steps[i] = target_pos->delta_steps[i];
-  }
-
-  const int abs_defining_axis_steps = abs(target_pos->delta_steps[defining_axis]);
+  const int *axis_steps = target_pos->delta_steps;  // shortcut.
+  const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
   const float a = acceleration_for_move(state, axis_steps, defining_axis);
   const float peak_speed = get_peak_speed(abs_defining_axis_steps,
                                           last_speed, next_speed, a);
@@ -419,7 +416,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   // accelerating or decelerating, but just do one speed.
 
   if (peak_speed < target_pos->speed) {
-    target_pos->speed = peak_speed;
+    target_pos->speed = peak_speed;  // Don't manage to accelerate to desired v
   }
   
   const float accel_fraction =
@@ -427,6 +424,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     ? steps_for_speed_change(a, last_speed, &target_pos->speed,
                              abs_defining_axis_steps) / abs_defining_axis_steps
     : 0;
+
   // We only decelerate if the upcoming speed is _slower_
   float dummy_next_speed = next_speed;  // Don't care to modify; we don't have
   const float decel_fraction =
@@ -435,10 +433,6 @@ static void move_machine_steps(GCodeMachineControl_t *state,
                              abs_defining_axis_steps) / abs_defining_axis_steps
     : 0;
 
-#if 0
-  fprintf(stderr, "HZ: defining-steps=%d; accel-frac=%.6f; decel-frac=%.6f. v: %.2f -> %.2f\n",
-          abs_defining_axis_steps, accel_fraction, decel_fraction, last_speed, next_speed);
-#endif
   assert(accel_fraction + decel_fraction <= 1.0 + 1e-4);
 
   char has_accel = 0;
@@ -462,7 +456,6 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     decel_command.v0 = target_pos->speed;
     decel_command.v1 = next_speed;
     target_pos->speed = next_speed;
-    //fprintf(stderr, "HZ: setting next speed to %.2f\n", target_pos->speed);
 
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -472,6 +465,8 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   }
 
   // Move is everything that hasn't been covered in speed changes.
+  // So we start with all steps and substract steps done in acceleration and
+  // deceleration.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     assign_steps_to_motors(state, &move_command, i, axis_steps[i]);
   }
@@ -492,11 +487,11 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 // If we have enough data in the queue, issue motor move.
 static void issue_motor_move_if_possible(GCodeMachineControl_t *state) {
   struct TargetBuffer *buffer = &state->buffer;
-  if (buffer_peek_available(buffer) >= 3) {
+  if (buffer_available(buffer) >= 3) {
     move_machine_steps(state,
-                       buffer_peek(buffer, 0),  // Current machine position
-                       buffer_peek(buffer, 1),  // Position we want to move to.
-                       buffer_peek(buffer, 2)); // next upcoming.
+                       buffer_at(buffer, 0),  // Current established position.
+                       buffer_at(buffer, 1),  // Position we want to move to.
+                       buffer_at(buffer, 2)); // Next upcoming.
     buffer_next(buffer);
   }
 }
@@ -512,8 +507,8 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   enum GCodeParserAxis defining_axis = AXIS_X;
   
   // Real world -> machine coordinates. Here, we are rounding to the next full
-  // step, but we never accumulate the error, as we always use the absolute position
-  // as reference.
+  // step, but we never accumulate the error, as we always use the absolute
+  // position as reference.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     new_pos->position_steps[i] = round2int(axis[i] * state->cfg.steps_per_mm[i]);
     new_pos->delta_steps[i] = new_pos->position_steps[i] - previous->position_steps[i];
@@ -842,25 +837,25 @@ static void target_buffer_init(struct TargetBuffer *b) {
   bzero(b, sizeof(*b));
 }
 static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b) {
-  assert(buffer_peek_available(b) < 3);
+  assert(buffer_available(b) < 3);
   struct AxisTarget *result = &b->ring_buffer[b->write_pos];
   b->write_pos = (b->write_pos + 1) % 4;
   return result;
 }
 static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b) {
-  assert(buffer_peek_available(b) > 0);
+  assert(buffer_available(b) > 0);
   return &b->ring_buffer[(b->write_pos + 3) % 4];
 }
-static int buffer_peek_available(struct TargetBuffer *b) {
+static int buffer_available(struct TargetBuffer *b) {
   return (b->write_pos + 4 - b->read_pos) % 4;
 }
-static struct AxisTarget *buffer_peek(struct TargetBuffer *b, int i) {
-  assert(buffer_peek_available(b) > i);
+static struct AxisTarget *buffer_at(struct TargetBuffer *b, int i) {
+  assert(buffer_available(b) > i);
   return &b->ring_buffer[(b->read_pos + i) % 4];
 }
 
 // Move on to the next read position.
 static void buffer_next(struct TargetBuffer *b) {
-  assert(buffer_peek_available(b) > 0);
+  assert(buffer_available(b) > 0);
   b->read_pos = (b->read_pos + 1) % 4;
 }
