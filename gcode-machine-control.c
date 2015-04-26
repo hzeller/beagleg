@@ -283,6 +283,13 @@ static float get_speed_for_axis(const struct AxisTarget *target,
   return target->speed * get_speed_factor_for_axis(target, request_axis);
 }
 
+static char within_acceptable_range(float new, float old, float fraction) {
+  const float max_diff = fraction * old;
+  if (new < old - max_diff) return 0;
+  if (new > old + max_diff) return 0;
+  return 1;
+}
+
 // Determine the fraction of the speed that "from" should decelerate
 // to at the end of its travel.
 // Only slowdowns factor 0.0-1.0 are considered. If there is any axis
@@ -290,9 +297,10 @@ static float get_speed_for_axis(const struct AxisTarget *target,
 // keep the speed at one.
 static float determine_joining_speed(const struct AxisTarget *from,
                                      const struct AxisTarget *to) {
-#if 0
+  // Our goal is to figure out what our from defining speed should
+  // be at the end of the move.
+  char is_first = 1;
   float from_defining_speed = from->speed;
-  float to_defining_speed = to->speed;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
     const int from_delta = from->delta_steps[axis];
     const int to_delta = to->delta_steps[axis];
@@ -313,14 +321,14 @@ static float determine_joining_speed(const struct AxisTarget *from,
             goal);
 #endif
     if (goal < 0.0f) return 0.0f;
-    if (goal < from_defining_speed) from_defining_speed = goal;
+    if (is_first || within_acceptable_range(goal, from_defining_speed, 0.001)) {
+      if (goal < from_defining_speed) from_defining_speed = goal;
+      is_first = 0;
+    } else {
+      return 0.0f;  // Too far off.
+    }
   }
-  // TODO: Good idea, but this won't work. As soon as there are two axes
-  // involved with different speed, we're forced to slow down to 0.
-  // Let's see if we can get around that with higher order planning.
-  //return from_defining_speed;
-#endif
-  return 0;  // for now.
+  return from_defining_speed;
 }
 
 // Assign steps to all the motors responsible for given axis.
