@@ -195,6 +195,10 @@ static const char *skip_white(const char *line) {
   return line;
 }
 
+static void send_ok(struct GCodeParser *parser) {
+  if (parser->msg) fprintf(parser->msg, "ok\n");
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
@@ -406,6 +410,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
     else {
       line = cb->unprocessed(userdata, letter, value, line);
     }
+    send_ok(p);  // Done parsing one line.
   }
   p->msg = NULL;
 }

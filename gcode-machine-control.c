@@ -148,12 +148,6 @@ static inline int round2int(float x) { return (int) roundf(x); }
 
 static void bring_path_to_halt(GCodeMachineControl_t *state);
 
-static void send_ok(GCodeMachineControl_t *state) {
-  if (state && state->msg_stream) {
-    fprintf(state->msg_stream, "ok\n");
-  }
-}
-
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -161,7 +155,6 @@ static void dummy_set_temperature(void *userdata, float f) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
   }
-  send_ok(state);
 }
 static void dummy_set_fanspeed(void *userdata, float speed) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -169,7 +162,6 @@ static void dummy_set_fanspeed(void *userdata, float speed) {
     fprintf(state->msg_stream,
 	    "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
   }
-  send_ok(state);
 }
 static void dummy_wait_temperature(void *userdata) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -177,13 +169,11 @@ static void dummy_wait_temperature(void *userdata) {
     fprintf(state->msg_stream,
 	    "// BeagleG: wait_temperature() not implemented.\n");
   }
-  send_ok(state);
 }
 static void motors_enable(void *userdata, char b) {  
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   bring_path_to_halt(state);
   state->motor_ops->motor_enable(state->motor_ops->user_data, b);
-  send_ok(state);
 }
 
 static const char *special_commands(void *userdata, char letter, float value,
@@ -300,6 +290,7 @@ static float get_speed_for_axis(const struct AxisTarget *target,
 // keep the speed at one.
 static float determine_joining_speed(const struct AxisTarget *from,
                                      const struct AxisTarget *to) {
+#if 0
   float from_defining_speed = from->speed;
   float to_defining_speed = to->speed;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
@@ -328,6 +319,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
   // involved with different speed, we're forced to slow down to 0.
   // Let's see if we can get around that with higher order planning.
   //return from_defining_speed;
+#endif
   return 0;  // for now.
 }
 
@@ -576,7 +568,6 @@ static void machine_G1(void *userdata, float feed, const float *axis) {
   }
   float feedrate = state->prog_speed_factor * state->current_feedrate_mm_per_sec;
   machine_move(userdata, feedrate, axis);
-  send_ok(state);
 }
 
 static void machine_G0(void *userdata, float feed, const float *axis) {
@@ -584,7 +575,6 @@ static void machine_G0(void *userdata, float feed, const float *axis) {
   float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   machine_move(userdata, given > 0 ? given : rapid_feed, axis);
-  send_ok(state);
 }
 
 static void machine_dwell(void *userdata, float value) {
@@ -592,7 +582,6 @@ static void machine_dwell(void *userdata, float value) {
   bring_path_to_halt(state);
   state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
   usleep((int) (value * 1000));
-  send_ok(state);
 }
 
 static void machine_set_speed_factor(void *userdata, float value) {
@@ -608,11 +597,9 @@ static void machine_set_speed_factor(void *userdata, float value) {
     return;
   }
   state->prog_speed_factor = value;
-  send_ok(state);
 }
 
 static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
-  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   int machine_pos_differences[GCODE_NUM_AXES];
   bzero(machine_pos_differences, sizeof(machine_pos_differences));
 
@@ -647,7 +634,6 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   move_machine_steps(state, state->g0_feedrate_mm_per_sec,
 		     machine_pos_differences);
 #endif
-  send_ok(state);
 }
 
 // Cleanup whatever is allocated. Return NULL for convenience.
