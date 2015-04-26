@@ -32,17 +32,23 @@
 //   Till then, gcode_parse_stream is sufficient.
 typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
 
+// These are internal implementation details of creating a GCodeParser
+// object. This was exposed before publically, but is not really needed, as
+// users use the facade gcodep_parse_stream() function.
+// Could be made a public API if needed.
+
 // Initialize parser.
 // The "callbacks"-struct contains the functions the parser calls on parsing.
 // Returns an opaque type used in the parse function.
 // Does not take ownership of the provided pointer.
-GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
+static GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
 
-void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
+static void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 
 // Main workhorse: Parse a gcode line, call callbacks if needed.
 // If "err_stream" is non-NULL, sends error messages that way.
-void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
+static void gcodep_parse_line(GCodeParser_t *obj, const char *line,
+                              FILE *err_stream);
 // -- End public API
 
 typedef float AxesRegister[GCODE_NUM_AXES];
@@ -54,7 +60,7 @@ const AxisBitmap_t kAllAxesBitmap =
 
 struct GCodeParser {
   struct GCodeParserCb callbacks;
-  FILE *msg;
+  FILE *err_msg;
   int line_number;
   int provided_axes;
   float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
@@ -65,6 +71,7 @@ struct GCodeParser {
 
 static void dummy_gcode_start(void *user) {}
 static void dummy_gcode_finished(void *user) {}
+static void dummy_gcode_command_executed(void *user, char letter, float val) {}
 
 static void dummy_set_speed_factor(void *user, float f) {
   fprintf(stderr, "GCodeParser: set_speed_factor(%.1f)\n", f);
@@ -143,7 +150,7 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
-struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
+static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
@@ -181,11 +188,12 @@ struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
     result->callbacks.rapid_move = result->callbacks.coordinated_move;
   if (!result->callbacks.unprocessed)
     result->callbacks.unprocessed = &dummy_unprocessed;
-
+  if (!result->callbacks.gcode_command_done)
+    result->callbacks.gcode_command_done = &dummy_gcode_command_executed;
   return result;
 }
 
-void gcodep_delete(struct GCodeParser *parser) {
+static void gcodep_delete(struct GCodeParser *parser) {
   free(parser);
 }
 
@@ -193,10 +201,6 @@ static const char *skip_white(const char *line) {
   while (*line && isspace(*line))
     line++;
   return line;
-}
-
-static void send_ok(struct GCodeParser *parser) {
-  if (parser->msg) fprintf(parser->msg, "ok\n");
 }
 
 // Parse next letter/number pair.
@@ -260,7 +264,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
 static const char *gparse_pair(struct GCodeParser *p, const char *line,
                                char *letter, float *value) {
   return gcodep_parse_pair_with_linenumber(p->line_number, line,
-                                           letter, value, p->msg);
+                                           letter, value, p->err_msg);
 }
 
 // public version.
@@ -360,12 +364,12 @@ static const char *handle_move(struct GCodeParser *p,
 }
 
 // Note: changes here should be documented in G-code.md as well.
-void gcodep_parse_line(struct GCodeParser *p, const char *line,
-		       FILE *err_stream) {
+static void gcodep_parse_line(struct GCodeParser *p, const char *line,
+                              FILE *err_stream) {
   ++p->line_number;
   void *const userdata = p->callbacks.user_data;
   struct GCodeParserCb *cb = &p->callbacks;
-  p->msg = err_stream;  // remember as 'instance' variable.
+  p->err_msg = err_stream;  // remember as 'instance' variable.
   char letter;
   float value;
   while ((line = gparse_pair(p, line, &letter, &value))) {
@@ -410,9 +414,9 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
     else {
       line = cb->unprocessed(userdata, letter, value, line);
     }
-    send_ok(p);  // Done parsing one line.
+    cb->gcode_command_done(userdata, letter, value);
   }
-  p->msg = NULL;
+  p->err_msg = NULL;
 }
 
 // It is usually good to shut down gracefully, otherwise the PRU keeps running.
@@ -436,7 +440,8 @@ static void disarm_signal_handler() {
 
 // Public facade function.
 int gcodep_parse_stream(int input_fd,
-                        struct GCodeParserCb *parse_events, FILE *err_stream) {
+                        struct GCodeParserCb *parse_events,
+                        FILE *err_stream) {
   if (err_stream) {
     // Output needs to be unbuffered, otherwise they'll never make it.
     setvbuf(err_stream, NULL, _IONBF, 0);

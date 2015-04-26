@@ -175,6 +175,12 @@ static void motors_enable(void *userdata, char b) {
   bring_path_to_halt(state);
   state->motor_ops->motor_enable(state->motor_ops->user_data, b);
 }
+static void gcode_send_ok(void *userdata, char l, float v) {
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  if (state->msg_stream) {
+    fprintf(state->msg_stream, "ok\n");
+  }
+}
 
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
@@ -795,6 +801,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   result->event_input.set_speed_factor = &machine_set_speed_factor;
   result->event_input.motors_enable = &motors_enable;
   result->event_input.unprocessed = &special_commands;
+  result->event_input.gcode_command_done = &gcode_send_ok;
 
   // Lifecycle
   result->event_input.gcode_finished = &finish_machine_control;

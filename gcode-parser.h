@@ -63,6 +63,12 @@ struct GCodeParserCb {
   void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
   void (*gcode_finished)(void *);          // FYI: Finished parsing.
 
+  // "gcode_command_done" is always executed when a command is completed, which
+  // is after internally executed ones (such as G21) or commands that have
+  // triggered a callback. Mostly FYI, but you might use this to send "ok\n",
+  // depending on the client implementation.
+  void (*gcode_command_done)(void *, char letter, float val);
+
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
@@ -94,7 +100,8 @@ struct GCodeParserCb {
 };
 
 // Read and parse GCode from input_fd and call callbacks
-// in "parse_events". Error messages are sent to "err_stream" if non-NULL.
+// in "parse_events".
+// Error messages are sent to "err_stream" if non-NULL.
 // Reads until EOF. The input file descriptor is closed.
 int gcodep_parse_stream(int input_fd,
                         struct GCodeParserCb *parse_events, FILE *err_stream);
