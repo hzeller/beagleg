@@ -37,8 +37,6 @@ struct MotorMovement {
   // acceleration is zero at the end of the move.
   float v0;     // initial speed
   float v1;     // final speed
-
-  float jerk;   // jerk in steps/s^3; Only needed if speeds are different.
   
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.

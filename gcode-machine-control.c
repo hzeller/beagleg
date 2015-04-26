@@ -247,17 +247,6 @@ static float euclid_distance(float x, float y, float z) {
   return sqrtf(x*x + y*y + z*z);
 }
 
-static char same_sign(int a, int b) {
-  return !((a < 0) ^ (b < 0));
-}
-
-static char same_sign_array(const int *a, const int *b, int count) {
-  for (int i = 0; i < count; ++i) {
-    if (!same_sign(a[i], b[i])) return 0;
-  }
-  return 1;
-}
-
 // Number of steps to accelerate or decelerate (negative "a") from speed
 // v0 to speed v1. Modifies v1 if we can't reach the speed with the allocated
 // number of steps.
@@ -279,8 +268,8 @@ static float acceleration_for_move(const GCodeMachineControl_t *state,
                                    int *axis_steps,
                                    enum GCodeParserAxis defining_axis) {
   return state->max_axis_accel[defining_axis];
-  // TODO: we need to scale the acceleration if one of the other axes could't deal
-  // with it. Look at axis steps for that.
+  // TODO: we need to scale the acceleration if one of the other axes could't
+  //deal with it. Look at axis steps for that.
 }
 
 // Given that we want to travel "s" steps, start with speed "v0",
@@ -290,18 +279,56 @@ static float get_peak_speed(float s, float v0, float v2, float a) {
   return sqrtf(v2*v2 + v0*v0 + 2 * a * s) / sqrtf(2);
 }
 
-// Get the fractional speed for a particular axis.
+// Speed relative to defining axis
+static float get_speed_factor_for_axis(const struct AxisTarget *t,
+                                       enum GCodeParserAxis request_axis) {
+  if (t->delta_steps[t->defining_axis] == 0) return 0.0f;
+  return 1.0f * t->delta_steps[request_axis] / t->delta_steps[t->defining_axis];
+}
+
+// Get the speed for a particular axis. Depending on the direction, this can
+// be positive or negative.
 static float get_speed_for_axis(const struct AxisTarget *target,
                                 enum GCodeParserAxis request_axis) {
-  float speed = 0;
-  // The requested axis might be different than the defining axis, but speed
-  // is given for the defining axis.
-  // So get the relative speed from the defining axis.
-  if (target->delta_steps[target->defining_axis] != 0) {
-    speed = fabsf(target->speed * target->delta_steps[request_axis]
-                  / target->delta_steps[target->defining_axis]);
+  return target->speed * get_speed_factor_for_axis(target, request_axis);
+}
+
+// Determine the fraction of the speed that "from" should decelerate
+// to at the end of its travel.
+// Only slowdowns factor 0.0-1.0 are considered. If there is any axis
+// reversal, that means slowdown to 0; if the next axis is faster, we
+// keep the speed at one.
+static float determine_joining_speed(const struct AxisTarget *from,
+                                     const struct AxisTarget *to) {
+  float from_defining_speed = from->speed;
+  float to_defining_speed = to->speed;
+  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+    const int from_delta = from->delta_steps[axis];
+    const int to_delta = to->delta_steps[axis];
+
+    // Quick integer decisions
+    if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
+    if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
+    if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
+      return 0.0f;  // turing around
+
+    float to_speed = get_speed_for_axis(to, axis);
+    // What would this speed translated to our defining axis be ?
+    float speed_conversion = 1.0f * from->delta_steps[from->defining_axis] / from->delta_steps[axis];
+    float goal = to_speed * speed_conversion;
+#if 0
+    fprintf(stderr, "HZ: axis %c %.1f -> %.1f\n",
+            gcodep_axis2letter(axis), get_speed_for_axis(from, axis),
+            goal);
+#endif
+    if (goal < 0.0f) return 0.0f;
+    if (goal < from_defining_speed) from_defining_speed = goal;
   }
-  return speed;
+  // TODO: Good idea, but this won't work. As soon as there are two axes
+  // involved with different speed, we're forced to slow down to 0.
+  // Let's see if we can get around that with higher order planning.
+  //return from_defining_speed;
+  return 0;  // for now.
 }
 
 // Assign steps to all the motors responsible for given axis.
@@ -363,32 +390,12 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   // Let's see what our defining axis had as speed in the previous segment. The
   // last segment might have had a different defining axis, so we calculate what the
   // the fraction of the speed that our _current_ defining axis had.
-  const float last_speed = get_speed_for_axis(last_pos, defining_axis);
-  float next_speed = get_speed_for_axis(upcoming, defining_axis);
-
-  // What is the speed of our current defining axis in the next step ? If it is
-  // less than current, we try to match that.
-  // If it turns around (i.e. the sign of the axis in question changes), we need
-  // to slow down to zero and let the next segment accelerate from there.
-  if (!same_sign_array(target_pos->delta_steps, upcoming->delta_steps, GCODE_NUM_AXES)) {
+  const float last_speed = fabsf(get_speed_for_axis(last_pos, defining_axis));
 #if 0
-    printf("HZ: next: change of direction in upcoming axis: %d vs. %d\n",
-           target_pos->delta_steps[upcoming->defining_axis], upcoming->delta_steps[upcoming->defining_axis]);
+  fprintf(stderr, "hz: last speed=%.2f; joining speed: %f\n",
+          last_speed, determine_joining_speed(target_pos, upcoming));
 #endif
-    next_speed = 0;
-  }
-
-  // If we turn around, the last step should've slowed down to zero first.
-  char assert_cond = last_speed == 0 || same_sign(last_pos->delta_steps[defining_axis],
-                                                  target_pos->delta_steps[defining_axis]);
-  if (!assert_cond) {
-    fprintf(stderr, "HZ: err: speed is %f; delta[%d]=%d --> delta[%d]=%d (speed=%f)\n",
-            last_speed,
-            defining_axis, last_pos->delta_steps[defining_axis],
-            defining_axis, target_pos->delta_steps[defining_axis],
-            last_pos->speed);
-  }
-  assert(assert_cond);
+  float next_speed = determine_joining_speed(target_pos, upcoming);
 
   // We are going to manipulate the delta values, do that on a copy.
   int axis_steps[GCODE_NUM_AXES];
@@ -449,7 +456,8 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     decel_command.v0 = target_pos->speed;
     decel_command.v1 = next_speed;
     target_pos->speed = next_speed;
-    
+    //fprintf(stderr, "HZ: setting next speed to %.2f\n", target_pos->speed);
+
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
       const int decel_steps = round2int(decel_fraction * axis_steps[i]);

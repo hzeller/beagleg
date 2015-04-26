@@ -165,6 +165,10 @@ static int beagleg_enqueue(void *ctx, const struct MotorMovement *param,
     fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
     return 1;
   }
+#if 0
+  fprintf(stderr, "MOTOR: move: v0=%.2f -> v1=%.2f  steps=%d\n",
+          param->v0, param->v1, biggest_value);
+#endif
   if (biggest_value > 65535 / LOOPS_PER_STEP) {
     // TODO: for now, we limit the number. This should be implemented by
     // cutting this in multiple pieces, each calling beagleg_enqueue_internal()
