@@ -372,7 +372,6 @@ static void move_machine_steps(GCodeMachineControl_t *state,
                                struct AxisTarget *target_pos,
                                const struct AxisTarget *upcoming) {
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
-    assert(last_pos->speed == 0);  // Last segment should've slowed down to 0
     return;
   }
   struct MotorMovement accel_command;
