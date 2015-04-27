@@ -435,11 +435,19 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 
   assert(accel_fraction + decel_fraction <= 1.0 + 1e-4);
 
+  // fudging: if we have tiny acceleration segments, don't do these at all
+  // but only do speed; otherwise we have a lot of rattling due to many little
+  // segments of acceleration/deceleration (think of drawing a circle).
+  const float accel_decel_mm
+    = (((accel_fraction + decel_fraction) * abs_defining_axis_steps)
+       / state->cfg.steps_per_mm[defining_axis]);
+  const char do_accel = (accel_decel_mm > 5);
+
   char has_accel = 0;
   char has_move = 0;
   char has_decel = 0;
   
-  if (accel_fraction * abs_defining_axis_steps > 0) {
+  if (do_accel && accel_fraction * abs_defining_axis_steps > 0) {
     has_accel = 1;
     accel_command.v0 = last_speed;           // Last speed of defining axis
     accel_command.v1 = target_pos->speed;    // New speed of defining axis
@@ -451,7 +459,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
     }
   }
   
-  if (decel_fraction * abs_defining_axis_steps > 0) {
+  if (do_accel && decel_fraction * abs_defining_axis_steps > 0) {
     has_decel = 1;
     decel_command.v0 = target_pos->speed;
     decel_command.v1 = next_speed;
