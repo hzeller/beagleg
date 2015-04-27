@@ -322,7 +322,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
     float speed_conversion = 1.0f * from->delta_steps[from->defining_axis] / from->delta_steps[axis];
     float goal = to_speed * speed_conversion;
     if (goal < 0.0f) return 0.0f;
-    if (is_first || within_acceptable_range(goal, from_defining_speed, 0.001)) {
+    if (is_first || within_acceptable_range(goal, from_defining_speed, 1e-5)) {
       if (goal < from_defining_speed) from_defining_speed = goal;
       is_first = 0;
     } else {
