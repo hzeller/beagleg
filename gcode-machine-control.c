@@ -593,6 +593,11 @@ static void machine_dwell(void *userdata, float value) {
   usleep((int) (value * 1000));
 }
 
+static void gcode_input_idle(void *userdata) {
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  bring_path_to_halt(state);
+}
+
 static void machine_set_speed_factor(void *userdata, float value) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (value < 0) {
@@ -797,6 +802,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   result->event_input.motors_enable = &motors_enable;
   result->event_input.unprocessed = &special_commands;
   result->event_input.gcode_command_done = &gcode_send_ok;
+  result->event_input.input_idle = &gcode_input_idle;
 
   // Lifecycle
   result->event_input.gcode_finished = &finish_machine_control;

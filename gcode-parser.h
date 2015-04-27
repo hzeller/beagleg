@@ -69,6 +69,10 @@ struct GCodeParserCb {
   // depending on the client implementation.
   void (*gcode_command_done)(void *, char letter, float val);
 
+  // If we haven't gotten any new line for more than 50ms, this function is
+  // called.
+  void (*input_idle)(void *);
+
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 

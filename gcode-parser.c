@@ -19,11 +19,14 @@
 
 #include "gcode-parser.h"
 
+#include <assert.h>  // remove.
+
 #include <ctype.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -108,6 +111,9 @@ static const char *dummy_unprocessed(void *user, char letter, float value,
 	  letter, (int) value, remaining);
   return NULL;
 }
+static void dummy_idle(void *user) {
+  fprintf(stderr, "GCodeParser: input idle\n");
+}
 
 static void set_all_axis_to_absolute(GCodeParser_t *p, char value) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -190,6 +196,8 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
     result->callbacks.unprocessed = &dummy_unprocessed;
   if (!result->callbacks.gcode_command_done)
     result->callbacks.gcode_command_done = &dummy_gcode_command_executed;
+  if (!result->callbacks.input_idle)
+    result->callbacks.input_idle = &dummy_idle;
   return result;
 }
 
@@ -453,11 +461,39 @@ int gcodep_parse_stream(int input_fd,
     return 1;
   }
 
+  fd_set read_fds;
+  struct timeval wait_time;
+  int select_ret;
+  char in_idle_mode = 0;
+  wait_time.tv_sec = 0;
+  wait_time.tv_usec = 50 * 1000;
+  FD_ZERO(&read_fds);
+
   GCodeParser_t *parser = gcodep_new(parse_events);
   arm_signal_handler();
   char buffer[8192];
   parser->callbacks.gcode_start(parse_events->user_data);
-  while (!caught_signal && fgets(buffer, sizeof(buffer), gcode_stream)) {
+  while (!caught_signal) {
+    // Read with timeout. If we don't get anything on our input, but it
+    // is not finished yet, we tell our
+    FD_SET(input_fd, &read_fds);
+    // When we're already in idle mode, we're not interested in change.
+    wait_time.tv_usec = in_idle_mode ? 500 * 1000 : 50 * 1000;
+    select_ret = select(input_fd + 1, &read_fds, NULL, NULL, &wait_time);
+    if (select_ret < 0)
+      break;
+    if (select_ret == 0) {  // timeout.
+      if (!in_idle_mode) {
+        parser->callbacks.input_idle(parse_events->user_data);
+        in_idle_mode = 1;
+      }
+      continue;
+    }
+
+    // Filedescriptor readable. Now wait for a line to finish.
+    if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
+      break;
+    in_idle_mode = 0;
     gcodep_parse_line(parser, buffer, err_stream);
   }
   disarm_signal_handler();
