@@ -210,21 +210,21 @@ static const char *special_commands(void *userdata, char letter, float value,
     if (!state->msg_stream)
       return NULL;
     switch ((int) value) {
-    case 105: fprintf(state->msg_stream, "ok T-300\n"); break;  // no temp yet.
+    case 105: fprintf(state->msg_stream, "T-300\n"); break;  // no temp yet.
     case 114:
       if (buffer_available(&state->buffer)) {
         struct AxisTarget *current = buffer_at(&state->buffer, 0);
-        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\nok\n",
+        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\n",
                 (1.0f * current->position_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X]),
                 (1.0f * current->position_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y]),
                 (1.0f * current->position_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]),
                 (1.0f * current->position_steps[AXIS_E] / state->cfg.steps_per_mm[AXIS_E]));
       } else {
-        fprintf(state->msg_stream, "// no current pos\nok\n");
+        fprintf(state->msg_stream, "// no current pos\n");
       }
       break;
-    case 115: fprintf(state->msg_stream, "ok %s\n", VERSION_STRING); break;
-    case 117: fprintf(state->msg_stream, "ok Msg: %s\n", remaining); break;
+    case 115: fprintf(state->msg_stream, "%s\n", VERSION_STRING); break;
+    case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining); break;
     default:  fprintf(state->msg_stream,
                       "// BeagleG: didn't understand ('%c', %d, '%s')\n",
                       letter, (int) value, remaining);
