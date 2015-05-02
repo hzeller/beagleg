@@ -61,16 +61,16 @@ struct GCodeParserCb {
   void *user_data;  // Context which is passed in each call of these functions.
 
   void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
-  void (*gcode_finished)(void *);          // FYI: Finished parsing.
+  void (*gcode_finished)(void *);          // FYI: Finished parsing. End of stream.
 
   // "gcode_command_done" is always executed when a command is completed, which
   // is after internally executed ones (such as G21) or commands that have
-  // triggered a callback. Mostly FYI, but you might use this to send "ok\n",
-  // depending on the client implementation.
+  // triggered a callback. Mostly FYI, you can use this for logging or
+  // might use this to send "ok\n" depending on the client implementation.
   void (*gcode_command_done)(void *, char letter, float val);
 
-  // If we haven't gotten any new line for more than 50ms, this function is
-  // called.
+  // If the input has been idle and we haven't gotten any new line for more
+  // than 50ms, this function is called.
   void (*input_idle)(void *);
 
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
@@ -95,9 +95,9 @@ struct GCodeParserCb {
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,
-  // string of rest of line.
-  // Should return pointer to remaining line after processed (after all consumed
-  // parameters) or NULL if the whole remaining line was consumed.
+  // string of rest of line (the letter is always upper-case).
+  // Should return pointer to remaining line that has not been processed or NULL
+  // if the whole remaining line was consumed.
   // Implementors might want to use gcodep_parse_pair() if they need to read
   // G-code words from the remaining line.
   const char *(*unprocessed)(void *, char letter, float value, const char *);
@@ -120,7 +120,8 @@ int gcodep_parse_stream(int input_fd,
 // line they received.
 //
 // Parses "line". If a pair could be parsed, returns non-NULL value and
-// fills in variables pointed to by "letter" and "value".
+// fills in variables pointed to by "letter" and "value". "letter" is guaranteed
+// to be upper-case.
 //
 // Returns the remainder of the line or NULL if no pair has been found and the
 // end-of-string has been reached.
