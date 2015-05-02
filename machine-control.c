@@ -181,7 +181,6 @@ static float parse_float_optional_fraction(const char *input, char **end) {
   input = *end + 1;
   float divisor = strtof(input, end);
   if (*end == input) return 0;
-  fprintf(stderr, "Parsing fraction: %f / %f\n", value, divisor);
   return value / divisor;
 }
 
