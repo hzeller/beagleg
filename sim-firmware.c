@@ -70,10 +70,10 @@ plot "/tmp/foo.data" \
         '' using 1:13 title "accel X" axes x1y2 with lines ls 12, \
         '' using 1:14 title "steps Y" with lines ls 20, \
         '' using 1:15 title "velocity Y" with lines ls 21,\
-        '' using 1:16 title "accel Y" axes x1y2 with lines ls 23
+        '' using 1:16 title "accel Y" axes x1y2 with lines ls 22
 
 #.. as one-liner
-plot "/tmp/foo.data" using 1:11 title "steps X" with lines ls 10, '' using 1:12 title "velocity X" with lines ls 11, '' using 1:13 title "accel X" axes x1y2 with lines ls 12,'' using 1:14 title "steps Y" with lines ls 20,'' using 1:15 title "velocity Y" with lines ls 21,'' using 1:16 title "accel Y" axes x1y2 with lines ls 23
+plot "/tmp/foo.data" using 1:11 title "steps X" with lines ls 10, '' using 1:12 title "velocity X" with lines ls 11, '' using 1:13 title "accel X" axes x1y2 with lines ls 12,'' using 1:14 title "steps Y" with lines ls 20,'' using 1:15 title "velocity Y" with lines ls 21,'' using 1:16 title "accel Y" axes x1y2 with lines ls 22
 
 # Euclid space
 plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using 1:4 title "accel Euclid" axes x1y2 with lines ls 2
