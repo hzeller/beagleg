@@ -185,31 +185,49 @@ static void gcode_send_ok(void *userdata, char l, float v) {
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  if (letter == 'M') {
+  const int code = (int)value;
 
-    if ((int) value == 42) {
-      int pin = 0;
-      int aux_bit = 0;
+  if (letter == 'M') {
+    int pin = -1;
+    int aux_bit = -1;
+
+    switch (code) {
+    case 7: state->aux_bits |= 1 << 0; return remaining;
+    case 8: state->aux_bits |= 1 << 1; return remaining;
+    case 9: state->aux_bits &= ~((1 << 0) | (1 << 1)); return remaining;
+    case 42:
+    case 62:
+    case 63:
+    case 64:
+    case 65:
       for (;;) {
-        remaining = gcodep_parse_pair(remaining, &letter, &value,
-                                      state->msg_stream);
-        if (remaining == NULL) break;
+        const char* after_pair = gcodep_parse_pair(remaining, &letter, &value,
+                                                   state->msg_stream);
+        if (after_pair == NULL) break;
         if (letter == 'P') pin = round2int(value);
-        else if (letter == 'S') aux_bit = round2int(value);
+        else if (letter == 'S' && code == 42) aux_bit = round2int(value);
         else break;
+        remaining = after_pair;
       }
-      if (aux_bit) {
-        state->aux_bits |= 1 << pin;
-      } else {
-        state->aux_bits &= ~(1 << pin);
+      if (code == 62 || code == 64)
+        aux_bit = 1;
+      else if (code == 63 || code == 65)
+        aux_bit = 0;
+      if (pin >= 0 && pin <= 1) {
+        if (aux_bit >= 0 && aux_bit <= 1) {
+          if (aux_bit) state->aux_bits |= 1 << pin;
+          else state->aux_bits &= ~(1 << pin);
+        } else if (code == 42 && state->msg_stream) {  // Just read operation.
+          fprintf(state->msg_stream, "%d\n", (state->aux_bits >> pin) & 1);
+	}
       }
       return remaining;
     }
 
     // The remaining codes are only useful when we have an output stream.
     if (!state->msg_stream)
-      return NULL;
-    switch ((int) value) {
+      return remaining;
+    switch (code) {
     case 105: fprintf(state->msg_stream, "T-300\n"); break;  // no temp yet.
     case 114:
       if (buffer_available(&state->buffer)) {
@@ -227,11 +245,11 @@ static const char *special_commands(void *userdata, char letter, float value,
     case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining); break;
     default:  fprintf(state->msg_stream,
                       "// BeagleG: didn't understand ('%c', %d, '%s')\n",
-                      letter, (int) value, remaining);
+                      letter, code, remaining);
       break;
     }
   }
-  return NULL;
+  return remaining;
 }
 
 static void finish_machine_control(void *userdata) {

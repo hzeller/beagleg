@@ -113,10 +113,18 @@ in callbacks. Other not quite standard G-codes are handled in machine-control.
 
 Command          | Description
 -----------------|----------------------------------------
+M7               | Turn mist on (set AUX Pin 0 to 1); happens synchronously with next move.
+M8               | Turn flood on (set AUX Pin 1 to 1); happens synchronously with next move.
+M9               | Turn all coolant off (set AUX Pins 0 and 1 to 0); happens synchronously with next move.
+M42 Pnn          | Get state of AUX Pin nn.
+M42 Pnn Sxx      | Set AUX Pin nn (range: 0..1) to value xx (binary value 0..1); happens synchronously with next move.
+M62 Pnn          | Set AUX Pin nn (range: 0..1) to 1; happens synchronously with next move.
+M63 Pnn          | Set AUX Pin nn (range: 0..1) to 0; happens synchronously with next move.
+M64 Pnn          | Set AUX Pin nn (range: 0..1) to 1; should happen immediately, currently mimics M62.
+M65 Pnn          | Set AUX Pin nn (range: 0..1) to 0; should happen immediately, currently mimics M63.
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
-M42 Pnn Sxx      | Set AUX Pin nn (range: 0..1) to value xx (binary value 0..1); happens synchronously with next move.
 
 ###Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `machine-control`: they are
