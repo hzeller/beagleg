@@ -57,10 +57,11 @@ static int usage(const char *prog, const char *msg) {
 #endif
 	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
 	  "                              Use letter or '_' for empty slot.\n"
+          "                              You can use the same letter multiple times for mirroring.\n"
 	  "                              Use lowercase to reverse. (Default: 'XYZEABC')\n"
           "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
           "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
-	  "  --port <port>         (-p): Listen on this TCP port.\n"
+	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"

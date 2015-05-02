@@ -110,10 +110,11 @@ This either takes a filename or a TCP port to listen on.
       --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
                                   Use letter or '_' for empty slot.
+                                  You can use the same letter multiple times for mirroring.
                                   Use lowercase to reverse. (Default: 'XYZEABC')
       --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)
                                   This depends on the harware mapping of the cape (Default for BUMPS: '23140').
-      --port <port>         (-p): Listen on this TCP port.
+      --port <port>         (-p): Listen on this TCP port for GCode.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
       -n                        : Dryrun; don't send to motors (Default: off).

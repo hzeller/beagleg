@@ -62,6 +62,9 @@ struct GCodeParserCb {
 
 ##Supported commands
 
+Supported commands are currently added on a need-to-have basis. They are a subset
+of G-Codes found documented in [LinuxCNC] and [RepRap Wiki].
+
 The following commands are supported. A place-holder of `[coordinates]` means
 a combination of axis koordinates (such as `X10 Y20`) and an optional feedrate
 (`F1000`).
@@ -134,3 +137,6 @@ path sees the given speed in space, not each individual axis:
 
     G28 G1 X100      F100  ; moves X with feedrate 100mm/min
     G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
+
+[LinuxCNC]: http://linuxcnc.org/docs/html/gcode.html
+[RepRap Wiki]: http://reprap.org/wiki/G-code

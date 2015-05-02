@@ -62,7 +62,7 @@ static const float kMoveRange[GCODE_NUM_AXES] =
 
 // This is the channel layout on the Bumps-board ( github.com/hzeller/bumps ),
 // currently the only cape existing for BeagleG, so we can as well hardcode it.
-// (for BURPS, this would be "012345678")
+// (for BURPS, this would be "01234567")
 static const char kChannelLayout[] = "23140";
 
 // Output mapping from left to right.
