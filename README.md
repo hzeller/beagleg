@@ -111,7 +111,7 @@ This either takes a filename or a TCP port to listen on.
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
                                   Use letter or '_' for empty slot.
                                   You can use the same letter multiple times for mirroring.
-                                  Use lowercase to reverse. (Default: 'XYZEABC')
+                                  Use lowercase to reverse. (Default: 'XYZEA')
       --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)
                                   This depends on the harware mapping of the cape (Default for BUMPS: '23140').
       --port <port>         (-p): Listen on this TCP port for GCode.

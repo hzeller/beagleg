@@ -43,30 +43,26 @@
 
 // Some default settings. These are most likely overrridden via flags by user.
 
-// All these settings are in sequence of enum GCodeParserAxes: XYZEABC
-static const float kMaxFeedrate[GCODE_NUM_AXES] =
-  {  200,  200,  90,     10, 1, 0, 0 };
-
-static const float kDefaultAccel[GCODE_NUM_AXES]=
-  { 4000, 4000, 1000, 10000, 1, 0, 0 };
-
-static const float kStepsPerMM[GCODE_NUM_AXES]  =
-  {  160,  160,  160,    40, 1, 0, 0 };
+// All these settings are in sequence of enum GCodeParserAxes: XYZEABCUVW. Axes not
+// used by default are initialized to 0
+static const float kMaxFeedrate[GCODE_NUM_AXES] = {  200,  200,   90,    10, 1 };
+static const float kDefaultAccel[GCODE_NUM_AXES]= { 4000, 4000, 1000, 10000, 1 };
+static const float kStepsPerMM[GCODE_NUM_AXES]  = {  160,  160,  160,    40, 1 };
 
 static const enum HomeType kHomePos[GCODE_NUM_AXES] =
   { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
     HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE };
 
-static const float kMoveRange[GCODE_NUM_AXES] =
-  { 100, 100, 100, -1, -1, -1, -1 };
+static const float kMoveRange[GCODE_NUM_AXES] = { 100, 100, 100, -1, -1 };
 
+// Output mapping of Axis to motor connectors from left to right.
+static const char kAxisMapping[] = "XYZEA";
+
+// Mapping the motor connectors to actual output channels.
 // This is the channel layout on the Bumps-board ( github.com/hzeller/bumps ),
 // currently the only cape existing for BeagleG, so we can as well hardcode it.
 // (for BURPS, this would be "01234567")
 static const char kChannelLayout[] = "23140";
-
-// Output mapping from left to right.
-static const char kAxisMapping[] = "XYZEABC";
 
 // The vector is essentially a position in the GCODE_NUM_AXES dimensional
 // space. An AxisTarget has a position vector, in absolute machine coordinates, and a
@@ -744,7 +740,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     pos_to_driver[i] = -1;
   }
   const char *physical_mapping = cfg.channel_layout;
-  if (physical_mapping == NULL) physical_mapping = "23140";  // bumps board.
+  if (physical_mapping == NULL) physical_mapping = kChannelLayout;
   if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
     fprintf(stderr, "Physical mapping string longer than available motors. "
             "('%s', max axes=%d)\n", physical_mapping, BEAGLEG_NUM_MOTORS);

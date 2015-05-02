@@ -58,13 +58,14 @@ static int usage(const char *prog, const char *msg) {
 	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
 	  "                              Use letter or '_' for empty slot.\n"
           "                              You can use the same letter multiple times for mirroring.\n"
-	  "                              Use lowercase to reverse. (Default: 'XYZEABC')\n"
+	  "                              Use lowercase to reverse. (Default: 'XYZEA')\n"
           "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
           "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
+          // -N dry-run with simulation output; mostly for development, so not mentioned here.
 	  "  -P                        : Verbose: Print motor commands (Default: off).\n"
 	  "  -S                        : Synchronous: don't queue (Default: off).\n"
 	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
@@ -86,6 +87,8 @@ static int send_file_to_machine(struct MachineControlConfig *config,
     int fd = open(gcode_filename, O_RDONLY);
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, stderr);
+    if (machine_control == NULL)
+      return 1;
     ret = gcodep_parse_stream(fd,
                               gcode_machine_control_event_receiver(machine_control),
                               stderr);
@@ -149,6 +152,8 @@ static int run_server(struct MachineControlConfig *config,
     FILE *msg_stream = fdopen(connection, "w");
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, msg_stream);
+    if (machine_control == NULL)
+      return 1;
     process_result
       = gcodep_parse_stream(connection,
                             gcode_machine_control_event_receiver(machine_control),
@@ -182,7 +187,8 @@ int main(int argc, char *argv[]) {
   gcode_machine_control_default_config(&config);
 
   char dry_run = 0;
-  
+  char simulation_output = 0;
+
   // Less common options don't have a short option.
   enum LongOptionsOnly {
     OPT_SET_STEPS_MM = 1000,
@@ -211,7 +217,7 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnf:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -256,6 +262,10 @@ int main(int argc, char *argv[]) {
     case 'n':
       dry_run = 1;
       break;
+    case 'N':
+      dry_run = 1;
+      simulation_output = 1;
+      break;
     case 'P':
       config.debug_print = 1;
       break;
@@ -288,9 +298,11 @@ int main(int argc, char *argv[]) {
   // just ignore them on dummy.
   struct MotionQueue motion_backend;
   if (dry_run) {
-    //init_dummy_motion_queue(&motion_backend);
-    // For now, a dry-run runs the simulation.
-    init_sim_motion_queue(&motion_backend);
+    if (simulation_output) {
+      init_sim_motion_queue(&motion_backend);
+    } else {
+      init_dummy_motion_queue(&motion_backend);
+    }
   } else {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
