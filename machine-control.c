@@ -196,7 +196,7 @@ static int parse_float_array(const char *input, float result[], int count) {
     if (*end == '\0') return i + 1;
     if (*end != ',') {
       fprintf(stderr, "Expected comma separation\n%s\n%*s^\n",
-              input, (end - input), " ");
+              full, (int)(end - full), " ");
       return 0;
     }
     input = end + 1;
