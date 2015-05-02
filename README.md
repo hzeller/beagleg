@@ -149,7 +149,7 @@ but have a look at the workaorund there.
 
 ### Examples
 
-    sudo ./machine-control -f 10 -m 1000 --loop myfile.gcode
+    sudo ./machine-control -f 10 --max-feedrate 1000 --loop myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
@@ -182,10 +182,10 @@ command line options
 
     $ cat type-a.config
     # Configuration for Type-A machine series 1, Motors @ 28V
-    --steps-mm 75.075,150.14,800   # x has half the steps than y
+    --steps-mm 1600/20,1600/20,800
     --max-feedrate 900,900,90
     --accel 18000,8000,1500
-    --axis-mapping X_ZEY   # y on the double-connector
+    --axis-mapping XYyZE   # y mirrored
 
 Now, you can invoke `machine-control` like this
 
@@ -195,7 +195,7 @@ or, simpler, if you don't have any comments in the configuration file:
 
     sudo ./machine-control $(cat type-a.config) --port 4444
 
-The `sed` command dumps the configuration, but removes the comment characters.
+The `sed` command passes the configuration, but removes the comment characters.
 
 ## Pinout
 
