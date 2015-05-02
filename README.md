@@ -111,6 +111,8 @@ This either takes a filename or a TCP port to listen on.
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
                                   Use letter or '_' for empty slot.
                                   Use lowercase to reverse. (Default: 'XYZEABC')
+      --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)
+                                  This depends on the harware mapping of the cape (Default for BUMPS: '23140').
       --port <port>         (-p): Listen on this TCP port.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
@@ -119,7 +121,8 @@ This either takes a filename or a TCP port to listen on.
       -S                        : Synchronous: don't queue (Default: off).
       --loop[=count]            : Loop file number of times (no value: forever)
     [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
-    (the actual mapping to a connector happens with --axis-mapping)
+    (the actual mapping to a connector happens with --channel-layout and --axis-mapping,
+    the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
     You can either specify --port <port> to listen for commands or give a GCode-filename
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
@@ -234,9 +237,8 @@ in `struct MachineControlConfig` about the configuration options `channel_layout
 and `axis_mapping`. The first describes the mapping of driver channels to
 connector positions on the cape (which might differ due to board layout reasons),
 the second the mapping of G-code axes (such as 'X' or 'Y') to the
-connector position. While the 'channel_layout' is
-configured in the code currently (and dependent on the cape hardware), the
-axis mapping can be set with the `--axis-mapping` flag.
+connector position. The channel layout can be changed with `--channel-layout` and defaults
+to the BUMPS cape; the axis mapping can be set with the `--axis-mapping` flag.
 
 In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
 in motor), second slot empty, third is 'Z', fourth (second-last) is E, and

@@ -45,45 +45,33 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] "
-	  "(Default 160,160,160,40,0, ...).\n"
+	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).\n"
 	  "                              (negative for reverse)\n"
-	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
-	  "comma separated[*] (Default: 200,200,90,10,0, ...).\n"
-	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
-	  "comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
+	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
+	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
 #if 0   // not yet implemented
-	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma "
-	  "separated\n"
-	  "                                0 = none, 1 = origin; "
-	  "2 = end-of-range (Default: 1,1,1,0,...).\n"
-	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis])"
-	  ". Only\n"
-	  "                               values > 0 are actively clipped. "
-	  "(Default: 100,100,100,-1,-1, ...)\n"
+	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma separated\n"
+	  "                                0 = none, 1 = origin; 2 = end-of-range (Default: 1,1,1,0,...).\n"
+	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
+	  "                               values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
 #endif
-	  "  --axis-mapping            : Axis letter mapped to which "
-          "motor connector (=string pos)\n"
+	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
 	  "                              Use letter or '_' for empty slot.\n"
-	  "                              Use lowercase to reverse. "
-	  "(Default: 'XYZEABC')\n"
+	  "                              Use lowercase to reverse. (Default: 'XYZEABC')\n"
+          "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
+          "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
 	  "  --port <port>         (-p): Listen on this TCP port.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
-	  "  -n                        : Dryrun; don't send to motors "
-	  "(Default: off).\n"
-	  "  -P                        : Verbose: Print motor commands "
-	  "(Default: off).\n"
-	  "  -S                        : Synchronous: don't queue "
-	  "(Default: off).\n"
+	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
+	  "  -P                        : Verbose: Print motor commands (Default: off).\n"
+	  "  -S                        : Synchronous: don't queue (Default: off).\n"
 	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
 	  prog);
-  fprintf(stderr, "[*] All comma separated axis numerical values are in the "
-	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
-  fprintf(stderr, "(the actual mapping to a connector happens with "
-          "--axis-mapping)\n");
-  fprintf(stderr, "You can either specify --port <port> to listen "
-          "for commands or give a GCode-filename\n");
+  fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
+  fprintf(stderr, "(the actual mapping to a connector happens with --channel-layout and --axis-mapping,\n");
+  fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
+  fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
   return 1;
 }
 
@@ -198,21 +186,23 @@ int main(int argc, char *argv[]) {
   enum LongOptionsOnly {
     OPT_SET_STEPS_MM = 1000,
     OPT_SET_HOME_POS,
+    OPT_SET_CHANNEL_LAYOUT,
     OPT_SET_MOTOR_MAPPING,
     OPT_LOOP,
   };
 
   static struct option long_options[] = {
-    { "max-feedrate",  required_argument, NULL, 'm'},
-    { "accel",         required_argument, NULL, 'a'},
-    { "range",         required_argument, NULL, 'r' },
-    { "steps-mm",      required_argument, NULL, OPT_SET_STEPS_MM },
-    { "home-pos",      required_argument, NULL, OPT_SET_HOME_POS },
-    { "axis-mapping",  required_argument, NULL, OPT_SET_MOTOR_MAPPING },
-    { "port",          required_argument, NULL, 'p'},
-    { "bind-addr",     required_argument, NULL, 'b'},
-    { "loop",          optional_argument, NULL, OPT_LOOP },
-    { 0,               0,                 0,    0  },
+    { "max-feedrate",   required_argument, NULL, 'm'},
+    { "accel",          required_argument, NULL, 'a'},
+    { "range",          required_argument, NULL, 'r' },
+    { "steps-mm",       required_argument, NULL, OPT_SET_STEPS_MM },
+    { "home-pos",       required_argument, NULL, OPT_SET_HOME_POS },
+    { "channel-layout", required_argument, NULL, OPT_SET_CHANNEL_LAYOUT },
+    { "axis-mapping",   required_argument, NULL, OPT_SET_MOTOR_MAPPING },
+    { "port",           required_argument, NULL, 'p'},
+    { "bind-addr",      required_argument, NULL, 'b'},
+    { "loop",           optional_argument, NULL, OPT_LOOP },
+    { 0,                0,                 0,    0  },
   };
 
   int listen_port = -1;
@@ -242,6 +232,9 @@ int main(int argc, char *argv[]) {
     case OPT_SET_STEPS_MM:
       if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "steps/mm failed to parse.");
+      break;
+    case OPT_SET_CHANNEL_LAYOUT:
+      config.channel_layout = strdup(optarg);
       break;
     case OPT_SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);

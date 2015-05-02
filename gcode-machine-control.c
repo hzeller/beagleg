@@ -66,7 +66,7 @@ static const float kMoveRange[GCODE_NUM_AXES] =
 static const char kChannelLayout[] = "23140";
 
 // Output mapping from left to right.
-static const char kAxisMapping[] = "XYZEA";
+static const char kAxisMapping[] = "XYZEABC";
 
 // The vector is essentially a position in the GCODE_NUM_AXES dimensional
 // space. An AxisTarget has a position vector, in absolute machine coordinates, and a
@@ -764,7 +764,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   }
 
   const char *axis_map = cfg.axis_mapping;
-  if (axis_map == NULL) axis_map = "XYZEABC";
+  if (axis_map == NULL) axis_map = kAxisMapping;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
     if (pos >= BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
       fprintf(stderr, "Axis mapping string has more elements than available %d "
