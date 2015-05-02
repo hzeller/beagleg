@@ -187,12 +187,18 @@ static float parse_float_optional_fraction(const char *input, char **end) {
 // Parse comma (or other character) separated array of up to "count" float
 // numbers and fill into result[]. Returns number of elements parsed on success.
 static int parse_float_array(const char *input, float result[], int count) {
+  const char *full = input;
   for (int i = 0; i < count; ++i) {
     char *end;
     result[i] = parse_float_optional_fraction(input, &end);
     if (end == input) return 0;  // parse error.
     while (isspace(*end)) ++end;
     if (*end == '\0') return i + 1;
+    if (*end != ',') {
+      fprintf(stderr, "Expected comma separation\n%s\n%*s^\n",
+              input, (end - input), " ");
+      return 0;
+    }
     input = end + 1;
   }
   return count;
