@@ -791,7 +791,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     char is_error = (result->cfg.steps_per_mm[i] <= 0
                      || result->cfg.max_feedrate[i] <= 0);
     if (result->cfg.debug_print || is_error) {
-      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %7.3f steps/mm%s\n",
+      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %8.4f steps/mm%s\n",
               gcodep_axis2letter(i), result->cfg.max_feedrate[i],
               result->cfg.acceleration[i],
               result->cfg.steps_per_mm[i],

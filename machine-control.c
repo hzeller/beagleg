@@ -171,15 +171,16 @@ static int run_server(struct MachineControlConfig *config,
   return process_result;
 }
 
-// Parse a float value. It can be given just as number or as fraction 200/2.5 for instance.
+// Parse a double value. It can be given just as number or as fraction if it
+// contains a slash. "13.524" or "3200/6.35" would be examples for valid input.
 // Returns the parsed value and in "end" the end of parse position.
-static float parse_float_optional_fraction(const char *input, char **end) {
-  float value = strtof(input, end);
+static double parse_double_optional_fraction(const char *input, char **end) {
+  const double value = strtod(input, end);
   if (*end == input) return 0;
   while (isspace(**end)) ++*end;
   if (**end != '/') return value;  // done. Not a fraction.
   input = *end + 1;
-  float divisor = strtof(input, end);
+  const double divisor = strtod(input, end);
   if (*end == input) return 0;
   return value / divisor;
 }
@@ -190,7 +191,7 @@ static int parse_float_array(const char *input, float result[], int count) {
   const char *full = input;
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = parse_float_optional_fraction(input, &end);
+    result[i] = (float) parse_double_optional_fraction(input, &end);
     if (end == input) return 0;  // parse error.
     while (isspace(*end)) ++end;
     if (*end == '\0') return i + 1;
