@@ -36,7 +36,7 @@ enum HomeType {
 struct MachineControlConfig {
   // Arrays with values for each axis
   float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.
-  float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis])
+  float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis]). -1: no limit
   enum HomeType home_switch[GCODE_NUM_AXES]; // Home position for axes.
                  // Axes with HOME_POS_NONE don't participate in homing.
 

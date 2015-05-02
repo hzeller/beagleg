@@ -125,6 +125,7 @@ This either takes a filename or a TCP port to listen on.
     (the actual mapping to a connector happens with --channel-layout and --axis-mapping,
     the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
     You can either specify --port <port> to listen for commands or give a GCode-filename
+    All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
 while `machine-control` maps these to physical output connectors,

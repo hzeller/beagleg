@@ -17,6 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <math.h>
@@ -74,6 +75,7 @@ static int usage(const char *prog, const char *msg) {
   fprintf(stderr, "(the actual mapping to a connector happens with --channel-layout and --axis-mapping,\n");
   fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
+  fprintf(stderr, "All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'\n");
   return 1;
 }
 
@@ -169,13 +171,28 @@ static int run_server(struct MachineControlConfig *config,
   return process_result;
 }
 
+// Parse a float value. It can be given just as number or as fraction 200/2.5 for instance.
+// Returns the parsed value and in "end" the end of parse position.
+static float parse_float_optional_fraction(const char *input, char **end) {
+  float value = strtof(input, end);
+  if (*end == input) return 0;
+  while (isspace(**end)) ++*end;
+  if (**end != '/') return value;  // done. Not a fraction.
+  input = *end + 1;
+  float divisor = strtof(input, end);
+  if (*end == input) return 0;
+  fprintf(stderr, "Parsing fraction: %f / %f\n", value, divisor);
+  return value / divisor;
+}
+
 // Parse comma (or other character) separated array of up to "count" float
 // numbers and fill into result[]. Returns number of elements parsed on success.
 static int parse_float_array(const char *input, float result[], int count) {
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = strtof(input, &end);
+    result[i] = parse_float_optional_fraction(input, &end);
     if (end == input) return 0;  // parse error.
+    while (isspace(*end)) ++end;
     if (*end == '\0') return i + 1;
     input = end + 1;
   }
