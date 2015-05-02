@@ -136,9 +136,11 @@ M106             | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
 
-###M Codes dealt with by machine-control
+###M Codes dealt with by gcode-machine-control
 The standard M-Code are directly handled by the G-code parser and result
-in callbacks. Other not quite standard G-codes are handled in machine-control.
+in parametrized callbacks. Other not quite standard G-codes are handled in
+[gcode-machine-control](./gcode-machine-control.c) when receiving
+the `unprocessed()` callback:
 
 Command          | Description
 -----------------|----------------------------------------
@@ -156,7 +158,7 @@ M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
 
 ###Feedrate in Euclidian space
-The axes X, Y, and Z are dealt with specially by `machine-control`: they are
+The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
 understood as representing coordinates in an Euclidian space (not entirely
 unwarranted :) ) and thus applies a feedrate in a way that the resulting
 path sees the given speed in space, not each individual axis:
