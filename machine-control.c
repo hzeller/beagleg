@@ -117,8 +117,7 @@ static int run_server(struct MachineControlConfig *config,
     return 1;
   }
 
-  struct sockaddr_in serv_addr;
-  bzero(&serv_addr, sizeof(serv_addr));
+  struct sockaddr_in serv_addr = {0};
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
@@ -339,7 +338,7 @@ int main(int argc, char *argv[]) {
 
   struct MotorOperations motor_operations;
   beagleg_init_motor_ops(&motion_backend, &motor_operations);
-  
+
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];

@@ -109,7 +109,7 @@ struct GCodeMachineControl {
   struct GCodeParserCb event_input;
   struct MotorOperations *motor_ops;
   const struct MachineControlConfig cfg;
-  
+
   // Derived configuration
   float g0_feedrate_mm_per_sec;          // Highest of all axes; used for G0
                                          // (will be trimmed if needed)
@@ -132,11 +132,11 @@ struct GCodeMachineControl {
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
   unsigned int aux_bits;                 // Set via M42.
-  
+
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
   struct TargetBuffer buffer;
-  
+
   FILE *msg_stream;
 };
 
@@ -166,7 +166,7 @@ static void dummy_wait_temperature(void *userdata) {
 	    "// BeagleG: wait_temperature() not implemented.\n");
   }
 }
-static void motors_enable(void *userdata, char b) {  
+static void motors_enable(void *userdata, char b) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   bring_path_to_halt(state);
   state->motor_ops->motor_enable(state->motor_ops->user_data, b);
@@ -388,15 +388,12 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
     return;
   }
-  struct MotorMovement accel_command;
-  struct MotorMovement move_command;
-  struct MotorMovement decel_command;
-  bzero(&accel_command, sizeof(accel_command));
-  bzero(&move_command, sizeof(move_command));
-  bzero(&decel_command, sizeof(decel_command));
+  struct MotorMovement accel_command = {0};
+  struct MotorMovement move_command = {0};
+  struct MotorMovement decel_command = {0};
 
   assert(target_pos->speed > 0);  // Speed is always a positive scalar.
-  
+
   // Aux bits are set synchronously with what we need.
   move_command.aux_bits = target_pos->aux_bits;
   const enum GCodeParserAxis defining_axis = target_pos->defining_axis;
@@ -404,7 +401,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   // Common settings.
   memcpy(&accel_command, &move_command, sizeof(accel_command));
   memcpy(&decel_command, &move_command, sizeof(decel_command));
-  
+
   move_command.v0 = target_pos->speed;
   move_command.v1 = target_pos->speed;
 
@@ -431,7 +428,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   if (peak_speed < target_pos->speed) {
     target_pos->speed = peak_speed;  // Don't manage to accelerate to desired v
   }
-  
+
   const float accel_fraction =
     (last_speed < target_pos->speed)
     ? steps_for_speed_change(a, last_speed, &target_pos->speed,
@@ -459,7 +456,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   char has_accel = 0;
   char has_move = 0;
   char has_decel = 0;
-  
+
   if (do_accel && accel_fraction * abs_defining_axis_steps > 0) {
     has_accel = 1;
     accel_command.v0 = last_speed;           // Last speed of defining axis
@@ -471,7 +468,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
       assign_steps_to_motors(state, &accel_command, i, accel_steps);
     }
   }
-  
+
   if (do_accel && decel_fraction * abs_defining_axis_steps > 0) {
     has_decel = 1;
     decel_command.v0 = target_pos->speed;
@@ -493,7 +490,7 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   }
   substract_steps(&move_command, &accel_command);
   has_move = substract_steps(&move_command, &decel_command);
-    
+
   if (state->cfg.synchronous) {
     state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
   }
@@ -526,7 +523,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   struct AxisTarget *new_pos = buffer_add_next_target(buffer);
   int max_steps = -1;
   enum GCodeParserAxis defining_axis = AXIS_X;
-  
+
   // Real world -> machine coordinates. Here, we are rounding to the next full
   // step, but we never accumulate the error, as we always use the absolute
   // position as reference.
@@ -544,7 +541,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   }
   new_pos->aux_bits = state->aux_bits;
   new_pos->defining_axis = defining_axis;
-  
+
   // Now let's calculate the travel speed in steps/s on the defining axis.
   if (max_steps > 0) {
     float travel_speed = feedrate * state->cfg.steps_per_mm[defining_axis];
@@ -559,7 +556,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
         euclid_distance(new_pos->delta_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
                         new_pos->delta_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
                         new_pos->delta_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
-      const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];  
+      const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
       const float defining_axis_len_mm = new_pos->delta_steps[defining_axis] / steps_per_mm;
       const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
       travel_speed *= euclid_fraction;
@@ -571,7 +568,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   } else {
     new_pos->speed = 0;
   }
-  
+
   issue_motor_move_if_possible(state);
 }
 
@@ -686,7 +683,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   bzero(result, sizeof(*result));
   result->motor_ops = motor_ops;
   result->msg_stream = msg_stream;
-  
+
   // Always keep the steps_per_mm positive, but extract direction for
   // final assignment to motor.
   struct MachineControlConfig cfg = *config_in;
@@ -704,7 +701,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
       return cleanup_state(result);
     }
   }
-  
+
   // Here we assign it to the 'const' cfg, all other accesses will check for
   // the readonly ness. So some nasty override here: we know what we're doing.
   *((struct MachineControlConfig*) &result->cfg) = cfg;
@@ -813,8 +810,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     init_axis->position_steps[i] = 0;
   }
   init_axis->speed = 0;
-  
-  result->event_input.user_data = result;    
+
+  result->event_input.user_data = result;
   result->event_input.coordinated_move = &machine_G1;
   result->event_input.rapid_move = &machine_G0;
   result->event_input.go_home = &machine_home;
