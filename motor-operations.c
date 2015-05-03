@@ -37,10 +37,15 @@
 // more than one bit output per step (probably only with hand-built drivers).
 #define LOOPS_PER_STEP (1 << 1)
 
+// If we do more than these number of steps, the fixed point fraction
+// accumulate too much error.
+#define MAX_STEPS_PER_SEGMENT (65535 / LOOPS_PER_STEP)
+
 // TODO: don't store this singleton like, but keep in user_data of the MotorOperations
 static float hardware_frequency_limit_;
 
 static inline float sq(float x) { return x * x; }  // square a number
+static inline double sqd(double x) { return x * x; }  // square a number
 static inline int round2int(float x) { return (int) roundf(x); }
 
 // Clip speed to maximum we can reach with hardware.
@@ -78,8 +83,8 @@ static char test_acceleration_ok(float acceleration) {
 }
 #endif
 
-static int beagleg_enqueue_internal(struct MotionQueue *backend,
-                                    const struct MotorMovement *param,
+static void beagleg_enqueue_internal(struct MotionQueue *backend,
+                                     const struct MotorMovement *param,
 				    int defining_axis_steps) {
   struct MotionSegment new_element;
   new_element.direction_bits = 0;
@@ -122,7 +127,7 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
     // we needed. We need to go this index into our taylor series.
     const int accel_loops_from_zero =
       round2int(LOOPS_PER_STEP * (sq(param->v0 - 0) / (2.0f * acceleration)));
- 
+
     new_element.accel_series_index = accel_loops_from_zero;
     new_element.hires_accel_cycles =
       round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
@@ -141,43 +146,72 @@ static int beagleg_enqueue_internal(struct MotionQueue *backend,
     new_element.hires_accel_cycles =
       round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
   }
-  
+
   new_element.aux = param->aux_bits;
   new_element.state = STATE_FILLED;
   backend->enqueue(&new_element);
+}
 
-  return 0;
+static int get_defining_axis_steps(const struct MotorMovement *param) {
+  int defining_axis_steps = abs(param->steps[0]);
+  for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
+    if (abs(param->steps[i]) > defining_axis_steps) {
+      defining_axis_steps = abs(param->steps[i]);
+    }
+  }
+  return defining_axis_steps;
 }
 
 static int beagleg_enqueue(void *ctx, const struct MotorMovement *param,
                            FILE *err_stream) {
   struct MotionQueue *backend = (struct MotionQueue*)ctx;
-  
-  // TODO: this function should automatically split this into multiple segments
-  // each with the maximum number of steps.
-  int biggest_value = abs(param->steps[0]);
-  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    if (abs(param->steps[i]) > biggest_value) {
-      biggest_value = abs(param->steps[i]);
-    }
-  }
-  if (biggest_value == 0) {
+  const int defining_axis_steps = get_defining_axis_steps(param);
+  if (defining_axis_steps == 0) {
     fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
     return 1;
   }
-#if 0
-  fprintf(stderr, "MOTOR: move: v0=%.2f -> v1=%.2f  steps=%d\n",
-          param->v0, param->v1, biggest_value);
-#endif
-  if (biggest_value > 65535 / LOOPS_PER_STEP) {
-    // TODO: for now, we limit the number. This should be implemented by
-    // cutting this in multiple pieces, each calling beagleg_enqueue_internal()
-    fprintf(err_stream ? err_stream : stderr,
-	    "At most %d steps, got %d. Ignoring command.\n",
-	    65535 / LOOPS_PER_STEP, biggest_value);
-    return 2;
+
+  if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
+    // We have more steps that we can enqueue in one chunk, so let's cut
+    // it in pieces.
+    const double a = (sqd(param->v1) - sqd(param->v0))/(2.0*defining_axis_steps);
+    const int divisions = (defining_axis_steps / MAX_STEPS_PER_SEGMENT) + 1;
+    int64_t hires_steps_per_div[BEAGLEG_NUM_MOTORS];
+    for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+      // (+1 to fix rounding trouble in the LSB)
+      hires_steps_per_div[i] = ((int64_t)param->steps[i] << 32)/divisions + 1;
+    }
+
+    struct MotorMovement previous = {0}, accumulator = {0}, output;
+    int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
+    double previous_speed = param->v0;   // speed calculation in double
+
+    for (int d = 0; d < divisions; ++d) {
+      for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+        hires_step_accumulator[i] += hires_steps_per_div[i];
+        accumulator.steps[i] = hires_step_accumulator[i] >> 32;
+        output.steps[i] = accumulator.steps[i] - previous.steps[i];
+      }
+      const int division_steps = get_defining_axis_steps(&output);
+      // These squared values can get huge, lets not loose precision
+      // here and do calculations in double (otherwise our results can
+      // be a little bit off and fail to reach zero properly).
+      const double v0squared = sqd(previous_speed);
+      // v1 = v0 + a*t; t = (sqrt(v0^2 + 2 * a * steps) - v0) / a
+      // -> v1 = sqrt(v0^ + 2 * a * steps)
+      const double v1squared = v0squared + 2.0 * a * division_steps;
+      // Rounding errors can make v1squared slightly negative...
+      const double v1 = v1squared > 0.0 ? sqrt(v1squared) : 0;
+      output.v0 = previous_speed;
+      output.v1 = v1;
+      beagleg_enqueue_internal(backend, &output, division_steps);
+      previous = accumulator;
+      previous_speed = v1;
+    }
+  } else {
+    beagleg_enqueue_internal(backend, param, defining_axis_steps);
   }
-  return beagleg_enqueue_internal(backend, param, biggest_value);
+  return 0;
 }
 
 static void beagleg_motor_enable(void *ctx, char on) {
@@ -194,12 +228,12 @@ static void beagleg_wait_queue_empty(void *ctx) {
 int beagleg_init_motor_ops(struct MotionQueue *backend,
                            struct MotorOperations *ops) {
   hardware_frequency_limit_ = 1e6;    // Don't go over 1 Mhz
-  
+
   // Set up operations.
   ops->user_data = backend;
   ops->motor_enable = beagleg_motor_enable;
   ops->enqueue = beagleg_enqueue;
   ops->wait_queue_empty = beagleg_wait_queue_empty;
-  
+
   return 0;
 }
