@@ -17,6 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <math.h>
@@ -45,45 +46,36 @@ static int usage(const char *prog, const char *msg) {
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
-	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] "
-	  "(Default 160,160,160,40,0, ...).\n"
+	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).\n"
 	  "                              (negative for reverse)\n"
-	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), "
-	  "comma separated[*] (Default: 200,200,90,10,0, ...).\n"
-	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), "
-	  "comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
+	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
+	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
 #if 0   // not yet implemented
-	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma "
-	  "separated\n"
-	  "                                0 = none, 1 = origin; "
-	  "2 = end-of-range (Default: 1,1,1,0,...).\n"
-	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis])"
-	  ". Only\n"
-	  "                               values > 0 are actively clipped. "
-	  "(Default: 100,100,100,-1,-1, ...)\n"
+	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma separated\n"
+	  "                                0 = none, 1 = origin; 2 = end-of-range (Default: 1,1,1,0,...).\n"
+	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
+	  "                               values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
 #endif
-	  "  --axis-mapping            : Axis letter mapped to which "
-          "motor connector (=string pos)\n"
+	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
 	  "                              Use letter or '_' for empty slot.\n"
-	  "                              Use lowercase to reverse. "
-	  "(Default: 'XYZEABC')\n"
-	  "  --port <port>         (-p): Listen on this TCP port.\n"
+          "                              You can use the same letter multiple times for mirroring.\n"
+	  "                              Use lowercase to reverse. (Default: 'XYZEA')\n"
+          "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
+          "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
+	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
-	  "  -n                        : Dryrun; don't send to motors "
-	  "(Default: off).\n"
-	  "  -P                        : Verbose: Print motor commands "
-	  "(Default: off).\n"
-	  "  -S                        : Synchronous: don't queue "
-	  "(Default: off).\n"
+	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
+          // -N dry-run with simulation output; mostly for development, so not mentioned here.
+	  "  -P                        : Verbose: Print motor commands (Default: off).\n"
+	  "  -S                        : Synchronous: don't queue (Default: off).\n"
 	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
 	  prog);
-  fprintf(stderr, "[*] All comma separated axis numerical values are in the "
-	  "sequence X,Y,Z,E,A,B,C,U,V,W\n");
-  fprintf(stderr, "(the actual mapping to a connector happens with "
-          "--axis-mapping)\n");
-  fprintf(stderr, "You can either specify --port <port> to listen "
-          "for commands or give a GCode-filename\n");
+  fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
+  fprintf(stderr, "(the actual mapping to a connector happens with --channel-layout and --axis-mapping,\n");
+  fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
+  fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
+  fprintf(stderr, "All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'\n");
   return 1;
 }
 
@@ -97,6 +89,8 @@ static int send_file_to_machine(struct MachineControlConfig *config,
     int fd = open(gcode_filename, O_RDONLY);
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, stderr);
+    if (machine_control == NULL)
+      return 1;
     ret = gcodep_parse_stream(fd,
                               gcode_machine_control_event_receiver(machine_control),
                               stderr);
@@ -123,8 +117,7 @@ static int run_server(struct MachineControlConfig *config,
     return 1;
   }
 
-  struct sockaddr_in serv_addr;
-  bzero(&serv_addr, sizeof(serv_addr));
+  struct sockaddr_in serv_addr = {0};
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
@@ -160,6 +153,8 @@ static int run_server(struct MachineControlConfig *config,
     FILE *msg_stream = fdopen(connection, "w");
     GCodeMachineControl_t *machine_control
       = gcode_machine_control_new(config, motor_ops, msg_stream);
+    if (machine_control == NULL)
+      return 1;
     process_result
       = gcodep_parse_stream(connection,
                             gcode_machine_control_event_receiver(machine_control),
@@ -175,14 +170,35 @@ static int run_server(struct MachineControlConfig *config,
   return process_result;
 }
 
+// Parse a double value. It can be given just as number or as fraction if it
+// contains a slash. "13.524" or "3200/6.35" would be examples for valid input.
+// Returns the parsed value and in "end" the end of parse position.
+static double parse_double_optional_fraction(const char *input, char **end) {
+  const double value = strtod(input, end);
+  if (*end == input) return 0;
+  while (isspace(**end)) ++*end;
+  if (**end != '/') return value;  // done. Not a fraction.
+  input = *end + 1;
+  const double divisor = strtod(input, end);
+  if (*end == input) return 0;
+  return value / divisor;
+}
+
 // Parse comma (or other character) separated array of up to "count" float
 // numbers and fill into result[]. Returns number of elements parsed on success.
 static int parse_float_array(const char *input, float result[], int count) {
+  const char *full = input;
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = strtof(input, &end);
+    result[i] = (float) parse_double_optional_fraction(input, &end);
     if (end == input) return 0;  // parse error.
+    while (isspace(*end)) ++end;
     if (*end == '\0') return i + 1;
+    if (*end != ',') {
+      fprintf(stderr, "Expected comma separation\n%s\n%*s^\n",
+              full, (int)(end - full), " ");
+      return 0;
+    }
     input = end + 1;
   }
   return count;
@@ -193,26 +209,29 @@ int main(int argc, char *argv[]) {
   gcode_machine_control_default_config(&config);
 
   char dry_run = 0;
-  
+  char simulation_output = 0;
+
   // Less common options don't have a short option.
   enum LongOptionsOnly {
     OPT_SET_STEPS_MM = 1000,
     OPT_SET_HOME_POS,
+    OPT_SET_CHANNEL_LAYOUT,
     OPT_SET_MOTOR_MAPPING,
     OPT_LOOP,
   };
 
   static struct option long_options[] = {
-    { "max-feedrate",  required_argument, NULL, 'm'},
-    { "accel",         required_argument, NULL, 'a'},
-    { "range",         required_argument, NULL, 'r' },
-    { "steps-mm",      required_argument, NULL, OPT_SET_STEPS_MM },
-    { "home-pos",      required_argument, NULL, OPT_SET_HOME_POS },
-    { "axis-mapping",  required_argument, NULL, OPT_SET_MOTOR_MAPPING },
-    { "port",          required_argument, NULL, 'p'},
-    { "bind-addr",     required_argument, NULL, 'b'},
-    { "loop",          optional_argument, NULL, OPT_LOOP },
-    { 0,               0,                 0,    0  },
+    { "max-feedrate",   required_argument, NULL, 'm'},
+    { "accel",          required_argument, NULL, 'a'},
+    { "range",          required_argument, NULL, 'r' },
+    { "steps-mm",       required_argument, NULL, OPT_SET_STEPS_MM },
+    { "home-pos",       required_argument, NULL, OPT_SET_HOME_POS },
+    { "channel-layout", required_argument, NULL, OPT_SET_CHANNEL_LAYOUT },
+    { "axis-mapping",   required_argument, NULL, OPT_SET_MOTOR_MAPPING },
+    { "port",           required_argument, NULL, 'p'},
+    { "bind-addr",      required_argument, NULL, 'b'},
+    { "loop",           optional_argument, NULL, OPT_LOOP },
+    { 0,                0,                 0,    0  },
   };
 
   int listen_port = -1;
@@ -220,7 +239,7 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnf:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -243,6 +262,9 @@ int main(int argc, char *argv[]) {
       if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "steps/mm failed to parse.");
       break;
+    case OPT_SET_CHANNEL_LAYOUT:
+      config.channel_layout = strdup(optarg);
+      break;
     case OPT_SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);
       break;
@@ -261,6 +283,10 @@ int main(int argc, char *argv[]) {
       break;
     case 'n':
       dry_run = 1;
+      break;
+    case 'N':
+      dry_run = 1;
+      simulation_output = 1;
       break;
     case 'P':
       config.debug_print = 1;
@@ -294,9 +320,11 @@ int main(int argc, char *argv[]) {
   // just ignore them on dummy.
   struct MotionQueue motion_backend;
   if (dry_run) {
-    //init_dummy_motion_queue(&motion_backend);
-    // For now, a dry-run runs the simulation.
-    init_sim_motion_queue(&motion_backend);
+    if (simulation_output) {
+      init_sim_motion_queue(&motion_backend);
+    } else {
+      init_dummy_motion_queue(&motion_backend);
+    }
   } else {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
@@ -310,7 +338,7 @@ int main(int argc, char *argv[]) {
 
   struct MotorOperations motor_operations;
   beagleg_init_motor_ops(&motion_backend, &motor_operations);
-  
+
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];

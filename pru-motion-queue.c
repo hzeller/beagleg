@@ -42,7 +42,7 @@
 #define DEBUG_QUEUE
 #define PRU_NUM 0
 
-#define GPIO_0_ADDR 0x44e07000	// memory space mapped to GPIO-0	
+#define GPIO_0_ADDR 0x44e07000	// memory space mapped to GPIO-0
 #define GPIO_1_ADDR 0x4804c000	// memory space mapped to GPIO-1
 #define GPIO_MMAP_SIZE 0x2000
 
@@ -141,7 +141,7 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e) {
     }
 #endif
     fprintf(stderr, "\n");
-  }	    
+  }
 }
 #endif
 
@@ -150,7 +150,7 @@ static void pru_enqueue_segment(struct MotionSegment *element) {
   assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
   // Initially, we copy everything with 'STATE_EMPTY', then flip the state
   // to avoid a race condition while copying.
-  element->state = STATE_EMPTY; 
+  element->state = STATE_EMPTY;
   volatile struct MotionSegment *queue_element = next_queue_element();
   *queue_element = *element;
 
@@ -171,8 +171,7 @@ static void pru_wait_queue_empty() {
 
 static void pru_shutdown(char flush_queue) {
   if (flush_queue) {
-    struct MotionSegment end_element;
-    bzero(&end_element, sizeof(end_element));
+    struct MotionSegment end_element = {0};
     end_element.state = STATE_EXIT;
     pru_enqueue_segment(&end_element);
     pru_wait_queue_empty();
@@ -219,7 +218,7 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
   queue->wait_queue_empty = &pru_wait_queue_empty;
   queue->motor_enable = &pru_motor_enable_nowait;
   queue->shutdown = &pru_shutdown;
- 
+
   return 0;
 }
 

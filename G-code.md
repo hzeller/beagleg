@@ -4,12 +4,14 @@ BealgeG G-Code interpretation
 ##Synatx
 
 G-Code is essentially a pair of 'letters' and 'numbers' that tell the machine
-what to do. It is well described somewhere else, so this is only a
+what to do. It is well described [somewhere else][Intro GCode], so this is only a
 quick overview.
-G-Codes are typically organized in lines. This is a typical command:
+G-Codes are typically organized in lines. These are typical commands:
 
     G1 X10 Y20 ; move to X-coordinate 10 and Y=20
     G1X0Y8     ; no need for spaces between pairs - but readability sucks.
+    G1 X10 (small move) Y200 (big move) ; comments can be in-line with parenthesis
+    G1 X10 Y100 G1 X0 Y0  ; multiple commands can be in one line.
 
 `G1` means: move in a coordinated move, i.e. the axis move in a way that the
 final move resembles a straight line in the N-dimensional space they are in.
@@ -23,12 +25,34 @@ by every G-Code interpreter, but BeagleG does:
 
 ##API
 G-code parsing as provided by [the G-Code parse API](./gcode-parser.h) receives
-G-code either from a string or a file-descriptor and calls parametrized
-parse-callbacks representing slightly more higher-level commands.
-The callbacks are defined in a struct
+G-code from a file-descriptor (via the `int gcodep_parse_stream()` function)
+and calls parametrized parse-callbacks representing slightly more higher-level commands.
+The callbacks are defined in a struct:
 
 ```c
+// Callbacks called by the parser and to be implemented by the user
+// with meaningful actions.
+//
+// The units in these callbacks are always mm and always absolute: the parser
+// takes care of interpreting G20/G21, G90/G91/G92 internally.
+//
+// The first parameter in any callback is the "user_data" data pointer member.
 struct GCodeParserCb {
+  void *user_data;  // Context which is passed in each call of these functions.
+
+  void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
+  void (*gcode_finished)(void *);          // FYI: Finished parsing. End of stream.
+
+  // "gcode_command_done" is always executed when a command is completed, which
+  // is after internally executed ones (such as G21) or commands that have
+  // triggered a callback. Mostly FYI, you can use this for logging or
+  // might use this to send "ok\n" depending on the client implementation.
+  void (*gcode_command_done)(void *, char letter, float val);
+
+  // If the input has been idle and we haven't gotten any new line for more
+  // than 50ms, this function is called.
+  void (*input_idle)(void *);
+
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
@@ -51,9 +75,9 @@ struct GCodeParserCb {
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,
-  // string of rest of line.
-  // Should return pointer to remaining line after processed (after all consumed
-  // parameters) or NULL if the whole remaining line was consumed.
+  // string of rest of line (the letter is always upper-case).
+  // Should return pointer to remaining line that has not been processed or NULL
+  // if the whole remaining line was consumed.
   // Implementors might want to use gcodep_parse_pair() if they need to read
   // G-code words from the remaining line.
   const char *(*unprocessed)(void *, char letter, float value, const char *);
@@ -62,19 +86,24 @@ struct GCodeParserCb {
 
 ##Supported commands
 
+Supported commands are currently added on a need-to-have basis. They are a subset
+of G-Codes found documented in [LinuxCNC] and [RepRap Wiki].
+
 The following commands are supported. A place-holder of `[coordinates]` means
 a combination of axis koordinates (such as `X10 Y20`) and an optional feedrate
 (`F1000`).
-Current set of supported axis-letters is X, Y, Z, E, A, B, C, U, V, W.
+Current set of supported axis-letters is X, Y, Z, E, A, B, C, U, V, W (the `--axis-mapping`
+and `--channel-mapping` flags decide which make it to motors).
 
 Callbacks that take coordinates are _always_ pre-converted to
-machine-absolute and metric. The codes G20/G21 and G90/G91/G92 as well as
+machine-absolute and metric to make implementation easy.
+The codes G20/G21 and G90/G91/G92 as well as
 M82, M83 are handled internally to always output absolute, metric coordinates.
 
 Commands that are not recognized are passed on to the `unprocessed()` callback
 for the user to handle (see description in API).
 
-Line numbers `Nxx` and checksums `*xx` are parsed and discarded, but ignored
+Line numbers `Nxx` and checksums `*xx` are parsed, but discarded and ignored
 for now.
 
 ###G Codes
@@ -107,22 +136,36 @@ M106             | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
 
-###M Codes dealt with by machine-control
+###M Codes dealt with by gcode-machine-control
 The standard M-Code are directly handled by the G-code parser and result
-in callbacks. Other not quite standard G-codes are handled in machine-control.
+in parametrized callbacks. Other not quite standard G-codes are handled in
+[gcode-machine-control](./gcode-machine-control.c) when receiving
+the `unprocessed()` callback:
 
 Command          | Description
 -----------------|----------------------------------------
+M7               | Turn mist on (set AUX Pin 0 to 1); happens synchronously with next move.
+M8               | Turn flood on (set AUX Pin 1 to 1); happens synchronously with next move.
+M9               | Turn all coolant off (set AUX Pins 0 and 1 to 0); happens synchronously with next move.
+M42 Pnn          | Get state of AUX Pin nn.
+M42 Pnn Sxx      | Set AUX Pin nn (range: 0..1) to value xx (binary value 0..1); happens synchronously with next move.
+M62 Pnn          | Set AUX Pin nn (range: 0..1) to 1; happens synchronously with next move.
+M63 Pnn          | Set AUX Pin nn (range: 0..1) to 0; happens synchronously with next move.
+M64 Pnn          | Set AUX Pin nn (range: 0..1) to 1; should happen immediately, currently mimics M62.
+M65 Pnn          | Set AUX Pin nn (range: 0..1) to 0; should happen immediately, currently mimics M63.
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
-M42 Pnn Sxx      | Set AUX Pin nn (range: 0..1) to value xx (binary value 0..1); happens synchronously with next move.
 
 ###Feedrate in Euclidian space
-The axes X, Y, and Z are dealt with specially by `machine-control`: they are
+The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
 understood as representing coordinates in an Euclidian space (not entirely
 unwarranted :) ) and thus applies a feedrate in a way that the resulting
 path sees the given speed in space, not each individual axis:
 
     G28 G1 X100      F100  ; moves X with feedrate 100mm/min
     G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
+
+[LinuxCNC]: http://linuxcnc.org/docs/html/gcode.html
+[RepRap Wiki]: http://reprap.org/wiki/G-code
+[Intro GCode]: http://en.wikipedia.org/wiki/G-code

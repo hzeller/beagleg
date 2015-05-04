@@ -318,7 +318,7 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
     if (axis == GCODE_NUM_AXES)
       break;    // Possibly start of new command.
     p->relative_zero[axis] = p->axes_pos[axis] - unit_val;
- 
+
     line = remaining_line;
   }
   return line;
@@ -381,6 +381,7 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
   char letter;
   float value;
   while ((line = gparse_pair(p, line, &letter, &value))) {
+    char processed_command = 1;
     if (letter == 'G') {
       switch ((int) value) {
       case 0: line = handle_move(p, cb->rapid_move, line); break;
@@ -418,11 +419,14 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
     }
     else if (letter == 'N') {
       // Line number? Yeah, ignore for now :)
+      processed_command = 0;
     }
     else {
       line = cb->unprocessed(userdata, letter, value, line);
     }
-    cb->gcode_command_done(userdata, letter, value);
+    if (processed_command) {
+      cb->gcode_command_done(userdata, letter, value);
+    }
   }
   p->err_msg = NULL;
 }

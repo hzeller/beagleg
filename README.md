@@ -110,8 +110,11 @@ This either takes a filename or a TCP port to listen on.
       --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
       --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
                                   Use letter or '_' for empty slot.
-                                  Use lowercase to reverse. (Default: 'XYZEABC')
-      --port <port>         (-p): Listen on this TCP port.
+                                  You can use the same letter multiple times for mirroring.
+                                  Use lowercase to reverse. (Default: 'XYZEA')
+      --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)
+                                  This depends on the harware mapping of the cape (Default for BUMPS: '23140').
+      --port <port>         (-p): Listen on this TCP port for GCode.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
       -n                        : Dryrun; don't send to motors (Default: off).
@@ -119,8 +122,10 @@ This either takes a filename or a TCP port to listen on.
       -S                        : Synchronous: don't queue (Default: off).
       --loop[=count]            : Loop file number of times (no value: forever)
     [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
-    (the actual mapping to a connector happens with --axis-mapping)
+    (the actual mapping to a connector happens with --channel-layout and --axis-mapping,
+    the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
     You can either specify --port <port> to listen for commands or give a GCode-filename
+    All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
 while `machine-control` maps these to physical output connectors,
@@ -144,7 +149,7 @@ but have a look at the workaorund there.
 
 ### Examples
 
-    sudo ./machine-control -f 10 -m 1000 --loop myfile.gcode
+    sudo ./machine-control -f 10 --max-feedrate 1000 --loop myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed, with a feedrate
 capped at 1000mm/s. Repeat this file forever (say you want to stress-test).
@@ -177,10 +182,10 @@ command line options
 
     $ cat type-a.config
     # Configuration for Type-A machine series 1, Motors @ 28V
-    --steps-mm 75.075,150.14,800   # x has half the steps than y
+    --steps-mm 1600/20,1600/20,800
     --max-feedrate 900,900,90
     --accel 18000,8000,1500
-    --axis-mapping X_ZEY   # y on the double-connector
+    --axis-mapping XYyZE   # y mirrored
 
 Now, you can invoke `machine-control` like this
 
@@ -190,7 +195,7 @@ or, simpler, if you don't have any comments in the configuration file:
 
     sudo ./machine-control $(cat type-a.config) --port 4444
 
-The `sed` command dumps the configuration, but removes the comment characters.
+The `sed` command passes the configuration, but removes the comment characters.
 
 ## Pinout
 
@@ -234,9 +239,8 @@ in `struct MachineControlConfig` about the configuration options `channel_layout
 and `axis_mapping`. The first describes the mapping of driver channels to
 connector positions on the cape (which might differ due to board layout reasons),
 the second the mapping of G-code axes (such as 'X' or 'Y') to the
-connector position. While the 'channel_layout' is
-configured in the code currently (and dependent on the cape hardware), the
-axis mapping can be set with the `--axis-mapping` flag.
+connector position. The channel layout can be changed with `--channel-layout` and defaults
+to the BUMPS cape; the axis mapping can be set with the `--axis-mapping` flag.
 
 In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
 in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
