@@ -30,6 +30,7 @@ GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TARGETS=machine-control gcode-print-stats
+TEST_BINARIES=gcode-machine-control_test
 
 all : $(TARGETS)
 
@@ -41,6 +42,12 @@ machine-control: machine-control.o $(OBJECTS)
 
 BeagleG-00A0.dtbo: BeagleG.dts
 	dtc -I dts -O dtb -o $@ -b 0 -@ $^
+
+test: $(TEST_BINARIES)
+	./gcode-machine-control_test
+
+%_test: %_test.c $(OBJECTS)
+	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
 
 %.o: %.c
 	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $< 
@@ -54,8 +61,12 @@ $(PASM):
 pru-motion-queue.o : motor-interface-constants.h $(PRU_BIN)
 motor-operations.o : motor-interface-constants.h
 sim-firmware.o : motor-interface-constants.h
+
+# test dependencies.
+gcode-machine-control_test.c: gcode-machine-control.c
+
 $(PRU_BIN) : motor-interface-constants.h
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(TEST_BINARIES)
 
