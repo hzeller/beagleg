@@ -33,16 +33,15 @@ static void init_test_config(struct MachineControlConfig *c) {
 
 // Helpers to compare and print MotorMovements.
 static void print_movement(const char *msg, const struct MotorMovement *m) {
-  printf("%s: v0=%.1f -> v1=%.1f {%d, %d, %d}", msg,
-         m->v0, m->v1,
+  printf("%s: v0=%.1f -> v1=%.1f {%d, %d, %d}", msg, m->v0, m->v1,
          m->steps[0], m->steps[1], m->steps[2]);
 }
 
 static void expect_movement_eq(const struct MotorMovement *expected,
 			       const struct MotorMovement *reality,
-                               int seg_number) {
+                               int info_segment_number) {
   if (memcmp(expected, reality, sizeof(*expected)) != 0) {
-    printf("segment #%d: ", seg_number);
+    printf("segment #%d: ", info_segment_number);
     print_movement("expected", expected);
     print_movement("; but was", reality);
     printf("\n");
@@ -50,14 +49,13 @@ static void expect_movement_eq(const struct MotorMovement *expected,
   }
 }
 
-
-// Internal state of a test.
+// Internal state of a test sequence.
 struct ExpectState {
   const struct MotorMovement *expect;
   const struct MotorMovement *current;
 };
 
-// Implementation of MotorOperations. This uses the "struct ExpectState" as
+// Implementation of Mock MotorOperations. This uses the "struct ExpectState" as
 // user data keeping track of the MotorMovement sequence we expect.
 static void test_motor_enable(void *user, char on) { /* ign */}
 
@@ -79,17 +77,38 @@ static void init_expect_motor(struct MotorOperations *ops,
   ops->enqueue = &test_enqueue;
 }
 
-/*
- * TODO(hzeller): there is a lot of boilderplate in each of these test-cases.
- * make that a bit more common.
- */
-
-// If we get two line segments that are straigt and don't change speed, we
-// expect no slow-down.
-void test_straight_segments_same_speed() {
-  printf("%s\n", __func__);
+struct Harness {
   struct MachineControlConfig config;
-  init_test_config(&config);
+  struct ExpectState expect_state;
+  struct MotorOperations expect_motor_ops;
+  GCodeMachineControl_t *object;
+};
+
+// Initialize harness with the expected sequence of motor movements
+// and return the callback struct to receive simulated gcode calls.
+struct GCodeParserCb *init_harness(struct Harness *harness,
+                                   const struct MotorMovement *expected) {
+  init_test_config(&harness->config);
+  harness->expect_state.expect = expected;
+  init_expect_motor(&harness->expect_motor_ops,
+                    &harness->expect_state);
+  harness->object = gcode_machine_control_new(&harness->config,
+                                              &harness->expect_motor_ops,
+                                              NULL);
+  return gcode_machine_control_event_receiver(harness->object);
+}
+
+void finish_harness(struct Harness *harness) {
+  gcode_machine_control_delete(harness->object);
+  // Did we walk through all states ?
+  assert(harness->expect_state.current->aux_bits == END_SENTINEL);
+}
+
+// If we get two line segments that are straight and don't change speed, we
+// expect no slow-down.
+void TEST_straight_segments_same_speed() {
+  printf(" %s\n", __func__);
+  struct Harness harness;
   static const struct MotorMovement expected[] = {
     { .v0 =     0.0, .v1 = 10000.0, .steps = { 500}},  // accel
     { .v0 = 10000.0, .v1 = 10000.0, .steps = {9500}},  // 1st move @100mm/s
@@ -97,38 +116,29 @@ void test_straight_segments_same_speed() {
     { .v0 = 10000.0, .v1 =     0.0, .steps = { 500}},  // decel back to 0
     { .aux_bits = END_SENTINEL},
   };
-  struct ExpectState state = { .expect = expected };
-  struct MotorOperations expect_motor;
-  init_expect_motor(&expect_motor, &state);
-  GCodeMachineControl_t *obj = gcode_machine_control_new(&config,
-                                                         &expect_motor,
-                                                         NULL);
-  struct GCodeParserCb *call = gcode_machine_control_event_receiver(obj);
-  
+  struct GCodeParserCb *call = init_harness(&harness, expected);
+
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call->coordinated_move(call->user_data, 100, coordinates);
+  call->coordinated_move(call->user_data, 100, coordinates);  // 100mm/s
 
   // second half, same speed
   coordinates[0] = 200;
-  call->coordinated_move(call->user_data, 100, coordinates);
+  call->coordinated_move(call->user_data, 100, coordinates);  // also 100mm/s
 
-  // stay at that place, so we expect to decelerate to 0.
-  call->coordinated_move(call->user_data, 50, coordinates);
+  call->motors_enable(call->user_data, 0);  // finish movement.
 
-  gcode_machine_control_delete(obj);
-  assert(state.current->aux_bits == END_SENTINEL);
-  printf("DONE %s\n", __func__);
+  finish_harness(&harness);
+  printf(" DONE %s\n", __func__);
 }
 
 // If we have two line segments in a straight line and one is slower than the
 // other, slow down the first segment at the end to the travel speed of the
 // next segment.
-void test_straight_segments_speed_change() {
-  printf("%s\n", __func__);
-  struct MachineControlConfig config;
-  init_test_config(&config);
+void TEST_straight_segments_speed_change() {
+  printf(" %s\n", __func__);
+  struct Harness harness;
   static const struct MotorMovement expected[] = {
     { .v0 =     0.0, .v1 = 10000.0, .steps = { 500}},  // accel
     { .v0 = 10000.0, .v1 = 10000.0, .steps = {9125}},  // move @100mm/s
@@ -137,36 +147,28 @@ void test_straight_segments_speed_change() {
     { .v0 =  5000.0, .v1 =     0.0, .steps = { 125}},  // final slow to zero
     { .aux_bits = END_SENTINEL},
   };
-  struct ExpectState state = { .expect = expected };
-  struct MotorOperations expect_motor;
-  init_expect_motor(&expect_motor, &state);
-  GCodeMachineControl_t *obj = gcode_machine_control_new(&config,
-                                                         &expect_motor,
-                                                         NULL);
-  struct GCodeParserCb *call = gcode_machine_control_event_receiver(obj);
-  
+  struct GCodeParserCb *call = init_harness(&harness, expected);
+
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call->coordinated_move(call->user_data, 100, coordinates);
+  call->coordinated_move(call->user_data, 100, coordinates); // 100mm/s
 
   // second half, less speed.
   coordinates[0] = 200;
-  call->coordinated_move(call->user_data, 50, coordinates);
+  call->coordinated_move(call->user_data, 50, coordinates);  // 50mm/s
 
-  // stay at that place, so we expect to decelerate to 0.
-  call->coordinated_move(call->user_data, 50, coordinates);
+  call->motors_enable(call->user_data, 0);  // finish movement.
 
-  gcode_machine_control_delete(obj);
-  assert(state.current->aux_bits == END_SENTINEL);
-  printf("DONE %s\n", __func__);
+  finish_harness(&harness);
+  printf(" DONE %s\n", __func__);
 }
 
 int main() {
   printf("RUN (%s)\n", __FILE__);
 
-  test_straight_segments_same_speed();
-  test_straight_segments_speed_change();
+  TEST_straight_segments_same_speed();
+  TEST_straight_segments_speed_change();
 
   printf("PASS (%s)\n", __FILE__);
 }
