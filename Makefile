@@ -43,6 +43,9 @@ machine-control: machine-control.o $(OBJECTS)
 BeagleG-00A0.dtbo: BeagleG.dts
 	dtc -I dts -O dtb -o $@ -b 0 -@ $^
 
+BeagleG-CRAMPS-00A0.dtbo: BeagleG-CRAMPS.dts
+	dtc -I dts -O dtb -o $@ -b 0 -@ $^
+
 test: $(TEST_BINARIES)
 	./gcode-machine-control_test
 

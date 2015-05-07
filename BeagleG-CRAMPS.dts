@@ -1,0 +1,117 @@
+/*
+ * Based on github.com/jadonk/validation-scripts/tree/master/test-capemgr
+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Purpose License Version 2 as
+ * published by the Free Software Foundation
+ *
+ * To create the binary representation that the device manager can handle, run
+ *   make BeagleG-CRAMPS-00A0.dtbo
+ * See beagleg-cramps-cape-pinmux.sh how to enable.
+ */
+
+/dts-v1/;
+/plugin/;
+
+/{
+    compatible = "ti,beaglebone", "ti,beaglebone-black";
+    part-number = "BeagleG-CRAMPS";  /* BeagleG/CRAMPS 'cape' */
+    version = "00A0";
+
+    exclusive-use = "pruss",  // Programmable realtime unit
+		  "P9.23", "P9.14", "P8.26", "P8.17", "P9.25",						// power control
+		  "P8.13", "P8.15", "P8.19", "P9.16", "P9.17", "P9.24", "P9.42A", "P9.31", "P9.29",	// step
+		  "P8.12", "P8.14", "P8.18", "P9.12", "P9.18", "P9.26", "P9.16", "P9.28", "P9.30",	// direction
+		  "P8.8", "P8.7", "P9.10", "P8.9", "P9.13", "P9.11",					// endstops
+		  "P8.11", "P9.15", "P9.27", "P9.21", "P9.41A", "P9.22",				// fets
+		  "tscadc";   // Analog digital converter
+
+    fragment@0 {
+        target = <&am33xx_pinmux>;
+        __overlay__ {
+            beagleg_gpio_pins: BeagleG_Pins {
+                pinctrl-single,pins = <
+				/* P9.9   PWR_BUT */
+				/* P9.10  SYS_RESETn */
+		    0x044 0x07	/* P9.23  GPIO1[17] out, pd  machine_pwr MACHINE_PWR */
+		    0x048 0x17	/* P9.14  GPIO1[18] out, pu  ~axis_ena	MOTOR_ENABLE */
+		    0x07c 0x07	/* P8.26  GPIO1[29] out, pd  estop_sw	ESTOP_SW */
+		    0x02c 0x2f	/* P8.17  GPIO0[27] in       estop	ESTOP */
+		    0x1ac 0x07	/* P9.25  GPIO3[21] out, pd  led	LED */
+
+		    0x024 0x07	/* P8.13  GPIO0[23] out, pd  x_step	MOTOR_1_STEP */
+		    0x03c 0x07	/* P8.15  GPIO1[15] out, pd  y_step	MOTOR_2_STEP */
+		    0x020 0x07	/* P8.19  GPIO0[22] out, pd  z_step	MOTOR_3_STEP */
+		    0x04c 0x07	/* P9.16  GPIO1[19] out, pd  e0_step	MOTOR_4_STEP */
+		    0x15c 0x07	/* P9.17  GPIO0[5]  out, pd  e1_step	MOTOR_5_STEP */
+		    0x184 0x07	/* P9.24  GPIO0[15] out, pd  e2_step	MOTOR_6_STEP */
+		    0x164 0x07	/* P9.42A GPIO0[7]  out, pd  step_u	MOTOR_7_STEP (external driver) */
+				/* P9.31  GPIO3[14]          step_v     MOTOR_8_STEP (external driver) */
+				/* P9.29  GPIO3[15]          step_w     MOTOR_9_STEP (external driver) */
+
+		    0x030 0x07	/* P8.12  GPIO1[12] out, pd  x_dir	MOTOR_1_DIR */
+		    0x028 0x07	/* P8.14  GPIO0[26] out, pd  y_dir	MOTOR_2_DIR */
+		    0x08c 0x07	/* P8.18  GPIO2[1]  out, pd  z_dir	MOTOR_3_DIR */
+		    0x078 0x07	/* P9.12  GPIO1[28] out, pd  e0_dir	MOTOR_4_DIR */
+		    0x158 0x07	/* P9.18  GPIO0[4]  out, pd  e1_dir	MOTOR_5_DIR */
+		    0x180 0x07	/* P9.26  GPIO0[14] out, pd  e2_dir	MOTOR_6_DIR */
+		    0x038 0x07	/* P8.16  GPIO1[14] out, pd  dir_u	MOTOR_7_DIR (external driver) */
+				/* P9.28  GPIO3[17]          dir_v	MOTOR_8_DIR (external driver) */
+				/* P9.30  GPIO3[16]          dir_w	MOTOR_9_DIR (external driver) */
+
+		    0x094 0x2f	/* P8.8   GPIO2[3]  in       x-min	END_X_MIN */
+		    0x090 0x2f	/* P8.7   GPIO2[2]  in       x-max	END_X_MAX */
+		    0x098 0x2f	/* P8.10  GPIO2[4]  in       y-min	END_Y_MIN */
+		    0x09c 0x2f	/* P8.9   GPIO2[5]  in       y-max	END_Y_MAX */
+		    0x074 0x2f	/* P9.13  GPIO0[31] in       z-min	END_Z_MIN */
+		    0x070 0x2f	/* P9.11  GPIO0[30] in       z-max	END_Z_MAX */
+
+		    0x034 0x07	/* P8.11  GPIO1[13] out, pd  fet1 */
+		    0x040 0x07	/* P9.15  GPIO1[16] out, pd  fet2 */
+		    0x1a4 0x07	/* P9.27  GPIO3[19] out, pd  fet3 */
+		    0x154 0x07	/* P9.21  GPIO0[3]  out, pd  fet4 */
+		    0x1b4 0x07	/* P9.41A GPIO0[20] out, pd  fet5 */
+		    0x150 0x07	/* P9.22  GPIO0[2]  out, pd  fet6 */
+
+				/* P9.20  GPIO0[12]          sda */
+				/* P9.19  GPIO0[13]          scl */
+
+				/* P9.31  GPIO3[14]          sck */
+				/* P9.29  GPIO3[15]          miso */
+				/* P9.30  GPIO3[16]          mosi */
+				/* P9.28  GPIO3[17]          spi_cs0 */
+
+				/* P9.33  AIN4               therm0 */
+				/* P9.35  AIN6               therm2 */
+				/* P9.36  AIN5               therm1 */
+				/* P9.37  AIN2               ain2 */
+				/* P9.38  AIN3               ain3 */
+				/* P9.39  AIN0               ain0 */
+				/* P9.40  AIN1               ain1 */
+                >;
+            };
+        };
+    };
+
+    // TODO: some other fragment mentioning adc 0, 1, 2 ?
+
+    fragment@1 {
+        target = <&ocp>;
+        __overlay__ {
+            test_helper: helper {
+                compatible = "bone-pinmux-helper";
+                pinctrl-names = "default";
+                pinctrl-0 = <&beagleg_gpio_pins>;
+                status = "okay";
+            };
+        };
+    };
+
+   fragment@2{
+        target = <&pruss>;
+        __overlay__ {
+            status = "okay";
+        };
+   };
+};
