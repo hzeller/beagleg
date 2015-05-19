@@ -128,8 +128,10 @@ G92 [coordinates]| -                    | Set position to be the new zero.
 
 Command          | Callback              | Description
 -----------------|-----------------------|-----------------------------
+M2               | `input_idle()`        | Program end.
 M17              | `motors_enable()`     | Switch on motors.
 M18              | `motors_enable()`     | Switch off motors.
+M30              | `input_idle()`        | Program end.
 M84              | `motors_enable()`     | Switch off motors.
 M82              | -                     | Set E-axis to absolute.
 M83              | -                     | Set E-axis to relative.

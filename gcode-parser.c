@@ -587,8 +587,10 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
     }
     else if (letter == 'M') {
       switch ((int) value) {
+      case 2: cb->input_idle(userdata); break;
       case 17: cb->motors_enable(userdata, 1); break;
       case 18: cb->motors_enable(userdata, 0); break;
+      case 30: cb->input_idle(userdata); break;
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
       case 84: cb->motors_enable(userdata, 0); break;
