@@ -577,6 +577,8 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
+      case 70: p->unit_to_mm_factor = 25.4f; break;
+      case 71: p->unit_to_mm_factor = 1.0f; break;
       case 90: set_all_axis_to_absolute(p, 1); break;
       case 91: set_all_axis_to_absolute(p, 0); break;
       case 92: line = handle_rebase(p, line); break;
