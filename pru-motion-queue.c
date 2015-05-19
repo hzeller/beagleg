@@ -74,8 +74,8 @@ static volatile struct MotionSegment *next_queue_element() {
 
 static void pru_motor_enable_nowait(char on) {
   // Enable pin is inverse logic: -EN
-  if (on) clr_motor_ena();
-  else set_motor_ena();
+  if (on) clr_gpio(MOTOR_ENABLE_GPIO);
+  else set_gpio(MOTOR_ENABLE_GPIO);
 }
 
 #ifdef DEBUG_QUEUE

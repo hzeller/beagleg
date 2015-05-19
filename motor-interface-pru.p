@@ -77,6 +77,28 @@
 	.u32 m7
 	.u32 m8
 .ends
+.assign MotorState, STATE_START, STATE_END, mstate
+
+;;; Set/Clr a GPIO pin based on 'bit' being set/clr in 'bits'
+;;; Uses:
+;;;   r4 : the base address of the gpio bank to set/clr the pin
+;;;   r5 : the bitmask to set/clr the gpio pin
+;;;   r6 : scratch
+.macro SetGPIO
+.mparam bits, bit, gpio_def
+	MOV r4, (gpio_def & 0xfffff000)
+	QBEQ no_map, r4.w2, GPIO_NOT_MAPPED
+	MOV r5, 1 << (gpio_def & 0x1f)
+	QBBS set_gpio, bits, bit
+	MOV r6, GPIO_CLEARDATAOUT
+	QBA update_gpio
+set_gpio:
+	MOV r6, GPIO_SETDATAOUT
+update_gpio:
+	ADD r4, r4, r6
+	SBBO r5, r4, 0, 4
+no_map:
+.endm
 
 ;;; Calculate the current delay depending on the phase (acceleration, travel,
 ;;; deceleration). Modifies the values in params, which is of type
@@ -166,33 +188,6 @@ calc_decel:
 DONE_CALCULATE_DELAY:
 .endm
 
-// Only used once, just macro.
-// Preliminary, not yet really useful.
-.macro CheckStopSwitches
-.mparam output_register, scratch, input_location
-	LBBO scratch, input_location, 0, 4
-	QBBS switch_1_handled, scratch, STOP_1_BIT
-	ZERO &output_register, 4  ; todo set proper value
-switch_1_handled:
-	QBBS switch_2_handled, scratch, STOP_2_BIT
-	ZERO &output_register, 4   ; todo set proper value
-switch_2_handled:
-	QBBS switch_3_handled, scratch, STOP_3_BIT
-	ZERO &output_register, 4   ; todo: set proper value
-switch_3_handled:
-.endm
-	
-;;; Update the state register of a motor with its 1.31 resolution fraction.
-;;; The 31st bit contains the overflow that we're interested in.
-;;; Uses a fixed number of 4 cycles
-.macro UpdateMotor
-.mparam output_register, scratch, state_reg, fraction, bit
-	ADD state_reg, state_reg, fraction
-	LSR scratch, state_reg, 31
-	LSL scratch, scratch, bit
-	OR  output_register, output_register, scratch
-.endm
-
 INIT:
 	;; Clear STANDBY_INIT in SYSCFG register.
 	LBCO r0, C4, 4, 4
@@ -211,57 +206,53 @@ QUEUE_READ:
 	QBEQ QUEUE_READ, queue_header.state, STATE_EMPTY ; wait until got data.
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
-	
-	;; Output direction bits to GPIO-1. Also, this sets the
-	;; motor enable (-EN) bit on this GPIO to zero, i.e. enable.
+
+	;; Enable the stepper motors (lo-active)
+	MOV r3, 0
+	CALL EnableMotors
+
+	;; Set direction bits
 	MOV r3, queue_header.direction_bits
-	LSL r3, r3, DIRECTION_GPIO1_SHIFT
-	MOV r4, GPIO_1_BASE | GPIO_DATAOUT
-	SBBO r3, r4, 0, 4
+	CALL SetDirections
 
 	;; queue_header processed, r1 is free to use
 	ADD r1, r2, SIZE(QueueHeader) ; r2 stays at queue pos
 	.assign TravelParameters, PARAM_START, PARAM_END, travel_params
 	LBCO travel_params, CONST_PRUDRAM, r1, SIZE(travel_params)
 
-	.assign MotorState, STATE_START, STATE_END, mstate
-	ZERO &mstate, SIZE(mstate)
-	
-	MOV r4, GPIO_0_BASE | GPIO_DATAOUT
-	ZERO &r3, 4		; initialize delay calculation state register.
-	
+	;; Set the Aux bits
+	MOV r3, travel_params.aux
+	CALL SetAuxBits
+
+	ZERO &mstate, SIZE(mstate)	; clear the motor states
+	ZERO &r3, 4			; initialize delay calculation state register.
+
 	;; Registers
 	;; r0, r1 free for calculation
 	;; r2 = queue pos
 	;; r3 = state for CalculateDelay
-	;; r4 = motor out GPIO
-	;; r5, r6 scratch
+	;; scratch:      r4..r6
 	;; parameter:    r7..r19
 	;; motor-state: r20..r27
+	;; call/ret:    r30
 STEP_GEN:
 	;; 
 	;; Generate motion profile configured by TravelParameters
 	;;
-	
-	;; update states and extract overflow bits into r1
-	;; 8 times 4 = 32 cpu cycles = 160ns. So whatever step output we do
-	;; is some time after we set the direction bit. Good, because the Allegro
-	;; chip requires this time delay.
-	ZERO &r1, 4
-	LSL r1, travel_params.aux, AUX_1_BIT
-	UpdateMotor r1, r5, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
-	UpdateMotor r1, r5, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
-	UpdateMotor r1, r5, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT
-	UpdateMotor r1, r5, mstate.m4, travel_params.fraction_4, MOTOR_4_STEP_BIT
-	UpdateMotor r1, r5, mstate.m5, travel_params.fraction_5, MOTOR_5_STEP_BIT
-	UpdateMotor r1, r5, mstate.m6, travel_params.fraction_6, MOTOR_6_STEP_BIT
-	UpdateMotor r1, r5, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
-	UpdateMotor r1, r5, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
-	MOV r6, GPIO_0_BASE | GPIO_DATAIN
-	CheckStopSwitches r1, r5, r6
-	
-	SBBO r1, r4, 0, 4	; motor bits to GPIO-0
+	;;; Update the state registers with the 1.31 resolution fraction.
+	;;; The 31st bit contains the overflow that causes a step.
+	ADD mstate.m1, mstate.m1, travel_params.fraction_1
+	ADD mstate.m2, mstate.m2, travel_params.fraction_2
+	ADD mstate.m3, mstate.m3, travel_params.fraction_3
+	ADD mstate.m4, mstate.m4, travel_params.fraction_4
+	ADD mstate.m5, mstate.m5, travel_params.fraction_5
+	ADD mstate.m6, mstate.m6, travel_params.fraction_6
+	ADD mstate.m7, mstate.m7, travel_params.fraction_7
+	ADD mstate.m8, mstate.m8, travel_params.fraction_8
+
+	;; Set the step bits (Need to check timing)
+	CALL SetSteps
 
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
@@ -290,3 +281,38 @@ FINISH:
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16
 
 	HALT
+
+// Set the motor enable signal based on the flag (r3)
+EnableMotors:
+	SetGPIO r3, 0, MOTOR_ENABLE_GPIO
+	RET
+
+// Set the aux bit signals based on the travel_params.aux (r3)
+SetAuxBits:
+	SetGPIO r3, 0, AUX_1_GPIO
+	SetGPIO r3, 1, AUX_2_GPIO
+	RET
+
+// Set the motor direction signals based on the queue_header.direction_bits (r3)
+SetDirections:
+	SetGPIO r3, 0, MOTOR_1_DIR_GPIO
+	SetGPIO r3, 1, MOTOR_2_DIR_GPIO
+	SetGPIO r3, 2, MOTOR_3_DIR_GPIO
+	SetGPIO r3, 3, MOTOR_4_DIR_GPIO
+	SetGPIO r3, 4, MOTOR_5_DIR_GPIO
+	SetGPIO r3, 5, MOTOR_6_DIR_GPIO
+	SetGPIO r3, 6, MOTOR_7_DIR_GPIO
+	SetGPIO r3, 7, MOTOR_8_DIR_GPIO
+	RET
+
+// Set the motor step signals based on bit 31 of the mstate of the motor
+SetSteps:
+	SetGPIO mstate.m1, 31, MOTOR_1_STEP_GPIO
+	SetGPIO mstate.m2, 31, MOTOR_2_STEP_GPIO
+	SetGPIO mstate.m3, 31, MOTOR_3_STEP_GPIO
+	SetGPIO mstate.m4, 31, MOTOR_4_STEP_GPIO
+	SetGPIO mstate.m5, 31, MOTOR_5_STEP_GPIO
+	SetGPIO mstate.m6, 31, MOTOR_6_STEP_GPIO
+	SetGPIO mstate.m7, 31, MOTOR_7_STEP_GPIO
+	SetGPIO mstate.m8, 31, MOTOR_8_STEP_GPIO
+	RET

@@ -41,31 +41,97 @@
 
 #define GPIO_MMAP_SIZE 0x2000
 
-#define MOTOR_OUT_BITS				\
-  ((uint32_t) ( (1<<MOTOR_1_STEP_BIT)		\
-		| (1<<MOTOR_2_STEP_BIT)		\
-		| (1<<MOTOR_3_STEP_BIT)		\
-		| (1<<MOTOR_4_STEP_BIT)		\
-		| (1<<MOTOR_5_STEP_BIT)		\
-		| (1<<MOTOR_6_STEP_BIT)		\
-		| (1<<MOTOR_7_STEP_BIT)		\
-		| (1<<MOTOR_8_STEP_BIT) ))
-
-// Direction bits are a contiguous chunk, just a bit shifted.
-#define DIRECTION_OUT_BITS ((uint32_t) (0xFF << DIRECTION_GPIO1_SHIFT))
-
 // GPIO registers.
 static volatile uint32_t *gpio_0 = NULL;
 static volatile uint32_t *gpio_1 = NULL;
 static volatile uint32_t *gpio_2 = NULL;
 static volatile uint32_t *gpio_3 = NULL;
 
-void set_motor_ena() {
-  gpio_1[GPIO_DATAOUT/4] = (1 << MOTOR_ENABLE_GPIO1_BIT);
+static volatile uint32_t *get_gpio_base(uint32_t gpio_def) {
+  switch (gpio_def & 0xfffff000) {
+  case GPIO_0_BASE: return gpio_0;
+  case GPIO_1_BASE: return gpio_1;
+  case GPIO_2_BASE: return gpio_2;
+  case GPIO_3_BASE: return gpio_3;
+  default: return NULL;
+  }
 }
 
-void clr_motor_ena() {
-  gpio_1[GPIO_DATAOUT/4] = 0;
+int get_gpio(uint32_t gpio_def) {
+  volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
+  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  uint32_t status;
+
+  if (gpio_port) {
+    status = gpio_port[GPIO_DATAIN/4];
+    return (status & bitmask) ? 1 : 0;
+  }
+  return -1;
+}
+
+void set_gpio(uint32_t gpio_def) {
+  volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
+  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  if (gpio_port)
+    gpio_port[GPIO_SETDATAOUT/4] = bitmask;
+}
+
+void clr_gpio(uint32_t gpio_def) {
+  volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
+  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  if (gpio_port)
+    gpio_port[GPIO_CLEARDATAOUT/4] = bitmask;
+}
+
+static void set_gpio_output_mask(uint32_t *output_mask, uint32_t gpio_def) {
+  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  switch (gpio_def & 0xfffff000) {
+  case GPIO_0_BASE: output_mask[0] |= bitmask; break;
+  case GPIO_1_BASE: output_mask[1] |= bitmask; break;
+  case GPIO_2_BASE: output_mask[2] |= bitmask; break;
+  case GPIO_3_BASE: output_mask[3] |= bitmask; break;
+  }
+}
+
+static void cfg_gpio_outputs() {
+  uint32_t output_mask[4] = { 0, 0, 0, 0 };
+
+  // Motor Step signals
+  set_gpio_output_mask(output_mask, MOTOR_1_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_2_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_3_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_4_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_5_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_6_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_7_STEP_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_8_STEP_GPIO);
+
+  // Motor Direction signals
+  set_gpio_output_mask(output_mask, MOTOR_1_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_2_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_3_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_4_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_5_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_6_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_7_DIR_GPIO);
+  set_gpio_output_mask(output_mask, MOTOR_8_DIR_GPIO);
+
+  // Motor Enable signal and other outputs
+  set_gpio_output_mask(output_mask, MOTOR_ENABLE_GPIO);
+
+  // Aux and PWM signals
+  set_gpio_output_mask(output_mask, AUX_1_GPIO);
+  set_gpio_output_mask(output_mask, AUX_2_GPIO);
+  set_gpio_output_mask(output_mask, PWM_1_GPIO);
+  set_gpio_output_mask(output_mask, PWM_2_GPIO);
+  set_gpio_output_mask(output_mask, PWM_3_GPIO);
+  set_gpio_output_mask(output_mask, PWM_4_GPIO);
+
+  // Set the output enable register for each GPIO bank
+  gpio_0[GPIO_OE/4] = ~output_mask[0];
+  gpio_1[GPIO_OE/4] = ~output_mask[1];
+  gpio_2[GPIO_OE/4] = ~output_mask[2];
+  gpio_3[GPIO_OE/4] = ~output_mask[3];
 }
 
 static volatile uint32_t *map_port(int fd, size_t length, off_t offset) {
@@ -121,10 +187,8 @@ int map_gpio() {
   gpio_3 = map_port(fd, GPIO_MMAP_SIZE, GPIO_3_BASE);
   if (gpio_3 == MAP_FAILED) { perror("mmap() GPIO-3"); goto exit; }
 
-  // Prepare all the pins we need for output. All the other bits are inputs,
-  // so the STOP switch bits are automatically prepared for input.
-  gpio_0[GPIO_OE/4] = ~(MOTOR_OUT_BITS | (1 << AUX_1_BIT) | (1 << AUX_2_BIT));
-  gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
+  // Prepare all the pins we need for output.
+  cfg_gpio_outputs();
 
   ret = 1;
 
