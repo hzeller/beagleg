@@ -198,6 +198,7 @@ static const char *special_commands(void *userdata, char letter, float value,
     int aux_bit = -1;
 
     switch (code) {
+    case 0: set_gpio(ESTOP_SW_GPIO); return remaining;
     case 3:
     case 4:
       for (;;) {
@@ -249,6 +250,7 @@ static const char *special_commands(void *userdata, char letter, float value,
       return remaining;
     case 80: set_gpio(MACHINE_PWR_GPIO); return remaining;
     case 81: clr_gpio(MACHINE_PWR_GPIO); return remaining;
+    case 999: clr_gpio(ESTOP_SW_GPIO); return remaining;
     }
 
     // The remaining codes are only useful when we have an output stream.

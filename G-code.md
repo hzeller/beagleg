@@ -150,6 +150,7 @@ the `unprocessed()` callback:
 
 Command          | Description
 -----------------|----------------------------------------
+M0               | Unconditional stop, sets Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 M3 Sxx           | Spindle On Clockwise at speed Sxx; happens synchronously with next move.
 M4 Sxx           | Spindle On Counterclockwise at speed Sxx; happens synchronously with next move.
 M5               | Spindle Off; happens synchronously with next move.
@@ -169,6 +170,7 @@ M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
+M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 
 ###Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
