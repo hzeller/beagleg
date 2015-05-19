@@ -65,6 +65,7 @@ const AxisBitmap_t kAllAxesBitmap =
 struct GCodeParser {
   struct GCodeParserCb callbacks;
   FILE *err_msg;
+  int modal_g0_g1;
   int line_number;
   int provided_axes;
   float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
@@ -352,11 +353,10 @@ static float f_param_to_feedrate(const float unit_value) {
 }
 
 static const char *handle_move(struct GCodeParser *p,
-			       void (*fun_move)(void *, float, const float *),
-			       const char *line) {
+			       const char *line, int force_change) {
   char axis_l;
   float value;
-  int any_change = 0;
+  int any_change = force_change;
   float feedrate = -1;
   const char *remaining_line;
   while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
@@ -375,7 +375,12 @@ static const char *handle_move(struct GCodeParser *p,
     line = remaining_line;
   }
 
-  if (any_change) fun_move(p->callbacks.user_data, feedrate, p->axes_pos);
+  if (any_change) {
+    if (p->modal_g0_g1)
+      p->callbacks.coordinated_move(p->callbacks.user_data, feedrate, p->axes_pos);
+    else
+      p->callbacks.rapid_move(p->callbacks.user_data, feedrate, p->axes_pos);
+  }
   return line;
 }
 
@@ -569,8 +574,8 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
     char processed_command = 1;
     if (letter == 'G') {
       switch ((int) value) {
-      case 0: line = handle_move(p, cb->rapid_move, line); break;
-      case 1: line = handle_move(p, cb->coordinated_move, line); break;
+      case 0: p->modal_g0_g1 = 0; line = handle_move(p, line, 0); break;
+      case 1: p->modal_g0_g1 = 1; line = handle_move(p, line, 0); break;
       case 2: line = handle_arc(p, line, 1); break;
       case 3: line = handle_arc(p, line, 0); break;
       case 4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
@@ -613,7 +618,19 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
       processed_command = 0;
     }
     else {
-      line = cb->unprocessed(userdata, letter, value, line);
+      const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
+      if (axis == GCODE_NUM_AXES) {
+        line = cb->unprocessed(userdata, letter, value, line);
+      } else {
+        // This line must be a continuation of a previous G0/G1 command.
+        // Update the axis position then handle the move.
+        const float unit_value = value * p->unit_to_mm_factor;
+        p->axes_pos[axis] = abs_axis_pos(p, axis, unit_value);
+	line = handle_move(p, line, 1);
+	// make gcode_command_done() think this was a 'G0/G1' command
+	letter = 'G';
+	value = p->modal_g0_g1;
+      }
     }
     if (processed_command) {
       cb->gcode_command_done(userdata, letter, value);
