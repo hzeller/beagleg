@@ -41,6 +41,12 @@
 #define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
+// aux_bits
+#define AUX_BIT_MIST        (1 << 0)
+#define AUX_BIT_FLOOD       (1 << 1)
+#define AUX_BIT_VACUUM      (1 << 2)
+#define MAX_AUX_PIN         2
+
 // Some default settings. These are most likely overrridden via flags by user.
 
 // All these settings are in sequence of enum GCodeParserAxes: XYZEABCUVW. Axes not
@@ -188,9 +194,11 @@ static const char *special_commands(void *userdata, char letter, float value,
     int aux_bit = -1;
 
     switch (code) {
-    case 7: state->aux_bits |= 1 << 0; return remaining;
-    case 8: state->aux_bits |= 1 << 1; return remaining;
-    case 9: state->aux_bits &= ~((1 << 0) | (1 << 1)); return remaining;
+    case 7: state->aux_bits |= AUX_BIT_MIST; return remaining;
+    case 8: state->aux_bits |= AUX_BIT_FLOOD; return remaining;
+    case 9: state->aux_bits &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); return remaining;
+    case 10: state->aux_bits |= AUX_BIT_VACUUM; return remaining;
+    case 11: state->aux_bits &= ~AUX_BIT_VACUUM; return remaining;
     case 42:
     case 62:
     case 63:
@@ -209,7 +217,7 @@ static const char *special_commands(void *userdata, char letter, float value,
         aux_bit = 1;
       else if (code == 63 || code == 65)
         aux_bit = 0;
-      if (pin >= 0 && pin <= 1) {
+      if (pin >= 0 && pin <= MAX_AUX_PIN) {
         if (aux_bit >= 0 && aux_bit <= 1) {
           if (aux_bit) state->aux_bits |= 1 << pin;
           else state->aux_bits &= ~(1 << pin);
