@@ -20,6 +20,8 @@
 #ifndef __GENERIC_GPIO_H
 #define __GENERIC_GPIO_H
 
+#include "motor-interface-constants.h"
+
 int get_gpio(uint32_t gpio_def);
 
 void set_gpio(uint32_t gpio_def);

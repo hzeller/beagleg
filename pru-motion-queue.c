@@ -28,13 +28,10 @@
 #include <prussdrv.h>
 #include <strings.h>
 
-// Shared between us and PRU
-#include "motor-interface-constants.h"
+#include "generic-gpio.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
-
-#include "generic-gpio.h"
 
 #define DEBUG_QUEUE
 #define PRU_NUM 0

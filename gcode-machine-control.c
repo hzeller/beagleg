@@ -34,6 +34,7 @@
 
 #include "motor-operations.h"
 #include "gcode-parser.h"
+#include "generic-gpio.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
@@ -246,6 +247,8 @@ static const char *special_commands(void *userdata, char letter, float value,
 	}
       }
       return remaining;
+    case 80: set_gpio(MACHINE_PWR_GPIO); return remaining;
+    case 81: clr_gpio(MACHINE_PWR_GPIO); return remaining;
     }
 
     // The remaining codes are only useful when we have an output stream.

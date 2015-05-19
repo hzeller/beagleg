@@ -164,6 +164,8 @@ M62 Pnn          | Set AUX Pin nn to 1; happens synchronously with next move.
 M63 Pnn          | Set AUX Pin nn to 0; happens synchronously with next move.
 M64 Pnn          | Set AUX Pin nn to 1; should happen immediately, currently mimics M62.
 M65 Pnn          | Set AUX Pin nn to 0; should happen immediately, currently mimics M63.
+M80              | ATX Power On (only on capes that have MACHINE_PWR_GPIO)
+M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
