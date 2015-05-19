@@ -136,6 +136,7 @@ static void pru_shutdown(char flush_queue) {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
   pru_motor_enable_nowait(0);
+  clr_gpio(LED_GPIO);  // turn off the status LED
   unmap_gpio();
 }
 
@@ -144,6 +145,8 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
     return 1;
   }
+
+  set_gpio(LED_GPIO);  // turn on the status LED
 
   pru_motor_enable_nowait(0);  // motors off initially.
 
