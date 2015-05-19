@@ -150,6 +150,9 @@ the `unprocessed()` callback:
 
 Command          | Description
 -----------------|----------------------------------------
+M3 Sxx           | Spindle On Clockwise at speed Sxx; happens synchronously with next move.
+M4 Sxx           | Spindle On Counterclockwise at speed Sxx; happens synchronously with next move.
+M5               | Spindle Off; happens synchronously with next move.
 M7               | Turn mist on; happens synchronously with next move.
 M8               | Turn flood on; happens synchronously with next move.
 M9               | Turn all coolant off; happens synchronously with next move.

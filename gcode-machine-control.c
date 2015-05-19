@@ -45,7 +45,9 @@
 #define AUX_BIT_MIST        (1 << 0)
 #define AUX_BIT_FLOOD       (1 << 1)
 #define AUX_BIT_VACUUM      (1 << 2)
-#define MAX_AUX_PIN         2
+#define AUX_BIT_SPINDLE_ON  (1 << 3)
+#define AUX_BIT_SPINDLE_DIR (1 << 4)
+#define MAX_AUX_PIN         4
 
 // Some default settings. These are most likely overrridden via flags by user.
 
@@ -138,6 +140,7 @@ struct GCodeMachineControl {
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
   unsigned int aux_bits;                 // Set via M42.
+  unsigned int spindle_rpm;              // Set via Sxxx of M3/M4 and remembered
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
@@ -194,6 +197,23 @@ static const char *special_commands(void *userdata, char letter, float value,
     int aux_bit = -1;
 
     switch (code) {
+    case 3:
+    case 4:
+      for (;;) {
+        const char* after_pair = gcodep_parse_pair(remaining, &letter, &value,
+                                                   state->msg_stream);
+        if (after_pair == NULL) break;
+        else if (letter == 'S') state->spindle_rpm = round2int(value);
+        else break;
+        remaining = after_pair;
+      }
+      if (state->spindle_rpm) {
+        state->aux_bits |= AUX_BIT_SPINDLE_ON;
+	if (code == 3) state->aux_bits &= ~AUX_BIT_SPINDLE_DIR;
+        else state->aux_bits |= AUX_BIT_SPINDLE_DIR;
+      }
+      return remaining;
+    case 5: state->aux_bits &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); return remaining;
     case 7: state->aux_bits |= AUX_BIT_MIST; return remaining;
     case 8: state->aux_bits |= AUX_BIT_FLOOD; return remaining;
     case 9: state->aux_bits &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); return remaining;
