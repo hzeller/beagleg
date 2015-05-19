@@ -112,6 +112,8 @@ Command          | Callback             | Description
 ---------------- |----------------------|------------------------------------
 G0 [coordinates] | `rapid_move()`       | Move to coordinates
 G1 [coordinates] | `coordinated_move()` | Like G0, but guarantee linear move
+G2 [end] [offset]| `coordinated_move()` | Clockwise arc
+G3 [end] [offset]| `coordinated_move()` | Counterclockwise arc
 G4 Pnnn          | `dwell()`            | Dwell (wait) for nnn milliseconds.
 G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
