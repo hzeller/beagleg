@@ -186,6 +186,7 @@ static int beagleg_enqueue(void *ctx, const struct MotorMovement *param,
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
     double previous_speed = param->v0;   // speed calculation in double
 
+    output.aux_bits = param->aux_bits;  // use the original Aux bits for all segments
     for (int d = 0; d < divisions; ++d) {
       for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
         hires_step_accumulator[i] += hires_steps_per_div[i];
