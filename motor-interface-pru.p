@@ -24,12 +24,6 @@
 .origin 0
 .entrypoint INIT
 
-#define GPIO_0 0x44e07000	; memory space mapped to GPIO-0	
-#define GPIO_1 0x4804c000	; memory space mapped to GPIO-1
-
-#define GPIO_DATAOUT 0x13c      ; Set all the bits
-#define GPIO_DATAIN  0x138
-
 #define PRU0_ARM_INTERRUPT 19
 #define CONST_PRUDRAM	   C24
 
@@ -222,7 +216,7 @@ QUEUE_READ:
 	;; motor enable (-EN) bit on this GPIO to zero, i.e. enable.
 	MOV r3, queue_header.direction_bits
 	LSL r3, r3, DIRECTION_GPIO1_SHIFT
-	MOV r4, GPIO_1 | GPIO_DATAOUT
+	MOV r4, GPIO_1_BASE | GPIO_DATAOUT
 	SBBO r3, r4, 0, 4
 
 	;; queue_header processed, r1 is free to use
@@ -233,7 +227,7 @@ QUEUE_READ:
 	.assign MotorState, STATE_START, STATE_END, mstate
 	ZERO &mstate, SIZE(mstate)
 	
-	MOV r4, GPIO_0 | GPIO_DATAOUT
+	MOV r4, GPIO_0_BASE | GPIO_DATAOUT
 	ZERO &r3, 4		; initialize delay calculation state register.
 	
 	;; Registers
@@ -264,7 +258,7 @@ STEP_GEN:
 	UpdateMotor r1, r5, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
 	UpdateMotor r1, r5, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
-	MOV r6, GPIO_0 | GPIO_DATAIN
+	MOV r6, GPIO_0_BASE | GPIO_DATAIN
 	CheckStopSwitches r1, r5, r6
 	
 	SBBO r1, r4, 0, 4	; motor bits to GPIO-0

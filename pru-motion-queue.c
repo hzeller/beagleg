@@ -24,11 +24,6 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #include <pruss_intc_mapping.h>
 #include <prussdrv.h>
 #include <strings.h>
@@ -39,28 +34,10 @@
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
 
+#include "generic-gpio.h"
+
 #define DEBUG_QUEUE
 #define PRU_NUM 0
-
-#define GPIO_0_ADDR 0x44e07000	// memory space mapped to GPIO-0
-#define GPIO_1_ADDR 0x4804c000	// memory space mapped to GPIO-1
-#define GPIO_MMAP_SIZE 0x2000
-
-#define GPIO_OE 0x134           // setting direction.
-#define GPIO_DATAOUT 0x13c      // Set all the bits
-
-#define MOTOR_OUT_BITS				\
-  ((uint32_t) ( (1<<MOTOR_1_STEP_BIT)		\
-		| (1<<MOTOR_2_STEP_BIT)		\
-		| (1<<MOTOR_3_STEP_BIT)		\
-		| (1<<MOTOR_4_STEP_BIT)		\
-		| (1<<MOTOR_5_STEP_BIT)		\
-		| (1<<MOTOR_6_STEP_BIT)		\
-		| (1<<MOTOR_7_STEP_BIT)		\
-		| (1<<MOTOR_8_STEP_BIT) ))
-
-// Direction bits are a contiguous chunk, just a bit shifted.
-#define DIRECTION_OUT_BITS ((uint32_t) (0xFF << DIRECTION_GPIO1_SHIFT))
 
 // The communication with the PRU. We memory map the static RAM in the PRU
 // and write stuff into it from here. Mostly this is a ring-buffer with
@@ -73,27 +50,6 @@ struct PRUCommunication {
 // This is a physical singleton, so simply reflect that here.
 static volatile struct PRUCommunication *pru_data_;
 static unsigned int queue_pos_;
-
-// GPIO registers.
-static volatile uint32_t *gpio_0 = NULL;
-static volatile uint32_t *gpio_1 = NULL;
-
-static int map_gpio() {
-  int fd = open("/dev/mem", O_RDWR);
-  gpio_0 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
-				     MAP_SHARED, fd, GPIO_0_ADDR);
-  if (gpio_0 == MAP_FAILED) { perror("mmap() GPIO-0"); return 0; }
-  gpio_1 = (volatile uint32_t*) mmap(0, GPIO_MMAP_SIZE, PROT_READ | PROT_WRITE,
-				     MAP_SHARED, fd, GPIO_1_ADDR);
-  if (gpio_1 == MAP_FAILED) { perror("mmap() GPIO-1"); return 0; }
-  close(fd);
-  return 1;
-}
-
-static void unmap_gpio() {
-  munmap((void*)gpio_0, GPIO_MMAP_SIZE); gpio_0 = NULL;
-  munmap((void*)gpio_1, GPIO_MMAP_SIZE); gpio_1 = NULL;
-}
 
 static volatile struct PRUCommunication *map_pru_communication() {
   void *result;
@@ -118,7 +74,8 @@ static volatile struct MotionSegment *next_queue_element() {
 
 static void pru_motor_enable_nowait(char on) {
   // Enable pin is inverse logic: -EN
-  gpio_1[GPIO_DATAOUT/4] = on ? 0 : (1 << MOTOR_ENABLE_GPIO1_BIT);
+  if (on) clr_motor_ena();
+  else set_motor_ena();
 }
 
 #ifdef DEBUG_QUEUE
@@ -187,11 +144,6 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
     return 1;
   }
-
-  // Prepare all the pins we need for output. All the other bits are inputs,
-  // so the STOP switch bits are automatically prepared for input.
-  gpio_0[GPIO_OE/4] = ~(MOTOR_OUT_BITS | (1 << AUX_1_BIT) | (1 << AUX_2_BIT));
-  gpio_1[GPIO_OE/4] = ~(DIRECTION_OUT_BITS | (1 << MOTOR_ENABLE_GPIO1_BIT));
 
   pru_motor_enable_nowait(0);  // motors off initially.
 
