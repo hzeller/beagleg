@@ -76,6 +76,9 @@ struct GCodeParserCb {
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
+  // G30: Probe Z axis to travel_endstop
+  int (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis);
+
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
   void (*set_temperature)(void *, float);  // M104, M109: Set temp. in Celsius.

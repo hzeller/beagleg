@@ -118,6 +118,7 @@ G4 Pnnn          | `dwell()`            | Dwell (wait) for nnn milliseconds.
 G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
 G28 [coordinates]| `handle_home()`      | Home the machine on given axes.
+G30              | `handle_z_probe()`   | Z Probe.
 G70              | -                    | Set coordinates to inches.
 G71              | -                    | Set coordinates to millimeter.
 G90              | -                    | Coordinates are absolute.

@@ -79,6 +79,14 @@ struct MachineControlConfig {
                                 // Axis name '_' for skipped placeholder.
                                 // Not mentioned axes are not handled.
 
+  // The follwing parameters determine which endstops are used by each logical
+  // axis for the "home" and "travel" switches as well as the switch polarity.
+  const char *min_endswitch;
+  const char *max_endswitch;
+  const char *endswitch_polarity;
+
+  const char *home_order;
+
   char debug_print;             // Print step-tuples to output_fd if 1.
   char synchronous;             // Don't queue, wait for command to finish if 1.
 };
