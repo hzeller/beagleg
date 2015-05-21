@@ -8,7 +8,7 @@ BeagleG
 Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
 acceleration and travel (right now: trapezoidal motion profile;
-jerk in progress).
+jerk implementation in progress).
 
 This is one of my early tests:
 [![First Test][run-vid]](http://youtu.be/hIEY9077D64)
@@ -27,11 +27,11 @@ doing travel planning, while all the real-time critical parts are
 done in the PRU. The host program needs less than 1% CPU-time processing a
 typical G-Code file.
 
-The `machine-control` program is parsing G-Code, extracting axes moves and
-enqueues them to the realtime unit.
+The main `machine-control` program is parsing G-Code, extracting axes moves and
+enqueues them to the realtime unit. It can receive G-Code from a file or socket.
 
 ## APIs
-The functionality is encapsulated in independently usable APIs.
+The functionality is implemented in a stack of independently usable APIs.
 
    - [gcode-parser.h](./gcode-parser.h) : C-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
@@ -61,10 +61,11 @@ The functionality is encapsulated in independently usable APIs.
       what to do with the parameters. The simulation just outputs the would-be
       result as CSV file (good for debugging).
      
-   - `determine-print-stats.h`: C-API to determine some basic stats about
-      a G-Code file; it processes the entire file and determines estimated
-      print time, filament used etc. Implementation is mostly an example using
-      gcode-parser.h.
+   - [determine-print-stats.h](./determine-print-stats.h): Highlevel C-API
+      facade to determine some basic stats about a G-Code file; it processes
+      the entire file and determines estimated print time, filament used etc.
+      Since this takes the actual travel planning into account, the values are
+      a correct prediction of the actual print or CNC time.
       Used in the `gcode-print-stats` binary.
 
 The interfaces are typically C-structs with function pointers which allows for
@@ -225,6 +226,11 @@ Now, all pins are mapped to be used by beagleg. This is the pinout
                       |
     Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
            BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
+
+Note that Step and Direction are carefully chosen in a way that they are on
+different GPIO words. This improves the possible timing we can achieve
+(unfortunately, not all BBB stepper projects out there were bothering with
+this detail).
 
 Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
 (The mapping right now was done because these are consecutive GPIO pins that
