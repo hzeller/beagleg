@@ -8,7 +8,8 @@ Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
 acceleration and travel (right now: trapezoidal motion profile).
 
-See example here: http://www.youtube.com/watch?v=hIEY9077D64
+This is one of my early tests:
+[![First Test][run-vid]](http://youtu.be/hIEY9077D64)
 
 The motor-operations API allows to enqueue operations with speed changes
 (transition between segments) or fixed speed (travel) of 8 steppers that are
@@ -335,7 +336,8 @@ the Free Software Foundation, either version 3 of the License, or
      recover exact last position. That way pause/resume is possible.
    - ...
 
-[manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
-[bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
+[manual-cape]: ./img/manual-ramps-cape.jpg
+[bumps-cape]: ./img/bumps-connect.jpg
 [bumps]: https://github.com/hzeller/bumps
 [buserror]: https://github.com/hzeller/beagleg/issues/4
+[run-vid]: ./img/beagleg-vid-thumb.jpg
