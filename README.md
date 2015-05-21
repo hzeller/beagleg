@@ -144,10 +144,6 @@ two motors connected to the first two connectors with a mirrored X-axis.
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).
 
-If you get an Bus error, have a look at this [Bus Error FYI][buserror] - this
-seems to happen on some machines and this needs to be fixed in the pinmux script,
-but have a look at the workaorund there.
-
 ### Examples
 
     sudo ./machine-control -f 10 --max-feedrate 1000 --loop myfile.gcode
@@ -339,5 +335,4 @@ the Free Software Foundation, either version 3 of the License, or
 [manual-cape]: ./img/manual-ramps-cape.jpg
 [bumps-cape]: ./img/bumps-connect.jpg
 [bumps]: https://github.com/hzeller/bumps
-[buserror]: https://github.com/hzeller/beagleg/issues/4
 [run-vid]: ./img/beagleg-vid-thumb.jpg
