@@ -60,8 +60,11 @@ static int usage(const char *prog, const char *msg) {
 	  "                              Use letter or '_' for empty slot.\n"
           "                              You can use the same letter multiple times for mirroring.\n"
 	  "                              Use lowercase to reverse. (Default: 'XYZEA')\n"
+#if 0     // Commented out for now as it is just confusing. Only needed for
+          // different hardware.
           "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
           "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
+#endif
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
@@ -72,7 +75,7 @@ static int usage(const char *prog, const char *msg) {
 	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
 	  prog);
   fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
-  fprintf(stderr, "(the actual mapping to a connector happens with --channel-layout and --axis-mapping,\n");
+  fprintf(stderr, "(the actual mapping to a connector happens with --axis-mapping,\n");
   fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
   fprintf(stderr, "All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'\n");

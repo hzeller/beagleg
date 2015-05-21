@@ -1,12 +1,14 @@
 BeagleG
 =======
 
-(I am experimenting with the acceleration planning and jerk right now, so don't expect
- everything 100% to work every time)
+(Note: I am experimenting with the acceleration planning and jerk right now,
+ so don't expect everything 100% to work all the time while things are in flux.
+ Contact me if you want to use BeagleG).
 
 Step-motor controller (and eventually 3D printer controller) using the PRU
 capability of the Beaglebone Black to create precisely timed stepper-pulses for
-acceleration and travel (right now: trapezoidal motion profile).
+acceleration and travel (right now: trapezoidal motion profile;
+jerk in progress).
 
 This is one of my early tests:
 [![First Test][run-vid]](http://youtu.be/hIEY9077D64)
@@ -14,7 +16,7 @@ This is one of my early tests:
 The motor-operations API allows to enqueue operations with speed changes
 (transition between segments) or fixed speed (travel) of 8 steppers that are
 controlled in a coordinated move (G1), with real-time
-controlled steps at rates that can go beyond 500kHz.
+controlled steps at rates that can go beyond 800kHz.
 So: sufficient even for advanced step motors and drivers :)
 
 The jerk/{accl-,decel-}eration motion profile is entirely
@@ -113,8 +115,6 @@ This either takes a filename or a TCP port to listen on.
                                   Use letter or '_' for empty slot.
                                   You can use the same letter multiple times for mirroring.
                                   Use lowercase to reverse. (Default: 'XYZEA')
-      --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)
-                                  This depends on the harware mapping of the cape (Default for BUMPS: '23140').
       --port <port>         (-p): Listen on this TCP port for GCode.
       --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
       -f <factor>               : Print speed factor (Default 1.0).
@@ -123,7 +123,7 @@ This either takes a filename or a TCP port to listen on.
       -S                        : Synchronous: don't queue (Default: off).
       --loop[=count]            : Loop file number of times (no value: forever)
     [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
-    (the actual mapping to a connector happens with --channel-layout and --axis-mapping,
+    (the actual mapping to a connector happens with --axis-mapping,
     the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
     You can either specify --port <port> to listen for commands or give a GCode-filename
     All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'
@@ -236,8 +236,10 @@ in `struct MachineControlConfig` about the configuration options `channel_layout
 and `axis_mapping`. The first describes the mapping of driver channels to
 connector positions on the cape (which might differ due to board layout reasons),
 the second the mapping of G-code axes (such as 'X' or 'Y') to the
-connector position. The channel layout can be changed with `--channel-layout` and defaults
-to the BUMPS cape; the axis mapping can be set with the `--axis-mapping` flag.
+connector position. The channel layout defaults to the BUMPS cape, but
+can be changed with `--channel-layout` (only needed if you connect your own
+cape with a different layout).
+Taxis mapping can be set with the `--axis-mapping` flag.
 
 In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
 in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
@@ -325,8 +327,6 @@ the Free Software Foundation, either version 3 of the License, or
 
 ## TODO
    - Read end-switches
-   - Do planning: no need to decelerate fully if we're going on an (almost)
-     straight line between line segments.
    - Needed for full 3D printer solution: add PWM for heaters.
    - Fast pause without waiting for queues to empty, but still be able to
      recover exact last position. That way pause/resume is possible.
