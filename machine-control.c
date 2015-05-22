@@ -173,18 +173,42 @@ static int run_server(struct MachineControlConfig *config,
   return process_result;
 }
 
-// Parse a double value. It can be given just as number or as fraction if it
-// contains a slash. "13.524" or "3200/6.35" would be examples for valid input.
+// Parse a double value and allow simple multiplicative operations.
+// So "13.524" or "3200/6.35" or "3200/25.4*4" would be examples for valid input.
 // Returns the parsed value and in "end" the end of parse position.
-static double parse_double_optional_fraction(const char *input, char **end) {
-  const double value = strtod(input, end);
-  if (*end == input) return 0;
-  while (isspace(**end)) ++*end;
-  if (**end != '/') return value;  // done. Not a fraction.
-  input = *end + 1;
-  const double divisor = strtod(input, end);
-  if (*end == input) return 0;
-  return value / divisor;
+static double parse_double_optional_fraction(const char *input, double fallback,
+                                             char **end) {
+  const char *full_expr = input;
+  double value = strtod(input, end);
+  if (*end == input) return fallback;
+  for (;;) {
+    while (isspace(**end)) ++*end;
+    const char op = **end;
+    if (op != '/' && op != '*') {
+      return value;  // done. Not an operation.
+    }
+    ++*end;
+    while (isspace(**end)) ++*end;
+    input = *end;
+    double operand;
+    if (*input == '(') {
+      operand = parse_double_optional_fraction(input+1, 1.0, end);
+      if (**end != ')') {
+        fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
+        return fallback;
+      } else {
+        ++*end;
+      }
+    } else {
+      operand = strtod(input, end);
+    }
+    if (*end == input) return fallback;
+    if (op == '/')
+      value /= operand;
+    else if (op == '*')
+      value *= operand;
+  }
+  return value;
 }
 
 // Parse comma (or other character) separated array of up to "count" float
@@ -193,7 +217,7 @@ static int parse_float_array(const char *input, float result[], int count) {
   const char *full = input;
   for (int i = 0; i < count; ++i) {
     char *end;
-    result[i] = (float) parse_double_optional_fraction(input, &end);
+    result[i] = (float) parse_double_optional_fraction(input, 0, &end);
     if (end == input) return 0;  // parse error.
     while (isspace(*end)) ++end;
     if (*end == '\0') return i + 1;
