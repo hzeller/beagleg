@@ -78,7 +78,9 @@ static int usage(const char *prog, const char *msg) {
   fprintf(stderr, "(the actual mapping to a connector happens with --axis-mapping,\n");
   fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
   fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
-  fprintf(stderr, "All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'\n");
+  fprintf(stderr, "All numbers can be given as multiplicative expression\n"
+          "which makes microstepping and unit conversions more readable\n"
+          "e.g. --steps-mm '16*200/(25.4/4),8*200/4'\n");
   return 1;
 }
 

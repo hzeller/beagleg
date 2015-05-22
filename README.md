@@ -127,7 +127,9 @@ This either takes a filename or a TCP port to listen on.
     (the actual mapping to a connector happens with --axis-mapping,
     the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
     You can either specify --port <port> to listen for commands or give a GCode-filename
-    All numbers can optionally be given as fraction, e.g. --steps-mm '3200/6.35,200/3'
+    All numbers can be given as multiplicative expression
+    which makes microstepping and unit conversions more readable
+    e.g. --steps-mm '16*200/(25.4/4),8*200/4'
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
 while `machine-control` maps these to physical output connectors,
@@ -180,7 +182,7 @@ command line options
 
     $ cat type-a.config
     # Configuration for Type-A machine series 1, Motors @ 28V
-    --steps-mm 1600/20,1600/20,800
+    --steps-mm 8*200/20,8*200/20,800
     --max-feedrate 900,900,90
     --accel 18000,8000,1500
     --axis-mapping XYyZE   # y mirrored
