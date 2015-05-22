@@ -49,6 +49,7 @@
 #define AUX_BIT_SPINDLE_ON  (1 << 3)
 #define AUX_BIT_SPINDLE_DIR (1 << 4)
 #define MAX_AUX_PIN         4
+#define NUM_ENDSTOPS        6
 
 // Some default settings. These are most likely overrridden via flags by user.
 
@@ -135,6 +136,13 @@ static void buffer_next(struct TargetBuffer *b) {
 
 typedef uint8_t DriverBitmap;
 
+// Compact representation of an enstop configuration.
+struct EndstopConfig {
+  unsigned char direction : 1;       // 0: towards zero  1: towards bedsize
+  unsigned char polarity : 1;        // 0: Normally Open 1: normally close
+  unsigned char endstop_number : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
+};
+
 struct GCodeMachineControl {
   struct GCodeParserCb event_input;
   struct MotorOperations *motor_ops;
@@ -158,8 +166,9 @@ struct GCodeMachineControl {
   int axis_flip[GCODE_NUM_AXES];        // 1 or -1 for direction flip of axis
   int driver_flip[BEAGLEG_NUM_MOTORS];  // 1 or -1 for for individual driver
 
-  unsigned char home_endstop[GCODE_NUM_AXES];
-  unsigned char travel_endstop[GCODE_NUM_AXES];
+  // Mapping of Axis to which endstop it affects.
+  struct EndstopConfig home_endstop[GCODE_NUM_AXES];
+  struct EndstopConfig travel_endstop[GCODE_NUM_AXES];
 
   // Current machine configuration
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
@@ -703,11 +712,11 @@ static void machine_set_speed_factor(void *userdata, float value) {
 static uint32_t get_home_endstop(GCodeMachineControl_t *state,
 				 enum GCodeParserAxis axis,
 				 int *dir, int *polarity) {
-  unsigned char mask = state->home_endstop[axis];
+  struct EndstopConfig config = state->home_endstop[axis];
   uint32_t gpio_def = 0;
-  *dir = (mask & 0x80) ? -1 : 1;
-  *polarity = (mask & 0x40) ? 1 : 0;
-  switch (mask & 0x3f) {
+  *dir = (config.direction) ? 1 : -1;
+  *polarity = config.polarity;
+  switch (config.endstop_number) {
   case 1: gpio_def = END_1_GPIO; break;
   case 2: gpio_def = END_2_GPIO; break;
   case 3: gpio_def = END_3_GPIO; break;
@@ -722,11 +731,11 @@ static uint32_t get_home_endstop(GCodeMachineControl_t *state,
 static uint32_t get_travel_endstop(GCodeMachineControl_t *state,
 				   enum GCodeParserAxis axis,
 				   int *dir, int *polarity) {
-  unsigned char mask = state->travel_endstop[axis];
+  struct EndstopConfig config = state->travel_endstop[axis];
   uint32_t gpio_def = 0;
-  *dir = (mask & 0x80) ? -1 : 1;
-  *polarity = (mask & 0x40) ? 1 : 0;
-  switch (mask & 0x3f) {
+  *dir = (config.direction) ? 1 : -1;
+  *polarity = config.polarity;
+  switch (config.endstop_number) {
   case 1: gpio_def = END_1_GPIO; break;
   case 2: gpio_def = END_2_GPIO; break;
   case 3: gpio_def = END_3_GPIO; break;
@@ -925,10 +934,28 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     result->axis_to_driver[axis] |= (1 << driver);
   }
 
+  // Extract enstop polarity
+  char endstop_polarity[NUM_ENDSTOPS] = {0};
+  if (cfg.endswitch_polarity) {
+    const char *map = cfg.endswitch_polarity;
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
+      if (*map == '_' || *map == '0' || *map == '-') {
+        endstop_polarity[switch_connector] = 0;
+      } else if (*map == '1' || *map == '+') {
+        endstop_polarity[switch_connector] = 1;
+      } else {
+        fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",
+                *map, cfg.endswitch_polarity);
+        return cleanup_state(result);
+      }
+    }
+  }
+
   // Now map the endstops
   if (cfg.min_endswitch) {
+    const char direction_towards_min = 0;
     const char *map = cfg.min_endswitch;
-    for (int pos = 1; *map; pos++, map++) {
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
       if (*map == '_')
         continue;
       const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
@@ -939,25 +966,30 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
                 toupper(*map), cfg.min_endswitch);
         return cleanup_state(result);
       }
-      int home = (toupper(*map) == *map) ? 1 : 0;
+      const int home = (toupper(*map) == *map) ? 1 : 0;
       if (home) {
-        if (result->home_endstop[axis]) {
+        if (result->home_endstop[axis].endstop_number) {
           fprintf(stderr, "Axis %c is already mapped to a home endstop\n", toupper(*map));
           return cleanup_state(result);
         }
-        result->home_endstop[axis] = 0x80 | pos;
+        result->home_endstop[axis].endstop_number = switch_connector + 1;
+        result->home_endstop[axis].direction = direction_towards_min;
+        result->home_endstop[axis].polarity = endstop_polarity[switch_connector];
       } else {
-        if (result->travel_endstop[axis]) {
+        if (result->travel_endstop[axis].endstop_number) {
           fprintf(stderr, "Axis %c is already mapped to a travel endstop\n", toupper(*map));
           return cleanup_state(result);
         }
-        result->travel_endstop[axis] = 0x80 | pos;
+        result->travel_endstop[axis].endstop_number = switch_connector + 1;
+        result->travel_endstop[axis].direction = direction_towards_min;
+        result->travel_endstop[axis].polarity = endstop_polarity[switch_connector];
       }
     }
   }
   if (cfg.max_endswitch) {
+    const char direction_towards_max = 1;
     const char *map = cfg.max_endswitch;
-    for (int pos = 1; *map; pos++, map++) {
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
       if (*map == '_')
         continue;
       const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
@@ -968,35 +1000,23 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
                 toupper(*map), cfg.max_endswitch);
         return cleanup_state(result);
       }
-      int home = (toupper(*map) == *map) ? 1 : 0;
+      const int home = (toupper(*map) == *map) ? 1 : 0;
       if (home) {
-        if (result->home_endstop[axis]) {
+        if (result->home_endstop[axis].endstop_number) {
           fprintf(stderr, "Axis %c is already mapped to a home endstop\n", toupper(*map));
           return cleanup_state(result);
         }
-        result->home_endstop[axis] = 0x00 | pos;
+        result->home_endstop[axis].endstop_number = switch_connector + 1;
+        result->home_endstop[axis].direction = direction_towards_max;
+        result->home_endstop[axis].polarity = endstop_polarity[switch_connector];
       } else {
-        if (result->travel_endstop[axis]) {
+        if (result->travel_endstop[axis].endstop_number) {
           fprintf(stderr, "Axis %c is already mapped to an overtravel endstop\n", toupper(*map));
           return cleanup_state(result);
         }
-        result->travel_endstop[axis] = 0x00 | pos;
-      }
-    }
-  }
-  if (cfg.endswitch_polarity) {
-    const char *map = cfg.endswitch_polarity;
-    for (int pos = 0; *map; pos++, map++) {
-      if (*map == '_' || *map == '0' || *map == '-') {
-        result->home_endstop[pos] &= ~0x40;
-        result->travel_endstop[pos] &= ~0x40;
-      } else if (*map == '1' || *map == '+') {
-        result->home_endstop[pos] |= 0x40;
-        result->travel_endstop[pos] |= 0x40;
-      } else {
-        fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",
-		*map, cfg.endswitch_polarity);
-          return cleanup_state(result);
+        result->travel_endstop[axis].endstop_number = switch_connector + 1;
+        result->travel_endstop[axis].direction = direction_towards_max;
+        result->travel_endstop[axis].polarity = endstop_polarity[switch_connector];
       }
     }
   }
@@ -1015,15 +1035,15 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
               result->cfg.acceleration[i],
               result->cfg.steps_per_mm[i],
               result->axis_flip[i] < 0 ? " (reversed)" : "");
-      int endstop = result->home_endstop[i] & 0x3f;
-      int dir = (result->home_endstop[i] & 0x80) ? -1 : 1;
-      int polarity = (result->home_endstop[i] & 0x40) ? 1 : 0;
+      int endstop = result->home_endstop[i].endstop_number;
+      int dir = (result->home_endstop[i].direction) ? 1 : -1;
+      int polarity = result->home_endstop[i].polarity;
       if (endstop)
         fprintf(stderr, "endstop %d (%d %d) for home switch ",
 		endstop, dir, polarity);
-      endstop = result->travel_endstop[i] & 0x3f;
-      dir = (result->travel_endstop[i] & 0x80) ? -1 : 1;
-      polarity = (result->travel_endstop[i] & 0x40) ? 1 : 0;
+      endstop = result->travel_endstop[i].endstop_number;
+      dir = (result->travel_endstop[i].direction) ? 1 : -1;
+      polarity = result->travel_endstop[i].polarity;
       if (endstop)
         fprintf(stderr, "endstop %d (%d %d) for travel switch ",
 		endstop, dir, polarity);

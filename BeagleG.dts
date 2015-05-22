@@ -24,6 +24,7 @@
     exclusive-use = "pruss",  // Programmable realtime unit
     		  "P9.22", "P9.21", "P9.18", "P9.17", "P9.42A", "P9.26", "P9.24", "P9.41A", // step
 		  "P8.12", "P8.11", "P8.16", "P8.15", "P9.15",  "P9.23", "P9.14", "P9.16",  // dir
+		  "P8.13", "P8.14", "P8.17",    // endswitches
 		  "tscadc";   // Analog digital converter
 
     fragment@0 {
@@ -54,7 +55,7 @@
 
 		    /* Motor enable */
 		    0x078 0x17 /* GPIO1[28] Motor Enable, pull up */
-		    
+
 		    /* Aux */
 		    0x070 0x07 /* GPIO0[30], pull-down; AUX 1 */
 		    0x074 0x07 /* GPIO0[31], pull-down; AUX 2 */
@@ -75,7 +76,7 @@
     };
 
     // TODO: some other fragment mentioning adc 0, 1, 2 ?
-    
+
     fragment@1 {
         target = <&ocp>;
         __overlay__ {
