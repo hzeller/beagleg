@@ -795,6 +795,7 @@ static void home_axis(GCodeMachineControl_t *state, enum GCodeParserAxis axis) {
 static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   const struct MachineControlConfig *cfg = &state->cfg;
+  bring_path_to_halt(state);
   for (const char *order = cfg->home_order; *order; order++) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
     if (axis == GCODE_NUM_AXES)
