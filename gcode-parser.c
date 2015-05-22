@@ -72,6 +72,7 @@ struct GCodeParser {
   char axis_is_absolute[GCODE_NUM_AXES];
   AxesRegister relative_zero;  // reference, set by G92 commands
   AxesRegister axes_pos;
+  enum GCodeParserAxis plane[3];
 };
 
 static void dummy_gcode_start(void *user) {}
@@ -165,6 +166,11 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   // Initial values for various constants.
   result->unit_to_mm_factor = 1.0f;
   set_all_axis_to_absolute(result, 1);
+
+  // Set to XY-plane
+  result->plane[0] = AXIS_X;
+  result->plane[1] = AXIS_Y;
+  result->plane[2] = AXIS_Z;
 
   // Setting up all callbacks
   if (callbacks) {
@@ -387,7 +393,6 @@ static const char *handle_move(struct GCodeParser *p,
 // Arc generation based on smoothieware implementation
 // https://github.com/Smoothieware/Smoothieware.git
 // src/modules/robot/Robot.cpp - Robot::append_arc()
-// currently only supports XY-plane
 //
 // G2 or G3 <X- Y- Z- I- J- K- P- F->
 //
@@ -399,7 +404,7 @@ static const char *handle_move(struct GCodeParser *p,
 //   P   : number of turns (currently only 1 turn is generated - 0-90 degree arc)
 //   F   : feedrate
 //
-// XZ-plane (G18)
+// ZX-plane (G18)
 //   X Z : end point of arc
 //   Y   : helix (linear_travel)
 //   I K : X Z offset to center of arc
@@ -460,17 +465,24 @@ static const char *handle_arc(struct GCodeParser *p,
   }
 
   // Scary math
-  float radius = sqrtf(offset[AXIS_X]*offset[AXIS_X] + offset[AXIS_Y]*offset[AXIS_Y]);
-  float center_x = p->axes_pos[AXIS_X] + offset[AXIS_X];
-  float center_y = p->axes_pos[AXIS_Y] + offset[AXIS_Y];
-  float linear_travel = end[AXIS_Z] - p->axes_pos[AXIS_Z];
-  float r_x = -offset[AXIS_X]; // Radius vector from center to current location
-  float r_y = -offset[AXIS_Y];
-  float rt_x = end[AXIS_X] - center_x;
-  float rt_y = end[AXIS_Y] - center_y;
+  float radius = sqrtf(offset[p->plane[0]]*offset[p->plane[0]] +
+                       offset[p->plane[1]]*offset[p->plane[1]]);
+  float center_0 = p->axes_pos[p->plane[0]] + offset[p->plane[0]];
+  float center_1 = p->axes_pos[p->plane[1]] + offset[p->plane[1]];
+  float linear_travel = end[p->plane[2]] - p->axes_pos[p->plane[2]];
+  float r_0 = -offset[p->plane[0]]; // Radius vector from center to current location
+  float r_1 = -offset[p->plane[1]];
+  float rt_0 = end[p->plane[0]] - center_0;
+  float rt_1 = end[p->plane[1]] - center_1;
+
+  fprintf(stderr, "arc from %c,%c: %.3f,%.3f to %.3f,%.3f (radius:%.3f) helix %c:%.3f\n",
+	  gcodep_axis2letter(p->plane[0]), gcodep_axis2letter(p->plane[1]),
+	  p->axes_pos[p->plane[0]], p->axes_pos[p->plane[1]],
+	  end[p->plane[0]], end[p->plane[1]], radius,
+	  gcodep_axis2letter(p->plane[2]), linear_travel);
 
   // CCW angle between position and target from circle center. Only one atan2() trig computation required.
-  float angular_travel = atan2(r_x*rt_y - r_y*rt_x, r_x*rt_x + r_y*rt_y);
+  float angular_travel = atan2(r_0*rt_1 - r_1*rt_0, r_0*rt_0 + r_1*rt_1);
   if (angular_travel < 0) angular_travel += 2 * M_PI;
   if (is_cw) angular_travel -= 2 * M_PI;
 
@@ -523,29 +535,29 @@ static const char *handle_arc(struct GCodeParser *p,
   int count = 0;
 
   // Initialize the linear axis
-  arc_target[AXIS_Z] = p->axes_pos[AXIS_Z];
+  arc_target[p->plane[2]] = p->axes_pos[p->plane[2]];
 
   for (i = 1; i < segments; i++) { // Increment (segments-1)
     if (count < N_ARC_CORRECTION) {
       // Apply vector rotation matrix
-      float rot = r_x * sin_T + r_y * cos_T;
-      r_x = r_x * cos_T - r_y * sin_T;
-      r_y = rot;
+      float rot = r_0 * sin_T + r_1 * cos_T;
+      r_0 = r_0 * cos_T - r_1 * sin_T;
+      r_1 = rot;
       count++;
     } else {
       // Arc correction to radius vector. Computed only every N_ARC_CORRECTION increments.
       // Compute exact location by applying transformation matrix from initial radius vector(=-offset).
       cos_Ti = cosf(i * theta_per_segment);
       sin_Ti = sinf(i * theta_per_segment);
-      r_x = -offset[AXIS_X] * cos_Ti + offset[AXIS_Y] * sin_Ti;
-      r_y = -offset[AXIS_X] * sin_Ti - offset[AXIS_Y] * cos_Ti;
+      r_0 = -offset[p->plane[0]] * cos_Ti + offset[p->plane[1]] * sin_Ti;
+      r_1 = -offset[p->plane[0]] * sin_Ti - offset[p->plane[1]] * cos_Ti;
       count = 0;
     }
 
     // Update arc_target location
-    arc_target[AXIS_X] = center_x + r_x;
-    arc_target[AXIS_Y] = center_y + r_y;
-    arc_target[AXIS_Z] += linear_per_segment;
+    arc_target[p->plane[0]] = center_0 + r_0;
+    arc_target[p->plane[1]] = center_1 + r_1;
+    arc_target[p->plane[2]] += linear_per_segment;
 
     // Append this segment to the queue
     for (axis = 0; axis <= AXIS_Z; axis++)
@@ -579,6 +591,9 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 2: line = handle_arc(p, line, 1); break;
       case 3: line = handle_arc(p, line, 0); break;
       case 4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
+      case 17: p->plane[0] = AXIS_X; p->plane[1] = AXIS_Y; p->plane[2] = AXIS_Z; break;
+      case 18: p->plane[0] = AXIS_Z; p->plane[1] = AXIS_X; p->plane[2] = AXIS_Y; break;
+      case 19: p->plane[0] = AXIS_Y; p->plane[1] = AXIS_Z; p->plane[2] = AXIS_X; break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;

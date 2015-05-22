@@ -115,6 +115,9 @@ G1 [coordinates] | `coordinated_move()` | Like G0, but guarantee linear move
 G2 [end] [offset]| `coordinated_move()` | Clockwise arc
 G3 [end] [offset]| `coordinated_move()` | Counterclockwise arc
 G4 Pnnn          | `dwell()`            | Dwell (wait) for nnn milliseconds.
+G17              | -                    | XY plane selection.
+G18              | -                    | ZX plane selection.
+G19              | -                    | YZ plane selection.
 G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
 G28 [coordinates]| `handle_home()`      | Home the machine on given axes.
