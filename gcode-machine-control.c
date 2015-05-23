@@ -818,15 +818,18 @@ static void home_axis(GCodeMachineControl_t *state, enum GCodeParserAxis axis) {
   last->position_steps[axis] = round2int(home_pos * cfg->steps_per_mm[axis]);
 }
 
-static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
+static void machine_home(void *userdata, AxisBitmap_t axes_bitmap,
+                         float *new_position) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   const struct MachineControlConfig *cfg = &state->cfg;
   bring_path_to_halt(state);
+  struct AxisTarget *last = buffer_get_last_written(&state->buffer);
   for (const char *order = cfg->home_order; *order; order++) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
     if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
       continue;
     home_axis(state, axis);
+    new_position[axis] = last->position_steps[axis] / cfg->steps_per_mm[axis];
   }
   motors_enable(state, 0);
 }

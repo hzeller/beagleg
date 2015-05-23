@@ -104,8 +104,9 @@ static void dummy_move(void *user, float feed, const float *axes) {
   else
     fprintf(stderr, "\n");
 }
-static void dummy_go_home(void *user, AxisBitmap_t axes) {
+static void dummy_go_home(void *user, AxisBitmap_t axes, float *new_pos) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
+  memset(new_pos, GCODE_NUM_AXES, sizeof(*new_pos));
 }
 static int dummy_probe_axis(void *user, float feed, enum GCodeParserAxis axis) {
   fprintf(stderr, "GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
@@ -309,15 +310,15 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   }
   if (homing_flags == 0) homing_flags = kAllAxesBitmap;
   // home the selected axes (last machine position will be updated)
-  p->callbacks.go_home(p->callbacks.user_data, homing_flags);
+  float new_position[GCODE_NUM_AXES] = {0};
+  p->callbacks.go_home(p->callbacks.user_data, homing_flags,
+                       new_position);
 
   // now update the world position
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (homing_flags & (1 << i)) {
-      // FIXME: these should be updated based on the home_switch configuration
-      // so that the machine and world positions reflect the same position
-      p->axes_pos[i] = 0;
-      p->relative_zero[i] = 0;
+      p->axes_pos[i] = new_position[i];
+      p->relative_zero[i] = new_position[i];
     }
   }
 

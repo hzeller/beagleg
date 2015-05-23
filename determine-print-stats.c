@@ -82,9 +82,9 @@ static void forwarding_coordinated_move(void *userdata, float feed, const float 
   data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
   update_coordinate_stats(data->stats, axes);
 }
-static void forwarding_go_home(void *userdata, AxisBitmap_t axes) {
+static void forwarding_go_home(void *userdata, AxisBitmap_t axes, float *new_pos) {
   struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes);
+  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes, new_pos);
 }
 static const char *forwarding_unprocessed(void *userdata, char letter, float value,
                                           const char *remaining) {
@@ -138,9 +138,9 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
 
   struct GCodeParserCb callbacks;
   bzero(&callbacks, sizeof(callbacks));
-  
+
   callbacks.user_data = &data;
-  
+
   callbacks.go_home = &forwarding_go_home;
   callbacks.set_speed_factor = forwarding_set_speed_factor;
   callbacks.set_fanspeed = forwarding_set_fanspeed;
