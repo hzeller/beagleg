@@ -774,10 +774,14 @@ static void move_to_endstop(GCodeMachineControl_t *state,
 			    float feedrate, int backoff,
 			    int dir, int trigger_value, uint32_t gpio_def) {
   struct MotorMovement move_command = {0};
-  float steps_per_mm = state->cfg.steps_per_mm[axis];
+  const float steps_per_mm = state->cfg.steps_per_mm[axis];
+  float target_speed = feedrate * steps_per_mm;
+  if (target_speed > state->max_axis_speed[axis]) {
+    target_speed = state->max_axis_speed[axis];
+  }
 
-  move_command.v0 = feedrate * steps_per_mm;
-  move_command.v1 = move_command.v0;
+  move_command.v0 = 0;
+  move_command.v1 = target_speed;
 
   // move axis until endstop is hit
   assign_steps_to_motors(state, &move_command, axis, 0.5 * steps_per_mm * dir);
@@ -785,6 +789,8 @@ static void move_to_endstop(GCodeMachineControl_t *state,
     state->motor_ops->enqueue(state->motor_ops->user_data,
                               &move_command, state->msg_stream);
     state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    // TODO: possibly acceleration over multiple segments.
+    move_command.v0 = move_command.v1;
   }
 
   if (backoff) {
