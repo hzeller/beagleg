@@ -800,8 +800,9 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
     if (axis == GCODE_NUM_AXES)
       continue;
-    if (cfg->home_switch[axis] && (axes_bitmap & (1 << axis)))
+    if (cfg->home_switch[axis] && (axes_bitmap & (1 << axis))) {
       home_axis(state, axis); // home axis and update the last position
+    }
   }
 }
 
