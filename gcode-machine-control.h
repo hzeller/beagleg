@@ -37,8 +37,6 @@ struct MachineControlConfig {
   // Arrays with values for each axis
   float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.
   float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis]). -1: no limit
-  enum HomeType home_switch[GCODE_NUM_AXES]; // Home position for axes.
-                 // Axes with HOME_POS_NONE don't participate in homing.
 
   float max_feedrate[GCODE_NUM_AXES];   // Max feedrate for axis (mm/s)
   float acceleration[GCODE_NUM_AXES];   // Max acceleration for axis (mm/s^2)
@@ -79,11 +77,11 @@ struct MachineControlConfig {
                                 // Axis name '_' for skipped placeholder.
                                 // Not mentioned axes are not handled.
 
-  // The follwing parameters determine which endstops are used by each logical
-  // axis for the "home" and "travel" switches as well as the switch polarity.
+  // Position in these strings is the connector position of input switches.
+  // Lower case: just regular stopswitch, Upper case: used for homing.
   const char *min_endswitch;
   const char *max_endswitch;
-  const char *endswitch_polarity;
+  const char *endswitch_polarity;  // Position:
 
   const char *home_order;
 

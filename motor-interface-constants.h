@@ -23,8 +23,8 @@
 #define __MOTOR_INTERFACE_CONSTANTS_H
 
 // FIXME: We need some better way to select the cape...
-//#define USE_BUMPS_CAPE
-#define USE_CRAMPS_CAPE
+#define USE_BUMPS_CAPE
+//#define USE_CRAMPS_CAPE
 
 // Frequency we use for our timer. The CPU uses two CPU cycles per busy loop,
 // so we divide CPU freq by that.
