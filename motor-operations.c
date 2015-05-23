@@ -86,7 +86,7 @@ static char test_acceleration_ok(float acceleration) {
 static void beagleg_enqueue_internal(struct MotionQueue *backend,
                                      const struct MotorMovement *param,
 				    int defining_axis_steps) {
-  struct MotionSegment new_element;
+  struct MotionSegment new_element = {0};
   new_element.direction_bits = 0;
 
   // The defining_axis_steps is the number of steps of the axis that requires

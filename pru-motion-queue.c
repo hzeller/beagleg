@@ -81,14 +81,24 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e) {
     fprintf(stderr, "enqueue[%02td]: EXIT\n", e - pru_data_->ring_buffer);
   } else {
     struct MotionSegment copy = *e;
-    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d "
-	    "ad: %d; td: %d ",
+    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
 	    e - pru_data_->ring_buffer, copy.direction_bits,
 	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
-	    copy.loops_accel + copy.loops_travel + copy.loops_decel,
-	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
-	    copy.travel_delay_cycles);
-#if 1
+	    copy.loops_accel + copy.loops_travel + copy.loops_decel);
+
+    if (copy.hires_accel_cycles > 0) {
+      fprintf(stderr, "accel : %5.0fHz (%d loops);",
+              TIMER_FREQUENCY /
+              (2.0*(copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT)),
+              copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT);
+    }
+    if (copy.travel_delay_cycles > 0) {
+      fprintf(stderr, "travel: %5.0fHz (%d loops);",
+              TIMER_FREQUENCY / (2.0*copy.travel_delay_cycles),
+              copy.travel_delay_cycles);
+    }
+#if 0
+    // The fractional parts.
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       if (copy.fractions[i] == 0) continue;  // not interesting.
       fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
