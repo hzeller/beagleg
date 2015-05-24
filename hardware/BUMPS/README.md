@@ -19,12 +19,12 @@ Before we can use all pins, we need to install the device-tree overlay, see the
 
 After that, all pins are mapped to be used by beagleg. This is the pinout
 
-      Motor connector |  0     1     2     3      4      5     6     7
-    Step     : GPIO-0 |  4,    5,    3,    7,     2,    14,   15,   20
-           BBB Header |P9-18 P9-17 P9-21 P9-42A P9-22 P9-26 P9-24 P9-41A
-                      |
-    Direction: GPIO-1 | 14,   15,   13,   16,    12,    17,  18,   19
-           BBB Header |P8-16 P8-15 P8-11 P9-15 P8-12 P9-23  P9-14 P9-16
+|Motor connector        |  1  |  2  |  3  |   4  |  5  |  6  |  7  |    8  |
+|----------------------:|:---:|:---:|:---:|:----:|:---:|:---:|:---:|:-----:|
+|**Step** `GPIO-0`      |  4  |  5  |   3 |   7  |  2  |  14 | 15  |   20  |
+|      ...on BBB Header |P9-18|P9-17|P9-21|P9-42A|P9-22|P9-26|P9-24|P9-41A |
+|**Direction** `GPIO-1` | 14  |  15 |  13 |  16  |  12 |  17 | 18  |   19  |
+|      ...on BBB Header |P8-16|P8-15|P8-11| P9-15|P8-12|P9-23|P9-14| P9-16 |
 
 Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
 (The mapping right now was done because these are consecutive GPIO pins that
