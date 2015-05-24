@@ -50,25 +50,6 @@ static int usage(const char *prog, const char *msg) {
 	  "                                (negative for reverse)\n"
 	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
 	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
-<<<<<<< HEAD
-#if 0   // not yet implemented
-	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma separated\n"
-	  "                                0 = none, 1 = origin; 2 = end-of-range (Default: 1,1,1,0,...).\n"
-	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
-	  "                               values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
-#endif
-	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
-	  "                              Use letter or '_' for empty slot.\n"
-          "                              You can use the same letter multiple times for mirroring.\n"
-	  "                              Use lowercase to reverse. (Default: 'XYZEA')\n"
-#if 0     // Commented out for now as it is just confusing. Only needed for
-          // different hardware.
-          "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
-          "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
-#endif
-=======
-          "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
-          "                                This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
 	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
 	  "                                Use letter or '_' for empty slot.\n"
           "                                You can use the same letter multiple times for mirroring.\n"
@@ -86,7 +67,6 @@ static int usage(const char *prog, const char *msg) {
 	  "                                Use '1' or '+' for logic high trigger.\n"
 	  "                                Use '0' or '-' for logic low trigger.\n"
 	  "                                Use '_' for unused endstops.\n"
->>>>>>> multi-hardware-support
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
