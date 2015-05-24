@@ -4,16 +4,15 @@ BeagleG
 Step-motor controller for CNC-like devices (or 3D printers) using the
 PRU (Programmable Realtime Unit) of the Beaglebone Black to create precisely timed and
 fast stepper-pulses for acceleration and travel.
-And with fast, we're talking **up to 1Mhz fast**.
+And with fast, we're talking up to 1Mhz fast.
 For 8 motors in parallel. In a controlled move (G1).
-If there only were motors that could turn that fast ...
-
-This is one of my early tests:
-[![First Test][run-vid]](http://youtu.be/hIEY9077D64)
 
 Works with a cape designed by the author (the [BUMPS] cape), but also provides
 relatively easy adaption to new hardware (currently: support for CRAMPS). See
 [hardware](./hardware) subdirectory.
+
+This is one of my early tests:
+[![First Test][run-vid]](http://youtu.be/hIEY9077D64)
 
 The {accl-,decel-}eration and travel motion profile is entirely
 created within the PRU from parameters sent by the host CPU decoupled via a ring-buffer.
