@@ -143,10 +143,6 @@ two motors connected to the first two connectors with a mirrored X-axis.
 More details about the G-Code code parsed and handled can be found in the
 [G-Code documentation](./G-code.md).
 
-If you get an Bus error, have a look at this [Bus Error FYI][buserror] - this
-seems to happen on some machines and this needs to be fixed in the pinmux script,
-but have a look at the workaorund there.
-
 ### Examples
 
     sudo ./machine-control -f 10 --max-feedrate 1000 --loop myfile.gcode
@@ -175,13 +171,13 @@ to a pseudo-terminal in case your printer-software only talks to a terminal
 
 Note, there can only be one open TCP connection at any given time.
 
-## Axis mapping
+### Axis to Motor mapping
 
 Each board has a number of connectors for motors and switches to which you connect your
 physical motors to.
 To intuitively map these connector positions to logical axes names, the `machine-control`
-binary is configured with a string that associates the motor position (=string position)
-with the actual axis (name of axis).
+binary can be configured with command line flags with a string that associates the motor
+position (=string position) with the actual axis (name of axis).
 
 In the following example configuration of a [Bumps cape][bumps] with 5 connectors,
 the X axis on the very left
@@ -191,6 +187,13 @@ need for my Type-A machine).
 The mapping is configured with:
 
         ./machine-control --axis-mapping "X_ZEY"  ...
+
+(TODO: make example for mirrored axes)
+
+Similarly, the `--min-endswitch` and `--max-endswitch` takes a string with axis letters,
+where the string position represents the connector position on your cape and the letter the
+corresponding axis this switch is for (Upper case: used for homing; lower case: just general
+axis endstop).
 
 ![Bumps board][BUMPS-img]
 
@@ -248,5 +251,5 @@ the Free Software Foundation, either version 3 of the License, or
      recover exact last position. That way pause/resume is possible.
    - ...
 
-[buserror]: https://github.com/hzeller/beagleg/issues/4
+[BUMPS]: https://github.com/hzeller/bumps
 [BUMPS-img]: ./img/bumps-connect.jpg

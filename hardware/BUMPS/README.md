@@ -14,24 +14,10 @@ These are the GPIO bits associated with the motor outputs on the BUMPS board.
 The actual physical pins are all over the place on the Beaglebone Black extension headers
 P8 and P9, see table below.
 
-Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
-which we're going to use for GPIO. For that, we need to install a device
-tree overlay. Just run the script beagleg-cape-pinmux.sh as root
+Before we can use all pins, we need to install the device-tree overlay, see the
+[hardware page](../hardware) for details.
 
-    sudo ./beagleg-cape-pinmux.sh
-
-This registers the cape, as you can confirm by looking at the slots:
-
-    $ cat /sys/devices/bone_capemgr.*/slots
-     0: 54:PF---
-     1: 55:PF---
-     2: 56:PF---
-     3: 57:PF---
-     4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
-     5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
-     8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
-
-Now, all pins are mapped to be used by beagleg. This is the pinout
+After that, all pins are mapped to be used by beagleg. This is the pinout
 
        Driver channel |  0     1     2     3     4      5     6     7
     Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20

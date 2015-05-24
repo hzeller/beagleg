@@ -21,7 +21,7 @@ you intend to use in the toplevel Makefile.
 (If you have access to other boards and run them with BeagleG, consider adding the support and
 send a pull request)
 
-## Load cape device tree and install bootup
+## Load cape device tree
 In each hardware subdirectgory directory, named after the cape, there is a device tree overlay
 file that you need to install for your hardware (or just use the one that comes with your board).
 
@@ -36,27 +36,22 @@ This initializes the pinmux now, but we have to do this every time after boot. A
 we'd like to have the cape installed as early as possible in the boot process
 to properly set all the output values to safe values.
 
-For that, we essentially have to add
-
-    optargs=capemgr.enable_partno=BeagleG
-
-To the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
-
-The kernel looks for the firmware in /lib/firmware - since at boot time the
-root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
-to have it in the uInitrd filesystem.
-
-There is a script that does both of these things (unpacking the uInitrd, copy file into
-that filesystem, repacking). This might depend on  distribution (Is there a script that comes
-with beaglebone already that does this?), so take a look at the script first to check that it
-does what it should do (it will abort on the first error, so probably it won't do damage).
-In particular the unpacking/repacking of the initrd file might be specific to
-your distribution.
+There is a script for that
 
     sudo ./install-devicetree-overlay.sh BUMPS/BeagleG.dts
 
-After a reboot, you should see the cape to be enabled early on in the boot
-process (Power PWM LEDs switch on briefly).
+In general, what this script is doing is to add the overlay name
+
+    optargs=capemgr.enable_partno=BeagleG
+
+to the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
+
+The kernel looks for the firmware in /lib/firmware - since at boot time the
+root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
+to have it in the uInitrd filesystem. The script copies it there.
+
+The script assumes a certain way the boot happens, so it might depend on your distribution
+if it actually works; you might want to inspect it first to what it does.
 
 [BeagleBone-Black]: http://beagleboard.org/BLACK
 [BUMPS]: http://github.com/hzeller/bumps
