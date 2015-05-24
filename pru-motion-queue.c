@@ -33,7 +33,7 @@
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
 
-#define DEBUG_QUEUE
+//#define DEBUG_QUEUE
 #define PRU_NUM 0
 
 // The communication with the PRU. We memory map the static RAM in the PRU
