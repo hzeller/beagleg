@@ -121,6 +121,7 @@ G19              | -                    | YZ plane selection.
 G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
 G28 [coordinates]| `handle_home()`      | Home the machine on given axes.
+G30              | `handle_z_probe()`   | Z Probe.
 G70              | -                    | Set coordinates to inches.
 G71              | -                    | Set coordinates to millimeter.
 G90              | -                    | Coordinates are absolute.
@@ -153,6 +154,7 @@ the `unprocessed()` callback:
 
 Command          | Description
 -----------------|----------------------------------------
+M0               | Unconditional stop, sets Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 M3 Sxx           | Spindle On Clockwise at speed Sxx; happens synchronously with next move.
 M4 Sxx           | Spindle On Counterclockwise at speed Sxx; happens synchronously with next move.
 M5               | Spindle Off; happens synchronously with next move.
@@ -167,9 +169,12 @@ M62 Pnn          | Set AUX Pin nn to 1; happens synchronously with next move.
 M63 Pnn          | Set AUX Pin nn to 0; happens synchronously with next move.
 M64 Pnn          | Set AUX Pin nn to 1; should happen immediately, currently mimics M62.
 M65 Pnn          | Set AUX Pin nn to 0; should happen immediately, currently mimics M63.
+M80              | ATX Power On (only on capes that have MACHINE_PWR_GPIO)
+M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
+M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 
 ###Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are

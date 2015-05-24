@@ -105,8 +105,17 @@ static void dummy_move(void *user, float feed, const float *axes) {
   else
     fprintf(stderr, "\n");
 }
-static void dummy_go_home(void *user, AxisBitmap_t axes) {
+static void dummy_go_home(void *user, AxisBitmap_t axes, float *new_pos) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
+  memset(new_pos, GCODE_NUM_AXES, sizeof(*new_pos));
+}
+static int dummy_probe_axis(void *user, float feed, enum GCodeParserAxis axis) {
+  fprintf(stderr, "GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
+  if (feed > 0)
+    fprintf(stderr, " feed=%.1f\n", feed);
+  else
+    fprintf(stderr, "\n");
+  return 0;
 }
 static const char *dummy_unprocessed(void *user, char letter, float value,
 				     const char *remaining) {
@@ -184,6 +193,8 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
     result->callbacks.gcode_finished = &dummy_gcode_finished;
   if (!result->callbacks.go_home)
     result->callbacks.go_home = &dummy_go_home;
+  if (!result->callbacks.probe_axis)
+    result->callbacks.probe_axis = &dummy_probe_axis;
   if (!result->callbacks.set_fanspeed)
     result->callbacks.set_fanspeed = &dummy_set_fanspeed;
   if (!result->callbacks.set_speed_factor)
@@ -304,12 +315,16 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     line = remaining_line;
   }
   if (homing_flags == 0) homing_flags = kAllAxesBitmap;
-  p->callbacks.go_home(p->callbacks.user_data, homing_flags);
+  // home the selected axes (last machine position will be updated)
+  float new_position[GCODE_NUM_AXES] = {0};
+  p->callbacks.go_home(p->callbacks.user_data, homing_flags,
+                       new_position);
 
+  // now update the world position
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (homing_flags & (1 << i)) {
-      p->axes_pos[i] = 0;
-      p->relative_zero[i] = 0;
+      p->axes_pos[i] = new_position[i];
+      p->relative_zero[i] = new_position[i];
     }
   }
 
@@ -573,6 +588,28 @@ static const char *handle_arc(struct GCodeParser *p,
   return line;
 }
 
+static const char *handle_z_probe(struct GCodeParser *p, const char *line) {
+  char letter;
+  float value;
+  float feedrate = -1;
+  float new_pos = 0;
+  const char *remaining_line;
+  while ((remaining_line = gparse_pair(p, line, &letter, &value))) {
+    const float unit_value = value * p->unit_to_mm_factor;
+    if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
+    else if (letter == 'Z') new_pos = value * p->unit_to_mm_factor;
+    else break;
+    line = remaining_line;
+  }
+  // probe for the travel endstop
+  if (p->callbacks.probe_axis(p->callbacks.user_data, feedrate, AXIS_Z)) {
+    // FIXME: the machine and world positions should refelct the same position
+    p->axes_pos[AXIS_Z] = new_pos;
+    p->relative_zero[AXIS_Z] = 0;
+  }
+  return line;
+}
+
 // Note: changes here should be documented in G-code.md as well.
 static void gcodep_parse_line(struct GCodeParser *p, const char *line,
                               FILE *err_stream) {
@@ -597,6 +634,7 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
+      case 30: line = handle_z_probe(p, line); break;
       case 70: p->unit_to_mm_factor = 25.4f; break;
       case 71: p->unit_to_mm_factor = 1.0f; break;
       case 90: set_all_axis_to_absolute(p, 1); break;

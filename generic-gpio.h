@@ -20,8 +20,12 @@
 #ifndef __GENERIC_GPIO_H
 #define __GENERIC_GPIO_H
 
-void set_motor_ena();
-void clr_motor_ena();
+#include "motor-interface-constants.h"
+
+int get_gpio(uint32_t gpio_def);
+
+void set_gpio(uint32_t gpio_def);
+void clr_gpio(uint32_t gpio_def);
 
 int map_gpio();
 void unmap_gpio();

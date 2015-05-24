@@ -47,9 +47,10 @@ static int usage(const char *prog, const char *msg) {
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
 	  "Options:\n"
 	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).\n"
-	  "                              (negative for reverse)\n"
+	  "                                (negative for reverse)\n"
 	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
 	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
+<<<<<<< HEAD
 #if 0   // not yet implemented
 	  "  --home-pos <0/1/2>,*      : Home positions of axes, comma separated\n"
 	  "                                0 = none, 1 = origin; 2 = end-of-range (Default: 1,1,1,0,...).\n"
@@ -65,6 +66,27 @@ static int usage(const char *prog, const char *msg) {
           "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
           "                              This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
 #endif
+=======
+          "  --channel-layout          : Driver channel (0..7) mapped to which motor connector (=string pos)\n"
+          "                                This depends on the harware mapping of the cape (Default for BUMPS: '23140').\n"
+	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
+	  "                                Use letter or '_' for empty slot.\n"
+          "                                You can use the same letter multiple times for mirroring.\n"
+	  "                                Use lowercase to reverse. (Default: 'XYZEA')\n"
+	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
+	  "                                values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
+	  "  --min-endswitch           : Axis letter mapped to which endstop connector for negative travel (=string pos)\n"
+	  "                                Use letter or '_' for unused endstop.\n"
+	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
+	  "  --max-endswitch           : Axis letter mapped to which endstop connector for positive travel (=string pos)\n"
+	  "                                Use letter or '_' for unused endstop.\n"
+	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
+          "  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)\n"
+	  "  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).\n"
+	  "                                Use '1' or '+' for logic high trigger.\n"
+	  "                                Use '0' or '-' for logic low trigger.\n"
+	  "                                Use '_' for unused endstops.\n"
+>>>>>>> multi-hardware-support
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
@@ -244,23 +266,30 @@ int main(int argc, char *argv[]) {
   enum LongOptionsOnly {
     OPT_SET_STEPS_MM = 1000,
     OPT_SET_HOME_POS,
+    OPT_SET_HOME_ORDER,
     OPT_SET_CHANNEL_LAYOUT,
     OPT_SET_MOTOR_MAPPING,
+    OPT_SET_MIN_ENDSWITCH,
+    OPT_SET_MAX_ENDSWITCH,
+    OPT_SET_ENDSWITCH_POLARITY,
     OPT_LOOP,
   };
 
   static struct option long_options[] = {
-    { "max-feedrate",   required_argument, NULL, 'm'},
-    { "accel",          required_argument, NULL, 'a'},
-    { "range",          required_argument, NULL, 'r' },
-    { "steps-mm",       required_argument, NULL, OPT_SET_STEPS_MM },
-    { "home-pos",       required_argument, NULL, OPT_SET_HOME_POS },
-    { "channel-layout", required_argument, NULL, OPT_SET_CHANNEL_LAYOUT },
-    { "axis-mapping",   required_argument, NULL, OPT_SET_MOTOR_MAPPING },
-    { "port",           required_argument, NULL, 'p'},
-    { "bind-addr",      required_argument, NULL, 'b'},
-    { "loop",           optional_argument, NULL, OPT_LOOP },
-    { 0,                0,                 0,    0  },
+    { "max-feedrate",       required_argument, NULL, 'm'},
+    { "accel",              required_argument, NULL, 'a'},
+    { "range",              required_argument, NULL, 'r' },
+    { "steps-mm",           required_argument, NULL, OPT_SET_STEPS_MM },
+    { "home-order",         required_argument, NULL, OPT_SET_HOME_ORDER },
+    { "channel-layout",     required_argument, NULL, OPT_SET_CHANNEL_LAYOUT },
+    { "axis-mapping",       required_argument, NULL, OPT_SET_MOTOR_MAPPING },
+    { "min-endswitch",      required_argument, NULL, OPT_SET_MIN_ENDSWITCH },
+    { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
+    { "endswitch-polarity", required_argument, NULL, OPT_SET_ENDSWITCH_POLARITY },
+    { "port",               required_argument, NULL, 'p'},
+    { "bind-addr",          required_argument, NULL, 'b'},
+    { "loop",               optional_argument, NULL, OPT_LOOP },
+    { 0,                    0,                 0,    0  },
   };
 
   int listen_port = -1;
@@ -297,14 +326,17 @@ int main(int argc, char *argv[]) {
     case OPT_SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);
       break;
-    case OPT_SET_HOME_POS: {
-      float tmp[GCODE_NUM_AXES];
-      bzero(tmp, sizeof(tmp));
-      if (!parse_float_array(optarg, tmp, GCODE_NUM_AXES))
-	return usage(argv[0], "Failed to parse home switch.");
-      for (int i = 0; i < GCODE_NUM_AXES; ++i)
-	config.home_switch[i] = (enum HomeType) tmp[i];
-    }
+    case OPT_SET_MIN_ENDSWITCH:
+      config.min_endswitch = strdup(optarg);
+      break;
+    case OPT_SET_MAX_ENDSWITCH:
+      config.max_endswitch = strdup(optarg);
+      break;
+    case OPT_SET_ENDSWITCH_POLARITY:
+      config.endswitch_polarity = strdup(optarg);
+      break;
+    case OPT_SET_HOME_ORDER:
+      config.home_order = strdup(optarg);
       break;
     case 'r':
       if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))

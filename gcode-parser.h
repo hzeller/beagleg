@@ -44,7 +44,7 @@ enum GCodeParserAxis {
 // Maps axis enum to letter. AXIS_Z -> 'Z'
 char gcodep_axis2letter(enum GCodeParserAxis axis);
 
-// Case-insensitively maps an axis letter to the GCodeParserAxis enumeration 
+// Case-insensitively maps an axis letter to the GCodeParserAxis enumeration
 // value.
 // Returns GCODE_NUM_AXES on invalid character.
 enum GCodeParserAxis gcodep_letter2axis(char letter);
@@ -74,7 +74,14 @@ struct GCodeParserCb {
   void (*input_idle)(void *);
 
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  void (*go_home)(void *, AxisBitmap_t axis_bitmap);
+  // Machine returns the new axis position in the return parameter,
+  // which is an array of metric coordinates.
+  // (the homing position is machine dependent, e.g. it could be at
+  // either end of the axis).
+  void (*go_home)(void *, AxisBitmap_t axis_bitmap, float[]);
+
+  // G30: Probe Z axis to travel_endstop
+  int (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis);
 
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
@@ -84,7 +91,7 @@ struct GCodeParserCb {
   void (*motors_enable)(void *, char b);   // M17,M84,M18: Switch on/off motors
                                            // b == 1: on, b == 0: off.
 
-  // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates. 
+  // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates.
   // First parameter is the userdata.
   // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).

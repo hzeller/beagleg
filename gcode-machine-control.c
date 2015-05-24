@@ -34,6 +34,7 @@
 
 #include "motor-operations.h"
 #include "gcode-parser.h"
+#include "generic-gpio.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
@@ -48,6 +49,7 @@
 #define AUX_BIT_SPINDLE_ON  (1 << 3)
 #define AUX_BIT_SPINDLE_DIR (1 << 4)
 #define MAX_AUX_PIN         4
+#define NUM_ENDSTOPS        6
 
 // Some default settings. These are most likely overrridden via flags by user.
 
@@ -56,11 +58,6 @@
 static const float kMaxFeedrate[GCODE_NUM_AXES] = {  200,  200,   90,    10, 1 };
 static const float kDefaultAccel[GCODE_NUM_AXES]= { 4000, 4000, 1000, 10000, 1 };
 static const float kStepsPerMM[GCODE_NUM_AXES]  = {  160,  160,  160,    40, 1 };
-
-static const enum HomeType kHomePos[GCODE_NUM_AXES] =
-  { HOME_POS_ORIGIN, HOME_POS_ORIGIN, HOME_POS_ORIGIN,
-    HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE, HOME_POS_NONE };
-
 static const float kMoveRange[GCODE_NUM_AXES] = { 100, 100, 100, -1, -1 };
 
 // Output mapping of Axis to motor connectors from left to right.
@@ -71,6 +68,8 @@ static const char kAxisMapping[] = "XYZEA";
 // currently the only cape existing for BeagleG, so we can as well hardcode it.
 // (for BURPS, this would be "01234567")
 static const char kChannelLayout[] = "23140";
+
+static const char kHomeOrder[] = "ZXY";
 
 // The vector is essentially a position in the GCODE_NUM_AXES dimensional
 // space. An AxisTarget has a position vector, in absolute machine coordinates, and a
@@ -87,6 +86,7 @@ struct AxisTarget {
   unsigned int aux_bits;               // Auxiliarry bits in this segment; set with M42
 };
 
+// TargetBuffer implementation
 struct TargetBuffer {
   unsigned write_pos;
   unsigned read_pos;
@@ -94,24 +94,49 @@ struct TargetBuffer {
 };
 
 // Initialize a new buffer.
-static void target_buffer_init(struct TargetBuffer *b);
-
-// Add a new target and return pointer. Makes sure that we never override
-static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b);
-
-// Get the last item written.
-static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b);
+static void target_buffer_init(struct TargetBuffer *b) {
+  bzero(b, sizeof(*b));
+}
 
 // Returns number of available read items.
-static int buffer_available(struct TargetBuffer *b);
+static int buffer_available(struct TargetBuffer *b) {
+  return (b->write_pos + 4 - b->read_pos) % 4;
+}
+
+// Add a new target and return pointer. Makes sure that we never override
+static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b) {
+  assert(buffer_available(b) < 3);
+  struct AxisTarget *result = &b->ring_buffer[b->write_pos];
+  b->write_pos = (b->write_pos + 1) % 4;
+  return result;
+}
+
+// Get the last item written.
+static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b) {
+  assert(buffer_available(b) > 0);
+  return &b->ring_buffer[(b->write_pos + 3) % 4];
+}
 
 // Get the given target, delta 0 up to buffer_peek_available();
-static struct AxisTarget *buffer_at(struct TargetBuffer *b, int delta);
+static struct AxisTarget *buffer_at(struct TargetBuffer *b, int delta) {
+  assert(buffer_available(b) > delta);
+  return &b->ring_buffer[(b->read_pos + delta) % 4];
+}
 
 // Move on to the next read position.
-static void buffer_next(struct TargetBuffer *b);
+static void buffer_next(struct TargetBuffer *b) {
+  assert(buffer_available(b) > 0);
+  b->read_pos = (b->read_pos + 1) % 4;
+}
 
 typedef uint8_t DriverBitmap;
+
+// Compact representation of an enstop configuration.
+struct EndstopConfig {
+  unsigned char trigger_value : 1;   // 0: trigged low 1: triggered high.
+  unsigned char homing_use : 1;      // 0: no 1: yes.
+  unsigned char endstop_number : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
+};
 
 struct GCodeMachineControl {
   struct GCodeParserCb event_input;
@@ -136,6 +161,10 @@ struct GCodeMachineControl {
   int axis_flip[GCODE_NUM_AXES];        // 1 or -1 for direction flip of axis
   int driver_flip[BEAGLEG_NUM_MOTORS];  // 1 or -1 for for individual driver
 
+  // Mapping of Axis to which endstop it affects.
+  struct EndstopConfig min_endstop[GCODE_NUM_AXES];
+  struct EndstopConfig max_endstop[GCODE_NUM_AXES];
+
   // Current machine configuration
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
@@ -148,6 +177,8 @@ struct GCodeMachineControl {
 
   FILE *msg_stream;
 };
+
+static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config);
 
 static inline int round2int(float x) { return (int) roundf(x); }
 
@@ -197,6 +228,7 @@ static const char *special_commands(void *userdata, char letter, float value,
     int aux_bit = -1;
 
     switch (code) {
+    case 0: set_gpio(ESTOP_SW_GPIO); return remaining;
     case 3:
     case 4:
       for (;;) {
@@ -246,6 +278,9 @@ static const char *special_commands(void *userdata, char letter, float value,
 	}
       }
       return remaining;
+    case 80: set_gpio(MACHINE_PWR_GPIO); return remaining;
+    case 81: clr_gpio(MACHINE_PWR_GPIO); return remaining;
+    case 999: clr_gpio(ESTOP_SW_GPIO); return remaining;
     }
 
     // The remaining codes are only useful when we have an output stream.
@@ -267,6 +302,25 @@ static const char *special_commands(void *userdata, char letter, float value,
       break;
     case 115: fprintf(state->msg_stream, "%s\n", VERSION_STRING); break;
     case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining); break;
+    case 119:
+      for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+        struct EndstopConfig config = state->min_endstop[axis];
+        if (config.endstop_number) {
+          int value = get_gpio(get_endstop_gpio_descriptor(config));
+          fprintf(state->msg_stream, "%c_min:%s ",
+                  tolower(gcodep_axis2letter(axis)),
+                  value == config.trigger_value ? "TRIGGERED" : "open");
+        }
+        config = state->max_endstop[axis];
+        if (config.endstop_number) {
+          int value = get_gpio(get_endstop_gpio_descriptor(config));
+          fprintf(state->msg_stream, "%c_max:%s ",
+                  tolower(gcodep_axis2letter(axis)),
+                  value == config.trigger_value ? "TRIGGERED" : "open");
+        }
+      }
+      fprintf(state->msg_stream, "\n");
+      break;
     default:  fprintf(state->msg_stream,
                       "// BeagleG: didn't understand ('%c', %d, '%s')\n",
                       letter, code, remaining);
@@ -663,41 +717,141 @@ static void machine_set_speed_factor(void *userdata, float value) {
   state->prog_speed_factor = value;
 }
 
-static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
-  int machine_pos_differences[GCODE_NUM_AXES];
-  bzero(machine_pos_differences, sizeof(machine_pos_differences));
+ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
+   switch (config.endstop_number) {
+   case 1: return END_1_GPIO;
+   case 2: return END_2_GPIO;
+   case 3: return END_3_GPIO;
+   case 4: return END_4_GPIO;
+   case 5: return END_5_GPIO;
+   case 6: return END_6_GPIO;
+   }
+   return 0;
+ }
 
-#if TODO_NEW_CONTROL
-  // TODO(hzeller): use home_switch info.
-  // Goal is to bring back the machine the negative amount of steps.
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if ((1 << i) & axes_bitmap) {
-      if (i != AXIS_E) {  // 'homing' of filament never makes sense.
-	machine_pos_differences[i] = -state->machine_position[i];
-      }
-      state->machine_position[i] = 0;
+// Get the endstop for the axis. If there are two axis configured for some
+// reason, we prefer the one in the origin.
+static uint32_t get_home_endstop(GCodeMachineControl_t *state,
+				 enum GCodeParserAxis axis,
+				 int *dir, int *trigger_value) {
+  // Just extract one endstop. We prefer the lower one if we find it.
+  *dir = 1;
+  struct EndstopConfig config = state->max_endstop[axis];
+  if (state->min_endstop[axis].endstop_number
+      && state->min_endstop[axis].homing_use) {
+    *dir = -1;
+    config = state->min_endstop[axis];
+  }
+  if (!config.homing_use)
+    return 0;
+  *trigger_value = config.trigger_value;
+  return get_endstop_gpio_descriptor(config);
+}
+
+#if 0
+static uint32_t get_travel_endstop(GCodeMachineControl_t *state,
+				   enum GCodeParserAxis axis,
+				   int *dir, int *polarity) {
+  struct EndstopConfig config = state->travel_endstop[axis];
+  uint32_t gpio_def = 0;
+  *dir = (config.direction) ? 1 : -1;
+  *polarity = config.polarity;
+  switch (config.endstop_number) {
+  case 1: gpio_def = END_1_GPIO; break;
+  case 2: gpio_def = END_2_GPIO; break;
+  case 3: gpio_def = END_3_GPIO; break;
+  case 4: gpio_def = END_4_GPIO; break;
+  case 5: gpio_def = END_5_GPIO; break;
+  case 6: gpio_def = END_6_GPIO; break;
+  default: break;
+  }
+  return gpio_def;
+}
+#endif
+
+static void move_to_endstop(GCodeMachineControl_t *state,
+			    enum GCodeParserAxis axis,
+			    float feedrate, int backoff,
+			    int dir, int trigger_value, uint32_t gpio_def) {
+  struct MotorMovement move_command = {0};
+  const float steps_per_mm = state->cfg.steps_per_mm[axis];
+  float target_speed = feedrate * steps_per_mm;
+  if (target_speed > state->max_axis_speed[axis]) {
+    target_speed = state->max_axis_speed[axis];
+  }
+
+  move_command.v0 = 0;
+  move_command.v1 = target_speed;
+
+  // move axis until endstop is hit
+  assign_steps_to_motors(state, &move_command, axis, 0.5 * steps_per_mm * dir);
+  while (get_gpio(gpio_def) != trigger_value) {
+    state->motor_ops->enqueue(state->motor_ops->user_data,
+                              &move_command, state->msg_stream);
+    state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    // TODO: possibly acceleration over multiple segments.
+    move_command.v0 = move_command.v1;
+  }
+
+  if (backoff) {
+    // move axis off endstop
+    assign_steps_to_motors(state, &move_command, axis, 0.1 * steps_per_mm * -dir);
+    while (get_gpio(gpio_def) == trigger_value) {
+      state->motor_ops->enqueue(state->motor_ops->user_data,
+                                &move_command, state->msg_stream);
+      state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
     }
   }
+}
 
-  // We don't have endswitches yet, so homing brings us in a bad situation with
-  // two bad solutions:
-  //  (a) just 'assume' we're home. This really only works well the first time
-  //      if the machine was manually homed. Followups are considering the last
-  //      position as home, which might be ... uhm .. worse.
-  //  (b) Rapid move to position 0 of the requested axes. This will work multiple
-  //      times but still assumes that we were at 0 initially and it is subject
-  //      to machine shift.
-  // Solution (b) is what we're doing.
-  // TODO: do this with endswitches.
-  if (state->msg_stream) {
-    fprintf(state->msg_stream, "// BeagleG: Homing requested (0x%02x), but "
-	    "don't have endswitches, so move difference steps (%d, %d, %d)\n",
-	    axes_bitmap, machine_pos_differences[AXIS_X],
-	    machine_pos_differences[AXIS_Y], machine_pos_differences[AXIS_Z]);
+static void home_axis(GCodeMachineControl_t *state, enum GCodeParserAxis axis) {
+  const struct MachineControlConfig *cfg = &state->cfg;
+  struct AxisTarget *last = buffer_get_last_written(&state->buffer);
+  float home_pos = 0; // assume HOME_POS_ORIGIN
+  int dir;
+  int trigger_value;
+  uint32_t gpio_def = get_home_endstop(state, axis, &dir, &trigger_value);
+  if (!gpio_def)
+    return;
+  move_to_endstop(state, axis, 15, 1, dir, trigger_value, gpio_def);
+  home_pos = (dir < 0) ? 0 : cfg->move_range_mm[axis];
+  last->position_steps[axis] = round2int(home_pos * cfg->steps_per_mm[axis]);
+}
+
+static void machine_home(void *userdata, AxisBitmap_t axes_bitmap,
+                         float *new_position) {
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  const struct MachineControlConfig *cfg = &state->cfg;
+  bring_path_to_halt(state);
+  struct AxisTarget *last = buffer_get_last_written(&state->buffer);
+  for (const char *order = cfg->home_order; *order; order++) {
+    const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
+    if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
+      continue;
+    home_axis(state, axis);
+    new_position[axis] = last->position_steps[axis] / cfg->steps_per_mm[axis];
   }
-  move_machine_steps(state, state->g0_feedrate_mm_per_sec,
-		     machine_pos_differences);
-#endif
+  motors_enable(state, 0);
+}
+
+// todo: currently disabled.
+static int machine_probe(void *userdata, float feedrate,
+			 enum GCodeParserAxis axis) {
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  int dir;
+  int polarity;
+  uint32_t gpio_def = 0; // get_travel_endstop(state, axis, &dir, &polarity);
+  if (gpio_def) {
+    if (feedrate <= 0)
+      feedrate = 20;
+    move_to_endstop(state, axis, feedrate, 0, dir, polarity, gpio_def);
+    // FIXME: should the last position be updated?
+    return 1;
+  }
+  fprintf(state->msg_stream,
+	  "// BeagleG: No probe - axis %c does not have a travel endstop\n",
+	  gcodep_axis2letter(axis));
+  return 0;
 }
 
 // Cleanup whatever is allocated. Return NULL for convenience.
@@ -811,6 +965,62 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     result->axis_to_driver[axis] |= (1 << driver);
   }
 
+  // Extract enstop polarity
+  char endstop_trigger[NUM_ENDSTOPS] = {0};
+  if (cfg.endswitch_polarity) {
+    const char *map = cfg.endswitch_polarity;
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
+      if (*map == '_' || *map == '0' || *map == '-') {
+        endstop_trigger[switch_connector] = 0;
+      } else if (*map == '1' || *map == '+') {
+        endstop_trigger[switch_connector] = 1;
+      } else {
+        fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",
+                *map, cfg.endswitch_polarity);
+        return cleanup_state(result);
+      }
+    }
+  }
+
+  // Now map the endstops. String position is position on the switch connector
+  if (cfg.min_endswitch) {
+    const char *map = cfg.min_endswitch;
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
+      if (*map == '_')
+        continue;
+      const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
+      if (axis == GCODE_NUM_AXES) {
+        fprintf(stderr,
+                "Illegal axis->min_endswitch mapping character '%c' in '%s' "
+                "(Only valid axis letter or '_' to skip a connector).\n",
+                toupper(*map), cfg.min_endswitch);
+        return cleanup_state(result);
+      }
+      result->min_endstop[axis].endstop_number = switch_connector + 1;
+      result->min_endstop[axis].homing_use = (toupper(*map) == *map) ? 1 : 0;
+      result->min_endstop[axis].trigger_value = endstop_trigger[switch_connector];
+    }
+  }
+
+  if (cfg.max_endswitch) {
+    const char *map = cfg.max_endswitch;
+    for (int switch_connector = 0; *map; switch_connector++, map++) {
+      if (*map == '_')
+        continue;
+      const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
+      if (axis == GCODE_NUM_AXES) {
+        fprintf(stderr,
+                "Illegal axis->min_endswitch mapping character '%c' in '%s' "
+                "(Only valid axis letter or '_' to skip a connector).\n",
+                toupper(*map), cfg.min_endswitch);
+        return cleanup_state(result);
+      }
+      result->max_endstop[axis].endstop_number = switch_connector + 1;
+      result->max_endstop[axis].homing_use = (toupper(*map) == *map) ? 1 : 0;
+      result->max_endstop[axis].trigger_value = endstop_trigger[switch_connector];
+    }
+  }
+
   // Now let's see what motors are mapped to any useful output.
   if (result->cfg.debug_print) fprintf(stderr, "-- Config --\n");
   int error_count = 0;
@@ -820,11 +1030,26 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     char is_error = (result->cfg.steps_per_mm[i] <= 0
                      || result->cfg.max_feedrate[i] <= 0);
     if (result->cfg.debug_print || is_error) {
-      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %8.4f steps/mm%s\n",
+      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %8.4f steps/mm%s ",
               gcodep_axis2letter(i), result->cfg.max_feedrate[i],
               result->cfg.acceleration[i],
               result->cfg.steps_per_mm[i],
               result->axis_flip[i] < 0 ? " (reversed)" : "");
+      int endstop = result->min_endstop[i].endstop_number;
+      const char *trg = result->min_endstop[i].trigger_value ? "hi" : "lo";
+      if (endstop) {
+        fprintf(stderr, "min-switch %d (%s-trigger)%s; ",
+		endstop, trg,
+                result->min_endstop[i].homing_use ? " [HOME]" : "       ");
+      }
+      endstop = result->max_endstop[i].endstop_number;
+      trg = result->max_endstop[i].trigger_value ? "hi" : "lo";
+      if (endstop) {
+        fprintf(stderr, "max-switch %d (%s-trigger)%s;",
+		endstop, trg,
+                result->max_endstop[i].homing_use ? " [HOME]" : "");
+      }
+      fprintf(stderr, "\n");
     }
     if (is_error) {
       fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
@@ -847,6 +1072,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   result->event_input.coordinated_move = &machine_G1;
   result->event_input.rapid_move = &machine_G0;
   result->event_input.go_home = &machine_home;
+  result->event_input.probe_axis = &machine_probe;
   result->event_input.dwell = &machine_dwell;
   result->event_input.set_speed_factor = &machine_set_speed_factor;
   result->event_input.motors_enable = &motors_enable;
@@ -876,7 +1102,6 @@ void gcode_machine_control_delete(GCodeMachineControl_t *object) {
 void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   bzero(config, sizeof(*config));
   memcpy(config->steps_per_mm, kStepsPerMM, sizeof(config->steps_per_mm));
-  memcpy(config->home_switch, kHomePos, sizeof(config->home_switch));
   memcpy(config->move_range_mm, kMoveRange, sizeof(config->move_range_mm));
   memcpy(config->max_feedrate, kMaxFeedrate, sizeof(config->max_feedrate));
   memcpy(config->acceleration, kDefaultAccel, sizeof(config->acceleration));
@@ -885,33 +1110,5 @@ void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   config->synchronous = 0;
   config->channel_layout = kChannelLayout;
   config->axis_mapping = kAxisMapping;
-}
-
-
-// TargetBuffer implementation
-static void target_buffer_init(struct TargetBuffer *b) {
-  bzero(b, sizeof(*b));
-}
-static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b) {
-  assert(buffer_available(b) < 3);
-  struct AxisTarget *result = &b->ring_buffer[b->write_pos];
-  b->write_pos = (b->write_pos + 1) % 4;
-  return result;
-}
-static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b) {
-  assert(buffer_available(b) > 0);
-  return &b->ring_buffer[(b->write_pos + 3) % 4];
-}
-static int buffer_available(struct TargetBuffer *b) {
-  return (b->write_pos + 4 - b->read_pos) % 4;
-}
-static struct AxisTarget *buffer_at(struct TargetBuffer *b, int i) {
-  assert(buffer_available(b) > i);
-  return &b->ring_buffer[(b->read_pos + i) % 4];
-}
-
-// Move on to the next read position.
-static void buffer_next(struct TargetBuffer *b) {
-  assert(buffer_available(b) > 0);
-  b->read_pos = (b->read_pos + 1) % 4;
+  config->home_order = kHomeOrder;
 }

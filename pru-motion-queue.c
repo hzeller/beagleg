@@ -28,13 +28,10 @@
 #include <prussdrv.h>
 #include <strings.h>
 
-// Shared between us and PRU
-#include "motor-interface-constants.h"
+#include "generic-gpio.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
-
-#include "generic-gpio.h"
 
 #define DEBUG_QUEUE
 #define PRU_NUM 0
@@ -74,8 +71,8 @@ static volatile struct MotionSegment *next_queue_element() {
 
 static void pru_motor_enable_nowait(char on) {
   // Enable pin is inverse logic: -EN
-  if (on) clr_motor_ena();
-  else set_motor_ena();
+  if (on) clr_gpio(MOTOR_ENABLE_GPIO);
+  else set_gpio(MOTOR_ENABLE_GPIO);
 }
 
 #ifdef DEBUG_QUEUE
@@ -84,14 +81,24 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e) {
     fprintf(stderr, "enqueue[%02td]: EXIT\n", e - pru_data_->ring_buffer);
   } else {
     struct MotionSegment copy = *e;
-    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d "
-	    "ad: %d; td: %d ",
+    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
 	    e - pru_data_->ring_buffer, copy.direction_bits,
 	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
-	    copy.loops_accel + copy.loops_travel + copy.loops_decel,
-	    copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT,
-	    copy.travel_delay_cycles);
-#if 1
+	    copy.loops_accel + copy.loops_travel + copy.loops_decel);
+
+    if (copy.hires_accel_cycles > 0) {
+      fprintf(stderr, "accel : %5.0fHz (%d loops);",
+              TIMER_FREQUENCY /
+              (2.0*(copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT)),
+              copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT);
+    }
+    if (copy.travel_delay_cycles > 0) {
+      fprintf(stderr, "travel: %5.0fHz (%d loops);",
+              TIMER_FREQUENCY / (2.0*copy.travel_delay_cycles),
+              copy.travel_delay_cycles);
+    }
+#if 0
+    // The fractional parts.
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       if (copy.fractions[i] == 0) continue;  // not interesting.
       fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
@@ -136,6 +143,7 @@ static void pru_shutdown(char flush_queue) {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
   pru_motor_enable_nowait(0);
+  clr_gpio(LED_GPIO);  // turn off the status LED
   unmap_gpio();
 }
 
@@ -144,6 +152,8 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
     return 1;
   }
+
+  set_gpio(LED_GPIO);  // turn on the status LED
 
   pru_motor_enable_nowait(0);  // motors off initially.
 

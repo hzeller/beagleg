@@ -40,17 +40,17 @@
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 
 	.u16 aux		 // lowest two bits only used.
-	
+
 	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
 	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
 	.u32 travel_delay_cycles // Exact cycle value for travel (do not rely
 	                         // on accel approx to exactly reach that)
-	
+
 	// 1.31 Fixed point increments for each motor
 	.u32 fraction_1
-	.u32 fraction_2          
+	.u32 fraction_2
 	.u32 fraction_3
 	.u32 fraction_4
 	.u32 fraction_5
@@ -77,6 +77,7 @@
 	.u32 m7
 	.u32 m8
 .ends
+.assign MotorState, STATE_START, STATE_END, mstate
 
 ;;; Calculate the current delay depending on the phase (acceleration, travel,
 ;;; deceleration). Modifies the values in params, which is of type
@@ -85,7 +86,7 @@
 ;;; Outputs the resulting delay in output_reg.
 ;;; Returns special value 0 when done.
 ;;; Only used once, so just macro.
-;;; 
+;;;
 ;;; We are approximating the needed sqrt() operation with a few terms
 ;;; from an Taylor series which brings sufficient accuracy and boils down
 ;;; to a single (somewhat expensive) division. I tried as well using an
@@ -101,18 +102,18 @@
 PHASE_1_ACCELERATION:	; ==================================================
 	QBEQ PHASE_2_TRAVEL, params.loops_accel, 0
 	QBEQ accel_calc_done, params.accel_series_index, 0 // first ? no calc.
-	
+
 	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	;; Add previous remainder for higher resolution.
 	ADD divident_tmp, divident_tmp, state_register
-	
+
 	;; divisor = (accel_series_index << 2) + 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	ADD divisor_tmp, divisor_tmp, 1
-	
+
 	idiv_macro divident_tmp, divisor_tmp, state_register
-	
+
 	;; params.hires_accel_cycles -= quotient (divident_tmp became quotient)
 	SUB params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 accel_calc_done:
@@ -143,13 +144,13 @@ calc_decel:
 	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	ADD divident_tmp, divident_tmp, state_register
-	
+
 	;; divisor = (accel_series_index << 2) - 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	SUB divisor_tmp, divisor_tmp, 1
-	
+
 	idiv_macro divident_tmp, divisor_tmp, state_register
-	
+
 	;; params.hires_accel_cycles += quotient (divident_tmp became quotient)
 	ADD params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 
@@ -159,38 +160,11 @@ calc_decel:
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
 	;; more bits. Shift back: output_reg = hires_cycles >> DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
-	
+
 	;; Correct timing: Substract the number of cycles we have spent here.
 	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 11) / 2
 
 DONE_CALCULATE_DELAY:
-.endm
-
-// Only used once, just macro.
-// Preliminary, not yet really useful.
-.macro CheckStopSwitches
-.mparam output_register, scratch, input_location
-	LBBO scratch, input_location, 0, 4
-	QBBS switch_1_handled, scratch, STOP_1_BIT
-	ZERO &output_register, 4  ; todo set proper value
-switch_1_handled:
-	QBBS switch_2_handled, scratch, STOP_2_BIT
-	ZERO &output_register, 4   ; todo set proper value
-switch_2_handled:
-	QBBS switch_3_handled, scratch, STOP_3_BIT
-	ZERO &output_register, 4   ; todo: set proper value
-switch_3_handled:
-.endm
-	
-;;; Update the state register of a motor with its 1.31 resolution fraction.
-;;; The 31st bit contains the overflow that we're interested in.
-;;; Uses a fixed number of 4 cycles
-.macro UpdateMotor
-.mparam output_register, scratch, state_reg, fraction, bit
-	ADD state_reg, state_reg, fraction
-	LSR scratch, state_reg, 31
-	LSL scratch, scratch, bit
-	OR  output_register, output_register, scratch
 .endm
 
 INIT:
@@ -201,67 +175,63 @@ INIT:
 
 	MOV r2, 0		; Queue address in PRU memory
 QUEUE_READ:
-	;; 
+	;;
 	;; Read next element from ring-buffer
 	;;
-	
+
 	;; Check queue header at our read-position until it contains something.
 	.assign QueueHeader, r1.w0, r1.w0, queue_header
 	LBCO queue_header, CONST_PRUDRAM, r2, SIZE(queue_header)
 	QBEQ QUEUE_READ, queue_header.state, STATE_EMPTY ; wait until got data.
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
-	
-	;; Output direction bits to GPIO-1. Also, this sets the
-	;; motor enable (-EN) bit on this GPIO to zero, i.e. enable.
+
+	;; Enable the stepper motors (lo-active)
+	MOV r3, 0
+	CALL EnableMotors
+
+	;; Set direction bits
 	MOV r3, queue_header.direction_bits
-	LSL r3, r3, DIRECTION_GPIO1_SHIFT
-	MOV r4, GPIO_1_BASE | GPIO_DATAOUT
-	SBBO r3, r4, 0, 4
+	CALL SetDirections
 
 	;; queue_header processed, r1 is free to use
 	ADD r1, r2, SIZE(QueueHeader) ; r2 stays at queue pos
 	.assign TravelParameters, PARAM_START, PARAM_END, travel_params
 	LBCO travel_params, CONST_PRUDRAM, r1, SIZE(travel_params)
 
-	.assign MotorState, STATE_START, STATE_END, mstate
-	ZERO &mstate, SIZE(mstate)
-	
-	MOV r4, GPIO_0_BASE | GPIO_DATAOUT
-	ZERO &r3, 4		; initialize delay calculation state register.
-	
+	;; Set the Aux bits
+	MOV r3, travel_params.aux
+	CALL SetAuxBits
+
+	ZERO &mstate, SIZE(mstate)	; clear the motor states
+	ZERO &r3, 4			; initialize delay calculation state register.
+
 	;; Registers
 	;; r0, r1 free for calculation
 	;; r2 = queue pos
 	;; r3 = state for CalculateDelay
-	;; r4 = motor out GPIO
-	;; r5, r6 scratch
+	;; scratch:      r4..r6
 	;; parameter:    r7..r19
 	;; motor-state: r20..r27
+	;; call/ret:    r30
 STEP_GEN:
-	;; 
+	;;
 	;; Generate motion profile configured by TravelParameters
 	;;
-	
-	;; update states and extract overflow bits into r1
-	;; 8 times 4 = 32 cpu cycles = 160ns. So whatever step output we do
-	;; is some time after we set the direction bit. Good, because the Allegro
-	;; chip requires this time delay.
-	ZERO &r1, 4
-	LSL r1, travel_params.aux, AUX_1_BIT
-	UpdateMotor r1, r5, mstate.m1, travel_params.fraction_1, MOTOR_1_STEP_BIT
-	UpdateMotor r1, r5, mstate.m2, travel_params.fraction_2, MOTOR_2_STEP_BIT
-	UpdateMotor r1, r5, mstate.m3, travel_params.fraction_3, MOTOR_3_STEP_BIT
-	UpdateMotor r1, r5, mstate.m4, travel_params.fraction_4, MOTOR_4_STEP_BIT
-	UpdateMotor r1, r5, mstate.m5, travel_params.fraction_5, MOTOR_5_STEP_BIT
-	UpdateMotor r1, r5, mstate.m6, travel_params.fraction_6, MOTOR_6_STEP_BIT
-	UpdateMotor r1, r5, mstate.m7, travel_params.fraction_7, MOTOR_7_STEP_BIT
-	UpdateMotor r1, r5, mstate.m8, travel_params.fraction_8, MOTOR_8_STEP_BIT
 
-	MOV r6, GPIO_0_BASE | GPIO_DATAIN
-	CheckStopSwitches r1, r5, r6
-	
-	SBBO r1, r4, 0, 4	; motor bits to GPIO-0
+	;;; Update the state registers with the 1.31 resolution fraction.
+	;;; The 31st bit contains the overflow that causes a step.
+	ADD mstate.m1, mstate.m1, travel_params.fraction_1
+	ADD mstate.m2, mstate.m2, travel_params.fraction_2
+	ADD mstate.m3, mstate.m3, travel_params.fraction_3
+	ADD mstate.m4, mstate.m4, travel_params.fraction_4
+	ADD mstate.m5, mstate.m5, travel_params.fraction_5
+	ADD mstate.m6, mstate.m6, travel_params.fraction_6
+	ADD mstate.m7, mstate.m7, travel_params.fraction_7
+	ADD mstate.m8, mstate.m8, travel_params.fraction_8
+
+	;; Set the step bits (Need to check timing)
+	CALL SetSteps
 
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
@@ -276,7 +246,7 @@ DONE_STEP_GEN:
 	MOV queue_header.state, STATE_EMPTY
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16 ; signal host program free slot.
-		
+
 	;; Next position in ring buffer
 	ADD r2, r2, QUEUE_ELEMENT_SIZE
 	MOV r1, QUEUE_LEN * QUEUE_ELEMENT_SIZE ; end-of-queue
@@ -290,3 +260,13 @@ FINISH:
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16
 
 	HALT
+
+;;; This include file needs to provide the subroutines
+;;;    EnableMotors
+;;;    SetAuxBits
+;;;    SetDirections
+;;;    SetSteps
+;;; There is one of these in each hardware directory. They can choose to just
+;;; include pru-generic-io-routines.hp that just uses the generic bits
+;;; or provide their own optimized version.
+#include <pru-io-routines.hp>
