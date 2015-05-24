@@ -1,34 +1,30 @@
 BeagleG
 =======
 
-(Note: I am experimenting with the acceleration planning and jerk right now,
- so don't expect everything 100% to work all the time while things are in flux.
- Contact me if you want to use BeagleG).
-
-Step-motor controller (and eventually 3D printer controller) using the PRU
-capability of the Beaglebone Black to create precisely timed stepper-pulses for
-acceleration and travel (right now: trapezoidal motion profile;
-jerk implementation in progress).
+Step-motor controller for CNC-like devices (or 3D printers) using the
+PRU (Programmable Realtime Unit) of the Beaglebone Black to create precisely timed and
+fast stepper-pulses for acceleration and travel.
+And with fast, we're talking **up to 1Mhz fast**.
+For 8 motors in parallel. In a controlled move (G1).
+If there only were motors that could turn that fast ...
 
 This is one of my early tests:
 [![First Test][run-vid]](http://youtu.be/hIEY9077D64)
 
-The motor-operations API allows to enqueue operations with speed changes
-(transition between segments) or fixed speed (travel) of 8 steppers that are
-controlled in a coordinated move (G1), with real-time
-controlled steps at rates that can go beyond 800kHz.
-So: sufficient even for advanced step motors and drivers :)
+Works with a cape designed by the author (the [BUMPS] cape), but also provides
+relatively easy adaption to new hardware (currently: support for CRAMPS). See
+[hardware](./hardware) subdirectory.
 
-The jerk/{accl-,decel-}eration motion profile is entirely
-created within the PRU from parameters sent by the host CPU (i.e. BeagleBone ARM)
-via a ring-buffer.
-The host CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
+The {accl-,decel-}eration and travel motion profile is entirely
+created within the PRU from parameters sent by the host CPU decoupled via a ring-buffer.
+The BeagleBone main CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
 doing travel planning, while all the real-time critical parts are
-done in the PRU. The host program needs less than 1% CPU-time processing a
-typical G-Code file.
+done in the PRU. The host CPU typically needs less than 1% CPU-time doing everything else (and
+there is no need for a real-time kernel).
 
 The main `machine-control` program is parsing G-Code, extracting axes moves and
-enqueues them to the realtime unit. It can receive G-Code from a file or socket.
+enqueues them to the realtime unit. It can receive G-Code from a file or socket (you
+can just telnet to it for an interactive session).
 
 ## APIs
 The functionality is implemented in a stack of independently usable APIs.
@@ -66,13 +62,17 @@ The functionality is implemented in a stack of independently usable APIs.
       Since this takes the actual travel planning into account, the values are
       a correct prediction of the actual print or CNC time.
 
-The interfaces are typically C-structs with function pointers which allows for
-easy testing or simple translation into languages such as Go or C++.
+The interfaces are C-structs with function pointers which allows for
+easy testing or simple integrating with languages such as Go or C++.
+
+*(Note: I am experimenting with improving acceleration planning and add jerk calculations
+  right now, so don't expect everything 100% to work all the time while things are in flux.
+  Contact me if you have questions for a particular use-case of BeagleG)*
 
 ## Build
 To build, we need the BeagleG code and the PRU assembler with supporting library.
 The BeagleG repository is set up in a way that the PRU assembler is checked out via
-a sub-module to make these things simple.
+a git sub-module to make it simple.
 
 Clone the BeagleG repository with the `--recursive` flag to get this sub-module
 
@@ -94,7 +94,7 @@ If you are looking at the code and developing on a non-Beaglebone machine, pass 
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
 we have to tell the pin multiplexer to connect them to the output pins. For
 that, just run the start-devicetree-overlay.sh script with your hardware
-to install the device overlay.
+to install the device overlay. You find it in the `hardware/` subdirectory.
 
     sudo hardware/start-devicetree-overlay.sh hardware/BUMPS/BeagleG.dts
 
@@ -186,26 +186,29 @@ broken so that it can get stuck. With `socat`, it should be possible to connect
 to a pseudo-terminal in case your printer-software only talks to a terminal
 (haven't tried that yet, please let me know if it works).
 
-Note, there can only be one open TCP connection at any given time.
+Note, there can only be one open TCP connection at any given time (after all, there is
+only one physical machine).
 
 ### Axis to Motor mapping
 
 Each board has a number of connectors for motors and switches to which you connect your
-physical motors to.
+physical motors and end-switches to.
+
 To intuitively map these connector positions to logical axes names, the `machine-control`
 binary can be configured with command line flags with a string that associates the motor
-position (=string position) with the actual axis (name of axis).
+position (=string position) with the actual axis (name of axis). You can map the same axis
+letter to multiple positions, if you mirror motors. Lower- and uppper-case of that letter
+flip the direction.
 
 In the following example configuration of a [Bumps cape][bumps] with 5 connectors,
-the X axis on the very left
-(with a plugged in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
-finally the Y axis is on the very right (more space for two connectors which I
-need for my Type-A machine).
+we want the `X` axis on the very left, then another, mirrored X axis motor, turning in the
+opposite direction (lowercase `x`), third is `Z`,
+fourth (second-last) is `E` (extrusion for a 3D printer), and finally the `Y` axis is on the
+very right.
+
 The mapping is configured with:
 
-        ./machine-control --axis-mapping "X_ZEY"  ...
-
-(TODO: make example for mirrored axes)
+        ./machine-control --axis-mapping "XxZEY"  ...
 
 Similarly, the `--min-endswitch` and `--max-endswitch` takes a string with axis letters,
 where the string position represents the connector position on your cape and the letter the
@@ -213,6 +216,7 @@ corresponding axis this switch is for (Upper case: used for homing; lower case: 
 axis endstop).
 
 ![Bumps board][BUMPS-img]
+(Just for reference. This has one missing Pololu driver, so the second connector wouldn't work).
 
 ### Configuration tip
 For a particular machine, you might have some settings you always want to
@@ -254,6 +258,8 @@ time
 
     ./gcode-print-stats *.gcode | sort -k2 -n
 
+(TODO: make it share the same configuration as machine-control)
+
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -261,7 +267,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 ## TODO
-   - Needed for full 3D printer solution: add PWM for heaters.
+Not everything I'd like to have is implemented yet, but getting closer as weekend
+hacking permits.
+
+   - Needed for full 3D printer solution: add PWM/PID-loop for heaters.
    - Fast pause without waiting for queues to empty, but still be able to
      recover exact last position. That way pause/resume is possible.
    - ...
