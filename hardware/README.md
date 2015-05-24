@@ -53,6 +53,12 @@ to have it in the uInitrd filesystem. The script copies it there.
 The script assumes a certain way the boot happens, so it might depend on your distribution
 if it actually works; you might want to inspect it first to what it does.
 
+## Adding new hardware
+
+Adding new hardware is, in the simple case, just creating a new subdirectory, providing a *.dts
+file and adding a `beagleg-pin-mapping.h` file. Please check out the existing subdirectories
+to get an idea. If you added a new board, consider sending a patch.
+
 [BeagleBone-Black]: http://beagleboard.org/BLACK
 [BUMPS]: http://github.com/hzeller/bumps
 [CRAMPS]: http://reprap.org/wiki/CRAMPS

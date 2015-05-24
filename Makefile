@@ -6,6 +6,7 @@
 # https://github.com/beagleboard/am335x_pru_package
 
 # Change here for which hardware you are compiling. See hardware/ directory.
+# Currently supported BUMPS and CRAMPS
 HARDWARE_TARGET=BUMPS
 
 # In case you cross compile this on a different architecture, uncomment this
@@ -22,8 +23,9 @@ AM335_BASE=am335x_pru_package
 PASM=$(AM335_BASE)/pru_sw/utils/pasm
 LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
+CAPE_INCLUDE=hardware/$(HARDWARE_TARGET)
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -std=c99 -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -std=c99 -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=-Wl,-rpath=$(LIBDIR_APP_LOADER) -L$(LIBDIR_APP_LOADER) -lprussdrv
 
@@ -54,7 +56,7 @@ test: $(TEST_BINARIES)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $<
 
 %_bin.h : %.p $(PASM)
-	$(PASM) -V3 -c $<
+	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
 
 $(PASM):
 	make -C $(AM335_BASE)

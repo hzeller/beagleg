@@ -22,10 +22,6 @@
 #ifndef __MOTOR_INTERFACE_CONSTANTS_H
 #define __MOTOR_INTERFACE_CONSTANTS_H
 
-// FIXME: We need some better way to select the cape...
-#define USE_BUMPS_CAPE
-//#define USE_CRAMPS_CAPE
-
 // Frequency we use for our timer. The CPU uses two CPU cycles per busy loop,
 // so we divide CPU freq by that.
 // A hardware timer might run natively at full speed.
@@ -56,6 +52,8 @@
 
 //
 // Generic GPIO mapping pin definitions for the BeagleBone cape
+// Here, we put them together in one convenient value which is used for
+// the generic pin-mapping in BeagleG
 //
 
 #define PIN_P9_11  (GPIO_0_BASE | 30)  // UART4_RXD
@@ -64,12 +62,12 @@
 #define PIN_P9_14  (GPIO_1_BASE | 18)  // EHRPWM1A
 #define PIN_P9_15  (GPIO_1_BASE | 16)
 #define PIN_P9_16  (GPIO_1_BASE | 19)  // EHRPWM1B
-#define PIN_P9_17  (GPIO_0_BASE | 5)   // I2C1_SCL
-#define PIN_P9_18  (GPIO_0_BASE | 4)   // I2C1_SDA
+#define PIN_P9_17  (GPIO_0_BASE |  5)   // I2C1_SCL
+#define PIN_P9_18  (GPIO_0_BASE |  4)   // I2C1_SDA
 #define PIN_P9_19  (GPIO_0_BASE | 13)  // I2C2_SCL
 #define PIN_P9_20  (GPIO_0_BASE | 12)  // I2C2_SDA
-#define PIN_P9_21  (GPIO_0_BASE | 3)   // UART2_TXD
-#define PIN_P9_22  (GPIO_0_BASE | 2)   // UART2_RXD
+#define PIN_P9_21  (GPIO_0_BASE |  3)   // UART2_TXD
+#define PIN_P9_22  (GPIO_0_BASE |  2)   // UART2_RXD
 #define PIN_P9_23  (GPIO_1_BASE | 17)
 #define PIN_P9_24  (GPIO_0_BASE | 15)  // UART1_TXD
 #define PIN_P9_25  (GPIO_3_BASE | 21)
@@ -80,12 +78,12 @@
 #define PIN_P9_30  (GPIO_3_BASE | 16)  // SPI1_D1 (MOSI)
 #define PIN_P9_31  (GPIO_3_BASE | 14)  // SPI1_SCK
 #define PIN_P9_41  (GPIO_0_BASE | 20)  // CLKOUT2
-#define PIN_P9_42  (GPIO_0_BASE | 7)
+#define PIN_P9_42  (GPIO_0_BASE |  7)
 
-#define PIN_P8_7   (GPIO_2_BASE | 2)   // TIMER4
-#define PIN_P8_8   (GPIO_2_BASE | 3)   // TIMER7
-#define PIN_P8_9   (GPIO_2_BASE | 5)   // TIMER5
-#define PIN_P8_10  (GPIO_2_BASE | 4)   // TIMER6
+#define PIN_P8_7   (GPIO_2_BASE |  2)   // TIMER4
+#define PIN_P8_8   (GPIO_2_BASE |  3)   // TIMER7
+#define PIN_P8_9   (GPIO_2_BASE |  5)   // TIMER5
+#define PIN_P8_10  (GPIO_2_BASE |  4)   // TIMER6
 #define PIN_P8_11  (GPIO_1_BASE | 13)
 #define PIN_P8_12  (GPIO_1_BASE | 12)
 #define PIN_P8_13  (GPIO_0_BASE | 23)  // EHRPWM2B
@@ -93,108 +91,19 @@
 #define PIN_P8_15  (GPIO_1_BASE | 15)
 #define PIN_P8_16  (GPIO_1_BASE | 14)
 #define PIN_P8_17  (GPIO_0_BASE | 27)
-#define PIN_P8_18  (GPIO_2_BASE | 1)
+#define PIN_P8_18  (GPIO_2_BASE |  1)
 #define PIN_P8_19  (GPIO_0_BASE | 22)  // EHRPWM2A
 #define PIN_P8_26  (GPIO_1_BASE | 29)
 
 #define GPIO_NOT_MAPPED  0
 
-#ifdef USE_BUMPS_CAPE
-//
-// BUMPS cape Generic GPIO mapping
-// https://github.com/hzeller/bumps
-//
 
-#define MOTOR_1_STEP_GPIO  PIN_P9_22  // STEP_X
-#define MOTOR_2_STEP_GPIO  PIN_P9_21  // STEP_Y
-#define MOTOR_3_STEP_GPIO  PIN_P9_18  // STEP_Z
-#define MOTOR_4_STEP_GPIO  PIN_P9_17  // STEP_E
-#define MOTOR_5_STEP_GPIO  PIN_P9_42  // STEP_A
-#define MOTOR_6_STEP_GPIO  PIN_P9_26  // STEP_B
-#define MOTOR_7_STEP_GPIO  PIN_P9_24  // STEP_C
-#define MOTOR_8_STEP_GPIO  PIN_P9_41  // STEP_U
-#define MOTOR_9_STEP_GPIO  GPIO_NOT_MAPPED
-
-#define MOTOR_1_DIR_GPIO   PIN_P8_12  // DIR_X
-#define MOTOR_2_DIR_GPIO   PIN_P8_11  // DIR_Y
-#define MOTOR_3_DIR_GPIO   PIN_P8_16  // DIR_Z
-#define MOTOR_4_DIR_GPIO   PIN_P8_15  // DIR_E
-#define MOTOR_5_DIR_GPIO   PIN_P9_15  // DIR_A
-#define MOTOR_6_DIR_GPIO   PIN_P9_23  // DIR_B
-#define MOTOR_7_DIR_GPIO   PIN_P9_14  // DIR_C
-#define MOTOR_8_DIR_GPIO   PIN_P9_16  // DIR_U
-#define MOTOR_9_DIR_GPIO   GPIO_NOT_MAPPED
-
-#define MOTOR_ENABLE_GPIO  PIN_P9_12  // ENn
-#define MACHINE_PWR_GPIO   GPIO_NOT_MAPPED
-#define ESTOP_HW_GPIO      GPIO_NOT_MAPPED
-#define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
-#define LED_GPIO           GPIO_NOT_MAPPED
-
-#define AUX_1_GPIO         PIN_P9_11  // AUX_1 "Aux, Open Collector"
-#define AUX_2_GPIO         PIN_P9_13  // AUX_2 "Aux, Open Collector"
-
-#define PWM_1_GPIO         PIN_P8_9   // PWM_1 "Power PWM"
-#define PWM_2_GPIO         PIN_P8_10  // PWM_2 "Power PWM"
-#define PWM_3_GPIO         PIN_P8_7   // PWM_3 "PWM, Open Collector"
-#define PWM_4_GPIO         PIN_P8_8   // PWM_4 "PWM, Open Collector"
-
-#define END_1_GPIO         PIN_P8_13  // END_X
-#define END_2_GPIO         PIN_P8_14  // END_Y
-#define END_3_GPIO         PIN_P8_17  // END_Z
-#define END_4_GPIO         GPIO_NOT_MAPPED
-#define END_5_GPIO         GPIO_NOT_MAPPED
-#define END_6_GPIO         GPIO_NOT_MAPPED
-
-#endif // USE_BUMPS_CAPE
-
-#ifdef USE_CRAMPS_CAPE
-//
-// CRAMPS cape Generic GPIO mapping
-// http://reprap.org/wiki/CRAMPS
-//
-
-#define MOTOR_1_STEP_GPIO  PIN_P8_13  // X_STEP
-#define MOTOR_2_STEP_GPIO  PIN_P8_15  // Y_STEP
-#define MOTOR_3_STEP_GPIO  PIN_P8_19  // Z_STEP
-#define MOTOR_4_STEP_GPIO  PIN_P9_16  // E0_STEP
-#define MOTOR_5_STEP_GPIO  PIN_P9_17  // E1_STEP
-#define MOTOR_6_STEP_GPIO  PIN_P9_24  // E2_STEP
-#define MOTOR_7_STEP_GPIO  PIN_P9_42  // STEP_U (external)
-#define MOTOR_8_STEP_GPIO  PIN_P9_31  // STEP_V (external)
-#define MOTOR_9_STEP_GPIO  PIN_P9_29  // STEP_W (external)
-
-#define MOTOR_1_DIR_GPIO   PIN_P8_12  // X_DIR
-#define MOTOR_2_DIR_GPIO   PIN_P8_14  // Y_DIR
-#define MOTOR_3_DIR_GPIO   PIN_P8_18  // Z_DIR
-#define MOTOR_4_DIR_GPIO   PIN_P9_12  // E0_DIR
-#define MOTOR_5_DIR_GPIO   PIN_P9_18  // E1_DIR
-#define MOTOR_6_DIR_GPIO   PIN_P9_26  // E2_DIR
-#define MOTOR_7_DIR_GPIO   PIN_P8_16  // DIR_U (external)
-#define MOTOR_8_DIR_GPIO   PIN_P9_28  // DIR_V (external)
-#define MOTOR_9_DIR_GPIO   PIN_P9_30  // DIR_W (external)
-
-#define MOTOR_ENABLE_GPIO  PIN_P9_14  // AXIS_ENAn
-#define MACHINE_PWR_GPIO   PIN_P9_23  // MACHINE_PWR
-#define ESTOP_HW_GPIO      PIN_P8_17  // ESTOP (input)
-#define ESTOP_SW_GPIO      PIN_P8_26  // ESTOP_SW (output)
-#define LED_GPIO           PIN_P9_25  // LED
-
-#define AUX_1_GPIO         PIN_P9_41  // FET5
-#define AUX_2_GPIO         PIN_P9_22  // FET6
-
-#define PWM_1_GPIO         PIN_P8_11  // FET1
-#define PWM_2_GPIO         PIN_P9_15  // FET2
-#define PWM_3_GPIO         PIN_P9_27  // FET3
-#define PWM_4_GPIO         PIN_P9_21  // FET4
-
-#define END_1_GPIO         PIN_P8_8   // X-MIN
-#define END_2_GPIO         PIN_P8_10  // Y-MIN
-#define END_3_GPIO         PIN_P9_13  // Z-MIN
-#define END_4_GPIO         PIN_P8_7   // X-MAX
-#define END_5_GPIO         PIN_P8_9   // Y-MAX
-#define END_6_GPIO         PIN_P9_11  // Z-MAX
-
-#endif // USE_CRAMPS_CAPE
+// The following file is included from the hardware directory
+// of the cape we are compiling for.
+// If this include fails, check the HARDWARE_TARGET in the
+// Makefile: it must match a subdirectory in hardware/
+// (because of a broken implementation of the include directive in
+// the pasm, this needs to be in angle brackets).
+#include <beagleg-pin-mapping.h>
 
 #endif // __MOTOR_INTERFACE_CONSTANTS_H
