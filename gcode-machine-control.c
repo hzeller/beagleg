@@ -522,14 +522,17 @@ static void move_machine_steps(GCodeMachineControl_t *state,
 
   assert(accel_fraction + decel_fraction <= 1.0 + 1e-4);
 
-#if 0
+#if 1
   // fudging: if we have tiny acceleration segments, don't do these at all
   // but only do speed; otherwise we have a lot of rattling due to many little
-  // segments of acceleration/deceleration (think of drawing a circle).
+  // segments of acceleration/deceleration (e.g. for G2/G3).
+  // This is not optimal. Ideally, we would actually calculate in terms of
+  // jerk and optimize to stay within that constraint.
+  const int accel_decel_steps
+    = (accel_fraction + decel_fraction) * abs_defining_axis_steps;
   const float accel_decel_mm
-    = (((accel_fraction + decel_fraction) * abs_defining_axis_steps)
-       / state->cfg.steps_per_mm[defining_axis]);
-  const char do_accel = (accel_decel_mm > 5);
+    = (accel_decel_steps / state->cfg.steps_per_mm[defining_axis]);
+  const char do_accel = (accel_decel_mm > 2 || accel_decel_steps > 16);
 #else
   const char do_accel = 1;
 #endif

@@ -436,7 +436,7 @@ static const char *handle_move(struct GCodeParser *p,
 //   F   : feedrate
 
 // these need to be tuned (they are the default values from the smoothieware code)
-#define MM_PER_ARC_SEGMENT	0.5
+#define MM_PER_ARC_SEGMENT	0.1
 #define N_ARC_CORRECTION	5
 
 static const char *handle_arc(struct GCodeParser *p,
