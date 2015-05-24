@@ -74,7 +74,7 @@ static int usage(const char *prog, const char *msg) {
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
 	  "  -P                        : Verbose: Print motor commands (Default: off).\n"
 	  "  -S                        : Synchronous: don't queue (Default: off).\n"
-	  "  --loop[=count]            : Loop file number of times (no value: forever)\n",
+	  "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n",
 	  prog);
   fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
   fprintf(stderr, "(the actual mapping to a connector happens with --axis-mapping,\n");
