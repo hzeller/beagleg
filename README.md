@@ -104,30 +104,45 @@ See the [Hardware page](./hardware) how to enable the cape at boot time.
 To control a machine with G-Code, use the `machine-control` binary.
 This either takes a filename or a TCP port to listen on.
 
-    Usage: ./machine-control [options] [<gcode-filename>]
-    Options:
-      --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).
-                                  (negative for reverse)
-      --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).
-      --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
-      --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
-                                  Use letter or '_' for empty slot.
-                                  You can use the same letter multiple times for mirroring.
-                                  Use lowercase to reverse. (Default: 'XYZEA')
-      --port <port>         (-p): Listen on this TCP port for GCode.
-      --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
-      -f <factor>               : Print speed factor (Default 1.0).
-      -n                        : Dryrun; don't send to motors (Default: off).
-      -P                        : Verbose: Print motor commands (Default: off).
-      -S                        : Synchronous: don't queue (Default: off).
-      --loop[=count]            : Loop file number of times (no value: forever)
-    [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
-    (the actual mapping to a connector happens with --axis-mapping,
-    the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
-    You can either specify --port <port> to listen for commands or give a GCode-filename
-    All numbers can be given as multiplicative expression
-    which makes microstepping and unit conversions more readable
-    e.g. --steps-mm '16*200/(25.4/4),8*200/4'
+```
+Usage: ./machine-control [options] [<gcode-filename>]
+Options:
+  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).
+                                (negative for reverse)
+  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).
+  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).
+  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)
+                                Use letter or '_' for empty slot.
+                                You can use the same letter multiple times for mirroring.
+                                Use lowercase to reverse. (Default: 'XYZEA')
+  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only
+                                values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)
+  --min-endswitch           : Axis letter mapped to which endstop connector for negative travel (=string pos)
+                                Use letter or '_' for unused endstop.
+                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.
+  --max-endswitch           : Axis letter mapped to which endstop connector for positive travel (=string pos)
+                                Use letter or '_' for unused endstop.
+                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.
+  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)
+  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).
+                                Use '1' or '+' for logic high trigger.
+                                Use '0' or '-' for logic low trigger.
+                                Use '_' for unused endstops.
+  --port <port>         (-p): Listen on this TCP port for GCode.
+  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
+  -f <factor>               : Print speed factor (Default 1.0).
+  -n                        : Dryrun; don't send to motors (Default: off).
+  -P                        : Verbose: Print motor commands (Default: off).
+  -S                        : Synchronous: don't queue (Default: off).
+  --loop[=count]            : Loop file number of times (no value: forever)
+[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
+(the actual mapping to a connector happens with --axis-mapping,
+the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
+You can either specify --port <port> to listen for commands or give a GCode-filename
+All numbers can be given as multiplicative expression
+which makes microstepping and unit conversions more readable
+e.g. --steps-mm '16*200/(25.4/4),8*200/4'
+```
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W,
 while `machine-control` maps these to physical output connectors,
