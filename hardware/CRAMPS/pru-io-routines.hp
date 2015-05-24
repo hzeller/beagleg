@@ -1,0 +1,5 @@
+;;; -*- asm -*-
+;;; CRAMPS specific PRU routines.
+
+;; Just use the generic ones.
+#include "../../pru-generic-io-routines.hp"

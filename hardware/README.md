@@ -53,11 +53,40 @@ to have it in the uInitrd filesystem. The script copies it there.
 The script assumes a certain way the boot happens, so it might depend on your distribution
 if it actually works; you might want to inspect it first to what it does.
 
-## Adding new hardware
+## Adding support for new hardware
 
-Adding new hardware is, in the simple case, just creating a new subdirectory, providing a *.dts
-file and adding a `beagleg-pin-mapping.h` file. Please check out the existing subdirectories
-to get an idea. If you added a new board, consider sending a patch.
+To add support for a new cape, you need to create a subdirectory with the name of the
+cape you want to add.
+
+Each directory should contain at least a README or README.md describing the board and
+provide references where it can be found.
+
+You should provide a *.dts device tree overlay file for easy install (or provide a link where
+it can be found). If you have a *.dts file, it will work with the start-devicetree-overlay.sh
+and install-devicetree-overlay.sh scripts in this directory.
+
+In order to make things compile, each hardware subdirectory requires files with the following
+exact names.
+
+   * `beagleg-pin-mapping.h`: mapping of pinheader pins to logical functions.
+     As an example, see the BUMPS [beagleg-pin-mapping.h](./BUMPS/beagleg-pin-mapping.h)
+
+   * `pru-io-routines.hp`: a file containing a set of PRU subroutines to set certain
+     values. You can write this file yourself or just use the generic version provided
+     in this directory
+
+     ```bash
+     cd hardware  # subdirectory of the beagleg/ toplevel dir
+     cp template-pru-io-routines.hp MyCapeName/pru-io-routines.hp
+     ```
+
+You can enable compilation for your new cape by setting the variable `HARDWARE_TARGET` in
+the toplevel Makefile to your cape name
+
+     HARDWARE_TARGET=MyCapeName
+
+Please check out the existing subdirectories to get an idea. If you added a new board,
+consider sending a patch.
 
 [BeagleBone-Black]: http://beagleboard.org/BLACK
 [BUMPS]: http://github.com/hzeller/bumps

@@ -40,17 +40,17 @@
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 
 	.u16 aux		 // lowest two bits only used.
-	
+
 	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration
 	                         // shifted by DELAY_CYCLE_SHIFT
 	                         // Changes in the different phases.
 	.u32 travel_delay_cycles // Exact cycle value for travel (do not rely
 	                         // on accel approx to exactly reach that)
-	
+
 	// 1.31 Fixed point increments for each motor
 	.u32 fraction_1
-	.u32 fraction_2          
+	.u32 fraction_2
 	.u32 fraction_3
 	.u32 fraction_4
 	.u32 fraction_5
@@ -79,27 +79,6 @@
 .ends
 .assign MotorState, STATE_START, STATE_END, mstate
 
-;;; Set/Clr a GPIO pin based on 'bit' being set/clr in 'bits'
-;;; Uses:
-;;;   r4 : the base address of the gpio bank to set/clr the pin
-;;;   r5 : the bitmask to set/clr the gpio pin
-;;;   r6 : scratch
-.macro SetGPIO
-.mparam bits, bit, gpio_def
-	MOV r4, (gpio_def & 0xfffff000)
-	QBEQ no_map, r4.w2, GPIO_NOT_MAPPED
-	MOV r5, 1 << (gpio_def & 0x1f)
-	QBBS set_gpio, bits, bit
-	MOV r6, GPIO_CLEARDATAOUT
-	QBA update_gpio
-set_gpio:
-	MOV r6, GPIO_SETDATAOUT
-update_gpio:
-	ADD r4, r4, r6
-	SBBO r5, r4, 0, 4
-no_map:
-.endm
-
 ;;; Calculate the current delay depending on the phase (acceleration, travel,
 ;;; deceleration). Modifies the values in params, which is of type
 ;;; TravelParameters.
@@ -107,7 +86,7 @@ no_map:
 ;;; Outputs the resulting delay in output_reg.
 ;;; Returns special value 0 when done.
 ;;; Only used once, so just macro.
-;;; 
+;;;
 ;;; We are approximating the needed sqrt() operation with a few terms
 ;;; from an Taylor series which brings sufficient accuracy and boils down
 ;;; to a single (somewhat expensive) division. I tried as well using an
@@ -123,18 +102,18 @@ no_map:
 PHASE_1_ACCELERATION:	; ==================================================
 	QBEQ PHASE_2_TRAVEL, params.loops_accel, 0
 	QBEQ accel_calc_done, params.accel_series_index, 0 // first ? no calc.
-	
+
 	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	;; Add previous remainder for higher resolution.
 	ADD divident_tmp, divident_tmp, state_register
-	
+
 	;; divisor = (accel_series_index << 2) + 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	ADD divisor_tmp, divisor_tmp, 1
-	
+
 	idiv_macro divident_tmp, divisor_tmp, state_register
-	
+
 	;; params.hires_accel_cycles -= quotient (divident_tmp became quotient)
 	SUB params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 accel_calc_done:
@@ -165,13 +144,13 @@ calc_decel:
 	;; divident = (hires_accel_cycles << 1) + remainder
 	LSL divident_tmp, params.hires_accel_cycles, 1
 	ADD divident_tmp, divident_tmp, state_register
-	
+
 	;; divisor = (accel_series_index << 2) - 1
 	LSL divisor_tmp, params.accel_series_index, 2
 	SUB divisor_tmp, divisor_tmp, 1
-	
+
 	idiv_macro divident_tmp, divisor_tmp, state_register
-	
+
 	;; params.hires_accel_cycles += quotient (divident_tmp became quotient)
 	ADD params.hires_accel_cycles, params.hires_accel_cycles, divident_tmp
 
@@ -181,7 +160,7 @@ calc_decel:
 	;; The calculation is done in higher resolution with DELAY_CYCLE_SHIFT
 	;; more bits. Shift back: output_reg = hires_cycles >> DELAY_CYCLE_SHIFT
 	LSR output_reg, params.hires_accel_cycles, DELAY_CYCLE_SHIFT
-	
+
 	;; Correct timing: Substract the number of cycles we have spent here.
 	SUB output_reg, output_reg, (IDIV_MACRO_CYCLE_COUNT + 11) / 2
 
@@ -196,10 +175,10 @@ INIT:
 
 	MOV r2, 0		; Queue address in PRU memory
 QUEUE_READ:
-	;; 
+	;;
 	;; Read next element from ring-buffer
 	;;
-	
+
 	;; Check queue header at our read-position until it contains something.
 	.assign QueueHeader, r1.w0, r1.w0, queue_header
 	LBCO queue_header, CONST_PRUDRAM, r2, SIZE(queue_header)
@@ -236,7 +215,7 @@ QUEUE_READ:
 	;; motor-state: r20..r27
 	;; call/ret:    r30
 STEP_GEN:
-	;; 
+	;;
 	;; Generate motion profile configured by TravelParameters
 	;;
 
@@ -267,7 +246,7 @@ DONE_STEP_GEN:
 	MOV queue_header.state, STATE_EMPTY
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16 ; signal host program free slot.
-		
+
 	;; Next position in ring buffer
 	ADD r2, r2, QUEUE_ELEMENT_SIZE
 	MOV r1, QUEUE_LEN * QUEUE_ELEMENT_SIZE ; end-of-queue
@@ -282,37 +261,12 @@ FINISH:
 
 	HALT
 
-// Set the motor enable signal based on the flag (r3)
-EnableMotors:
-	SetGPIO r3, 0, MOTOR_ENABLE_GPIO
-	RET
-
-// Set the aux bit signals based on the travel_params.aux (r3)
-SetAuxBits:
-	SetGPIO r3, 0, AUX_1_GPIO
-	SetGPIO r3, 1, AUX_2_GPIO
-	RET
-
-// Set the motor direction signals based on the queue_header.direction_bits (r3)
-SetDirections:
-	SetGPIO r3, 0, MOTOR_1_DIR_GPIO
-	SetGPIO r3, 1, MOTOR_2_DIR_GPIO
-	SetGPIO r3, 2, MOTOR_3_DIR_GPIO
-	SetGPIO r3, 3, MOTOR_4_DIR_GPIO
-	SetGPIO r3, 4, MOTOR_5_DIR_GPIO
-	SetGPIO r3, 5, MOTOR_6_DIR_GPIO
-	SetGPIO r3, 6, MOTOR_7_DIR_GPIO
-	SetGPIO r3, 7, MOTOR_8_DIR_GPIO
-	RET
-
-// Set the motor step signals based on bit 31 of the mstate of the motor
-SetSteps:
-	SetGPIO mstate.m1, 31, MOTOR_1_STEP_GPIO
-	SetGPIO mstate.m2, 31, MOTOR_2_STEP_GPIO
-	SetGPIO mstate.m3, 31, MOTOR_3_STEP_GPIO
-	SetGPIO mstate.m4, 31, MOTOR_4_STEP_GPIO
-	SetGPIO mstate.m5, 31, MOTOR_5_STEP_GPIO
-	SetGPIO mstate.m6, 31, MOTOR_6_STEP_GPIO
-	SetGPIO mstate.m7, 31, MOTOR_7_STEP_GPIO
-	SetGPIO mstate.m8, 31, MOTOR_8_STEP_GPIO
-	RET
+;;; This include file needs to provide the subroutines
+;;;    EnableMotors
+;;;    SetAuxBits
+;;;    SetDirections
+;;;    SetSteps
+;;; There is one of these in each hardware directory. They can choose to just
+;;; include pru-generic-io-routines.hp that just uses the generic bits
+;;; or provide their own optimized version.
+#include <pru-io-routines.hp>
