@@ -1,0 +1,77 @@
+BUMPS hardware definition
+=========================
+
+The BUMPS cape was designed together with BeagleG.
+
+![Bumps board][BUMPS-img]
+
+TODO: The dts file should probably just be named BUMPS.dts instead of BeagleG.dts. Also, ideally
+this should actually live with the hardware.
+
+## Pinout
+
+These are the GPIO bits associated with the motor outputs on the BUMPS board.
+The actual physical pins are all over the place on the Beaglebone Black extension headers
+P8 and P9, see table below.
+
+Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
+which we're going to use for GPIO. For that, we need to install a device
+tree overlay. Just run the script beagleg-cape-pinmux.sh as root
+
+    sudo ./beagleg-cape-pinmux.sh
+
+This registers the cape, as you can confirm by looking at the slots:
+
+    $ cat /sys/devices/bone_capemgr.*/slots
+     0: 54:PF---
+     1: 55:PF---
+     2: 56:PF---
+     3: 57:PF---
+     4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
+     5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
+     8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
+
+Now, all pins are mapped to be used by beagleg. This is the pinout
+
+       Driver channel |  0     1     2     3     4      5     6     7
+    Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20
+           BBB Header |P9-22 P9-21 P9-18 P9-17 P9-42A P9-26 P9-24 P9-41A
+                      |
+    Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
+           BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
+
+Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
+(The mapping right now was done because these are consecutive GPIO pins that
+can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
+probably move to an unambiguated pin)
+
+In the [Bumps cape][bumps] picture above, the X axis on the very left (with a plugged
+in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
+finally the Y axis is on the very right (more space for two connectors which I
+need for my Type-A machine).
+The axis mapping is configured with:
+
+        ./machine-control --axis-mapping "X_ZEY"  ...
+
+If you build your own cape: note all logic levels are 3.3V (and assume not more
+than ~4mA). The RAMPS driver board for instance only works if you power the
+5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
+
+This is an early experimental manual cape interfacing to a RAMPS adapter:
+![Manual Cape][manual-cape]
+
+At the middle/bottom of the test board you see a headpone connector: many of
+the early experiments didn't have yet a stepper motor installed, but just
+listening to the step-frequency :)
+
+Not yet supported, coming soon:
+   * More PINS of GPIO-0 will be used
+       * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors at the bottom left on the [Bumps board][bumps].
+       * 3 end-switch inputs on GPIO-0 23, 26, 27
+   * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors on the Bumps board (connector top left).w
+   * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
+
+
+[BUMPS]: https://github.com/hzeller/bumps
+[BUMPS-img]: ../../img/bumps-connect.jpg
+[manual-cape]: ../../img/manual-ramps-cape.jpg

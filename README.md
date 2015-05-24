@@ -57,7 +57,7 @@ The functionality is encapsulated in independently usable APIs.
       There is a simulation implementation (sim-firmware.c) that illustrates
       what to do with the parameters. The simulation just outputs the would-be
       result as CSV file (good for debugging).
-     
+
    - `determine-print-stats.h`: C-API to determine some basic stats about
       a G-Code file; it processes the entire file and determines estimated
       print time, filament used etc. Implementation is mostly an example using
@@ -91,12 +91,12 @@ If you are looking at the code and developing on a non-Beaglebone machine, pass 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
 we have to tell the pin multiplexer to connect them to the output pins. For
-that, just run the beagleg-cape-pinmux.sh script that installs the device
-overlay.
+that, just run the start-devicetree-overlay.sh script with your hardware
+to install the device overlay.
 
-    sudo ./beagleg-cape-pinmux.sh
+    sudo hardware/start-devicetree-overlay.sh hardware/BUMPS/BeagleG.dts
 
-See below to enable the cape at boot time.
+See the [Hardware page](./hardware) how to enable the cape at boot time.
 
 ## Machine control binary
 To control a machine with G-Code, use the `machine-control` binary.
@@ -175,6 +175,25 @@ to a pseudo-terminal in case your printer-software only talks to a terminal
 
 Note, there can only be one open TCP connection at any given time.
 
+## Axis mapping
+
+Each board has a number of connectors for motors and switches to which you connect your
+physical motors to.
+To intuitively map these connector positions to logical axes names, the `machine-control`
+binary is configured with a string that associates the motor position (=string position)
+with the actual axis (name of axis).
+
+In the following example configuration of a [Bumps cape][bumps] with 5 connectors,
+the X axis on the very left
+(with a plugged in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
+finally the Y axis is on the very right (more space for two connectors which I
+need for my Type-A machine).
+The mapping is configured with:
+
+        ./machine-control --axis-mapping "X_ZEY"  ...
+
+![Bumps board][BUMPS-img]
+
 ### Configuration tip
 For a particular machine, you might have some settings you always want to
 use, and maybe add some comments. So create a file that contains all the
@@ -196,111 +215,6 @@ or, simpler, if you don't have any comments in the configuration file:
     sudo ./machine-control $(cat type-a.config) --port 4444
 
 The `sed` command passes the configuration, but removes the comment characters.
-
-## Pinout
-
-These are the GPIO bits associated with the motor outputs. The actual physical
-pins are all over the place on the Beaglebone Black extension headers P8 and P9,
-see table below.
-
-Before we can use all pins, we need to tell the Beaglebone Black pin multiplexer
-which we're going to use for GPIO. For that, we need to install a device
-tree overlay. Just run the script beagleg-cape-pinmux.sh as root
-
-    sudo ./beagleg-cape-pinmux.sh
-
-This registers the cape, as you can confirm by looking at the slots:
-
-    $ cat /sys/devices/bone_capemgr.*/slots
-     0: 54:PF---
-     1: 55:PF---
-     2: 56:PF---
-     3: 57:PF---
-     4: ff:P-O-L Bone-LT-eMMC-2G,00A0,Texas Instrument,BB-BONE-EMMC-2G
-     5: ff:P-O-L Bone-Black-HDMI,00A0,Texas Instrument,BB-BONELT-HDMI
-     8: ff:P-O-L Override Board Name,00A0,Override Manuf,BeagleG
-
-Now, all pins are mapped to be used by beagleg. This is the pinout
-
-       Driver channel |  0     1     2     3     4      5     6     7
-    Step     : GPIO-0 |  2,    3,    4,    5,    7,    14,   15,   20
-           BBB Header |P9-22 P9-21 P9-18 P9-17 P9-42A P9-26 P9-24 P9-41A
-                      |
-    Direction: GPIO-1 | 12,   13,   14,   15,    16,    17,  18,   19
-           BBB Header |P8-12 P8-11 P8-16 P8-15 P9-15 P9-23  P9-14 P9-16
-
-Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
-(The mapping right now was done because these are consecutive GPIO pins that
-can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
-probably move to an unambiguated pin)
-
-The mapping from axis to driver channel happens in two steps, see documentation
-in `struct MachineControlConfig` about the configuration options `channel_layout`
-and `axis_mapping`. The first describes the mapping of driver channels to
-connector positions on the cape (which might differ due to board layout reasons),
-the second the mapping of G-code axes (such as 'X' or 'Y') to the
-connector position. The channel layout can be changed with `--channel-layout` and defaults
-to the BUMPS cape; the axis mapping can be set with the `--axis-mapping` flag.
-
-In the following [Bumps cape][bumps], the X axis on the very left (with a plugged
-in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
-finally the Y axis is on the very right (more space for two connectors which I
-need for my Type-A machine).
-The mapping is configured with:
-
-        ./machine-control --axis-mapping "X_ZEY"  ...
-
-![Bumps output mapping][bumps-cape]
-
-(The [Bumps cape][bumps] was designed to work with BeagleG).
-
-If you build your own cape: note all logic levels are 3.3V (and assume not more
-than ~4mA). The RAMPS driver board for instance only works if you power the
-5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
-
-This is an early experimental manual cape interfacing to a RAMPS adapter:
-![Manual Cape][manual-cape]
-
-At the middle/bottom of the test board you see a headpone connector: many of
-the early experiments didn't have yet a stepper motor installed, but just
-listening to the step-frequency.
-
-Not yet supported, coming soon:
-   * More PINS of GPIO-0 will be used
-       * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors at the bottom left on the [Bumps board][bumps].
-       * 3 end-switch inputs on GPIO-0 23, 26, 27
-   * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors on the Bumps board (connector top left).w
-   * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
-
-## Load cape device tree at bootup
-While loading the pinmux manually with
-
-    sudo ./beagleg-cape-pinmux.sh
-
-initializes the pinmux now, we have to do this every time after boot. Also,
-we'd like to have the cape installed as early as possible in the boot process
-to properly set all the output values to safe values.
-
-For that, we essentially have to add
-
-    optargs=capemgr.enable_partno=BeagleG
-
-To the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
-
-The kernel looks for the firmware in /lib/firmware - since at boot time the
-root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
-to have it in the uInitrd filesystem.
-
-There is a script that does both of these things. This might depend on your
-distribution, so take a look at the script first to check that it does what
-it should do (it will abort on the first error, so probably it won't do damage).
-In particular the unpacking/repacking of the initrd file might be specific to
-your distribution.
-
-    sudo ./beagleg-install-cape.sh BeagleG-00A0.dtbo
-
-After a reboot, you should see the cape to be enabled early on in the boot
-process (Power PWM LEDs switch off).
 
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
@@ -327,7 +241,6 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
 ## TODO
-   - Read end-switches
    - Do planning: no need to decelerate fully if we're going on an (almost)
      straight line between line segments.
    - Needed for full 3D printer solution: add PWM for heaters.
@@ -335,7 +248,5 @@ the Free Software Foundation, either version 3 of the License, or
      recover exact last position. That way pause/resume is possible.
    - ...
 
-[manual-cape]: https://github.com/hzeller/beagleg/raw/master/img/manual-ramps-cape.jpg
-[bumps-cape]: https://github.com/hzeller/beagleg/raw/master/img/bumps-connect.jpg
-[bumps]: https://github.com/hzeller/bumps
 [buserror]: https://github.com/hzeller/beagleg/issues/4
+[BUMPS-img]: ./img/bumps-connect.jpg
