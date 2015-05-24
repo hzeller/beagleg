@@ -324,7 +324,7 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (homing_flags & (1 << i)) {
       p->axes_pos[i] = new_position[i];
-      p->relative_zero[i] = new_position[i];
+      p->relative_zero[i] = 0;
     }
   }
 
