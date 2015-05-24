@@ -15,7 +15,7 @@ The actual physical pins are all over the place on the Beaglebone Black extensio
 P8 and P9, see table below.
 
 Before we can use all pins, we need to install the device-tree overlay, see the
-[hardware page](../hardware) for details.
+[hardware page](../) for details.
 
 After that, all pins are mapped to be used by beagleg. This is the pinout
 
@@ -50,13 +50,15 @@ At the middle/bottom of the test board you see a headpone connector: many of
 the early experiments didn't have yet a stepper motor installed, but just
 listening to the step-frequency :)
 
-Not yet supported, coming soon:
-   * More PINS of GPIO-0 will be used
-       * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors at the bottom left on the [Bumps board][bumps].
-       * 3 end-switch inputs on GPIO-0 23, 26, 27
-   * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to use the AM335x Timer functionality in their PWM mode. These control the two high current PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors on the Bumps board (connector top left).w
+Other pins:
+   * Two AUX outputs on GPIO-0 30, 31. This controls the medium current Aux open drain connectors at the bottom left on the [Bumps board][BUMPS].
+   * 3 end-switch inputs on GPIO-0 23, 26, 27
+   * The PWM outputs are on GPIO-2 2, 3, 4, 5 which are also pins Timer 4, 5, 6, 7. Plan is to
+     use the AM335x Timer functionality in their PWM mode (yeah, but I have not looked at the data
+     sheet yet to see if this would actually work). These control the two high current
+     PWM outputs (screw terminals top right) and the two medium current open drain pwm connectors
+     on the Bumps board (connector top left).w
    * Analog inputs AIN0, AIN1, AIN2 will be used for temperature reading.
-
 
 [BUMPS]: https://github.com/hzeller/bumps
 [BUMPS-img]: ../../img/bumps-connect.jpg
