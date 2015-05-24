@@ -68,7 +68,8 @@ sim-firmware.o : motor-interface-constants.h
 # test dependencies.
 gcode-machine-control_test.c: gcode-machine-control.c
 
-$(PRU_BIN) : motor-interface-constants.h
+$(PRU_BIN) : motor-interface-constants.h \
+             $(CAPE_INCLUDE)/beagleg-pin-mapping.h $(CAPE_INCLUDE)/pru-io-routines.hp
 
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(TEST_BINARIES)
