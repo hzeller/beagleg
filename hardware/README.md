@@ -58,15 +58,15 @@ if it actually works; you might want to inspect it first to what it does.
 To add support for a new cape, you need to create a subdirectory with the name of the
 cape you want to add.
 
-Each directory should contain at least a README or README.md describing the board and
+The directory should contain at least a README or README.md describing the board and
 provide references where it can be found.
 
-You should provide a *.dts device tree overlay file for easy install (or provide a link where
-it can be found). If you have a *.dts file, it will work with the start-devicetree-overlay.sh
-and install-devicetree-overlay.sh scripts in this directory.
+You should provide a `*.dts` device tree overlay file for easy install (or provide a link where
+it can be found). If you have a `*.dts` file, it will work with the `start-devicetree-overlay.sh`
+and `install-devicetree-overlay.sh` scripts in this directory.
 
-In order to make things compile, each hardware subdirectory requires files with the following
-exact names:
+In order to make things compile, each hardware subdirectory requires the following files with
+these exact names:
 
    * `beagleg-pin-mapping.h`: mapping of GPIO pins to logical pins (e.g. `MOTOR_1_STEP`).
      As an example, see the BUMPS [beagleg-pin-mapping.h](./BUMPS/beagleg-pin-mapping.h)
