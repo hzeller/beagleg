@@ -63,12 +63,7 @@ static const float kMoveRange[GCODE_NUM_AXES] = { 100, 100, 100, -1, -1 };
 // Output mapping of Axis to motor connectors from left to right.
 static const char kAxisMapping[] = "XYZEA";
 
-// Mapping the motor connectors to actual output channels.
-// This is the channel layout on the Bumps-board ( github.com/hzeller/bumps ),
-// currently the only cape existing for BeagleG, so we can as well hardcode it.
-// (for BURPS, this would be "01234567")
-static const char kChannelLayout[] = "23140";
-
+// Default order in which axes should be homed.
 static const char kHomeOrder[] = "ZXY";
 
 // The vector is essentially a position in the GCODE_NUM_AXES dimensional
@@ -909,43 +904,10 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
 
   // Mapping axes to physical motors. We might have a larger set of logical
   // axes of which we map a subset to actual motors.
-  // We do this in two steps: One identifies which io-pin actually goes to which
-  // physical location (a property of the actual cape), the second maps
-  // logical axes (e.g. 'X') to the location on the board.
-  // This double mapping is done, so that it is intuitive for users to map
-  // (as the first is a hardware property that doesn't really change and the
-  // second the mapping the user wants).
-
-  // Mapping of connector position on cape to driver ID (the axis in the
-  // motor interface). This might differ due to physical board layout reasons.
-  int pos_to_driver[BEAGLEG_NUM_MOTORS];
-  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    pos_to_driver[i] = -1;
-  }
-  const char *physical_mapping = cfg.channel_layout;
-  if (physical_mapping == NULL) physical_mapping = kChannelLayout;
-  if (strlen(physical_mapping) > BEAGLEG_NUM_MOTORS) {
-    fprintf(stderr, "Physical mapping string longer than available motors. "
-            "('%s', max axes=%d)\n", physical_mapping, BEAGLEG_NUM_MOTORS);
-    return cleanup_state(result);
-  }
-  for (int pos = 0; *physical_mapping; pos++, physical_mapping++) {
-    const int mapped_driver = *physical_mapping - '0';
-    if (mapped_driver >= 0 && mapped_driver < BEAGLEG_NUM_MOTORS) {
-      pos_to_driver[pos] = mapped_driver;
-    }
-    else {
-      fprintf(stderr, "Invalid character '%c' in channel-layout mapping. "
-              "Can be characters '0'..'%d'\n",
-              *physical_mapping, BEAGLEG_NUM_MOTORS - 1);
-      return cleanup_state(result);
-    }
-  }
-
   const char *axis_map = cfg.axis_mapping;
   if (axis_map == NULL) axis_map = kAxisMapping;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
-    if (pos >= BEAGLEG_NUM_MOTORS || pos_to_driver[pos] < 0) {
+    if (pos >= BEAGLEG_NUM_MOTORS) {
       fprintf(stderr, "Axis mapping string has more elements than available %d "
               "connectors (remaining=\"..%s\").\n", pos, axis_map);
       return cleanup_state(result);
@@ -960,9 +922,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
               toupper(*axis_map), cfg.axis_mapping);
       return cleanup_state(result);
     }
-    const int driver = pos_to_driver[pos];
-    result->driver_flip[driver] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
-    result->axis_to_driver[axis] |= (1 << driver);
+    result->driver_flip[pos] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
+    result->axis_to_driver[axis] |= (1 << pos);
   }
 
   // Extract enstop polarity
@@ -1108,7 +1069,6 @@ void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   config->speed_factor = 1;
   config->debug_print = 0;
   config->synchronous = 0;
-  config->channel_layout = kChannelLayout;
   config->axis_mapping = kAxisMapping;
   config->home_order = kHomeOrder;
 }

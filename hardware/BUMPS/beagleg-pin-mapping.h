@@ -21,24 +21,24 @@
 // This contains the defines the GPIO mappings for BUMPS
 // https://github.com/hzeller/bumps
 
-#define MOTOR_1_STEP_GPIO  PIN_P9_22  // STEP_X
-#define MOTOR_2_STEP_GPIO  PIN_P9_21  // STEP_Y
-#define MOTOR_3_STEP_GPIO  PIN_P9_18  // STEP_Z
-#define MOTOR_4_STEP_GPIO  PIN_P9_17  // STEP_E
-#define MOTOR_5_STEP_GPIO  PIN_P9_42  // STEP_A
-#define MOTOR_6_STEP_GPIO  PIN_P9_26  // STEP_B
-#define MOTOR_7_STEP_GPIO  PIN_P9_24  // STEP_C
-#define MOTOR_8_STEP_GPIO  PIN_P9_41  // STEP_U
+#define MOTOR_1_STEP_GPIO  PIN_P9_18  // motor 1
+#define MOTOR_2_STEP_GPIO  PIN_P9_17  // motor 2
+#define MOTOR_3_STEP_GPIO  PIN_P9_21  // motor 3
+#define MOTOR_4_STEP_GPIO  PIN_P9_42  // motor 4
+#define MOTOR_5_STEP_GPIO  PIN_P9_22  // motor 5
+#define MOTOR_6_STEP_GPIO  PIN_P9_26  // (extern 6)
+#define MOTOR_7_STEP_GPIO  PIN_P9_24  // (extern 7)
+#define MOTOR_8_STEP_GPIO  PIN_P9_41  // (extern 8)
 #define MOTOR_9_STEP_GPIO  GPIO_NOT_MAPPED
 
-#define MOTOR_1_DIR_GPIO   PIN_P8_12  // DIR_X
-#define MOTOR_2_DIR_GPIO   PIN_P8_11  // DIR_Y
-#define MOTOR_3_DIR_GPIO   PIN_P8_16  // DIR_Z
-#define MOTOR_4_DIR_GPIO   PIN_P8_15  // DIR_E
-#define MOTOR_5_DIR_GPIO   PIN_P9_15  // DIR_A
-#define MOTOR_6_DIR_GPIO   PIN_P9_23  // DIR_B
-#define MOTOR_7_DIR_GPIO   PIN_P9_14  // DIR_C
-#define MOTOR_8_DIR_GPIO   PIN_P9_16  // DIR_U
+#define MOTOR_1_DIR_GPIO   PIN_P8_16  // motor 1
+#define MOTOR_2_DIR_GPIO   PIN_P8_15  // motor 2
+#define MOTOR_3_DIR_GPIO   PIN_P8_11  // motor 3
+#define MOTOR_4_DIR_GPIO   PIN_P9_15  // motor 4
+#define MOTOR_5_DIR_GPIO   PIN_P8_12  // motor 5
+#define MOTOR_6_DIR_GPIO   PIN_P9_23  // (extern 6)
+#define MOTOR_7_DIR_GPIO   PIN_P9_14  // (extern 7)
+#define MOTOR_8_DIR_GPIO   PIN_P9_16  // (extern 8)
 #define MOTOR_9_DIR_GPIO   GPIO_NOT_MAPPED
 
 #define MOTOR_ENABLE_GPIO  PIN_P9_12  // ENn

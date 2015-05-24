@@ -43,34 +43,16 @@ struct MachineControlConfig {
 
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
 
-  // The follwing two parameters determine which logical axis ends up
-  // on which physical plug location. To make things easier to
-  // digest, this is done in two steps.
-  //
-  // The 'channel_layout' maps how the driver channels (internally some GPIO
-  // bits) ends up being mapped into the pysical sequence of connectors on
-  // the board. The pysical location is given as position in the string,
-  // the value at that point describes the internal channel.
-  // A channel_layout mapping of "021" for instance means, that on the very
-  // left is channel zero, followed by channel two in the middle and channel
-  // 1 at the right. Due to layout reasons, the Bumps board
-  // (github.com/hzeller/bumps) has the mapping "23140".
+  // The follwing parameter determines which logical axis ends up
+  // on which physical plug location.
   //
   // The 'axis_mapping' determines how to map a logical axis (e.g. 'X') to
-  // a connector position. So again, the string position represents the
+  // a connector position. The string position represents the
   // position on the board (sequence of connectors), while the character at
   // that position describes the logical axis. Typicaly, this is just
   // "XZYEABC"; for reasons such as using a double-connector, one might
   // have a different mapping, e.g. "XZE_Y". Underscores represent axis that
   // are not mapped.
-  //
-  // Of course, these two mappings could be done in one shot, but it would be
-  // a bit mind-twisting.
-  const char *channel_layout;   // Mapping of driver channel (character in
-                                // string) to physical location (position in
-                                // string). This typically is a constant of
-                                // the physical cape used.
-                                // If NULL, default is "23140" (Bumps board).
   const char *axis_mapping;     // Mapping of axis-name (character in string)
                                 // to physical location (position in string).
                                 // Assumed "XYZEABC" if NULL.

@@ -247,7 +247,6 @@ int main(int argc, char *argv[]) {
     OPT_SET_STEPS_MM = 1000,
     OPT_SET_HOME_POS,
     OPT_SET_HOME_ORDER,
-    OPT_SET_CHANNEL_LAYOUT,
     OPT_SET_MOTOR_MAPPING,
     OPT_SET_MIN_ENDSWITCH,
     OPT_SET_MAX_ENDSWITCH,
@@ -261,7 +260,6 @@ int main(int argc, char *argv[]) {
     { "range",              required_argument, NULL, 'r' },
     { "steps-mm",           required_argument, NULL, OPT_SET_STEPS_MM },
     { "home-order",         required_argument, NULL, OPT_SET_HOME_ORDER },
-    { "channel-layout",     required_argument, NULL, OPT_SET_CHANNEL_LAYOUT },
     { "axis-mapping",       required_argument, NULL, OPT_SET_MOTOR_MAPPING },
     { "min-endswitch",      required_argument, NULL, OPT_SET_MIN_ENDSWITCH },
     { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
@@ -299,9 +297,6 @@ int main(int argc, char *argv[]) {
     case OPT_SET_STEPS_MM:
       if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "steps/mm failed to parse.");
-      break;
-    case OPT_SET_CHANNEL_LAYOUT:
-      config.channel_layout = strdup(optarg);
       break;
     case OPT_SET_MOTOR_MAPPING:
       config.axis_mapping = strdup(optarg);
