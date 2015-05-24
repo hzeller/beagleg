@@ -66,22 +66,22 @@ it can be found). If you have a *.dts file, it will work with the start-devicetr
 and install-devicetree-overlay.sh scripts in this directory.
 
 In order to make things compile, each hardware subdirectory requires files with the following
-exact names.
+exact names:
 
-   * `beagleg-pin-mapping.h`: mapping of pinheader pins to logical functions.
+   * `beagleg-pin-mapping.h`: mapping of GPIO pins to logical pins (e.g. `MOTOR_1_STEP`).
      As an example, see the BUMPS [beagleg-pin-mapping.h](./BUMPS/beagleg-pin-mapping.h)
 
    * `pru-io-routines.hp`: a file containing a set of PRU subroutines to set certain
      values. You can write this file yourself or just use the generic version provided
-     in this directory
+     in this directory:
 
      ```bash
-     cd hardware  # subdirectory of the beagleg/ toplevel dir
+     cd hardware  # Where this README.md is; subdirectory of the beagleg/ toplevel dir
      cp template-pru-io-routines.hp MyCapeName/pru-io-routines.hp
      ```
 
 You can enable compilation for your new cape by setting the variable `HARDWARE_TARGET` in
-the toplevel Makefile to your cape name
+the toplevel Makefile to your cape name:
 
      HARDWARE_TARGET=MyCapeName
 
