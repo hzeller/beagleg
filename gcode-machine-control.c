@@ -922,6 +922,9 @@ static char machine_probe(void *userdata, float feedrate,
                           float *probe_result) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   const struct MachineControlConfig *cfg = &state->cfg;
+  if (!test_homing_status_ok(state))
+    return 0;
+
   bring_path_to_halt(state);
 
   int dir = 1;
