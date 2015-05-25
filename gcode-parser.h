@@ -104,8 +104,10 @@ struct GCodeParserCb {
   //   (typically, the user would need to remember the positive values).
   // The third parameter is an array of absolute coordinates (in mm), indexed
   // by GCodeParserAxis.
-  void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
-  void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
+  // Returns 1, if the move was successful or 0 if the machine could not move
+  // the machine (e.g. because it was beyond limits or other condition).
+  char (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
+  char (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
 
   // Hand out G-code command that could not be interpreted.
   // Parameters: letter + value of the command that was not understood,

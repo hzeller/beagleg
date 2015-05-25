@@ -72,15 +72,15 @@ static void update_coordinate_stats(struct BeagleGPrintStats *stats,
   stats->filament_len = axis[AXIS_E];
 }
 
-static void forwarding_rapid_move(void *userdata, float feed, const float *axes) {
+static char forwarding_rapid_move(void *userdata, float feed, const float *axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.rapid_move(data->machine_delegatee.user_data, feed, axes);
   update_coordinate_stats(data->stats, axes);
+  return data->machine_delegatee.rapid_move(data->machine_delegatee.user_data, feed, axes);
 }
-static void forwarding_coordinated_move(void *userdata, float feed, const float *axes) {
+static char forwarding_coordinated_move(void *userdata, float feed, const float *axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
   update_coordinate_stats(data->stats, axes);
+  return data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
 }
 static void forwarding_go_home(void *userdata, AxisBitmap_t axes) {
   struct StatsData *data = (struct StatsData*)userdata;

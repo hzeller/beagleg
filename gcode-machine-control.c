@@ -58,7 +58,6 @@
 static const float kMaxFeedrate[GCODE_NUM_AXES] = {  200,  200,   90,    10, 1 };
 static const float kDefaultAccel[GCODE_NUM_AXES]= { 4000, 4000, 1000, 10000, 1 };
 static const float kStepsPerMM[GCODE_NUM_AXES]  = {  160,  160,  160,    40, 1 };
-static const float kMoveRange[GCODE_NUM_AXES] = { 100, 100, 100, -1, -1 };
 
 // Output mapping of Axis to motor connectors from left to right.
 static const char kAxisMapping[] = "XYZEA";
@@ -149,7 +148,7 @@ struct GCodeMachineControl {
   // Derived configuration
   float g0_feedrate_mm_per_sec;          // Highest of all axes; used for G0
                                          // (will be trimmed if needed)
-  // Pre-calcualted per axis limits in steps/s, steps/s^2
+  // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
   float max_axis_speed[GCODE_NUM_AXES];  // max travel speed hz
   float max_axis_accel[GCODE_NUM_AXES];  // acceleration hz/s
@@ -719,24 +718,77 @@ static char test_homing_status_ok(GCodeMachineControl_t *state) {
   return 0;
 }
 
-static void machine_G1(void *userdata, float feed, const float *axis) {
+static char test_within_machine_limits(GCodeMachineControl_t *state,
+                                       const float *axis) {
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (axis[i] < 0) {
+      // Machine cube must be in positive range.
+      if (state->msg_stream) {
+        if (state->coordinate_display_origin[i] != 0) {
+          fprintf(state->msg_stream,
+                  "// ERROR outside machine limit: Axis %c < min allowed %+.1fmm "
+                  "in current coordinate system. Ignoring move!\n",
+                  gcodep_axis2letter(i), -state->coordinate_display_origin[i]);
+        } else {
+          // No relative G92 or similar set. Display in simpler form.
+          fprintf(state->msg_stream,
+                  "// ERROR outside machine limit: Axis %c < 0. Ignoring move!\n",
+                  gcodep_axis2letter(i));
+        }
+      }
+      return 0;
+    }
+    if (state->cfg.move_range_mm[i] <= 0)
+      continue;  // max range not configured.
+    if (axis[i] > state->cfg.move_range_mm[i]) {
+      // Machine cube must be within machine limits if defined.
+      if (state->msg_stream) {
+        if (state->coordinate_display_origin[i] != 0) {
+          fprintf(state->msg_stream,
+                  "// ERROR outside machine limit: Axis %c > max allowed %+.1fmm "
+                  "in current coordinate system (=%.1fmm machine absolute). "
+                  "Ignoring move!\n",
+                  gcodep_axis2letter(i),
+                  state->cfg.move_range_mm[i]-state->coordinate_display_origin[i],
+                  state->cfg.move_range_mm[i]);
+        } else {
+          // No relative G92 or similar set. Display in simpler form.
+          fprintf(state->msg_stream,
+                  "// ERROR outside machine limit: Axis %c > %.1fmm. "
+                  "Ignoring move!\n",
+                  gcodep_axis2letter(i), state->cfg.move_range_mm[i]);
+        }
+      }
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static char machine_G1(void *userdata, float feed, const float *axis) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (!test_homing_status_ok(state))
-    return;
+    return 0;
+  if (!test_within_machine_limits(state, axis))
+    return 0;
   if (feed > 0) {
     state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
   }
   float feedrate = state->prog_speed_factor * state->current_feedrate_mm_per_sec;
   machine_move(userdata, feedrate, axis);
+  return 1;
 }
 
-static void machine_G0(void *userdata, float feed, const float *axis) {
+static char machine_G0(void *userdata, float feed, const float *axis) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   if (!test_homing_status_ok(state))
-    return;
+    return 0;
+  if (!test_within_machine_limits(state, axis))
+    return 0;
   float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   machine_move(userdata, given > 0 ? given : rapid_feed, axis);
+  return 1;
 }
 
 static void machine_dwell(void *userdata, float value) {
@@ -957,8 +1009,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   if (axis_map == NULL) axis_map = kAxisMapping;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
     if (pos >= BEAGLEG_NUM_MOTORS) {
-      fprintf(stderr, "Axis mapping string has more elements than available %d "
-              "connectors (remaining=\"..%s\").\n", pos, axis_map);
+      fprintf(stderr, "Error: Axis mapping string has more elements than "
+              "available %d connectors (remaining=\"..%s\").\n", pos, axis_map);
       return cleanup_state(result);
     }
     if (*axis_map == '_')
@@ -992,6 +1044,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     }
   }
 
+  int error_count = 0;
+
   // Now map the endstops. String position is position on the switch connector
   if (cfg.min_endswitch) {
     const char *map = cfg.min_endswitch;
@@ -1004,7 +1058,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
                 "Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
                 toupper(*map), cfg.min_endswitch);
-        return cleanup_state(result);
+        ++error_count;
+        continue;
       }
       result->min_endstop[axis].endstop_number = switch_connector + 1;
       result->min_endstop[axis].homing_use = (toupper(*map) == *map) ? 1 : 0;
@@ -1023,10 +1078,20 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
                 "Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
                 toupper(*map), cfg.min_endswitch);
-        return cleanup_state(result);
+        ++error_count;
+        continue;
+      }
+      const char for_homing = (toupper(*map) == *map) ? 1 : 0;
+      if (result->cfg.move_range_mm[axis] <= 0) {
+        fprintf(stderr,
+                "Error: Endstop for axis %c defined at max-endswitch which "
+                "implies that we need to know that position; yet "
+                "no --range value was given for that axis\n", *map);
+        ++error_count;
+        continue;
       }
       result->max_endstop[axis].endstop_number = switch_connector + 1;
-      result->max_endstop[axis].homing_use = (toupper(*map) == *map) ? 1 : 0;
+      result->max_endstop[axis].homing_use = for_homing;
       result->max_endstop[axis].trigger_value = endstop_trigger[switch_connector];
     }
   }
@@ -1037,28 +1102,34 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
         && result->max_endstop[axis].endstop_number != 0) {
       if (result->min_endstop[axis].homing_use
           && result->max_endstop[axis].homing_use) {
-        fprintf(stderr, "There can only be one home-origin for axis %c, but "
-                "both min/max are set for homing (Uppercase letter)\n",
+        fprintf(stderr, "Error: There can only be one home-origin for axis %c, "
+                "but both min/max are set for homing (Uppercase letter)\n",
                 gcodep_axis2letter(axis));
-        return cleanup_state(result);
+        ++error_count;
+        continue;
       }
     }
   }
 
   // Now let's see what motors are mapped to any useful output.
   if (result->cfg.debug_print) fprintf(stderr, "-- Config --\n");
-  int error_count = 0;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (result->axis_to_driver[i] == 0)
       continue;
     char is_error = (result->cfg.steps_per_mm[i] <= 0
                      || result->cfg.max_feedrate[i] <= 0);
     if (result->cfg.debug_print || is_error) {
-      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %8.4f steps/mm%s ",
+      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %9.4f steps/mm%s ",
               gcodep_axis2letter(i), result->cfg.max_feedrate[i],
               result->cfg.acceleration[i],
               result->cfg.steps_per_mm[i],
               result->axis_flip[i] < 0 ? " (reversed)" : "");
+      if (result->cfg.move_range_mm[i] > 0) {
+        fprintf(stderr, "[machine-limit %5.1fmm] ",
+                result->cfg.move_range_mm[i]);
+      } else {
+        fprintf(stderr, "[    unknown limit    ] ");
+      }
       int endstop = result->min_endstop[i].endstop_number;
       const char *trg = result->min_endstop[i].trigger_value ? "hi" : "lo";
       if (endstop) {
@@ -1146,7 +1217,6 @@ void gcode_machine_control_delete(GCodeMachineControl_t *object) {
 void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   bzero(config, sizeof(*config));
   memcpy(config->steps_per_mm, kStepsPerMM, sizeof(config->steps_per_mm));
-  memcpy(config->move_range_mm, kMoveRange, sizeof(config->move_range_mm));
   memcpy(config->max_feedrate, kMaxFeedrate, sizeof(config->max_feedrate));
   memcpy(config->acceleration, kDefaultAccel, sizeof(config->acceleration));
   config->speed_factor = 1;

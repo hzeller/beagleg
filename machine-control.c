@@ -63,6 +63,7 @@ static int usage(const char *prog, const char *msg) {
 	  "                                Use letter or '_' for unused endstop.\n"
 	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
           "  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)\n"
+          "  --require-homing          : If set, machine refuses to work unless homed\n"
 	  "  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).\n"
 	  "                                Use '1' or '+' for logic high trigger.\n"
 	  "                                Use '0' or '-' for logic low trigger.\n"

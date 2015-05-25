@@ -120,13 +120,14 @@ static void dummy_dwell(void *user, float f) {
 static void dummy_motors_enable(void *user, char b) {
   fprintf(stderr, "GCodeParser: %s motors\n", b ? "enable" : "disable");
 }
-static void dummy_move(void *user, float feed, const float *axes) {
+static char dummy_move(void *user, float feed, const float *axes) {
   fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
 	  axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
   if (feed > 0)
     fprintf(stderr, " feed=%.1f\n", feed);
   else
     fprintf(stderr, "\n");
+  return 1;
 }
 static void dummy_go_home(void *user, AxisBitmap_t axes) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
@@ -414,6 +415,9 @@ static const char *handle_move(struct GCodeParser *p,
   int any_change = force_change;
   float feedrate = -1;
   const char *remaining_line;
+  AxesRegister new_pos;
+  memcpy(new_pos, p->axes_pos, sizeof(new_pos));
+
   while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     if (axis_l == 'F') {
@@ -424,17 +428,24 @@ static const char *handle_move(struct GCodeParser *p,
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
         break;  // Invalid axis: possibly start of new command.
-      p->axes_pos[update_axis] = abs_axis_pos(p, update_axis, unit_value);
+      new_pos[update_axis] = abs_axis_pos(p, update_axis, unit_value);
       any_change = 1;
     }
     line = remaining_line;
   }
 
+  char did_move = 0;
   if (any_change) {
-    if (p->modal_g0_g1)
-      p->callbacks.coordinated_move(p->callbacks.user_data, feedrate, p->axes_pos);
-    else
-      p->callbacks.rapid_move(p->callbacks.user_data, feedrate, p->axes_pos);
+    if (p->modal_g0_g1) {
+      did_move = p->callbacks.coordinated_move(p->callbacks.user_data,
+                                               feedrate, new_pos);
+    } else {
+      did_move = p->callbacks.rapid_move(p->callbacks.user_data,
+                                         feedrate, new_pos);
+    }
+  }
+  if (did_move) {
+    memcpy(p->axes_pos, new_pos, sizeof(p->axes_pos));
   }
   return line;
 }
