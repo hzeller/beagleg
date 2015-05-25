@@ -22,7 +22,7 @@ by every G-Code interpreter, but BeagleG does:
 
     G1(coordinated move) X10(to this position)
 
-##Supported commands
+## Supported commands
 
 Supported commands are currently added on a need-to-have basis. They are a subset
 of G-Codes found documented in [LinuxCNC] and [RepRap Wiki].
@@ -36,7 +36,7 @@ Current set of supported axis-letters is X, Y, Z, E, A, B, C, U, V, W (the
 Line numbers `Nxx` and checksums `*xx` are parsed, but discarded and ignored
 for now.
 
-###G Codes
+### G Codes
 
 Command          | Callback             | Description
 ---------------- |----------------------|------------------------------------
@@ -58,7 +58,7 @@ G90              | -                    | Coordinates are absolute.
 G91              | -                    | Coordinates are relative.
 G92 [coordinates]| -                    | Set position to be the new zero.
 
-###M Codes
+### M Codes
 
 Command          | Callback              | Description
 -----------------|-----------------------|-----------------------------
@@ -76,7 +76,7 @@ M106             | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
 
-###M Codes dealt with by gcode-machine-control
+### M Codes dealt with by gcode-machine-control
 The standard M-Code are directly handled by the G-code parser and result
 in parametrized callbacks. Other not quite standard G-codes are handled in
 [gcode-machine-control](./gcode-machine-control.c) when receiving
@@ -106,7 +106,7 @@ M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
 M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 
-###Feedrate in Euclidian space
+### Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
 understood as representing coordinates in an Euclidian space (not entirely
 unwarranted :) ) and thus applies a feedrate in a way that the resulting
@@ -115,87 +115,21 @@ path sees the given speed in space, not each individual axis:
     G28 G1 X100      F100  ; moves X with feedrate 100mm/min
     G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
 
-##API
+## API
 G-code parsing as provided by [the G-Code parse API](./gcode-parser.h) receives
 G-code from a file-descriptor (via the `int gcodep_parse_stream()` function)
 and calls parametrized parse-callbacks representing slightly more higher-level commands.
 
-The coordinaes passed to callbacks are _always_ pre-converted to machine-absolute and
+The coordinates passed to callbacks are _always_ pre-converted to machine-absolute and
 metric to make implementation of the callback receivers easy.
-The codes G20/G21 and G90/G91/G92 as well as
-M82, M83 are handled internally to always output absolute, metric coordinates.
+The codes `G20`/`G21`/`G70`/`G71` and `G90`/`G91`/`G92` as well as
+`M82`, `M83` are handled internally to always output absolute, metric coordinates.
 
-Currently, the GCode parser also implements G2 and G3 and emits line-segments with
-coordinated_move() callbacks. This should probably move outside the parser.
+Currently, the GCode parser also implements `G2` and `G3` and emits line-segments with
+`coordinated_move()` callbacks (this should probably move outside the parser).
 
 Commands that are not recognized are passed on to the `unprocessed()` callback
 for the user to handle (see description in API).
-
-You can just use the GCode parser in your own projects.
-The callbacks are defined in a struct:
-
-```c
-// Callbacks called by the parser and to be implemented by the user
-// with meaningful actions.
-//
-// The units in these callbacks are always mm and always absolute: the parser
-// takes care of interpreting G20/G21, G90/G91/G92 internally.
-// (TODO: rotational axes are probably to be handled differently).
-//
-// The first parameter in any callback is the "user_data" data pointer member.
-struct GCodeParserCb {
-  void *user_data;  // Context which is passed in each call of these functions.
-
-  void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
-  void (*gcode_finished)(void *);          // FYI: Finished parsing. End of stream.
-
-  // "gcode_command_done" is always executed when a command is completed, which
-  // is after internally executed ones (such as G21) or commands that have
-  // triggered a callback. Mostly FYI, you can use this for logging or
-  // might use this to send "ok\n" depending on the client implementation.
-  void (*gcode_command_done)(void *, char letter, float val);
-
-  // If the input has been idle and we haven't gotten any new line for more
-  // than 50ms, this function is called.
-  void (*input_idle)(void *);
-
-  // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  // Machine returns the new axis position in the return parameter,
-  // which is an array of metric coordinates.
-  // (the homing position is machine dependent, e.g. it could be at
-  // either end of the axis).
-  void (*go_home)(void *, AxisBitmap_t axis_bitmap, float[]);
-
-  // G30: Probe Z axis to travel_endstop
-  int (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis);
-
-  void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
-  void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255
-  void (*set_temperature)(void *, float);  // M104, M109: Set temp. in Celsius.
-  void (*wait_temperature)(void *);        // M109, M116: Wait for temp. reached.
-  void (*dwell)(void *, float);            // G4: dwell for milliseconds.
-  void (*motors_enable)(void *, char b);   // M17,M84,M18: Switch on/off motors
-                                           // b == 1: on, b == 0: off.
-
-  // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates.
-  // First parameter is the userdata.
-  // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
-  //   (typically, the user would need to remember the positive values).
-  // The third parameter is an array of absolute coordinates (in mm), indexed
-  // by GCodeParserAxis.
-  void (*coordinated_move)(void *, float feed_mm_p_sec, const float[]);  // G1
-  void (*rapid_move)(void *, float feed_mm_p_sec, const float[]);        // G0
-
-  // Hand out G-code command that could not be interpreted.
-  // Parameters: letter + value of the command that was not understood,
-  // string of rest of line (the letter is always upper-case).
-  // Should return pointer to remaining line that has not been processed or NULL
-  // if the whole remaining line was consumed.
-  // Implementors might want to use gcodep_parse_pair() if they need to read
-  // G-code words from the remaining line.
-  const char *(*unprocessed)(void *, char letter, float value, const char *);
-};
-```
 
 [LinuxCNC]: http://linuxcnc.org/docs/html/gcode.html
 [RepRap Wiki]: http://reprap.org/wiki/G-code
