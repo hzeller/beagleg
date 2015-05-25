@@ -87,8 +87,11 @@ struct GCodeParserCb {
   // the GCodeParserConfig for the given axes.
   void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
-  // G30: Probe Z axis to travel_endstop
-  int (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis);
+  // G30: Probe Z axis to travel_endstop. Returns 1 on success.
+  // The actual position reached within the machine cube (in mm) is
+  // returned in "probed_position" in that case.
+  char (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis,
+                     float *probed_position);
 
   void (*set_speed_factor)(void *, float); // M220 feedrate factor 0..1
   void (*set_fanspeed)(void *, float);     // M106, M107: speed 0...255

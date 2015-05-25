@@ -132,7 +132,8 @@ static char dummy_move(void *user, float feed, const float *axes) {
 static void dummy_go_home(void *user, AxisBitmap_t axes) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
 }
-static int dummy_probe_axis(void *user, float feed, enum GCodeParserAxis axis) {
+static char dummy_probe_axis(void *user, float feed, enum GCodeParserAxis axis,
+                             float *reached_pos) {
   fprintf(stderr, "GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
   if (feed > 0)
     fprintf(stderr, " feed=%.1f\n", feed);
@@ -520,22 +521,24 @@ static const char *handle_z_probe(struct GCodeParser *p, const char *line) {
   char letter;
   float value;
   float feedrate = -1;
-  float new_pos = 0;
+  float probe_thickness = 0;
   const char *remaining_line;
   while ((remaining_line = gparse_pair(p, line, &letter, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
     if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
-    else if (letter == 'Z') new_pos = value * p->unit_to_mm_factor;
+    else if (letter == 'Z') probe_thickness = value * p->unit_to_mm_factor;
     else break;
     line = remaining_line;
   }
   // probe for the travel endstop
-  if (p->callbacks.probe_axis(p->callbacks.user_data, feedrate, AXIS_Z)) {
-    // FIXME: the machine and world positions should reflect the same position
-    p->axes_pos[AXIS_Z] = new_pos;
-    p->origin_g92[AXIS_Z] = new_pos;  // doing implicit G92 here. Is this what w want ?
+  float probed_pos;
+  if (p->callbacks.probe_axis(p->callbacks.user_data, feedrate, AXIS_Z,
+                              &probed_pos)) {
+    p->axes_pos[AXIS_Z] = probed_pos;
+    // Doing implicit G92 here. Is this what we want ?
+    p->origin_g92[AXIS_Z] = probed_pos - probe_thickness;
+    set_current_origin(p, p->origin_g92);
   }
-  set_current_origin(p, p->origin_g92);
   return line;
 }
 

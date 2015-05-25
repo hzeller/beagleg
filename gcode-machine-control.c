@@ -847,31 +847,12 @@ static uint32_t get_home_endstop(GCodeMachineControl_t *state,
   return get_endstop_gpio_descriptor(config);
 }
 
-#if 0
-static uint32_t get_travel_endstop(GCodeMachineControl_t *state,
-				   enum GCodeParserAxis axis,
-				   int *dir, int *polarity) {
-  struct EndstopConfig config = state->travel_endstop[axis];
-  uint32_t gpio_def = 0;
-  *dir = (config.direction) ? 1 : -1;
-  *polarity = config.polarity;
-  switch (config.endstop_number) {
-  case 1: gpio_def = END_1_GPIO; break;
-  case 2: gpio_def = END_2_GPIO; break;
-  case 3: gpio_def = END_3_GPIO; break;
-  case 4: gpio_def = END_4_GPIO; break;
-  case 5: gpio_def = END_5_GPIO; break;
-  case 6: gpio_def = END_6_GPIO; break;
-  default: break;
-  }
-  return gpio_def;
-}
-#endif
-
-static void move_to_endstop(GCodeMachineControl_t *state,
-			    enum GCodeParserAxis axis,
-			    float feedrate, int backoff,
-			    int dir, int trigger_value, uint32_t gpio_def) {
+// Moves to endstop and returns how many steps it moved in the process.
+static int move_to_endstop(GCodeMachineControl_t *state,
+                           enum GCodeParserAxis axis,
+                           float feedrate, int backoff,
+                           int dir, int trigger_value, uint32_t gpio_def) {
+  int total_movement = 0;
   struct MotorMovement move_command = {0};
   const float steps_per_mm = state->cfg.steps_per_mm[axis];
   float target_speed = feedrate * steps_per_mm;
@@ -883,24 +864,30 @@ static void move_to_endstop(GCodeMachineControl_t *state,
   move_command.v1 = target_speed;
 
   // move axis until endstop is hit
-  assign_steps_to_motors(state, &move_command, axis, 0.5 * steps_per_mm * dir);
+  int segment_move_steps = 0.5 * steps_per_mm * dir;
+  assign_steps_to_motors(state, &move_command, axis, segment_move_steps);
   while (get_gpio(gpio_def) != trigger_value) {
     state->motor_ops->enqueue(state->motor_ops->user_data,
                               &move_command, state->msg_stream);
     state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+    total_movement += segment_move_steps;
     // TODO: possibly acceleration over multiple segments.
     move_command.v0 = move_command.v1;
   }
 
   if (backoff) {
     // move axis off endstop
-    assign_steps_to_motors(state, &move_command, axis, 0.1 * steps_per_mm * -dir);
+    segment_move_steps = 0.1 * steps_per_mm * -dir;
+    assign_steps_to_motors(state, &move_command, axis, segment_move_steps);
     while (get_gpio(gpio_def) == trigger_value) {
       state->motor_ops->enqueue(state->motor_ops->user_data,
                                 &move_command, state->msg_stream);
       state->motor_ops->wait_queue_empty(state->motor_ops->user_data);
+      total_movement += segment_move_steps;
     }
   }
+
+  return total_movement;
 }
 
 static void home_axis(GCodeMachineControl_t *state, enum GCodeParserAxis axis) {
@@ -930,24 +917,47 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   state->homing_state = HOMING_STATE_HOMED;
 }
 
-// todo: currently disabled.
-static int machine_probe(void *userdata, float feedrate,
-			 enum GCodeParserAxis axis) {
+static char machine_probe(void *userdata, float feedrate,
+                          enum GCodeParserAxis axis,
+                          float *probe_result) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  int dir;
-  int polarity;
-  uint32_t gpio_def = 0; // get_travel_endstop(state, axis, &dir, &polarity);
-  if (gpio_def) {
-    if (feedrate <= 0)
-      feedrate = 20;
-    move_to_endstop(state, axis, feedrate, 0, dir, polarity, gpio_def);
-    // FIXME: should the last position be updated?
-    return 1;
+  const struct MachineControlConfig *cfg = &state->cfg;
+  bring_path_to_halt(state);
+
+  int dir = 1;
+
+  // -- somewhat hackish
+
+  // We try to find the axis that is _not_ used for homing.
+  // this is not yet 100% the way it should be. We should actually
+  // define the probe-'endstops' somewhat differently.
+  // For now, we just do the simple thing
+  struct EndstopConfig config = state->max_endstop[axis];
+  if (state->min_endstop[axis].endstop_number
+      && !state->min_endstop[axis].homing_use) {
+    dir = -1;
+    config = state->min_endstop[axis];
   }
-  fprintf(state->msg_stream,
-	  "// BeagleG: No probe - axis %c does not have a travel endstop\n",
-	  gcodep_axis2letter(axis));
-  return 0;
+  uint32_t gpio_def = get_endstop_gpio_descriptor(config);
+  if (!gpio_def || config.homing_use) {
+    // We are only looking for probes that are _not_ used for homing.
+    if (state->msg_stream) {
+      fprintf(state->msg_stream,
+              "// BeagleG: No probe - axis %c does not have a travel endstop\n",
+              gcodep_axis2letter(axis));
+    }
+    return 0;
+  }
+
+  struct AxisTarget *last = buffer_get_last_written(&state->buffer);
+  if (feedrate <= 0) feedrate = 20;
+  // TODO: if the probe fails to trigger, there is no mechanism to stop
+  // it right now...
+  int total_steps = move_to_endstop(state, axis, feedrate, 0, dir,
+                                    config.trigger_value, gpio_def);
+  last->position_steps[axis] += total_steps;
+  *probe_result = 1.0f * last->position_steps[axis] / cfg->steps_per_mm[axis];
+  return 1;
 }
 
 // Cleanup whatever is allocated. Return NULL for convenience.
