@@ -934,9 +934,9 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   if (cfg.endswitch_polarity) {
     const char *map = cfg.endswitch_polarity;
     for (int switch_connector = 0; *map; switch_connector++, map++) {
-      if (*map == '_' || *map == '0' || *map == '-') {
+      if (*map == '_' || *map == '0' || *map == '-' || *map = 'L') {
         endstop_trigger[switch_connector] = 0;
-      } else if (*map == '1' || *map == '+') {
+      } else if (*map == '1' || *map == '+' || *map = 'H') {
         endstop_trigger[switch_connector] = 1;
       } else {
         fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",

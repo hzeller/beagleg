@@ -55,9 +55,9 @@ struct MachineControlConfig {
 
   // Position in these strings is the connector position of input switches.
   // Lower case: just regular stopswitch, Upper case: used for homing.
-  const char *min_endswitch;
-  const char *max_endswitch;
-  const char *endswitch_polarity;  // Position:
+  const char *min_endswitch;       // Letter: affected axis.
+  const char *max_endswitch;       // Letter: affected axis.
+  const char *endswitch_polarity;  // Letter: trigger logic level.
 
   const char *home_order;
 
