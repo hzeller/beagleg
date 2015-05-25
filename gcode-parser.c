@@ -19,6 +19,8 @@
 
 #include "gcode-parser.h"
 
+#include "arc-gen.h"
+
 #include <assert.h>  // remove.
 
 #include <ctype.h>
@@ -71,8 +73,8 @@ struct GCodeParser {
   float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
   char axis_is_absolute[GCODE_NUM_AXES];
   AxesRegister relative_zero;  // reference, set by G92 commands
-  AxesRegister axes_pos;
-  enum GCodeParserAxis plane[3];
+  AxesRegister axes_pos;       // Current position. Absolute from origin.
+  enum GCodeParserAxis arc_normal;  // normal vector of arcs.
 };
 
 static void dummy_gcode_start(void *user) {}
@@ -177,9 +179,7 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   set_all_axis_to_absolute(result, 1);
 
   // Set to XY-plane
-  result->plane[0] = AXIS_X;
-  result->plane[1] = AXIS_Y;
-  result->plane[2] = AXIS_Z;
+  result->arc_normal = AXIS_Z;
 
   // Setting up all callbacks
   if (callbacks) {
@@ -389,7 +389,7 @@ static const char *handle_move(struct GCodeParser *p,
     else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
-        break;  // Invalid axis: possibley start of new command.
+        break;  // Invalid axis: possibly start of new command.
       p->axes_pos[update_axis] = abs_axis_pos(p, update_axis, unit_value);
       any_change = 1;
     }
@@ -405,68 +405,43 @@ static const char *handle_move(struct GCodeParser *p,
   return line;
 }
 
-// Arc generation based on smoothieware implementation
-// https://github.com/Smoothieware/Smoothieware.git
-// src/modules/robot/Robot.cpp - Robot::append_arc()
-//
-// G2 or G3 <X- Y- Z- I- J- K- P- F->
-//
-// XY-plane (G17)
-//   X Y : end point of arc
-//   Z   : helix (linear_travel)
-//   I J : X Y offset to center of arc
-//   K   : not used
-//   P   : number of turns (currently only 1 turn is generated - 0-90 degree arc)
-//   F   : feedrate
-//
-// ZX-plane (G18)
-//   X Z : end point of arc
-//   Y   : helix (linear_travel)
-//   I K : X Z offset to center of arc
-//   J   : not used
-//   P   : number of turns (currently only 1 turn is generated - 0-90 degree arc)
-//   F   : feedrate
-//
-// YZ-plane (G19)
-//   Y Z : end point of arc
-//   X   : helix (linear_travel)
-//   J K : Y Z offset to center of arc
-//   I   : not used
-//   P   : number of turns (currently only 1 turn is generated - 0-90 degree arc)
-//   F   : feedrate
+struct ArcCallbackData {
+  struct GCodeParser *parser;
+  float feedrate;
+};
 
-// these need to be tuned (they are the default values from the smoothieware code)
-#define MM_PER_ARC_SEGMENT	0.1
-#define N_ARC_CORRECTION	5
+static void arc_callback(void *data, float new_pos[]) {
+  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
+  struct GCodeParser *p = cbinfo->parser;
+  p->callbacks.coordinated_move(p->callbacks.user_data,
+                                cbinfo->feedrate, new_pos);
+}
 
+// For we just generate an arc by emitting many small steps.
 static const char *handle_arc(struct GCodeParser *p,
 			      const char *line,
 			      int is_cw) {
   const char *remaining_line;
-  float end[3];		// absolute end point of arc
-  float offset[3];	// relative offset (center point) of arc
+  float target[GCODE_NUM_AXES];
+  float offset[GCODE_NUM_AXES] = {0};
   float feedrate = -1;
   float value;
   char letter;
   int turns = 1;
-  enum GCodeParserAxis axis;
 
-  // default the end points to the current position and clear the offset
-  for (axis = 0; axis <= AXIS_Z; axis++) {
-    end[axis] = p->axes_pos[axis];
-    offset[axis] = 0;
-  }
+  memcpy(target, p->axes_pos, GCODE_NUM_AXES * sizeof(*target));
 
   while ((remaining_line = gparse_pair(p, line, &letter, &value))) {
     const float unit_value = value * p->unit_to_mm_factor;
-    if (letter == 'X') end[AXIS_X] = abs_axis_pos(p, AXIS_X, unit_value);
-    else if (letter == 'Y') end[AXIS_Y] = abs_axis_pos(p, AXIS_Y, unit_value);
-    else if (letter == 'Z') end[AXIS_Z] = abs_axis_pos(p, AXIS_Z, unit_value);
+    if (letter == 'X') target[AXIS_X] = abs_axis_pos(p, AXIS_X, unit_value);
+    else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(p, AXIS_Y, unit_value);
+    else if (letter == 'Z') target[AXIS_Z] = abs_axis_pos(p, AXIS_Z, unit_value);
     else if (letter == 'I') offset[AXIS_X] = unit_value;
     else if (letter == 'J') offset[AXIS_Y] = unit_value;
     else if (letter == 'K') offset[AXIS_Z] = unit_value;
     else if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
     else if (letter == 'P') turns = (int)value;	// currently ignored
+    // TODO: 'R'
     else break;
 
     line = remaining_line;
@@ -479,111 +454,11 @@ static const char *handle_arc(struct GCodeParser *p,
     return remaining_line;
   }
 
-  // Scary math
-  float radius = sqrtf(offset[p->plane[0]]*offset[p->plane[0]] +
-                       offset[p->plane[1]]*offset[p->plane[1]]);
-  float center_0 = p->axes_pos[p->plane[0]] + offset[p->plane[0]];
-  float center_1 = p->axes_pos[p->plane[1]] + offset[p->plane[1]];
-  float linear_travel = end[p->plane[2]] - p->axes_pos[p->plane[2]];
-  float r_0 = -offset[p->plane[0]]; // Radius vector from center to current location
-  float r_1 = -offset[p->plane[1]];
-  float rt_0 = end[p->plane[0]] - center_0;
-  float rt_1 = end[p->plane[1]] - center_1;
-
-  fprintf(stderr, "arc from %c,%c: %.3f,%.3f to %.3f,%.3f (radius:%.3f) helix %c:%.3f\n",
-	  gcodep_axis2letter(p->plane[0]), gcodep_axis2letter(p->plane[1]),
-	  p->axes_pos[p->plane[0]], p->axes_pos[p->plane[1]],
-	  end[p->plane[0]], end[p->plane[1]], radius,
-	  gcodep_axis2letter(p->plane[2]), linear_travel);
-
-  // CCW angle between position and target from circle center. Only one atan2() trig computation required.
-  float angular_travel = atan2(r_0*rt_1 - r_1*rt_0, r_0*rt_0 + r_1*rt_1);
-  if (angular_travel < 0) angular_travel += 2 * M_PI;
-  if (is_cw) angular_travel -= 2 * M_PI;
-
-  // Find the distance for this gcode
-  float mm_of_travel = hypotf(angular_travel*radius, fabs(linear_travel));
-
-  // We don't care about non-XYZ moves (for example the extruder produces some of those)
-  if (mm_of_travel < 0.00001)
-    return remaining_line;
-
-  // Figure out how many segments for this gcode
-  int segments = floorf(mm_of_travel / MM_PER_ARC_SEGMENT);
-
-  float theta_per_segment = angular_travel / segments;
-  float linear_per_segment = linear_travel / segments;
-
-  /*
-   * Vector rotation by transformation matrix: r is the original vector, r_T is the rotated vector,
-   * and phi is the angle of rotation. Based on the solution approach by Jens Geisler.
-   * r_T = [cos(phi) -sin(phi);
-   * sin(phi) cos(phi] * r ;
-   * For arc generation, the center of the circle is the axis of rotation and the radius vector is
-   * defined from the circle center to the initial position. Each line segment is formed by successive
-   * vector rotations. This requires only two cos() and sin() computations to form the rotation
-   * matrix for the duration of the entire arc. Error may accumulate from numerical round-off, since
-   * all float numbers are single precision on the Arduino. (True float precision will not have
-   * round off issues for CNC applications.) Single precision error can accumulate to be greater than
-   * tool precision in some cases. Therefore, arc path correction is implemented.
-   *
-   * Small angle approximation may be used to reduce computation overhead further. This approximation
-   * holds for everything, but very small circles and large mm_per_arc_segment values. In other words,
-   * theta_per_segment would need to be greater than 0.1 rad and N_ARC_CORRECTION would need to be large
-   * to cause an appreciable drift error. N_ARC_CORRECTION~=25 is more than small enough to correct for
-   * numerical drift error. N_ARC_CORRECTION may be on the order a hundred(s) before error becomes an
-   * issue for CNC machines with the single precision Arduino calculations.
-   * This approximation also allows mc_arc to immediately insert a line segment into the planner
-   * without the initial overhead of computing cos() or sin(). By the time the arc needs to be applied
-   * a correction, the planner should have caught up to the lag caused by the initial mc_arc overhead.
-   * This is important when there are successive arc motions.
-   */
-
-  // Vector rotation matrix values
-  float cos_T = 1 - 0.5 * theta_per_segment * theta_per_segment; // Small angle approximation
-  float sin_T = theta_per_segment;
-
-  float arc_target[3];
-  float sin_Ti;
-  float cos_Ti;
-  int i;
-  int count = 0;
-
-  // Initialize the linear axis
-  arc_target[p->plane[2]] = p->axes_pos[p->plane[2]];
-
-  for (i = 1; i < segments; i++) { // Increment (segments-1)
-    if (count < N_ARC_CORRECTION) {
-      // Apply vector rotation matrix
-      float rot = r_0 * sin_T + r_1 * cos_T;
-      r_0 = r_0 * cos_T - r_1 * sin_T;
-      r_1 = rot;
-      count++;
-    } else {
-      // Arc correction to radius vector. Computed only every N_ARC_CORRECTION increments.
-      // Compute exact location by applying transformation matrix from initial radius vector(=-offset).
-      cos_Ti = cosf(i * theta_per_segment);
-      sin_Ti = sinf(i * theta_per_segment);
-      r_0 = -offset[p->plane[0]] * cos_Ti + offset[p->plane[1]] * sin_Ti;
-      r_1 = -offset[p->plane[0]] * sin_Ti - offset[p->plane[1]] * cos_Ti;
-      count = 0;
-    }
-
-    // Update arc_target location
-    arc_target[p->plane[0]] = center_0 + r_0;
-    arc_target[p->plane[1]] = center_1 + r_1;
-    arc_target[p->plane[2]] += linear_per_segment;
-
-    // Append this segment to the queue
-    for (axis = 0; axis <= AXIS_Z; axis++)
-      p->axes_pos[axis] = arc_target[axis];
-    p->callbacks.coordinated_move(p->callbacks.user_data, feedrate, p->axes_pos);
-  }
-
-  // Ensure last segment arrives at target location.
-  for (axis = 0; axis <= AXIS_Z; axis++)
-    p->axes_pos[axis] = end[axis];
-  p->callbacks.coordinated_move(p->callbacks.user_data, feedrate, p->axes_pos);
+  struct ArcCallbackData cb_arc_data;
+  cb_arc_data.parser = p;
+  cb_arc_data.feedrate = feedrate;
+  arc_gen(p->arc_normal, is_cw, p->axes_pos, offset, target,
+          &arc_callback, &cb_arc_data);
 
   return line;
 }
@@ -628,9 +503,9 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 2: line = handle_arc(p, line, 1); break;
       case 3: line = handle_arc(p, line, 0); break;
       case 4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
-      case 17: p->plane[0] = AXIS_X; p->plane[1] = AXIS_Y; p->plane[2] = AXIS_Z; break;
-      case 18: p->plane[0] = AXIS_Z; p->plane[1] = AXIS_X; p->plane[2] = AXIS_Y; break;
-      case 19: p->plane[0] = AXIS_Y; p->plane[1] = AXIS_Z; p->plane[2] = AXIS_X; break;
+      case 17: p->arc_normal = AXIS_Z; break;
+      case 18: p->arc_normal = AXIS_Y; break;
+      case 19: p->arc_normal = AXIS_X; break;
       case 20: p->unit_to_mm_factor = 25.4f; break;
       case 21: p->unit_to_mm_factor = 1.0f; break;
       case 28: line = handle_home(p, line); break;
