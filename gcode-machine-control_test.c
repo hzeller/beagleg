@@ -27,7 +27,6 @@ static void init_test_config(struct MachineControlConfig *c) {
     c->acceleration[i] = 1000;  // mm/s^2
   for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->max_feedrate[i] = 10000;
-  c->channel_layout = "01234567";
   c->axis_mapping   = "XYZEABCU";
 }
 

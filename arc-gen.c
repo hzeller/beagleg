@@ -33,7 +33,9 @@
 // Normal axis is the axis perpendicular to the plane the arc is
 // created in.
 
-// these need to be tuned (they are the default values from the smoothieware code)
+// Small arc segments increase accuracy, though might create some
+// CPU load. With 0.1mm arc segments, we can generate about 90 meter/second
+// of arcs with the BeagleBone Black CPU. Sufficient :)
 #define MM_PER_ARC_SEGMENT	0.1
 
 // Generate an arc. Input is the
