@@ -124,6 +124,7 @@ Options:
                                 Use letter or '_' for unused endstop.
                                 Use uppercase if endstop is used for homimg, lowercase if used for travel limit.
   --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)
+  --require-homing          : If set, machine refuses to work unless homed
   --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).
                                 Use '1' or '+' for logic high trigger.
                                 Use '0' or '-' for logic low trigger.
@@ -134,7 +135,7 @@ Options:
   -n                        : Dryrun; don't send to motors (Default: off).
   -P                        : Verbose: Print motor commands (Default: off).
   -S                        : Synchronous: don't queue (Default: off).
-  --loop[=count]            : Loop file number of times (no value: forever)
+  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)
 [*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W
 (the actual mapping to a connector happens with --axis-mapping,
 the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)
