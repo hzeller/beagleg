@@ -39,7 +39,7 @@ MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TARGETS=machine-control gcode-print-stats
 TEST_BINARIES=gcode-machine-control_test
 
-all : $(TARGETS)
+all : $(TARGETS) $(TEST_BINARIES)
 
 gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)

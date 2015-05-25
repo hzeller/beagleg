@@ -85,8 +85,9 @@ struct Harness {
 
 // Initialize harness with the expected sequence of motor movements
 // and return the callback struct to receive simulated gcode calls.
-struct GCodeParserCb *init_harness(struct Harness *harness,
-                                   const struct MotorMovement *expected) {
+void init_harness(struct Harness *harness,
+                  const struct MotorMovement *expected,
+                  struct GCodeParserCb *callbacks) {
   init_test_config(&harness->config);
   harness->expect_state.expect = expected;
   init_expect_motor(&harness->expect_motor_ops,
@@ -94,7 +95,7 @@ struct GCodeParserCb *init_harness(struct Harness *harness,
   harness->object = gcode_machine_control_new(&harness->config,
                                               &harness->expect_motor_ops,
                                               NULL);
-  return gcode_machine_control_event_receiver(harness->object);
+  gcode_machine_control_init_callbacks(harness->object, callbacks);
 }
 
 void finish_harness(struct Harness *harness) {
@@ -115,18 +116,19 @@ void TEST_straight_segments_same_speed() {
     { .v0 = 10000.0, .v1 =     0.0, .steps = { 500}},  // decel back to 0
     { .aux_bits = END_SENTINEL},
   };
-  struct GCodeParserCb *call = init_harness(&harness, expected);
+  struct GCodeParserCb call;
+  init_harness(&harness, expected, &call);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call->coordinated_move(call->user_data, 100, coordinates);  // 100mm/s
+  call.coordinated_move(call.user_data, 100, coordinates);  // 100mm/s
 
   // second half, same speed
   coordinates[0] = 200;
-  call->coordinated_move(call->user_data, 100, coordinates);  // also 100mm/s
+  call.coordinated_move(call.user_data, 100, coordinates);  // also 100mm/s
 
-  call->motors_enable(call->user_data, 0);  // finish movement.
+  call.motors_enable(call.user_data, 0);  // finish movement.
 
   finish_harness(&harness);
   printf(" DONE %s\n", __func__);
@@ -146,18 +148,19 @@ void TEST_straight_segments_speed_change() {
     { .v0 =  5000.0, .v1 =     0.0, .steps = { 125}},  // final slow to zero
     { .aux_bits = END_SENTINEL},
   };
-  struct GCodeParserCb *call = init_harness(&harness, expected);
+  struct GCodeParserCb call;
+  init_harness(&harness, expected, &call);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call->coordinated_move(call->user_data, 100, coordinates); // 100mm/s
+  call.coordinated_move(call.user_data, 100, coordinates); // 100mm/s
 
   // second half, less speed.
   coordinates[0] = 200;
-  call->coordinated_move(call->user_data, 50, coordinates);  // 50mm/s
+  call.coordinated_move(call.user_data, 50, coordinates);  // 50mm/s
 
-  call->motors_enable(call->user_data, 0);  // finish movement.
+  call.motors_enable(call.user_data, 0);  // finish movement.
 
   finish_harness(&harness);
   printf(" DONE %s\n", __func__);
