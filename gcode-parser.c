@@ -417,7 +417,15 @@ static void arc_callback(void *data, float new_pos[]) {
                                 cbinfo->feedrate, new_pos);
 }
 
-// For we just generate an arc by emitting many small steps.
+// For we just generate an arc by emitting many small steps for
+// now. TODO(hzeller): actually generate a curve profile for that.
+// With G17, G18, G19, the plane was selected before.
+// X, Y, Z: new position (two in the plane, one for the helix.
+// I, J, K: offset to center, corresponding to X,Y,Z.
+//          Only the two in the given plane are relevant.
+// F      : Optional feedrate.
+// P      : number of turns. currently ignored.
+// R      : TODO: implement. Modern systems allow that.
 static const char *handle_arc(struct GCodeParser *p,
 			      const char *line,
 			      int is_cw) {

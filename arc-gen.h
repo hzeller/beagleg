@@ -22,9 +22,12 @@
 #include "gcode-parser.h"
 
 // Generate an arc.
+//
 // Input is the current position, the desired offset to the
 // center point and the target position.
+//
 // Outputs segments to the segment_output() callback.
+//
 // After arc_gen() returns, the values in position[] are updated
 // to the new machine position.
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
