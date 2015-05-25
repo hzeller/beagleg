@@ -47,7 +47,7 @@ typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
 // The "callbacks"-struct contains the functions the parser calls on parsing.
 // Returns an opaque type used in the parse function.
 // Does not take ownership of the provided pointer.
-static GCodeParser_t *gcodep_new(struct GCodeParserCb *callbacks);
+static GCodeParser_t *gcodep_new(struct GCodeParserConfig *config);
 
 static void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 
@@ -56,8 +56,6 @@ static void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 static void gcodep_parse_line(GCodeParser_t *obj, const char *line,
                               FILE *err_stream);
 // -- End public API
-
-typedef float AxesRegister[GCODE_NUM_AXES];
 
 const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
@@ -70,15 +68,38 @@ struct GCodeParser {
   int modal_g0_g1;
   int line_number;
   int provided_axes;
-  float unit_to_mm_factor;      // metric: 1.0; imperial 25.4
-  char axis_is_absolute[GCODE_NUM_AXES];
-  AxesRegister relative_zero;  // reference, set by G92 commands
-  AxesRegister axes_pos;       // Current position. Absolute from origin.
+  float unit_to_mm_factor;               // metric: 1.0; imperial 25.4
+  char axis_is_absolute[GCODE_NUM_AXES]; // G90 or G91 active.
+
+  // The axes_pos is the current absolute position of the machine
+  // in the work-cube. It always is positive in the range of
+  // (0,0,0,...) -> (range_x, range_y, range_z,...)
+  AxesRegister axes_pos;
+
+  // All the following coordinates are absolute positions.
+  AxesRegister origin_machine;             // homing position.
+  AxesRegister origin_g92;
+
+  // TODO: origin_g54, origin_g55 ... These must come in the configuration
+  // as they can't be set
+
+  // The current active origin is the machine absolute position
+  // to which all coordinates given are relative.
+  const float *current_origin;      // active origin.
+
   enum GCodeParserAxis arc_normal;  // normal vector of arcs.
 };
 
 static void dummy_gcode_start(void *user) {}
 static void dummy_gcode_finished(void *user) {}
+static void dummy_inform_display_offset(void *user, const float *o) {
+  fprintf(stderr, "GCodeParser: display offset [");
+  for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
+    fprintf(stderr, "%s%.3f", i == 0 ? "" : ", ", o[i]);
+  }
+  fprintf(stderr, "\n");
+}
+
 static void dummy_gcode_command_executed(void *user, char letter, float val) {}
 
 static void dummy_set_speed_factor(void *user, float f) {
@@ -107,9 +128,8 @@ static void dummy_move(void *user, float feed, const float *axes) {
   else
     fprintf(stderr, "\n");
 }
-static void dummy_go_home(void *user, AxisBitmap_t axes, float *new_pos) {
+static void dummy_go_home(void *user, AxisBitmap_t axes) {
   fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
-  memset(new_pos, GCODE_NUM_AXES, sizeof(*new_pos));
 }
 static int dummy_probe_axis(void *user, float feed, enum GCodeParserAxis axis) {
   fprintf(stderr, "GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
@@ -170,7 +190,12 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
-static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
+static void set_current_origin(struct GCodeParser *p, float *origin) {
+  p->current_origin = origin;
+  p->callbacks.inform_origin_offset(p->callbacks.user_data, origin);
+}
+
+static struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
@@ -178,19 +203,26 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
   result->unit_to_mm_factor = 1.0f;
   set_all_axis_to_absolute(result, 1);
 
+  memcpy(result->origin_machine, config->machine_origin,
+         sizeof(result->origin_machine));
+
+  // Initially, G92 origin is as well where the machine is home.
+  memcpy(result->origin_g92, config->machine_origin,
+         sizeof(result->origin_g92));
+
   // Set to XY-plane
   result->arc_normal = AXIS_Z;
 
   // Setting up all callbacks
-  if (callbacks) {
-    memcpy(&result->callbacks, callbacks, sizeof(*callbacks));
-  }
+  result->callbacks = config->callbacks;
 
   // Set some reasonable defaults for unprovided callbacks:
   if (!result->callbacks.gcode_start)
     result->callbacks.gcode_start = &dummy_gcode_start;
   if (!result->callbacks.gcode_finished)
     result->callbacks.gcode_finished = &dummy_gcode_finished;
+  if (!result->callbacks.inform_origin_offset)
+    result->callbacks.inform_origin_offset = &dummy_inform_display_offset;
   if (!result->callbacks.go_home)
     result->callbacks.go_home = &dummy_go_home;
   if (!result->callbacks.probe_axis)
@@ -217,6 +249,9 @@ static struct GCodeParser *gcodep_new(struct GCodeParserCb *callbacks) {
     result->callbacks.gcode_command_done = &dummy_gcode_command_executed;
   if (!result->callbacks.input_idle)
     result->callbacks.input_idle = &dummy_idle;
+
+  set_current_origin(result, result->origin_machine);
+
   return result;
 }
 
@@ -301,7 +336,6 @@ const char *gcodep_parse_pair(const char *line,
   return gcodep_parse_pair_with_linenumber(-1, line, letter, value, err_stream);
 }
 
-
 static const char *handle_home(struct GCodeParser *p, const char *line) {
   AxisBitmap_t homing_flags = 0;
   char axis_l;
@@ -315,16 +349,12 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
     line = remaining_line;
   }
   if (homing_flags == 0) homing_flags = kAllAxesBitmap;
-  // home the selected axes (last machine position will be updated)
-  float new_position[GCODE_NUM_AXES] = {0};
-  p->callbacks.go_home(p->callbacks.user_data, homing_flags,
-                       new_position);
+  p->callbacks.go_home(p->callbacks.user_data, homing_flags);
 
-  // now update the world position
+  // Now update the world position
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (homing_flags & (1 << i)) {
-      p->axes_pos[i] = new_position[i];
-      p->relative_zero[i] = 0;
+      p->axes_pos[i] = p->origin_machine[i];
     }
   }
 
@@ -340,10 +370,12 @@ static const char *handle_rebase(struct GCodeParser *p, const char *line) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
     if (axis == GCODE_NUM_AXES)
       break;    // Possibly start of new command.
-    p->relative_zero[axis] = p->axes_pos[axis] - unit_val;
+    // This sets the given value to be the new zero.
+    p->origin_g92[axis] = p->axes_pos[axis] - unit_val;
 
     line = remaining_line;
   }
+  set_current_origin(p, p->origin_g92);
   return line;
 }
 
@@ -365,7 +397,9 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
 static float abs_axis_pos(struct GCodeParser *p,
 			  const enum GCodeParserAxis axis,
 			  const float unit_value) {
-  float pos = (p->axis_is_absolute[axis]) ? p->relative_zero[axis] : p->axes_pos[axis];
+  float pos = ((p->axis_is_absolute[axis])
+               ? p->current_origin[axis]
+               : p->axes_pos[axis]);
   return pos + unit_value;
 }
 
@@ -486,10 +520,11 @@ static const char *handle_z_probe(struct GCodeParser *p, const char *line) {
   }
   // probe for the travel endstop
   if (p->callbacks.probe_axis(p->callbacks.user_data, feedrate, AXIS_Z)) {
-    // FIXME: the machine and world positions should refelct the same position
+    // FIXME: the machine and world positions should reflect the same position
     p->axes_pos[AXIS_Z] = new_pos;
-    p->relative_zero[AXIS_Z] = 0;
+    p->origin_g92[AXIS_Z] = new_pos;  // doing implicit G92 here. Is this what w want ?
   }
+  set_current_origin(p, p->origin_g92);
   return line;
 }
 
@@ -595,8 +630,7 @@ static void disarm_signal_handler() {
 }
 
 // Public facade function.
-int gcodep_parse_stream(int input_fd,
-                        struct GCodeParserCb *parse_events,
+int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
                         FILE *err_stream) {
   if (err_stream) {
     // Output needs to be unbuffered, otherwise they'll never make it.
@@ -617,10 +651,10 @@ int gcodep_parse_stream(int input_fd,
   wait_time.tv_usec = 50 * 1000;
   FD_ZERO(&read_fds);
 
-  GCodeParser_t *parser = gcodep_new(parse_events);
+  GCodeParser_t *parser = gcodep_new(config);
   arm_signal_handler();
   char buffer[8192];
-  parser->callbacks.gcode_start(parse_events->user_data);
+  parser->callbacks.gcode_start(config->callbacks.user_data);
   while (!caught_signal) {
     // Read with timeout. If we don't get anything on our input, but it
     // is not finished yet, we tell our
@@ -632,7 +666,7 @@ int gcodep_parse_stream(int input_fd,
       break;
     if (select_ret == 0) {  // timeout.
       if (!in_idle_mode) {
-        parser->callbacks.input_idle(parse_events->user_data);
+        parser->callbacks.input_idle(config->callbacks.user_data);
         in_idle_mode = 1;
       }
       continue;
@@ -652,7 +686,7 @@ int gcodep_parse_stream(int input_fd,
   fclose(gcode_stream);
   gcodep_delete(parser);
 
-  parser->callbacks.gcode_finished(parse_events->user_data);
+  parser->callbacks.gcode_finished(config->callbacks.user_data);
 
   return caught_signal ? 2 : 0;
 }

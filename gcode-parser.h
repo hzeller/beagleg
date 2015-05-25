@@ -41,6 +41,9 @@ enum GCodeParserAxis {
   GCODE_NUM_AXES
 };
 
+// Convenient type: a register to store machine coordinates.
+typedef float AxesRegister[GCODE_NUM_AXES];
+
 // Maps axis enum to letter. AXIS_Z -> 'Z'
 char gcodep_axis2letter(enum GCodeParserAxis axis);
 
@@ -63,6 +66,12 @@ struct GCodeParserCb {
   void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
   void (*gcode_finished)(void *);          // FYI: Finished parsing. End of stream.
 
+  // The parser handles relative positions and coordinate systems internally,
+  // so the machine does not have to worry about that.
+  // But for display purposes, the machine might be interested in the current
+  // offset to apply.
+  void (*inform_origin_offset)(void *, const float[]);
+
   // "gcode_command_done" is always executed when a command is completed, which
   // is after internally executed ones (such as G21) or commands that have
   // triggered a callback. Mostly FYI, you can use this for logging or
@@ -74,11 +83,9 @@ struct GCodeParserCb {
   void (*input_idle)(void *);
 
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
-  // Machine returns the new axis position in the return parameter,
-  // which is an array of metric coordinates.
-  // (the homing position is machine dependent, e.g. it could be at
-  // either end of the axis).
-  void (*go_home)(void *, AxisBitmap_t axis_bitmap, float[]);
+  // After that, the parser assume to be at the machine_origin as set in
+  // the GCodeParserConfig for the given axes.
+  void (*go_home)(void *, AxisBitmap_t axis_bitmap);
 
   // G30: Probe Z axis to travel_endstop
   int (*probe_axis)(void *, float feed_mm_p_sec, enum GCodeParserAxis axis);
@@ -110,12 +117,28 @@ struct GCodeParserCb {
   const char *(*unprocessed)(void *, char letter, float value, const char *);
 };
 
+// Configuration of the GCodeParser
+struct GCodeParserConfig {
+  // Callback struct.
+  struct GCodeParserCb callbacks;
+
+  // The machine origin. This is where the end-switches are. Typically,
+  // for CNC machines, that might have Z at the highest point for instance,
+  // while 3D printers have Z at zero.
+  AxesRegister machine_origin;
+
+  // TODO(hzeller): here, there should be references to registers
+  // G54..G59. They are set externally to GCode by some operating
+  // terminal, but need to be accessed in gcode.
+  //float *position_register[5];  // register G54..G59
+};
+
 // Read and parse GCode from input_fd and call callbacks
 // in "parse_events".
 // Error messages are sent to "err_stream" if non-NULL.
 // Reads until EOF. The input file descriptor is closed.
-int gcodep_parse_stream(int input_fd,
-                        struct GCodeParserCb *parse_events, FILE *err_stream);
+int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
+                        FILE *err_stream);
 
 // Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
 // a pair of the letter 'P' and the value '123').

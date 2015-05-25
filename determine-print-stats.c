@@ -82,9 +82,9 @@ static void forwarding_coordinated_move(void *userdata, float feed, const float 
   data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
   update_coordinate_stats(data->stats, axes);
 }
-static void forwarding_go_home(void *userdata, AxisBitmap_t axes, float *new_pos) {
+static void forwarding_go_home(void *userdata, AxisBitmap_t axes) {
   struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes, new_pos);
+  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes);
 }
 static const char *forwarding_unprocessed(void *userdata, char letter, float value,
                                           const char *remaining) {
@@ -134,25 +134,25 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
   GCodeMachineControl_t *machine_control
     = gcode_machine_control_new(config, &stats_motor_control, NULL);
 
-  data.machine_delegatee = *gcode_machine_control_event_receiver(machine_control);
+  gcode_machine_control_init_callbacks(machine_control, &data.machine_delegatee);
 
-  struct GCodeParserCb callbacks;
-  bzero(&callbacks, sizeof(callbacks));
+  struct GCodeParserConfig parser_config;
+  bzero(&parser_config, sizeof(parser_config));
 
-  callbacks.user_data = &data;
+  parser_config.callbacks.user_data = &data;
 
-  callbacks.go_home = &forwarding_go_home;
-  callbacks.set_speed_factor = forwarding_set_speed_factor;
-  callbacks.set_fanspeed = forwarding_set_fanspeed;
-  callbacks.set_temperature = forwarding_set_temperature;
-  callbacks.wait_temperature = forwarding_wait_temperature;
-  callbacks.rapid_move = &forwarding_rapid_move;
-  callbacks.coordinated_move = &forwarding_coordinated_move;
-  callbacks.dwell = &forwarding_dwell;
-  callbacks.motors_enable = &forwarding_motors_enable;
-  callbacks.unprocessed = &forwarding_unprocessed;
+  parser_config.callbacks.go_home = &forwarding_go_home;
+  parser_config.callbacks.set_speed_factor = forwarding_set_speed_factor;
+  parser_config.callbacks.set_fanspeed = forwarding_set_fanspeed;
+  parser_config.callbacks.set_temperature = forwarding_set_temperature;
+  parser_config.callbacks.wait_temperature = forwarding_wait_temperature;
+  parser_config.callbacks.rapid_move = &forwarding_rapid_move;
+  parser_config.callbacks.coordinated_move = &forwarding_coordinated_move;
+  parser_config.callbacks.dwell = &forwarding_dwell;
+  parser_config.callbacks.motors_enable = &forwarding_motors_enable;
+  parser_config.callbacks.unprocessed = &forwarding_unprocessed;
 
-  gcodep_parse_stream(input_fd, &callbacks, stderr);
+  gcodep_parse_stream(&parser_config, input_fd, stderr);
 
   return 0;
 }

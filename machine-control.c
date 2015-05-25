@@ -98,9 +98,12 @@ static int send_file_to_machine(struct MachineControlConfig *config,
       = gcode_machine_control_new(config, motor_ops, stderr);
     if (machine_control == NULL)
       return 1;
-    ret = gcodep_parse_stream(fd,
-                              gcode_machine_control_event_receiver(machine_control),
-                              stderr);
+    struct GCodeParserConfig parser_config;
+    bzero(&parser_config, sizeof(parser_config));
+    gcode_machine_control_init_callbacks(machine_control, &parser_config.callbacks);
+    gcode_machine_control_get_homepos(machine_control,
+                                      parser_config.machine_origin);
+    ret = gcodep_parse_stream(&parser_config, fd, stderr);
     gcode_machine_control_delete(machine_control);
     if (ret != 0)
       break;
@@ -162,10 +165,12 @@ static int run_server(struct MachineControlConfig *config,
       = gcode_machine_control_new(config, motor_ops, msg_stream);
     if (machine_control == NULL)
       return 1;
-    process_result
-      = gcodep_parse_stream(connection,
-                            gcode_machine_control_event_receiver(machine_control),
-                            msg_stream);
+    struct GCodeParserConfig parser_cfg;
+    bzero(&parser_cfg, sizeof(parser_cfg));
+    gcode_machine_control_init_callbacks(machine_control, &parser_cfg.callbacks);
+    gcode_machine_control_get_homepos(machine_control, parser_cfg.machine_origin);
+    process_result = gcodep_parse_stream(&parser_cfg, connection, msg_stream);
+
     gcode_machine_control_delete(machine_control);
     fclose(msg_stream);
     printf("Connection to %s closed.\n", print_ip);

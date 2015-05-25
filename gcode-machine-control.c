@@ -161,6 +161,7 @@ struct GCodeMachineControl {
   struct EndstopConfig max_endstop[GCODE_NUM_AXES];
 
   // Current machine configuration
+  const float *coordinate_display_origin;
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
   unsigned int aux_bits;                 // Set via M42.
@@ -211,6 +212,10 @@ static void gcode_send_ok(void *userdata, char l, float v) {
   if (state->msg_stream) {
     fprintf(state->msg_stream, "ok\n");
   }
+}
+static void inform_origin_offset(void *userdata, const float *origin) {
+  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  state->coordinate_display_origin = origin;
 }
 
 static const char *special_commands(void *userdata, char letter, float value,
@@ -286,11 +291,17 @@ static const char *special_commands(void *userdata, char letter, float value,
     case 114:
       if (buffer_available(&state->buffer)) {
         struct AxisTarget *current = buffer_at(&state->buffer, 0);
-        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f\n",
-                (1.0f * current->position_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X]),
-                (1.0f * current->position_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y]),
-                (1.0f * current->position_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]),
-                (1.0f * current->position_steps[AXIS_E] / state->cfg.steps_per_mm[AXIS_E]));
+        const int *mpos = current->position_steps;
+        const float x = 1.0f * mpos[AXIS_X] / state->cfg.steps_per_mm[AXIS_X];
+        const float y = 1.0f * mpos[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y];
+        const float z = 1.0f * mpos[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z];
+        const float e = 1.0f * mpos[AXIS_E] / state->cfg.steps_per_mm[AXIS_E];
+        const float *origin = state->coordinate_display_origin;
+        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f",
+                x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
+                e - origin[AXIS_E]);
+        fprintf(state->msg_stream, " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]\n",
+                x, y, z);
       } else {
         fprintf(state->msg_stream, "// no current pos\n");
       }
@@ -727,12 +738,10 @@ static void machine_set_speed_factor(void *userdata, float value) {
    return 0;
  }
 
-// Get the endstop for the axis. If there are two axis configured for some
-// reason, we prefer the one in the origin.
+// Get the endstop for the axis.
 static uint32_t get_home_endstop(GCodeMachineControl_t *state,
 				 enum GCodeParserAxis axis,
 				 int *dir, int *trigger_value) {
-  // Just extract one endstop. We prefer the lower one if we find it.
   *dir = 1;
   struct EndstopConfig config = state->max_endstop[axis];
   if (state->min_endstop[axis].endstop_number
@@ -816,18 +825,15 @@ static void home_axis(GCodeMachineControl_t *state, enum GCodeParserAxis axis) {
   last->position_steps[axis] = round2int(home_pos * cfg->steps_per_mm[axis]);
 }
 
-static void machine_home(void *userdata, AxisBitmap_t axes_bitmap,
-                         float *new_position) {
+static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   const struct MachineControlConfig *cfg = &state->cfg;
   bring_path_to_halt(state);
-  struct AxisTarget *last = buffer_get_last_written(&state->buffer);
   for (const char *order = cfg->home_order; *order; order++) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
     if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
       continue;
     home_axis(state, axis);
-    new_position[axis] = last->position_steps[axis] / cfg->steps_per_mm[axis];
   }
   motors_enable(state, 0);
 }
@@ -934,9 +940,9 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
   if (cfg.endswitch_polarity) {
     const char *map = cfg.endswitch_polarity;
     for (int switch_connector = 0; *map; switch_connector++, map++) {
-      if (*map == '_' || *map == '0' || *map == '-' || *map = 'L') {
+      if (*map == '_' || *map == '0' || *map == '-' || *map == 'L') {
         endstop_trigger[switch_connector] = 0;
-      } else if (*map == '1' || *map == '+' || *map = 'H') {
+      } else if (*map == '1' || *map == '+' || *map == 'H') {
         endstop_trigger[switch_connector] = 1;
       } else {
         fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",
@@ -985,6 +991,20 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
     }
   }
 
+  // Check if things are plausible: we only allow one home endstop per axis.
+  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+    if (result->min_endstop[axis].endstop_number != 0
+        && result->max_endstop[axis].endstop_number != 0) {
+      if (result->min_endstop[axis].homing_use
+          && result->max_endstop[axis].homing_use) {
+        fprintf(stderr, "There can only be one home-origin for axis %c, but "
+                "both min/max are set for homing (Uppercase letter)\n",
+                gcodep_axis2letter(axis));
+        return cleanup_state(result);
+      }
+    }
+  }
+
   // Now let's see what motors are mapped to any useful output.
   if (result->cfg.debug_print) fprintf(stderr, "-- Config --\n");
   int error_count = 0;
@@ -1025,38 +1045,58 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
 
   target_buffer_init(&result->buffer);
 
-  // Initial position.
+  // Initial machine position. We assume the homed position here, which is
+  // wherever the endswitch is for each axis.
   struct AxisTarget *init_axis = buffer_add_next_target(&result->buffer);
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    init_axis->position_steps[i] = 0;
+  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+    int dir, dummy;
+    if (get_home_endstop(result, axis, &dir, &dummy)) {
+      const float home_pos = (dir < 0) ? 0 : result->cfg.move_range_mm[axis];
+      init_axis->position_steps[axis]
+        = round2int(home_pos * result->cfg.steps_per_mm[axis]);
+    } else {
+      init_axis->position_steps[axis] = 0;
+    }
   }
   init_axis->speed = 0;
-
-  result->event_input.user_data = result;
-  result->event_input.coordinated_move = &machine_G1;
-  result->event_input.rapid_move = &machine_G0;
-  result->event_input.go_home = &machine_home;
-  result->event_input.probe_axis = &machine_probe;
-  result->event_input.dwell = &machine_dwell;
-  result->event_input.set_speed_factor = &machine_set_speed_factor;
-  result->event_input.motors_enable = &motors_enable;
-  result->event_input.unprocessed = &special_commands;
-  result->event_input.gcode_command_done = &gcode_send_ok;
-  result->event_input.input_idle = &gcode_input_idle;
-
-  // Lifecycle
-  result->event_input.gcode_finished = &finish_machine_control;
-
-  // Not yet implemented
-  result->event_input.set_fanspeed = &dummy_set_fanspeed;
-  result->event_input.set_temperature = &dummy_set_temperature;
-  result->event_input.wait_temperature = &dummy_wait_temperature;
 
   return result;
 }
 
-struct GCodeParserCb *gcode_machine_control_event_receiver(GCodeMachineControl_t *object) {
-  return &object->event_input;
+void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
+                                          struct GCodeParserCb *callbacks) {
+  callbacks->user_data = object;
+  callbacks->coordinated_move = &machine_G1;
+  callbacks->rapid_move = &machine_G0;
+  callbacks->go_home = &machine_home;
+  callbacks->probe_axis = &machine_probe;
+  callbacks->dwell = &machine_dwell;
+  callbacks->set_speed_factor = &machine_set_speed_factor;
+  callbacks->motors_enable = &motors_enable;
+  callbacks->unprocessed = &special_commands;
+  callbacks->gcode_command_done = &gcode_send_ok;
+  callbacks->input_idle = &gcode_input_idle;
+  callbacks->inform_origin_offset = &inform_origin_offset;
+
+  // Lifecycle
+  callbacks->gcode_finished = &finish_machine_control;
+
+  // Not yet implemented
+  callbacks->set_fanspeed = &dummy_set_fanspeed;
+  callbacks->set_temperature = &dummy_set_temperature;
+  callbacks->wait_temperature = &dummy_wait_temperature;
+}
+
+void gcode_machine_control_get_homepos(GCodeMachineControl_t *obj,
+                                       float *home_pos) {
+  bzero(home_pos, sizeof(AxesRegister));
+  int dir;
+  int dummy;
+  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+    if (!get_home_endstop(obj, axis, &dir, &dummy))
+      continue;
+    home_pos[axis] = (dir < 0) ? 0 : obj->cfg.move_range_mm[axis];
+  }
 }
 
 void gcode_machine_control_delete(GCodeMachineControl_t *object) {

@@ -85,8 +85,17 @@ GCodeMachineControl_t *gcode_machine_control_new(
                        struct MotorOperations *motor_ops,
                        FILE *msg_stream);
 
+// ---
+// TODO(hzeller) the following are only needed to configure the gcode parser. Maybe
+// this is something the gcode_machine_control should actually do by itself.
+// ---
+
 // Get the struct to receive events.
-struct GCodeParserCb *gcode_machine_control_event_receiver(GCodeMachineControl_t *object);
+void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
+                                          struct GCodeParserCb *callbacks);
+
+// Get home position of this machine. This depends on the axis switches.
+void gcode_machine_control_get_homepos(GCodeMachineControl_t *obj, float *pos);
 
 void gcode_machine_control_delete(GCodeMachineControl_t *object);
 
