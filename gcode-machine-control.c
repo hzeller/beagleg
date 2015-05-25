@@ -133,6 +133,14 @@ struct EndstopConfig {
   unsigned char endstop_number : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
 };
 
+// The three levels of homing confidence. If we ever switch off
+// power to the motors after homing, we can't be sure.
+enum HomingState {
+  HOMING_STATE_NEVER_HOMED,
+  HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED,
+  HOMING_STATE_HOMED,
+};
+
 struct GCodeMachineControl {
   struct GCodeParserCb event_input;
   struct MotorOperations *motor_ops;
@@ -161,7 +169,7 @@ struct GCodeMachineControl {
   struct EndstopConfig max_endstop[GCODE_NUM_AXES];
 
   // Current machine configuration
-  const float *coordinate_display_origin;
+  const float *coordinate_display_origin; // info from parser for display.
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
   unsigned int aux_bits;                 // Set via M42.
@@ -170,6 +178,8 @@ struct GCodeMachineControl {
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
   struct TargetBuffer buffer;
+
+  enum HomingState homing_state;
 
   FILE *msg_stream;
 };
@@ -206,6 +216,9 @@ static void motors_enable(void *userdata, char b) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   bring_path_to_halt(state);
   state->motor_ops->motor_enable(state->motor_ops->user_data, b);
+  if (state->homing_state == HOMING_STATE_HOMED) {
+    state->homing_state = HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED;
+  }
 }
 static void gcode_send_ok(void *userdata, char l, float v) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -300,8 +313,20 @@ static const char *special_commands(void *userdata, char letter, float value,
         fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f",
                 x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
                 e - origin[AXIS_E]);
-        fprintf(state->msg_stream, " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]\n",
+        fprintf(state->msg_stream, " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
                 x, y, z);
+        switch (state->homing_state) {
+        case HOMING_STATE_NEVER_HOMED:
+          fprintf(state->msg_stream, " (Unsure: machine never homed!)\n");
+          break;
+        case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
+          fprintf(state->msg_stream, " (Lower confidence: motor power off at "
+                  "least once after homing)\n");
+          break;
+        case HOMING_STATE_HOMED:
+          fprintf(state->msg_stream, " (confident: machine was homed)\n");
+          break;
+        }
       } else {
         fprintf(state->msg_stream, "// no current pos\n");
       }
@@ -683,8 +708,21 @@ static void bring_path_to_halt(GCodeMachineControl_t *state) {
   issue_motor_move_if_possible(state);
 }
 
+static char test_homing_status_ok(GCodeMachineControl_t *state) {
+  if (!state->cfg.require_homing)
+    return 1;
+  if (state->homing_state > HOMING_STATE_NEVER_HOMED)
+    return 1;
+  if (state->msg_stream) {
+    fprintf(state->msg_stream, "// ERROR: please home machine first (G28).\n");
+  }
+  return 0;
+}
+
 static void machine_G1(void *userdata, float feed, const float *axis) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  if (!test_homing_status_ok(state))
+    return;
   if (feed > 0) {
     state->current_feedrate_mm_per_sec = state->cfg.speed_factor * feed;
   }
@@ -694,6 +732,8 @@ static void machine_G1(void *userdata, float feed, const float *axis) {
 
 static void machine_G0(void *userdata, float feed, const float *axis) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
+  if (!test_homing_status_ok(state))
+    return;
   float rapid_feed = state->g0_feedrate_mm_per_sec;
   const float given = state->cfg.speed_factor * state->prog_speed_factor * feed;
   machine_move(userdata, given > 0 ? given : rapid_feed, axis);
@@ -835,7 +875,7 @@ static void machine_home(void *userdata, AxisBitmap_t axes_bitmap) {
       continue;
     home_axis(state, axis);
   }
-  motors_enable(state, 0);
+  state->homing_state = HOMING_STATE_HOMED;
 }
 
 // todo: currently disabled.

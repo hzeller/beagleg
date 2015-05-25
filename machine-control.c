@@ -256,6 +256,7 @@ int main(int argc, char *argv[]) {
     OPT_SET_MIN_ENDSWITCH,
     OPT_SET_MAX_ENDSWITCH,
     OPT_SET_ENDSWITCH_POLARITY,
+    OPT_REQUIRE_HOMING,
     OPT_LOOP,
   };
 
@@ -269,6 +270,7 @@ int main(int argc, char *argv[]) {
     { "min-endswitch",      required_argument, NULL, OPT_SET_MIN_ENDSWITCH },
     { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
     { "endswitch-polarity", required_argument, NULL, OPT_SET_ENDSWITCH_POLARITY },
+    { "homing-required",    no_argument,       NULL, OPT_REQUIRE_HOMING },
     { "port",               required_argument, NULL, 'p'},
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
@@ -317,6 +319,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_SET_HOME_ORDER:
       config.home_order = strdup(optarg);
+      break;
+    case OPT_REQUIRE_HOMING:
+      config.require_homing = 1;
       break;
     case 'r':
       if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))
