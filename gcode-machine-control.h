@@ -23,12 +23,6 @@
 
 struct MotorOperations;
 
-enum HomeType {
-  HOME_POS_NONE     = 0,  // Axis does not do homing.
-  HOME_POS_ORIGIN   = 1,  // Home position is at origin '0' for this axis
-  HOME_POS_ENDRANGE = 2,  // Home position is at end of range for this axis.
-};
-
 /* Configuration constants for the controller.
  * Parameters in the arrays are always indexed by logical axes, e.g. AXIS_X.
  * The output mapping to the physical driver is controlled by output_mapping
