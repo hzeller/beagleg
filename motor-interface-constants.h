@@ -62,12 +62,12 @@
 #define PIN_P9_14  (GPIO_1_BASE | 18)  // EHRPWM1A
 #define PIN_P9_15  (GPIO_1_BASE | 16)
 #define PIN_P9_16  (GPIO_1_BASE | 19)  // EHRPWM1B
-#define PIN_P9_17  (GPIO_0_BASE |  5)   // I2C1_SCL
-#define PIN_P9_18  (GPIO_0_BASE |  4)   // I2C1_SDA
+#define PIN_P9_17  (GPIO_0_BASE |  5)  // I2C1_SCL
+#define PIN_P9_18  (GPIO_0_BASE |  4)  // I2C1_SDA
 #define PIN_P9_19  (GPIO_0_BASE | 13)  // I2C2_SCL
 #define PIN_P9_20  (GPIO_0_BASE | 12)  // I2C2_SDA
-#define PIN_P9_21  (GPIO_0_BASE |  3)   // UART2_TXD
-#define PIN_P9_22  (GPIO_0_BASE |  2)   // UART2_RXD
+#define PIN_P9_21  (GPIO_0_BASE |  3)  // UART2_TXD
+#define PIN_P9_22  (GPIO_0_BASE |  2)  // UART2_RXD
 #define PIN_P9_23  (GPIO_1_BASE | 17)
 #define PIN_P9_24  (GPIO_0_BASE | 15)  // UART1_TXD
 #define PIN_P9_25  (GPIO_3_BASE | 21)
@@ -80,10 +80,10 @@
 #define PIN_P9_41  (GPIO_0_BASE | 20)  // CLKOUT2
 #define PIN_P9_42  (GPIO_0_BASE |  7)
 
-#define PIN_P8_7   (GPIO_2_BASE |  2)   // TIMER4
-#define PIN_P8_8   (GPIO_2_BASE |  3)   // TIMER7
-#define PIN_P8_9   (GPIO_2_BASE |  5)   // TIMER5
-#define PIN_P8_10  (GPIO_2_BASE |  4)   // TIMER6
+#define PIN_P8_7   (GPIO_2_BASE |  2)  // TIMER4
+#define PIN_P8_8   (GPIO_2_BASE |  3)  // TIMER7
+#define PIN_P8_9   (GPIO_2_BASE |  5)  // TIMER5
+#define PIN_P8_10  (GPIO_2_BASE |  4)  // TIMER6
 #define PIN_P8_11  (GPIO_1_BASE | 13)
 #define PIN_P8_12  (GPIO_1_BASE | 12)
 #define PIN_P8_13  (GPIO_0_BASE | 23)  // EHRPWM2B

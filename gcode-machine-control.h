@@ -59,7 +59,7 @@ struct MachineControlConfig {
   const char *max_endswitch;       // Letter: affected axis.
   const char *endswitch_polarity;  // Letter: trigger logic level.
 
-  const char *home_order;
+  const char *home_order;        // Order in which axes are homed.
 
   char debug_print;             // Print step-tuples to output_fd if 1.
   char synchronous;             // Don't queue, wait for command to finish if 1.
