@@ -296,6 +296,8 @@ static const char *special_commands(void *userdata, char letter, float value,
     }
 
     // The remaining codes are only useful when we have an output stream.
+    // (false: it still consumes the necessary code and does things with it.
+    // TODO: implement a machine_printf(state, fmt, param) that checks for NULL.
     if (!state->msg_stream)
       return remaining;
     switch (code) {
@@ -331,7 +333,9 @@ static const char *special_commands(void *userdata, char letter, float value,
       }
       break;
     case 115: fprintf(state->msg_stream, "%s\n", VERSION_STRING); break;
-    case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining); break;
+    case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining);
+      remaining = NULL;
+      break;
     case 119:
       for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
         struct EndstopConfig config = state->min_endstop[axis];
@@ -1225,6 +1229,11 @@ void gcode_machine_control_get_homepos(GCodeMachineControl_t *obj,
 
 void gcode_machine_control_delete(GCodeMachineControl_t *object) {
   cleanup_state(object);
+}
+
+void gcode_machine_control_set_msg_out(GCodeMachineControl_t *object,
+                                       FILE *msg_stream) {
+  object->msg_stream = msg_stream;
 }
 
 void gcode_machine_control_default_config(struct MachineControlConfig *config) {

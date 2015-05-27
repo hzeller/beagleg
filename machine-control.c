@@ -89,23 +89,14 @@ static int usage(const char *prog, const char *msg) {
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "loop_count" is >= 0, repeats this number after the first execution.
-static int send_file_to_machine(struct MachineControlConfig *config,
-                                struct MotorOperations *motor_ops,
+static int send_file_to_machine(GCodeMachineControl_t *machine,
+                                GCodeParser_t *parser,
                                 const char *gcode_filename, int loop_count) {
   int ret;
+  gcode_machine_control_set_msg_out(machine, stderr);
   while (loop_count < 0 || loop_count-- > 0) {
     int fd = open(gcode_filename, O_RDONLY);
-    GCodeMachineControl_t *machine_control
-      = gcode_machine_control_new(config, motor_ops, stderr);
-    if (machine_control == NULL)
-      return 1;
-    struct GCodeParserConfig parser_config;
-    bzero(&parser_config, sizeof(parser_config));
-    gcode_machine_control_init_callbacks(machine_control, &parser_config.callbacks);
-    gcode_machine_control_get_homepos(machine_control,
-                                      parser_config.machine_origin);
-    ret = gcodep_parse_stream(&parser_config, fd, stderr);
-    gcode_machine_control_delete(machine_control);
+    ret = gcodep_parse_stream(parser, fd, stderr);
     if (ret != 0)
       break;
   }
@@ -115,8 +106,8 @@ static int send_file_to_machine(struct MachineControlConfig *config,
 // Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
 // Interprets GCode coming from a connection. Only one connection at a
 // time can be active.
-static int run_server(struct MachineControlConfig *config,
-                      struct MotorOperations *motor_ops,
+static int run_server(GCodeMachineControl_t *machine,
+                      GCodeParser_t *parser,
                       const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
@@ -162,17 +153,9 @@ static int run_server(struct MachineControlConfig *config,
 				     ip_buffer, sizeof(ip_buffer));
     printf("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
-    GCodeMachineControl_t *machine_control
-      = gcode_machine_control_new(config, motor_ops, msg_stream);
-    if (machine_control == NULL)
-      return 1;
-    struct GCodeParserConfig parser_cfg;
-    bzero(&parser_cfg, sizeof(parser_cfg));
-    gcode_machine_control_init_callbacks(machine_control, &parser_cfg.callbacks);
-    gcode_machine_control_get_homepos(machine_control, parser_cfg.machine_origin);
-    process_result = gcodep_parse_stream(&parser_cfg, connection, msg_stream);
+    gcode_machine_control_set_msg_out(machine, msg_stream);
+    process_result = gcodep_parse_stream(parser, connection, msg_stream);
 
-    gcode_machine_control_delete(machine_control);
     fclose(msg_stream);
     printf("Connection to %s closed.\n", print_ip);
   } while (process_result == 0);
@@ -180,6 +163,7 @@ static int run_server(struct MachineControlConfig *config,
   close(s);
   fprintf(stderr, "Last gcode_machine_control_from_stream() == %d. Exiting\n",
 	  process_result);
+
   return process_result;
 }
 
@@ -386,14 +370,27 @@ int main(int argc, char *argv[]) {
   struct MotorOperations motor_operations;
   beagleg_init_motor_ops(&motion_backend, &motor_operations);
 
+  GCodeMachineControl_t *machine_control
+    = gcode_machine_control_new(&config, &motor_operations, stderr);
+  if (machine_control == NULL)
+    return 1;
+  struct GCodeParserConfig parser_cfg;
+  bzero(&parser_cfg, sizeof(parser_cfg));
+  gcode_machine_control_init_callbacks(machine_control, &parser_cfg.callbacks);
+  gcode_machine_control_get_homepos(machine_control, parser_cfg.machine_origin);
+  GCodeParser_t *parser = gcodep_new(&parser_cfg);
+
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    ret = send_file_to_machine(&config, &motor_operations,
+    ret = send_file_to_machine(machine_control, parser,
                                filename, file_loop_count);
   } else {
-    ret = run_server(&config, &motor_operations, bind_addr, listen_port);
+    ret = run_server(machine_control, parser, bind_addr, listen_port);
   }
+
+  gcode_machine_control_delete(machine_control);
+  gcodep_delete(parser);
 
   const char caught_signal = (ret == 2);
   if (caught_signal) {

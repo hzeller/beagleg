@@ -86,6 +86,10 @@ GCodeMachineControl_t *gcode_machine_control_new(
                        struct MotorOperations *motor_ops,
                        FILE *msg_stream);
 
+// Sets where the messages go.
+void gcode_machine_control_set_msg_out(GCodeMachineControl_t *object,
+                                       FILE *msg_stream);
+
 // ---
 // TODO(hzeller) the following are only needed to configure the gcode parser. Maybe
 // this is something the gcode_machine_control should actually do by itself.

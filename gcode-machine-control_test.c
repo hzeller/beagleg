@@ -93,8 +93,7 @@ void init_harness(struct Harness *harness,
   init_expect_motor(&harness->expect_motor_ops,
                     &harness->expect_state);
   harness->object = gcode_machine_control_new(&harness->config,
-                                              &harness->expect_motor_ops,
-                                              NULL);
+                                              &harness->expect_motor_ops, NULL);
   gcode_machine_control_init_callbacks(harness->object, callbacks);
 }
 

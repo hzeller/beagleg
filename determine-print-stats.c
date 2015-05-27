@@ -93,6 +93,13 @@ static const char *forwarding_unprocessed(void *userdata, char letter, float val
                                              letter, value, remaining);
 }
 
+// Not interested.
+static void forwarding_info_origin_offset(void *userdata, const float *val) {
+  struct StatsData *data = (struct StatsData*)userdata;
+  return data->machine_delegatee
+    .inform_origin_offset(data->machine_delegatee.user_data, val);
+}
+
 // Motor operation simulation that determines the time spent.
 static void stats_motor_enable(void *ctx, char on) {}
 
@@ -151,8 +158,11 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
   parser_config.callbacks.dwell = &forwarding_dwell;
   parser_config.callbacks.motors_enable = &forwarding_motors_enable;
   parser_config.callbacks.unprocessed = &forwarding_unprocessed;
+  parser_config.callbacks.inform_origin_offset = &forwarding_info_origin_offset;
 
-  gcodep_parse_stream(&parser_config, input_fd, stderr);
+  GCodeParser_t *parser = gcodep_new(&parser_config);
+  gcodep_parse_stream(parser, input_fd, stderr);
+  gcodep_delete(parser);
 
   return 0;
 }

@@ -33,24 +33,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-//-- This is the more detailed public API. If it ever is needed (e.g.
-//   to keep track of multiple streams at once, put in gcode-parser.h.
-//   Till then, gcode_parse_stream is sufficient.
-typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
-
-// These are internal implementation details of creating a GCodeParser
-// object. This was exposed before publically, but is not really needed, as
-// users use the facade gcodep_parse_stream() function.
-// Could be made a public API if needed.
-
-// Initialize parser.
-// The config contains the functions the parser calls on parsing.
-// Returns an opaque type used in the parse function.
-// Assumes the machine is in the machine home position.
-// Does not take ownership of the provided pointer.
-static GCodeParser_t *gcodep_new(struct GCodeParserConfig *config);
-static void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
-
 // Reset parser, mostly reset relative coordinate systems to whatever they
 // should be in the beginning.
 // Does _not_ reset the machine position.
@@ -203,7 +185,7 @@ static void set_current_origin(struct GCodeParser *p, float *origin) {
   p->callbacks.inform_origin_offset(p->callbacks.user_data, origin);
 }
 
-static struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
+struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
@@ -252,7 +234,7 @@ static struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   return result;
 }
 
-static void gcodep_delete(struct GCodeParser *parser) {
+void gcodep_delete(struct GCodeParser *parser) {
   free(parser);
 }
 
@@ -667,8 +649,7 @@ static void disarm_signal_handler() {
 }
 
 // Public facade function.
-int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
-                        FILE *err_stream) {
+int gcodep_parse_stream(GCodeParser_t *parser, int input_fd, FILE *err_stream) {
   if (err_stream) {
     // Output needs to be unbuffered, otherwise they'll never make it.
     setvbuf(err_stream, NULL, _IONBF, 0);
@@ -687,7 +668,6 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
   wait_time.tv_usec = 50 * 1000;
   FD_ZERO(&read_fds);
 
-  GCodeParser_t *parser = gcodep_new(config);
   arm_signal_handler();
   char buffer[8192];
   while (!caught_signal) {
@@ -701,7 +681,7 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
       break;
 
     if (select_ret == 0) {  // Timeout. Regularly call.
-      parser->callbacks.input_idle(config->callbacks.user_data);
+      parser->callbacks.input_idle(parser->callbacks.user_data);
       continue;
     }
 
@@ -718,10 +698,8 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
   fclose(gcode_stream);
 
   if (parser->program_in_progress) {
-    parser->callbacks.gcode_finished(config->callbacks.user_data);
+    parser->callbacks.gcode_finished(parser->callbacks.user_data);
   }
-
-  gcodep_delete(parser);
 
   return caught_signal ? 2 : 0;
 }

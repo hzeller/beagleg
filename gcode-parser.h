@@ -79,7 +79,7 @@ struct GCodeParserCb {
   void (*gcode_command_done)(void *, char letter, float val);
 
   // If the input has been idle and we haven't gotten any new line for more
-  // than 50ms, this function is called.
+  // than 50ms, this function is called (repeately, until there is input again).
   void (*input_idle)(void *);
 
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
@@ -122,6 +122,8 @@ struct GCodeParserCb {
   const char *(*unprocessed)(void *, char letter, float value, const char *);
 };
 
+typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
+
 // Configuration of the GCodeParser
 struct GCodeParserConfig {
   // Callback struct.
@@ -133,17 +135,24 @@ struct GCodeParserConfig {
   AxesRegister machine_origin;
 
   // TODO(hzeller): here, there should be references to registers
-  // G54..G59. They are set externally to GCode by some operating
+  // G54..G59. They can be set externally to GCode by some operating
   // terminal, but need to be accessed in gcode.
-  //float *position_register[5];  // register G54..G59
+  //float *position_register[6];  // register G54..G59
 };
 
-// Read and parse GCode from input_fd and call callbacks
-// in "parse_events".
+// Initialize parser.
+// Returns an opaque type used in the parse-stream function.
+// Assumes the machine is in the machine home position. The object keeps track
+// of the current absolute position of the machine.
+// Does not take ownership of the provided configuration pointer.
+GCodeParser_t *gcodep_new(struct GCodeParserConfig *config);
+void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
+
+// Read and parse GCode from "input_fd" and call callbacks.
 // Error messages are sent to "err_stream" if non-NULL.
-// Reads until EOF. The input file descriptor is closed.
-int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
-                        FILE *err_stream);
+// Reads until EOF (returns 0) or signal occured (returns 2).
+// The input file descriptor is closed.
+int gcodep_parse_stream(GCodeParser_t *parser, int input_fd, FILE *err_stream);
 
 // Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
 // a pair of the letter 'P' and the value '123').
