@@ -44,12 +44,17 @@ typedef struct GCodeParser GCodeParser_t;  // Opaque parser object type.
 // Could be made a public API if needed.
 
 // Initialize parser.
-// The "callbacks"-struct contains the functions the parser calls on parsing.
+// The config contains the functions the parser calls on parsing.
 // Returns an opaque type used in the parse function.
+// Assumes the machine is in the machine home position.
 // Does not take ownership of the provided pointer.
 static GCodeParser_t *gcodep_new(struct GCodeParserConfig *config);
-
 static void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
+
+// Reset parser, mostly reset relative coordinate systems to whatever they
+// should be in the beginning.
+// Does _not_ reset the machine position.
+static void gcodep_program_start_defaults(GCodeParser_t *object);
 
 // Main workhorse: Parse a gcode line, call callbacks if needed.
 // If "err_stream" is non-NULL, sends error messages that way.
@@ -64,6 +69,7 @@ const AxisBitmap_t kAllAxesBitmap =
 
 struct GCodeParser {
   struct GCodeParserCb callbacks;
+  char program_in_progress;
   FILE *err_msg;
   int modal_g0_g1;
   int line_number;
@@ -201,19 +207,8 @@ static struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
-  // Initial values for various constants.
-  result->unit_to_mm_factor = 1.0f;
-  set_all_axis_to_absolute(result, 1);
-
   memcpy(result->origin_machine, config->machine_origin,
          sizeof(result->origin_machine));
-
-  // Initially, G92 origin is as well where the machine is home.
-  memcpy(result->origin_g92, config->machine_origin,
-         sizeof(result->origin_g92));
-
-  // Set to XY-plane
-  result->arc_normal = AXIS_Z;
 
   // Setting up all callbacks
   result->callbacks = config->callbacks;
@@ -252,13 +247,37 @@ static struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   if (!result->callbacks.input_idle)
     result->callbacks.input_idle = &dummy_idle;
 
-  set_current_origin(result, result->origin_machine);
+  gcodep_program_start_defaults(result);
 
   return result;
 }
 
 static void gcodep_delete(struct GCodeParser *parser) {
   free(parser);
+}
+
+// Reset coordinate systems etc. that should be assumed at
+// the beginnig of a program.
+static void gcodep_program_start_defaults(GCodeParser_t *object) {
+  // Initial values for various constants.
+  object->unit_to_mm_factor = 1.0f;     // G21
+  set_all_axis_to_absolute(object, 1);  // G90
+
+  // Initially, G92 origin is as well where the machine is home.
+  memcpy(object->origin_g92, object->origin_machine,
+         sizeof(object->origin_g92));
+
+  object->arc_normal = AXIS_Z;  // Arcs in XY-plane
+
+  set_current_origin(object, object->origin_machine);
+}
+
+static void gcodep_finish_program_and_reset(GCodeParser_t *object) {
+  void *const userdata = object->callbacks.user_data;
+  object->callbacks.gcode_finished(userdata);
+
+  gcodep_program_start_defaults(object);
+  object->program_in_progress = 0;
 }
 
 static const char *skip_white(const char *line) {
@@ -552,14 +571,18 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
   char letter;
   float value;
   while ((line = gparse_pair(p, line, &letter, &value))) {
+    if (!p->program_in_progress) {
+      cb->gcode_start(userdata);
+      p->program_in_progress = 1;
+    }
     char processed_command = 1;
     if (letter == 'G') {
       switch ((int) value) {
-      case 0: p->modal_g0_g1 = 0; line = handle_move(p, line, 0); break;
-      case 1: p->modal_g0_g1 = 1; line = handle_move(p, line, 0); break;
-      case 2: line = handle_arc(p, line, 1); break;
-      case 3: line = handle_arc(p, line, 0); break;
-      case 4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
+      case  0: p->modal_g0_g1 = 0; line = handle_move(p, line, 0); break;
+      case  1: p->modal_g0_g1 = 1; line = handle_move(p, line, 0); break;
+      case  2: line = handle_arc(p, line, 1); break;
+      case  3: line = handle_arc(p, line, 0); break;
+      case  4: line = set_param(p, 'P', cb->dwell, 1.0f, line); break;
       case 17: p->arc_normal = AXIS_Z; break;
       case 18: p->arc_normal = AXIS_Y; break;
       case 19: p->arc_normal = AXIS_X; break;
@@ -577,10 +600,10 @@ static void gcodep_parse_line(struct GCodeParser *p, const char *line,
     }
     else if (letter == 'M') {
       switch ((int) value) {
-      case 2: cb->input_idle(userdata); break;
+      case  2: gcodep_finish_program_and_reset(p); break;
       case 17: cb->motors_enable(userdata, 1); break;
       case 18: cb->motors_enable(userdata, 0); break;
-      case 30: cb->input_idle(userdata); break;
+      case 30: gcodep_finish_program_and_reset(p); break;
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
       case 84: cb->motors_enable(userdata, 0); break;
@@ -660,7 +683,6 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
   fd_set read_fds;
   struct timeval wait_time;
   int select_ret;
-  char in_idle_mode = 0;
   wait_time.tv_sec = 0;
   wait_time.tv_usec = 50 * 1000;
   FD_ZERO(&read_fds);
@@ -668,28 +690,24 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
   GCodeParser_t *parser = gcodep_new(config);
   arm_signal_handler();
   char buffer[8192];
-  parser->callbacks.gcode_start(config->callbacks.user_data);
   while (!caught_signal) {
     // Read with timeout. If we don't get anything on our input, but it
     // is not finished yet, we tell our
     FD_SET(input_fd, &read_fds);
     // When we're already in idle mode, we're not interested in change.
-    wait_time.tv_usec = in_idle_mode ? 500 * 1000 : 50 * 1000;
+    wait_time.tv_usec = 50 * 1000;
     select_ret = select(input_fd + 1, &read_fds, NULL, NULL, &wait_time);
-    if (select_ret < 0)
+    if (select_ret < 0)  // Broken stream.
       break;
-    if (select_ret == 0) {  // timeout.
-      if (!in_idle_mode) {
-        parser->callbacks.input_idle(config->callbacks.user_data);
-        in_idle_mode = 1;
-      }
+
+    if (select_ret == 0) {  // Timeout. Regularly call.
+      parser->callbacks.input_idle(config->callbacks.user_data);
       continue;
     }
 
     // Filedescriptor readable. Now wait for a line to finish.
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
       break;
-    in_idle_mode = 0;
     gcodep_parse_line(parser, buffer, err_stream);
   }
   disarm_signal_handler();
@@ -698,9 +716,12 @@ int gcodep_parse_stream(struct GCodeParserConfig *config, int input_fd,
     fflush(err_stream);
   }
   fclose(gcode_stream);
-  gcodep_delete(parser);
 
-  parser->callbacks.gcode_finished(config->callbacks.user_data);
+  if (parser->program_in_progress) {
+    parser->callbacks.gcode_finished(config->callbacks.user_data);
+  }
+
+  gcodep_delete(parser);
 
   return caught_signal ? 2 : 0;
 }

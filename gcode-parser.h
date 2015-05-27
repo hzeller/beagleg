@@ -63,8 +63,8 @@ enum GCodeParserAxis gcodep_letter2axis(char letter);
 struct GCodeParserCb {
   void *user_data;  // Context which is passed in each call of these functions.
 
-  void (*gcode_start)(void *);             // FYI: Start parsing. Use for initialization.
-  void (*gcode_finished)(void *);          // FYI: Finished parsing. End of stream.
+  void (*gcode_start)(void *);     // Start program. Use for initialization.
+  void (*gcode_finished)(void *);  // End of program or stream.
 
   // The parser handles relative positions and coordinate systems internally,
   // so the machine does not have to worry about that.
