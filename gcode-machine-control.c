@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -189,27 +190,26 @@ static inline int round2int(float x) { return (int) roundf(x); }
 
 static void bring_path_to_halt(GCodeMachineControl_t *state);
 
+// machine-printf. Only prints if there is a msg-stream.
+static void mprintf(GCodeMachineControl_t *state, const char *format, ...) {
+  va_list ap;
+  va_start(ap, format);
+  if (state->msg_stream) vfprintf(state->msg_stream, format, ap);
+  va_end(ap);
+}
+
 // Dummy implementations of callbacks not yet handled.
 static void dummy_set_temperature(void *userdata, float f) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream,
-	    "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
-  }
+  mprintf(state, "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
 }
 static void dummy_set_fanspeed(void *userdata, float speed) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream,
-	    "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
-  }
+  mprintf(state, "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
 }
 static void dummy_wait_temperature(void *userdata) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream,
-	    "// BeagleG: wait_temperature() not implemented.\n");
-  }
+  mprintf(state, "// BeagleG: wait_temperature() not implemented.\n");
 }
 static void motors_enable(void *userdata, char b) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -221,9 +221,7 @@ static void motors_enable(void *userdata, char b) {
 }
 static void gcode_send_ok(void *userdata, char l, float v) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream, "ok\n");
-  }
+  mprintf(state, "ok\n");
 }
 static void inform_origin_offset(void *userdata, const float *origin) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -240,7 +238,7 @@ static const char *special_commands(void *userdata, char letter, float value,
     int aux_bit = -1;
 
     switch (code) {
-    case 0: set_gpio(ESTOP_SW_GPIO); return remaining;
+    case 0: set_gpio(ESTOP_SW_GPIO); break;
     case 3:
     case 4:
       for (;;) {
@@ -256,13 +254,13 @@ static const char *special_commands(void *userdata, char letter, float value,
 	if (code == 3) state->aux_bits &= ~AUX_BIT_SPINDLE_DIR;
         else state->aux_bits |= AUX_BIT_SPINDLE_DIR;
       }
-      return remaining;
-    case 5: state->aux_bits &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); return remaining;
-    case 7: state->aux_bits |= AUX_BIT_MIST; return remaining;
-    case 8: state->aux_bits |= AUX_BIT_FLOOD; return remaining;
-    case 9: state->aux_bits &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); return remaining;
-    case 10: state->aux_bits |= AUX_BIT_VACUUM; return remaining;
-    case 11: state->aux_bits &= ~AUX_BIT_VACUUM; return remaining;
+      break;
+    case 5: state->aux_bits &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); break;
+    case 7: state->aux_bits |= AUX_BIT_MIST; break;
+    case 8: state->aux_bits |= AUX_BIT_FLOOD; break;
+    case 9: state->aux_bits &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); break;
+    case 10: state->aux_bits |= AUX_BIT_VACUUM; break;
+    case 11: state->aux_bits &= ~AUX_BIT_VACUUM; break;
     case 42:
     case 62:
     case 63:
@@ -286,22 +284,13 @@ static const char *special_commands(void *userdata, char letter, float value,
           if (aux_bit) state->aux_bits |= 1 << pin;
           else state->aux_bits &= ~(1 << pin);
         } else if (code == 42 && state->msg_stream) {  // Just read operation.
-          fprintf(state->msg_stream, "%d\n", (state->aux_bits >> pin) & 1);
+          mprintf(state, "%d\n", (state->aux_bits >> pin) & 1);
 	}
       }
-      return remaining;
-    case 80: set_gpio(MACHINE_PWR_GPIO); return remaining;
-    case 81: clr_gpio(MACHINE_PWR_GPIO); return remaining;
-    case 999: clr_gpio(ESTOP_SW_GPIO); return remaining;
-    }
-
-    // The remaining codes are only useful when we have an output stream.
-    // (false: it still consumes the necessary code and does things with it.
-    // TODO: implement a machine_printf(state, fmt, param) that checks for NULL.
-    if (!state->msg_stream)
-      return remaining;
-    switch (code) {
-    case 105: fprintf(state->msg_stream, "T-300\n"); break;  // no temp yet.
+      break;
+    case 80: set_gpio(MACHINE_PWR_GPIO); break;
+    case 81: clr_gpio(MACHINE_PWR_GPIO); break;
+    case 105: mprintf(state, "T-300\n"); break;  // no temp yet.
     case 114:
       if (buffer_available(&state->buffer)) {
         struct AxisTarget *current = buffer_at(&state->buffer, 0);
@@ -311,53 +300,63 @@ static const char *special_commands(void *userdata, char letter, float value,
         const float z = 1.0f * mpos[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z];
         const float e = 1.0f * mpos[AXIS_E] / state->cfg.steps_per_mm[AXIS_E];
         const float *origin = state->coordinate_display_origin;
-        fprintf(state->msg_stream, "X:%.3f Y:%.3f Z:%.3f E:%.3f",
+        mprintf(state, "X:%.3f Y:%.3f Z:%.3f E:%.3f",
                 x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
                 e - origin[AXIS_E]);
-        fprintf(state->msg_stream, " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
-                x, y, z);
+        mprintf(state, " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]", x, y, z);
         switch (state->homing_state) {
         case HOMING_STATE_NEVER_HOMED:
-          fprintf(state->msg_stream, " (Unsure: machine never homed!)\n");
+          mprintf(state, " (Unsure: machine never homed!)\n");
           break;
         case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
-          fprintf(state->msg_stream, " (Lower confidence: motor power off at "
+          mprintf(state, " (Lower confidence: motor power off at "
                   "least once after homing)\n");
           break;
         case HOMING_STATE_HOMED:
-          fprintf(state->msg_stream, " (confident: machine was homed)\n");
+          mprintf(state, " (confident: machine was homed)\n");
           break;
         }
       } else {
-        fprintf(state->msg_stream, "// no current pos\n");
+        mprintf(state, "// no current pos\n");
       }
       break;
-    case 115: fprintf(state->msg_stream, "%s\n", VERSION_STRING); break;
-    case 117: fprintf(state->msg_stream, "Msg: %s\n", remaining);
-      remaining = NULL;
+    case 115: mprintf(state, "%s\n", VERSION_STRING); break;
+    case 117:
+      mprintf(state, "// Msg: %s\n", remaining); // TODO: different output ?
+      remaining = NULL;  // consume the full line.
       break;
-    case 119:
+    case 119: {
+      char any_enstops_found = 0;
       for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
         struct EndstopConfig config = state->min_endstop[axis];
         if (config.endstop_number) {
           int value = get_gpio(get_endstop_gpio_descriptor(config));
-          fprintf(state->msg_stream, "%c_min:%s ",
+          mprintf(state, "%c_min:%s ",
                   tolower(gcodep_axis2letter(axis)),
                   value == config.trigger_value ? "TRIGGERED" : "open");
+          any_enstops_found = 1;
         }
         config = state->max_endstop[axis];
         if (config.endstop_number) {
           int value = get_gpio(get_endstop_gpio_descriptor(config));
-          fprintf(state->msg_stream, "%c_max:%s ",
+          mprintf(state, "%c_max:%s ",
                   tolower(gcodep_axis2letter(axis)),
                   value == config.trigger_value ? "TRIGGERED" : "open");
+          any_enstops_found = 1;
         }
       }
-      fprintf(state->msg_stream, "\n");
+      if (any_enstops_found) {
+        mprintf(state, "\n");
+      } else {
+        mprintf(state, "// This machine has no endstops configured.\n");
+      }
+    }
       break;
-    default:  fprintf(state->msg_stream,
-                      "// BeagleG: didn't understand ('%c', %d, '%s')\n",
-                      letter, code, remaining);
+    case 999: clr_gpio(ESTOP_SW_GPIO); break;
+    default:
+      mprintf(state, "// BeagleG: didn't understand ('%c', %d, '%s')\n",
+              letter, code, remaining);
+      remaining = NULL;  // In this case, let's just discard remainig block.
       break;
     }
   }
@@ -395,7 +394,7 @@ static float acceleration_for_move(const GCodeMachineControl_t *state,
                                    enum GCodeParserAxis defining_axis) {
   return state->max_axis_accel[defining_axis];
   // TODO: we need to scale the acceleration if one of the other axes could't
-  //deal with it. Look at axis steps for that.
+  // deal with it. Look at axis steps for that.
 }
 
 // Given that we want to travel "s" steps, start with speed "v0",
@@ -716,52 +715,46 @@ static char test_homing_status_ok(GCodeMachineControl_t *state) {
     return 1;
   if (state->homing_state > HOMING_STATE_NEVER_HOMED)
     return 1;
-  if (state->msg_stream) {
-    fprintf(state->msg_stream, "// ERROR: please home machine first (G28).\n");
-  }
+  mprintf(state, "// ERROR: please home machine first (G28).\n");
   return 0;
 }
 
 static char test_within_machine_limits(GCodeMachineControl_t *state,
                                        const float *axis) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    // Min range ...
     if (axis[i] < 0) {
       // Machine cube must be in positive range.
-      if (state->msg_stream) {
-        if (state->coordinate_display_origin[i] != 0) {
-          fprintf(state->msg_stream,
-                  "// ERROR outside machine limit: Axis %c < min allowed %+.1fmm "
-                  "in current coordinate system. Ignoring move!\n",
-                  gcodep_axis2letter(i), -state->coordinate_display_origin[i]);
-        } else {
-          // No relative G92 or similar set. Display in simpler form.
-          fprintf(state->msg_stream,
-                  "// ERROR outside machine limit: Axis %c < 0. Ignoring move!\n",
-                  gcodep_axis2letter(i));
-        }
+      if (state->coordinate_display_origin[i] != 0) {
+        mprintf(state,
+                "// ERROR outside machine limit: Axis %c < min allowed "
+                "%+.1fmm in current coordinate system. Ignoring move!\n",
+                gcodep_axis2letter(i), -state->coordinate_display_origin[i]);
+      } else {
+        // No relative G92 or similar set. Display in simpler form.
+        mprintf(state, "// ERROR outside machine limit: Axis %c < 0. "
+                "Ignoring move!\n", gcodep_axis2letter(i));
       }
       return 0;
     }
+
+    // Max range ..
     if (state->cfg.move_range_mm[i] <= 0)
       continue;  // max range not configured.
-    if (axis[i] > state->cfg.move_range_mm[i]) {
+    const float max_limit = state->cfg.move_range_mm[i];
+    if (axis[i] > max_limit) {
       // Machine cube must be within machine limits if defined.
-      if (state->msg_stream) {
-        if (state->coordinate_display_origin[i] != 0) {
-          fprintf(state->msg_stream,
-                  "// ERROR outside machine limit: Axis %c > max allowed %+.1fmm "
-                  "in current coordinate system (=%.1fmm machine absolute). "
-                  "Ignoring move!\n",
-                  gcodep_axis2letter(i),
-                  state->cfg.move_range_mm[i]-state->coordinate_display_origin[i],
-                  state->cfg.move_range_mm[i]);
+      if (state->coordinate_display_origin[i] != 0) {
+        mprintf(state,
+                "// ERROR outside machine limit: Axis %c > max allowed %+.1fmm "
+                "in current coordinate system (=%.1fmm machine absolute). "
+                "Ignoring move!\n",
+                gcodep_axis2letter(i),
+                max_limit - state->coordinate_display_origin[i], max_limit);
         } else {
-          // No relative G92 or similar set. Display in simpler form.
-          fprintf(state->msg_stream,
-                  "// ERROR outside machine limit: Axis %c > %.1fmm. "
-                  "Ignoring move!\n",
-                  gcodep_axis2letter(i), state->cfg.move_range_mm[i]);
-        }
+        // No relative G92 or similar set. Display in simpler form.
+        mprintf(state, "// ERROR outside machine limit: Axis %c > %.1fmm. "
+                "Ignoring move!\n", gcodep_axis2letter(i), max_limit);
       }
       return 0;
     }
@@ -813,10 +806,8 @@ static void machine_set_speed_factor(void *userdata, float value) {
     value = 1.0f + value;   // M220 S-10 interpreted as: 90%
   }
   if (value < 0.005) {
-    if (state->msg_stream) fprintf(state->msg_stream,
-				   "// M220: Not accepting speed "
-				   "factors < 0.5%% (got %.1f%%)\n",
-				   100.0f * value);
+    mprintf(state, "// M220: Not accepting speed factors < 0.5%% (got %.1f%%)\n",
+            100.0f * value);
     return;
   }
   state->prog_speed_factor = value;
@@ -948,11 +939,9 @@ static char machine_probe(void *userdata, float feedrate,
   uint32_t gpio_def = get_endstop_gpio_descriptor(config);
   if (!gpio_def || config.homing_use) {
     // We are only looking for probes that are _not_ used for homing.
-    if (state->msg_stream) {
-      fprintf(state->msg_stream,
-              "// BeagleG: No probe - axis %c does not have a travel endstop\n",
-              gcodep_axis2letter(axis));
-    }
+    mprintf(state,
+            "// BeagleG: No probe - axis %c does not have a travel endstop\n",
+            gcodep_axis2letter(axis));
     return 0;
   }
 
@@ -1142,10 +1131,10 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
               result->cfg.steps_per_mm[i],
               result->axis_flip[i] < 0 ? " (reversed)" : "");
       if (result->cfg.move_range_mm[i] > 0) {
-        fprintf(stderr, "[machine-limit %5.1fmm] ",
+        fprintf(stderr, "[ limit %5.1fmm ] ",
                 result->cfg.move_range_mm[i]);
       } else {
-        fprintf(stderr, "[    unknown limit    ] ");
+        fprintf(stderr, "[ unknown limit ] ");
       }
       int endstop = result->min_endstop[i].endstop_number;
       const char *trg = result->min_endstop[i].trigger_value ? "hi" : "lo";

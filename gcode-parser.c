@@ -17,6 +17,10 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// TODO: when passing 'remaining', clean it from \n
+//  - M117 doesn't come with extra newline
+//  - M888 P0 (example non-existent M code) would be warn-printed nicely.
+
 #include "gcode-parser.h"
 
 #include "arc-gen.h"
