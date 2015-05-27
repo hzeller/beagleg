@@ -93,11 +93,9 @@ static const char *forwarding_unprocessed(void *userdata, char letter, float val
                                              letter, value, remaining);
 }
 
-// Not interested.
 static void forwarding_info_origin_offset(void *userdata, const float *val) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  return data->machine_delegatee
-    .inform_origin_offset(data->machine_delegatee.user_data, val);
+  struct StatsData *s = (struct StatsData*)userdata;
+  s->machine_delegatee.inform_origin_offset(s->machine_delegatee.user_data, val);
 }
 
 // Motor operation simulation that determines the time spent.
