@@ -28,7 +28,7 @@ enum {
 struct CallCounter {
   GCodeParser_t *parser;
   int call_count[NUM_COUNTED_CALLS];
-  AxesRegister last_coordinates;  // last coordinates we got from a call.
+  AxesRegister abs_pos;  // last coordinates we got from a call.
 };
 
 // Parses gcode block and updates counters. Possibly creates a parser first.
@@ -66,16 +66,33 @@ void TEST_simple_move() {
   GCodeTestParseLine("G1 X100", &counter);
   assert(counter.call_count[CALL_coordinated_move] == 1);
 
-  assert(ExpectEqual(counter.last_coordinates[AXIS_X], HOME_X + 100));
-  assert(ExpectEqual(counter.last_coordinates[AXIS_Y], HOME_Y)); // still at ..
-  assert(ExpectEqual(counter.last_coordinates[AXIS_Z], HOME_Z)); // .. origin.
+  // If we move one axis, the others are still at the origin.
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 100));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], HOME_Z));
 
   GCodeTestParseLine("G1 X10 Y10 Z-20", &counter);
   assert(counter.call_count[CALL_coordinated_move] == 2);
-  assert(ExpectEqual(counter.last_coordinates[AXIS_X], HOME_X + 10));
-  assert(ExpectEqual(counter.last_coordinates[AXIS_Y], HOME_Y + 10));
-  assert(ExpectEqual(counter.last_coordinates[AXIS_Z], HOME_Z - 20));
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 10));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 10));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], HOME_Z - 20));
 
+  ShutdownCounter(&counter);
+  printf(" DONE %s\n", __func__);
+}
+
+void TEST_set_origin_G92() {
+  printf(" %s\n", __func__);
+  struct CallCounter counter;
+  bzero(&counter, sizeof(counter));
+  GCodeTestParseLine("G1 X100 Y100", &counter);  // Some position.
+  GCodeTestParseLine("G92 X5 Y7", &counter);     // Tool left bottom of it.
+  GCodeTestParseLine("G1 X12 Y17", &counter);    // Move relative to that
+
+  // Final position.
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 100 - 5 + 12));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 100 - 7 + 17));
+  
   ShutdownCounter(&counter);
   printf(" DONE %s\n", __func__);
 }
@@ -85,6 +102,7 @@ int main() {
 
   TEST_axes_letter_conversion();
   TEST_simple_move();
+  TEST_set_origin_G92();
 
   printf("PASS (%s)\n", __FILE__);
 }
@@ -94,8 +112,7 @@ static void do_count(void *p, int what) {
   ((struct CallCounter*)p)->call_count[what]++;
 }
 static void do_copy_register(void *p, const float axes[]) {
-  memcpy(((struct CallCounter*)p)->last_coordinates, axes,
-         sizeof(AxesRegister));                         
+  memcpy(((struct CallCounter*)p)->abs_pos, axes, sizeof(AxesRegister));
 }
 
 static void gcode_start(void *p) { do_count(p, CALL_gcode_start); }
