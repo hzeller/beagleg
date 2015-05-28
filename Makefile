@@ -37,7 +37,7 @@ GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TARGETS=machine-control gcode-print-stats
-TEST_BINARIES=gcode-machine-control_test
+TEST_BINARIES=gcode-machine-control_test gcode-parser_test
 
 all : $(TARGETS) $(TEST_BINARIES)
 
@@ -48,7 +48,7 @@ machine-control: machine-control.o $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 test: $(TEST_BINARIES)
-	./gcode-machine-control_test
+	for test_bin in $(TEST_BINARIES) ; do ./$$test_bin ; done
 
 %_test: %_test.c $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)

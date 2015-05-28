@@ -42,12 +42,6 @@
 // Does _not_ reset the machine position.
 static void gcodep_program_start_defaults(GCodeParser_t *object);
 
-// Main workhorse: Parse a gcode line, call callbacks if needed.
-// If "err_stream" is non-NULL, sends error messages that way.
-static void gcodep_parse_line(GCodeParser_t *obj, const char *line,
-                              FILE *err_stream);
-// -- End public API
-
 const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
    | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C)
@@ -234,6 +228,10 @@ struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
     result->callbacks.input_idle = &dummy_idle;
 
   gcodep_program_start_defaults(result);
+
+  // When we initialize the machine, we assume the axes to
+  // be at the origin.
+  memcpy(result->axes_pos, config->machine_origin, sizeof(result->axes_pos));
 
   return result;
 }
@@ -548,8 +546,8 @@ static const char *handle_z_probe(struct GCodeParser *p, const char *line) {
 }
 
 // Note: changes here should be documented in G-code.md as well.
-static void gcodep_parse_line(struct GCodeParser *p, const char *line,
-                              FILE *err_stream) {
+void gcodep_parse_line(struct GCodeParser *p, const char *line,
+                       FILE *err_stream) {
   ++p->line_number;
   void *const userdata = p->callbacks.user_data;
   struct GCodeParserCb *cb = &p->callbacks;

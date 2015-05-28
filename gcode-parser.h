@@ -148,6 +148,10 @@ struct GCodeParserConfig {
 GCodeParser_t *gcodep_new(struct GCodeParserConfig *config);
 void gcodep_delete(GCodeParser_t *object);  // Opposite of gcodep_new()
 
+// Main workhorse: Parse a gcode line, call callbacks if needed.
+// If "err_stream" is non-NULL, sends error messages that way.
+void gcodep_parse_line(GCodeParser_t *obj, const char *line, FILE *err_stream);
+
 // Read and parse GCode from "input_fd" and call callbacks.
 // Error messages are sent to "err_stream" if non-NULL.
 // Reads until EOF (returns 0) or signal occured (returns 2).
