@@ -254,6 +254,11 @@ static void gcodep_program_start_defaults(GCodeParser_t *object) {
   object->arc_normal = AXIS_Z;  // Arcs in XY-plane
 
   set_current_origin(object, object->origin_machine);
+
+  // Some initial machine states
+  object->callbacks.set_speed_factor(object->callbacks.user_data, 1);
+  object->callbacks.set_fanspeed(object->callbacks.user_data, 0);
+  object->callbacks.set_temperature(object->callbacks.user_data, 0);
 }
 
 static void gcodep_finish_program_and_reset(GCodeParser_t *object) {
