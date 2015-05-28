@@ -60,6 +60,7 @@ void TEST_axes_letter_conversion() {
 }
 
 void TEST_simple_move() {
+  printf(" %s\n", __func__);
   struct CallCounter counter;
   bzero(&counter, sizeof(counter));
   GCodeTestParseLine("G1 X100", &counter);
@@ -76,6 +77,7 @@ void TEST_simple_move() {
   assert(ExpectEqual(counter.last_coordinates[AXIS_Z], HOME_Z - 20));
 
   ShutdownCounter(&counter);
+  printf(" DONE %s\n", __func__);
 }
 
 int main() {
@@ -87,6 +89,7 @@ int main() {
   printf("PASS (%s)\n", __FILE__);
 }
 
+// supporting mock counter functions.
 static void do_count(void *p, int what) {
   ((struct CallCounter*)p)->call_count[what]++;
 }
