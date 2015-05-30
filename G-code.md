@@ -57,6 +57,9 @@ G71              | -                    | Set coordinates to millimeter.
 G90              | -                    | Coordinates are absolute.
 G91              | -                    | Coordinates are relative.
 G92 [coordinates]| -                    | Set position to be the new zero.
+G92.1            | -                    | Reset G92 offset
+G92.2            | -                    | Suspend G92 offset
+G92.3            | -                    | Restore G92 offset
 
 ### M Codes
 
