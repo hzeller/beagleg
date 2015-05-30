@@ -62,7 +62,8 @@ struct GCodeParser {
   // (0,0,0,...) -> (range_x, range_y, range_z,...)
   AxesRegister axes_pos;
 
-  // All the following coordinates are absolute positions.
+  // All the following coordinates are absolute positions. They
+  // can be choosen as active origin.
   AxesRegister origin_machine;             // homing position.
   AxesRegister origin_g92;
 
@@ -81,9 +82,9 @@ static void dummy_gcode_finished(void *user) {}
 static void dummy_inform_display_offset(void *user, const float *o) {
   fprintf(stderr, "GCodeParser: display offset [");
   for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
-    fprintf(stderr, "%s%.3f", i == 0 ? "" : ", ", o[i]);
+    fprintf(stderr, "%s%c:%.3f", i == 0 ? "" : ", ", gcodep_axis2letter(i),o[i]);
   }
-  fprintf(stderr, "\n");
+  fprintf(stderr, "]\n");
 }
 
 static void dummy_gcode_command_executed(void *user, char letter, float val) {}
@@ -178,6 +179,11 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
+static void reset_G92(struct GCodeParser *object) {
+  memcpy(object->origin_g92, object->origin_machine,
+         sizeof(object->origin_g92));
+}
+
 static void set_current_origin(struct GCodeParser *p, float *origin) {
   p->current_origin = origin;
   p->callbacks.inform_origin_offset(p->callbacks.user_data, origin);
@@ -246,10 +252,7 @@ static void gcodep_program_start_defaults(GCodeParser_t *object) {
   // Initial values for various constants.
   object->unit_to_mm_factor = 1.0f;     // G21
   set_all_axis_to_absolute(object, 1);  // G90
-
-  // Initially, G92 origin is as well where the machine is home.
-  memcpy(object->origin_g92, object->origin_machine,
-         sizeof(object->origin_g92));
+  reset_G92(object);
 
   object->arc_normal = AXIS_Z;  // Arcs in XY-plane
 
@@ -371,21 +374,37 @@ static const char *handle_home(struct GCodeParser *p, const char *line) {
   return line;
 }
 
-static const char *handle_rebase(struct GCodeParser *p, const char *line) {
-  char axis_l;
-  float value;
-  const char *remaining_line;
-  while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
-    const float unit_val = value * p->unit_to_mm_factor;
-    const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
-    if (axis == GCODE_NUM_AXES)
-      break;    // Possibly start of new command.
-    // This sets the given value to be the new zero.
-    p->origin_g92[axis] = p->axes_pos[axis] - unit_val;
-
-    line = remaining_line;
+// Set relative coordinate system
+static const char *handle_G92(float sub_command,
+                              struct GCodeParser *p, const char *line) {
+  // It is safe to compare raw float values here, as long as we give float
+  // literals. They have been parsed from literals as well.
+  if (sub_command == 92.0f) {
+    char axis_l;
+    float value;
+    const char *remaining_line;
+    while ((remaining_line = gparse_pair(p, line, &axis_l, &value))) {
+      const float unit_val = value * p->unit_to_mm_factor;
+      const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
+      if (axis == GCODE_NUM_AXES)
+        break;    // Possibly start of new command.
+      // This sets the given value to be the new zero.
+      p->origin_g92[axis] = p->axes_pos[axis] - unit_val;
+      
+      line = remaining_line;
+    }
+    set_current_origin(p, p->origin_g92);
   }
-  set_current_origin(p, p->origin_g92);
+  else if (sub_command == 92.1f) {
+    reset_G92(p);
+    set_current_origin(p, p->origin_g92);
+  }
+  else if (sub_command == 92.2f) {
+    set_current_origin(p, p->origin_machine); // Later: G54...
+  }
+  else if (sub_command == 92.3f) {
+    set_current_origin(p, p->origin_g92);
+  }
   return line;
 }
 
@@ -583,7 +602,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case 71: p->unit_to_mm_factor = 1.0f; break;
       case 90: set_all_axis_to_absolute(p, 1); break;
       case 91: set_all_axis_to_absolute(p, 0); break;
-      case 92: line = handle_rebase(p, line); break;
+      case 92: line = handle_G92(value, p, line); break;
       default: line = cb->unprocessed(userdata, letter, value, line); break;
       }
     }

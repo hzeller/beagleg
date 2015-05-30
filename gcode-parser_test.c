@@ -92,7 +92,44 @@ void TEST_set_origin_G92() {
   // Final position.
   assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 100 - 5 + 12));
   assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 100 - 7 + 17));
-  
+
+  GCodeTestParseLine("G92 X3 Y4", &counter);  // Set new origin relative to here
+  GCodeTestParseLine("G1 X1 Y1", &counter);
+
+  // Now, we are relative to _that_
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 100 - 5 + 12 - 3 + 1));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 100 - 7 + 17 - 4 + 1));
+
+  GCodeTestParseLine("G92.2", &counter);      // Suspend.
+  GCodeTestParseLine("G1 X1 Y1", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 1));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 1));
+
+  // Only set one axis now, that way we see that the new axis is modified
+  // and the original axis is pulled out of the G92 store again.
+  GCodeTestParseLine("G92 X0", &counter);     // Set again. Modify Current G92.
+  GCodeTestParseLine("G1 X1 Y1", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 1 + 1));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 100 - 7 + 17 - 4 + 1));
+
+  GCodeTestParseLine("G92.2", &counter);      // Suspend.
+  GCodeTestParseLine("G1 X1 Y1", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 1));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 1));
+
+  GCodeTestParseLine("G92.3", &counter);      // Restore.
+  GCodeTestParseLine("G1 X7 Y8", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 1 + 7));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 100 - 7 + 17 - 4 + 8));
+
+  GCodeTestParseLine("G92.1", &counter);      // Reset. Back relative to machine.
+  GCodeTestParseLine("G1 X1 Y1", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 1));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 1));
+
+  // Later, once that is implemented: test with a G54. It is not clear yet
+  // if G92 works relative to the active coordinate system (G54, G55..), or
+  // if it is an absolute offset at the time it was established.
   ShutdownCounter(&counter);
   printf(" DONE %s\n", __func__);
 }
@@ -148,6 +185,7 @@ static struct GCodeParserCb mock_calls = {
 static void GCodeTestParseLine(const char *block, struct CallCounter *counter) {
   if (counter->parser == NULL) {
     struct GCodeParserConfig config;
+    bzero(&config, sizeof(config));
     config.callbacks = mock_calls;
     config.callbacks.user_data = counter;
     config.machine_origin[AXIS_X] = HOME_X;
