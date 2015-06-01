@@ -169,7 +169,7 @@ struct GCodeMachineControl {
   struct EndstopConfig max_endstop[GCODE_NUM_AXES];
 
   // Current machine configuration
-  const float *coordinate_display_origin; // info from parser for display.
+  float coordinate_display_origin[GCODE_NUM_AXES]; // parser tells us
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
   unsigned int aux_bits;                 // Set via M42.
@@ -225,7 +225,8 @@ static void gcode_send_ok(void *userdata, char l, float v) {
 }
 static void inform_origin_offset(void *userdata, const float *origin) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  state->coordinate_display_origin = origin;
+  memcpy(state->coordinate_display_origin, origin,
+         sizeof(state->coordinate_display_origin));
 }
 
 static const char *special_commands(void *userdata, char letter, float value,

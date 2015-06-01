@@ -28,7 +28,8 @@ enum {
 struct CallCounter {
   GCodeParser_t *parser;
   int call_count[NUM_COUNTED_CALLS];
-  AxesRegister abs_pos;  // last coordinates we got from a call.
+  AxesRegister abs_pos;         // last coordinates we got from a move.
+  AxesRegister parser_offset;   // current offset in the parser.
 };
 
 // Parses gcode block and updates counters. Possibly creates a parser first.
@@ -86,7 +87,17 @@ void TEST_set_origin_G92() {
   struct CallCounter counter;
   bzero(&counter, sizeof(counter));
   GCodeTestParseLine("G1 X100 Y100", &counter);  // Some position.
+
+  assert(ExpectEqual(counter.parser_offset[AXIS_X], HOME_X));
+  assert(ExpectEqual(counter.parser_offset[AXIS_Y], HOME_Y));
+  assert(ExpectEqual(counter.parser_offset[AXIS_Z], HOME_Z));
+
   GCodeTestParseLine("G92 X5 Y7", &counter);     // Tool left bottom of it.
+
+  // New offset within machine cube.
+  assert(ExpectEqual(counter.parser_offset[AXIS_X], HOME_X + 100 - 5));
+  assert(ExpectEqual(counter.parser_offset[AXIS_Y], HOME_Y + 100 - 7));
+
   GCodeTestParseLine("G1 X12 Y17", &counter);    // Move relative to that
 
   // Final position.
@@ -155,6 +166,10 @@ static void do_copy_register(void *p, const float axes[]) {
 static void gcode_start(void *p) { do_count(p, CALL_gcode_start); }
 static void gcode_finished(void *p) { do_count(p, CALL_gcode_finished); }
 
+static void inform_origin_offset(void *p, const float *offset) {
+  memcpy(((struct CallCounter*)p)->parser_offset, offset, sizeof(AxesRegister));
+}
+
 static void go_home(void *p, AxisBitmap_t b) { do_count(p, CALL_go_home); }
 static char probe_axis(void *p, float speed, enum GCodeParserAxis a,
                        float *probed) {
@@ -175,6 +190,7 @@ static char rapid_move(void *p, float speed, const float *axes) {
 static struct GCodeParserCb mock_calls = {
   .gcode_start = &gcode_start,
   .gcode_finished = &gcode_finished,
+  .inform_origin_offset = &inform_origin_offset,
   .go_home = &go_home,
   .probe_axis = &probe_axis,
   .motors_enable = &motors_enable,

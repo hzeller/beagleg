@@ -70,6 +70,10 @@ struct GCodeParserCb {
   // so the machine does not have to worry about that.
   // But for display purposes, the machine might be interested in the current
   // offset to apply.
+  // This callback informs about the current origin, relative to the (0/0/0)
+  // machine cube.
+  // If needed after the callback returns, the receiver should make a copy
+  // of the array.
   void (*inform_origin_offset)(void *, const float[]);
 
   // "gcode_command_done" is always executed when a command is completed, which
