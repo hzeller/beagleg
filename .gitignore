@@ -1,0 +1,8 @@
+*~
+*.o
+gcode-machine-control_test
+gcode-parser_test
+gcode-print-stats
+machine-control
+motor-interface-pru_bin.h
+
