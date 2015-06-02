@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/select.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -64,15 +65,20 @@ struct GCodeParser {
 
   // All the following coordinates are absolute positions. They
   // can be choosen as active origin.
-  AxesRegister origin_machine;             // homing position.
-  AxesRegister origin_g92;
+  const AxesRegister origin_machine;     // homing position.
+  // ... + other origins.
 
-  // TODO: origin_g54, origin_g55 ... These must come in the configuration
-  // as they can't be set
+  AxesRegister global_offset_g92;
+  // ... tool ofset ...
 
-  // The current active origin is the machine absolute position
-  // to which all coordinates given are relative.
-  const float *current_origin;      // active origin.
+  // The current active origin is the machine absolute position with
+  // respect to the machine cube. All GCode absolute positions are relative
+  // to that absolute position.
+  const float *current_origin;         // active origin.
+
+  // Active offsets from origin. They can be NULL if not active.
+  const float *current_global_offset;  // offset relative to current origin.
+  // more: tool offset.
 
   enum GCodeParserAxis arc_normal;  // normal vector of arcs.
 };
@@ -180,20 +186,29 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
 }
 
 static void reset_G92(struct GCodeParser *object) {
-  memcpy(object->origin_g92, object->origin_machine,
-         sizeof(object->origin_g92));
+  bzero(object->global_offset_g92, sizeof(object->global_offset_g92));
 }
 
-static void set_current_origin(struct GCodeParser *p, float *origin) {
+static void set_current_origin(struct GCodeParser *p,
+                               const float *origin, const float *offset) {
   p->current_origin = origin;
-  p->callbacks.inform_origin_offset(p->callbacks.user_data, origin);
+  p->current_global_offset = offset;
+  AxesRegister visible_origin;
+  memcpy(visible_origin, origin, sizeof(visible_origin));
+  if (p->current_global_offset) {
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      visible_origin[i] += p->current_global_offset[i];
+    }
+  }
+  p->callbacks.inform_origin_offset(p->callbacks.user_data, visible_origin);
 }
 
 struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   GCodeParser_t *result = (GCodeParser_t*)malloc(sizeof(*result));
   memset(result, 0x00, sizeof(*result));
 
-  memcpy(result->origin_machine, config->machine_origin,
+  // In the 'constructor', this is the only time we set the const value. Cast.
+  memcpy((float*) result->origin_machine, config->machine_origin,
          sizeof(result->origin_machine));
 
   // Setting up all callbacks
@@ -236,7 +251,7 @@ struct GCodeParser *gcodep_new(struct GCodeParserConfig *config) {
   gcodep_program_start_defaults(result);
 
   // When we initialize the machine, we assume the axes to
-  // be at the origin.
+  // be at the origin (but it better is G28-ed later)
   memcpy(result->axes_pos, config->machine_origin, sizeof(result->axes_pos));
 
   return result;
@@ -252,11 +267,11 @@ static void gcodep_program_start_defaults(GCodeParser_t *object) {
   // Initial values for various constants.
   object->unit_to_mm_factor = 1.0f;     // G21
   set_all_axis_to_absolute(object, 1);  // G90
-  reset_G92(object);
+  reset_G92(object);                    // No global offset.
 
   object->arc_normal = AXIS_Z;  // Arcs in XY-plane
 
-  set_current_origin(object, object->origin_machine);
+  set_current_origin(object, object->origin_machine, object->global_offset_g92);
 
   // Some initial machine states
   object->callbacks.set_speed_factor(object->callbacks.user_data, 1);
@@ -389,21 +404,22 @@ static const char *handle_G92(float sub_command,
       if (axis == GCODE_NUM_AXES)
         break;    // Possibly start of new command.
       // This sets the given value to be the new zero.
-      p->origin_g92[axis] = p->axes_pos[axis] - unit_val;
+      p->global_offset_g92[axis] = (p->axes_pos[axis] - unit_val) - 
+        p->current_origin[axis];
       
       line = remaining_line;
     }
-    set_current_origin(p, p->origin_g92);
+    set_current_origin(p, p->current_origin, p->global_offset_g92);
   }
-  else if (sub_command == 92.1f) {
+  else if (sub_command == 92.1f) {   // Reset
     reset_G92(p);
-    set_current_origin(p, p->origin_g92);
+    set_current_origin(p, p->current_origin, p->global_offset_g92);
   }
-  else if (sub_command == 92.2f) {
-    set_current_origin(p, p->origin_machine); // Later: G54...
+  else if (sub_command == 92.2f) {   // Suspend
+    set_current_origin(p, p->current_origin, NULL);
   }
-  else if (sub_command == 92.3f) {
-    set_current_origin(p, p->origin_g92);
+  else if (sub_command == 92.3f) {   // Restore
+    set_current_origin(p, p->current_origin, p->global_offset_g92);
   }
   return line;
 }
@@ -426,10 +442,11 @@ static const char *set_param(struct GCodeParser *p, char param_letter,
 static float abs_axis_pos(struct GCodeParser *p,
 			  const enum GCodeParserAxis axis,
 			  const float unit_value) {
-  float pos = ((p->axis_is_absolute[axis])
-               ? p->current_origin[axis]
-               : p->axes_pos[axis]);
-  return pos + unit_value;
+  float relative_to = ((p->axis_is_absolute[axis])
+                       ? p->current_origin[axis]
+                       : p->axes_pos[axis]);
+  float offset = p->current_global_offset ? p->current_global_offset[axis] : 0;
+  return relative_to + unit_value + offset;
 }
 
 static float f_param_to_feedrate(const float unit_value) {
@@ -557,14 +574,16 @@ static const char *handle_z_probe(struct GCodeParser *p, const char *line) {
     else break;
     line = remaining_line;
   }
-  // probe for the travel endstop
+  // Probe for the travel endstop
   float probed_pos;
   if (p->callbacks.probe_axis(p->callbacks.user_data, feedrate, AXIS_Z,
                               &probed_pos)) {
     p->axes_pos[AXIS_Z] = probed_pos;
-    // Doing implicit G92 here. Is this what we want ?
-    p->origin_g92[AXIS_Z] = probed_pos - probe_thickness;
-    set_current_origin(p, p->origin_g92);
+    // Doing implicit G92 here. Is this what we want ? Later, this might
+    // be part of tool-offset or something.
+    p->global_offset_g92[AXIS_Z] = (p->axes_pos[AXIS_Z] - probe_thickness)
+      - p->current_origin[AXIS_Z];
+    set_current_origin(p, p->current_origin, p->global_offset_g92);
   }
   return line;
 }

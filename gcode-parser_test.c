@@ -12,6 +12,7 @@
 #define HOME_X 123
 #define HOME_Y 456
 #define HOME_Z 789
+#define PROBE_POSITION 42
 
 // In our mock implementation, we keep counters for each call.
 enum {
@@ -46,7 +47,7 @@ static char ExpectEqual(int a, int b) {
   return 1;
 }
 
-void TEST_axes_letter_conversion() {
+static void TEST_axes_letter_conversion() {
   printf(" %s\n", __func__);
   // one way ..
   assert('X' == gcodep_axis2letter(AXIS_X));
@@ -60,7 +61,7 @@ void TEST_axes_letter_conversion() {
   printf(" DONE %s\n", __func__);
 }
 
-void TEST_simple_move() {
+static void TEST_simple_move() {
   printf(" %s\n", __func__);
   struct CallCounter counter;
   bzero(&counter, sizeof(counter));
@@ -82,7 +83,36 @@ void TEST_simple_move() {
   printf(" DONE %s\n", __func__);
 }
 
-void TEST_set_origin_G92() {
+static void TEST_absolute_relative() {
+  printf(" %s\n", __func__);
+  struct CallCounter counter;
+  bzero(&counter, sizeof(counter));
+
+  GCodeTestParseLine("G90", &counter);   // absolute mode.
+
+  GCodeTestParseLine("G1 X10 Y11 Z12", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 10));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 11));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], HOME_Z + 12));
+
+  // Another absolute position.
+  GCodeTestParseLine("G1 X20 Y21 Z22", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 20));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 21));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], HOME_Z + 22));
+
+  GCodeTestParseLine("G91", &counter);   // Now, go in relative mode.
+
+  GCodeTestParseLine("G1 X5 Y6 Z7", &counter);
+  assert(ExpectEqual(counter.abs_pos[AXIS_X], HOME_X + 20 + 5));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Y], HOME_Y + 21 + 6));
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], HOME_Z + 22 + 7));
+
+  ShutdownCounter(&counter);
+  printf(" DONE %s\n", __func__);
+}
+
+static void TEST_set_origin_G92() {
   printf(" %s\n", __func__);
   struct CallCounter counter;
   bzero(&counter, sizeof(counter));
@@ -145,12 +175,29 @@ void TEST_set_origin_G92() {
   printf(" DONE %s\n", __func__);
 }
 
+static void TEST_probe_axis() {
+  printf(" %s\n", __func__);
+  struct CallCounter counter;
+  bzero(&counter, sizeof(counter));
+  GCodeTestParseLine("G30 Z3", &counter);  // 3: thickness of our probe
+
+  assert(ExpectEqual(counter.parser_offset[AXIS_Z], PROBE_POSITION - 3));
+
+  GCodeTestParseLine("G1 Z1", &counter);  // Move Z axis hovering 1 over it
+  assert(ExpectEqual(counter.abs_pos[AXIS_Z], PROBE_POSITION - 3 + 1));
+
+  ShutdownCounter(&counter);
+  printf(" DONE %s\n", __func__);
+}
+
 int main() {
   printf("RUN (%s)\n", __FILE__);
 
   TEST_axes_letter_conversion();
   TEST_simple_move();
+  TEST_absolute_relative();
   TEST_set_origin_G92();
+  TEST_probe_axis();
 
   printf("PASS (%s)\n", __FILE__);
 }
@@ -163,6 +210,8 @@ static void do_copy_register(void *p, const float axes[]) {
   memcpy(((struct CallCounter*)p)->abs_pos, axes, sizeof(AxesRegister));
 }
 
+static void swallow_scalar(void *p, float dont_care) {}
+
 static void gcode_start(void *p) { do_count(p, CALL_gcode_start); }
 static void gcode_finished(void *p) { do_count(p, CALL_gcode_finished); }
 
@@ -171,11 +220,13 @@ static void inform_origin_offset(void *p, const float *offset) {
 }
 
 static void go_home(void *p, AxisBitmap_t b) { do_count(p, CALL_go_home); }
-static char probe_axis(void *p, float speed, enum GCodeParserAxis a,
-                       float *probed) {
+static char probe_axis(void *p, float feed_mm_p_sec, enum GCodeParserAxis axis,
+                       float *probed_position) {
   do_count(p, CALL_probe_axis);
+  *probed_position = PROBE_POSITION;
   return 1;
 }
+
 static void motors_enable(void *p, char b) { do_count(p, CALL_motors_enable); }
 static char coordinated_move(void *p, float speed, const float *axes) {
   do_count(p, CALL_coordinated_move);
@@ -195,7 +246,11 @@ static struct GCodeParserCb mock_calls = {
   .probe_axis = &probe_axis,
   .motors_enable = &motors_enable,
   .coordinated_move = &coordinated_move,
-  .rapid_move = &rapid_move
+  .rapid_move = &rapid_move,
+
+  .set_temperature = &swallow_scalar,
+  .set_fanspeed = &swallow_scalar,
+  .set_speed_factor = &swallow_scalar,
 };
 
 static void GCodeTestParseLine(const char *block, struct CallCounter *counter) {
