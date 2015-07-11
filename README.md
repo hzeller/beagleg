@@ -125,6 +125,7 @@ Options:
                                 Use uppercase if endstop is used for homimg, lowercase if used for travel limit.
   --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)
   --require-homing          : If set, machine refuses to work unless homed
+  --disable-range-check     : Don't limit at machine bounds. Dangerous.
   --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).
                                 Use '1' or '+' for logic high trigger.
                                 Use '0' or '-' for logic low trigger.
