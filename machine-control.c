@@ -64,6 +64,7 @@ static int usage(const char *prog, const char *msg) {
 	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
           "  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)\n"
           "  --require-homing          : If set, machine refuses to work unless homed\n"
+          "  --disable-range-check     : Don't limit at machine bounds. Dangerous.\n"
 	  "  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).\n"
 	  "                                Use '1' or '+' for logic high trigger.\n"
 	  "                                Use '0' or '-' for logic low trigger.\n"
@@ -242,6 +243,7 @@ int main(int argc, char *argv[]) {
     OPT_SET_MAX_ENDSWITCH,
     OPT_SET_ENDSWITCH_POLARITY,
     OPT_REQUIRE_HOMING,
+    OPT_DISABLE_RANGE_CHECK,
     OPT_LOOP,
   };
 
@@ -256,6 +258,7 @@ int main(int argc, char *argv[]) {
     { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
     { "endswitch-polarity", required_argument, NULL, OPT_SET_ENDSWITCH_POLARITY },
     { "homing-required",    no_argument,       NULL, OPT_REQUIRE_HOMING },
+    { "disable-range-check",no_argument,       NULL, OPT_DISABLE_RANGE_CHECK },
     { "port",               required_argument, NULL, 'p'},
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
@@ -307,6 +310,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_REQUIRE_HOMING:
       config.require_homing = 1;
+      break;
+    case OPT_DISABLE_RANGE_CHECK:
+      config.range_check = 0;
       break;
     case 'r':
       if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))

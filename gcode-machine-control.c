@@ -722,6 +722,9 @@ static char test_homing_status_ok(GCodeMachineControl_t *state) {
 
 static char test_within_machine_limits(GCodeMachineControl_t *state,
                                        const float *axis) {
+  if (!state->cfg.range_check)
+    return 1;
+
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     // Min range ...
     if (axis[i] < 0) {
@@ -1151,6 +1154,8 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
 		endstop, trg,
                 result->max_endstop[i].homing_use ? " [HOME]" : "");
       }
+      if (!result->cfg.range_check)
+        fprintf(stderr, "Limit checks disabled!");
       fprintf(stderr, "\n");
     }
     if (is_error) {
@@ -1234,6 +1239,7 @@ void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   config->speed_factor = 1;
   config->debug_print = 0;
   config->synchronous = 0;
+  config->range_check = 1;
   config->axis_mapping = kAxisMapping;
   config->home_order = kHomeOrder;
 }
