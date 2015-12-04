@@ -630,6 +630,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
       case  2: gcodep_finish_program_and_reset(p); break;
       case 17: cb->motors_enable(userdata, 1); break;
       case 18: cb->motors_enable(userdata, 0); break;
+      case 24: cb->wait_for_start(userdata); break;
       case 30: gcodep_finish_program_and_reset(p); break;
       case 82: p->axis_is_absolute[AXIS_E] = 1; break;
       case 83: p->axis_is_absolute[AXIS_E] = 0; break;
