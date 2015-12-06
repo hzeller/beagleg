@@ -48,6 +48,7 @@
 #define ESTOP_HW_GPIO      PIN_P8_17  // ESTOP (input)
 #define ESTOP_SW_GPIO      PIN_P8_26  // ESTOP_SW (output)
 #define LED_GPIO           PIN_P9_25  // LED
+#define START_GPIO         GPIO_NOT_MAPPED
 
 #define AUX_1_GPIO         PIN_P9_41  // FET5
 #define AUX_2_GPIO         PIN_P9_22  // FET6

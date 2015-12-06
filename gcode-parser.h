@@ -86,6 +86,11 @@ struct GCodeParserCb {
   // than 50ms, this function is called (repeately, until there is input again).
   void (*input_idle)(void *);
 
+  // G24: Start/resume
+  // If machine has a START_GPIO this callback will wait until it is low
+  // before continuing to parse commands.
+  void (*wait_for_start)(void *);
+
   // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
   // After that, the parser assume to be at the machine_origin as set in
   // the GCodeParserConfig for the given axes.

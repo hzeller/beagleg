@@ -229,6 +229,18 @@ static void inform_origin_offset(void *userdata, const float *origin) {
          sizeof(state->coordinate_display_origin));
 }
 
+static void machine_start(void *userdata) {
+  int flash_usec = 100 * 1000;
+  int value = get_gpio(START_GPIO);
+  while (value == 1) {
+    set_gpio(LED_GPIO);
+    usleep(flash_usec);
+    clr_gpio(LED_GPIO);
+    usleep(flash_usec);
+    value = get_gpio(START_GPIO);
+  }
+}
+
 static const char *special_commands(void *userdata, char letter, float value,
 				    const char *remaining) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
@@ -1189,6 +1201,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
 void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
                                           struct GCodeParserCb *callbacks) {
   callbacks->user_data = object;
+  callbacks->wait_for_start = &machine_start;
   callbacks->coordinated_move = &machine_G1;
   callbacks->rapid_move = &machine_G0;
   callbacks->go_home = &machine_home;

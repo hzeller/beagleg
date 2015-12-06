@@ -48,6 +48,7 @@
 #define ESTOP_HW_GPIO      GPIO_NOT_MAPPED
 #define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
 #define LED_GPIO           GPIO_NOT_MAPPED
+#define START_GPIO         GPIO_NOT_MAPPED
 
 #define AUX_1_GPIO         PIN_P9_11  // AUX_1 "Aux, Open Collector"
 #define AUX_2_GPIO         PIN_P9_13  // AUX_2 "Aux, Open Collector"

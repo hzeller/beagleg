@@ -152,7 +152,7 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
     return 1;
   }
 
-  set_gpio(LED_GPIO);  // turn on the status LED
+  clr_gpio(LED_GPIO);  // turn off the status LED
 
   pru_motor_enable_nowait(0);  // motors off initially.
 
