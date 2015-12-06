@@ -46,9 +46,10 @@ update_gpio:
 no_map:
 .endm
 
-;;;  Set the motor enable signal based on the flag (r3) bit 0
+;;; Set the motor enable signal based on the flag (r3) bit
+;;; depending on MOTOR_ENABLE_IS_ACTIVE_HIGH
 EnableMotors:
-	SetGPIO r3, 0, MOTOR_ENABLE_GPIO
+	SetGPIO r3, MOTOR_ENABLE_IS_ACTIVE_HIGH, MOTOR_ENABLE_GPIO
 	RET
 
 ;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..1

@@ -42,6 +42,8 @@
 #define MOTOR_9_DIR_GPIO   PIN_P9_30  // DIR_W (external)
 
 #define MOTOR_ENABLE_GPIO  PIN_P9_14  // AXIS_ENAn
+#define MOTOR_ENABLE_IS_ACTIVE_HIGH 0  // 1 if EN, 0 if ~EN
+
 #define MACHINE_PWR_GPIO   PIN_P9_23  // MACHINE_PWR
 #define ESTOP_HW_GPIO      PIN_P8_17  // ESTOP (input)
 #define ESTOP_SW_GPIO      PIN_P8_26  // ESTOP_SW (output)
