@@ -201,6 +201,12 @@
 #define START_GPIO         GPIO_NOT_MAPPED
 #endif
 
+// INPUT - Pauses motion generation when input is low
+#ifndef PAUSE_GPIO
+#define PAUSE_GPIO         GPIO_NOT_MAPPED
+#endif
+
+
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
 // Aux 1 = Mist control on/off (M7: on; M9: off)
 // Aux 2 = Flood control on/off (M8: on; M9: off)

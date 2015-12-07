@@ -1,5 +1,5 @@
 
-all : BUMPS/BeagleG-00A0.dtbo CRAMPS/BeagleG-CRAMPS-00A0.dtbo
+all : BUMPS/BeagleG-00A0.dtbo CRAMPS/BeagleG-CRAMPS-00A0.dtbo VGEN5/BeagleG-VGEN5-00A0.dtbo
 
 # Making a binary devicetree
 %-00A0.dtbo: %.dts

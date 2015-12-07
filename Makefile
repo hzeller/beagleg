@@ -6,7 +6,7 @@
 # https://github.com/beagleboard/am335x_pru_package
 
 # Change here for which hardware you are compiling. See hardware/ directory.
-# Currently supported BUMPS and CRAMPS
+# Currently supported BUMPS, CRAMPS, and VGEN5
 HARDWARE_TARGET=BUMPS
 
 # In case you cross compile this on a different architecture, uncomment this
