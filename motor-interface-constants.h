@@ -106,4 +106,147 @@
 // the pasm, this needs to be in angle brackets).
 #include <beagleg-pin-mapping.h>
 
+// Make sure all GPIOs are defined to avoid compiler errors
+
+// OUTPUTs - There are up to 9 motors, each requires a step signal
+// Ony the PRU code toggles these GPIOs
+#ifndef MOTOR_1_STEP_GPIO
+#define MOTOR_1_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_2_STEP_GPIO
+#define MOTOR_2_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_3_STEP_GPIO
+#define MOTOR_3_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_4_STEP_GPIO
+#define MOTOR_4_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_5_STEP_GPIO
+#define MOTOR_5_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_6_STEP_GPIO
+#define MOTOR_6_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_7_STEP_GPIO
+#define MOTOR_7_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_8_STEP_GPIO
+#define MOTOR_8_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_9_STEP_GPIO
+#define MOTOR_9_STEP_GPIO  GPIO_NOT_MAPPED
+#endif
+
+// OUTPUTs - There are up to 9 motors, each requires a direction signal
+// Ony the PRU code toggles these GPIOs
+#ifndef MOTOR_1_DIR_GPIO
+#define MOTOR_1_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_2_DIR_GPIO
+#define MOTOR_2_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_3_DIR_GPIO
+#define MOTOR_3_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_4_DIR_GPIO
+#define MOTOR_4_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_5_DIR_GPIO
+#define MOTOR_5_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_6_DIR_GPIO
+#define MOTOR_6_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_7_DIR_GPIO
+#define MOTOR_7_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_8_DIR_GPIO
+#define MOTOR_8_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_9_DIR_GPIO
+#define MOTOR_9_DIR_GPIO   GPIO_NOT_MAPPED
+#endif
+
+// OUtPUT - Enables the drivers, can be active-low (default) or high
+#ifndef MOTOR_ENABLE_GPIO
+#define MOTOR_ENABLE_GPIO  GPIO_NOT_MAPPED
+#endif
+#ifndef MOTOR_ENABLE_IS_ACTIVE_HIGH
+#define MOTOR_ENABLE_IS_ACTIVE_HIGH 0
+#endif
+
+// OUTPUT - Turns the ATX power on/off (M80: on; M81: off)
+#ifndef MACHINE_PWR_GPIO
+#define MACHINE_PWR_GPIO   GPIO_NOT_MAPPED
+#endif
+
+// INPUT - Allows detecting a hardware E-Stop
+#ifndef ESTOP_HW_GPIO
+#define ESTOP_HW_GPIO      GPIO_NOT_MAPPED
+#endif
+
+// OUTPUT - Generates a software E-Stop (M0; cleared with M999)
+#ifndef ESTOP_SW_GPIO
+#define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
+#endif
+
+// OUTPUT - General purpose LED (toggles with M24 until start button is pressed)
+#ifndef LED_GPIO
+#define LED_GPIO           GPIO_NOT_MAPPED
+#endif
+
+// INPUT - Starts motion generation after input is low (M24)
+#ifndef START_GPIO
+#define START_GPIO         GPIO_NOT_MAPPED
+#endif
+
+// OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
+// Aux 1 = Mist control on/off (M7: on; M9: off)
+// Aux 2 = Flood control on/off (M8: on; M9: off)
+// Aux 3 = Vacuum control on/off (M10: on; M11: off)
+#ifndef AUX_1_GPIO
+#define AUX_1_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_2_GPIO
+#define AUX_2_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_3_GPIO
+#define AUX_3_GPIO         GPIO_NOT_MAPPED
+#endif
+
+// OUTPUTs - PWM outputs
+#ifndef PWM_1_GPIO
+#define PWM_1_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef PWM_2_GPIO
+#define PWM_2_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef PWM_3_GPIO
+#define PWM_3_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef PWM_4_GPIO
+#define PWM_4_GPIO         GPIO_NOT_MAPPED
+#endif
+
+// INPUTs - Endstops
+#ifndef END_1_GPIO
+#define END_1_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_2_GPIO
+#define END_2_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_3_GPIO
+#define END_3_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_4_GPIO
+#define END_4_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_5_GPIO
+#define END_5_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_6_GPIO
+#define END_6_GPIO         GPIO_NOT_MAPPED
+#endif
+
 #endif // __MOTOR_INTERFACE_CONSTANTS_H

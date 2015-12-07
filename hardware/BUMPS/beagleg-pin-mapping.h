@@ -29,7 +29,6 @@
 #define MOTOR_6_STEP_GPIO  PIN_P9_26  // (extern 6)
 #define MOTOR_7_STEP_GPIO  PIN_P9_24  // (extern 7)
 #define MOTOR_8_STEP_GPIO  PIN_P9_41  // (extern 8)
-#define MOTOR_9_STEP_GPIO  GPIO_NOT_MAPPED
 
 #define MOTOR_1_DIR_GPIO   PIN_P8_16  // motor 1
 #define MOTOR_2_DIR_GPIO   PIN_P8_15  // motor 2
@@ -39,16 +38,9 @@
 #define MOTOR_6_DIR_GPIO   PIN_P9_23  // (extern 6)
 #define MOTOR_7_DIR_GPIO   PIN_P9_14  // (extern 7)
 #define MOTOR_8_DIR_GPIO   PIN_P9_16  // (extern 8)
-#define MOTOR_9_DIR_GPIO   GPIO_NOT_MAPPED
 
 #define MOTOR_ENABLE_GPIO  PIN_P9_12  // ENn
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0  // 1 if EN, 0 if ~EN
-
-#define MACHINE_PWR_GPIO   GPIO_NOT_MAPPED
-#define ESTOP_HW_GPIO      GPIO_NOT_MAPPED
-#define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
-#define LED_GPIO           GPIO_NOT_MAPPED
-#define START_GPIO         GPIO_NOT_MAPPED
 
 #define AUX_1_GPIO         PIN_P9_11  // AUX_1 "Aux, Open Collector"
 #define AUX_2_GPIO         PIN_P9_13  // AUX_2 "Aux, Open Collector"
@@ -61,6 +53,3 @@
 #define END_1_GPIO         PIN_P8_13  // END_X
 #define END_2_GPIO         PIN_P8_14  // END_Y
 #define END_3_GPIO         PIN_P8_17  // END_Z
-#define END_4_GPIO         GPIO_NOT_MAPPED
-#define END_5_GPIO         GPIO_NOT_MAPPED
-#define END_6_GPIO         GPIO_NOT_MAPPED
