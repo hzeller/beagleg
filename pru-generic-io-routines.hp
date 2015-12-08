@@ -58,10 +58,14 @@ EnableMotors:
 ;;; Aux 1 = Mist control on/off (M7: on; M9: off)
 ;;; Aux 2 = Flood control on/off (M8: on; M9: off)
 ;;; Aux 3 = Vacuum control on/off (M10: on; M11: off)
+;;; Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
+;;; Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
 SetAuxBits:
 	SetGPIO r3, 0, AUX_1_GPIO
 	SetGPIO r3, 1, AUX_2_GPIO
 	SetGPIO r3, 2, AUX_3_GPIO
+	SetGPIO r3, 3, AUX_4_GPIO
+	SetGPIO r3, 4, AUX_5_GPIO
 	RET
 
 ;;; Set the motor direction signals based from queue_header.direction_bits (r3)

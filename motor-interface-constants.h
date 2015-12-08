@@ -205,6 +205,8 @@
 // Aux 1 = Mist control on/off (M7: on; M9: off)
 // Aux 2 = Flood control on/off (M8: on; M9: off)
 // Aux 3 = Vacuum control on/off (M10: on; M11: off)
+// Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
+// Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED
 #endif
@@ -213,6 +215,12 @@
 #endif
 #ifndef AUX_3_GPIO
 #define AUX_3_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_4_GPIO
+#define AUX_4_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_5_GPIO
+#define AUX_5_GPIO         GPIO_NOT_MAPPED
 #endif
 
 // OUTPUTs - PWM outputs
