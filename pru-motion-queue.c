@@ -29,6 +29,7 @@
 #include <strings.h>
 
 #include "generic-gpio.h"
+#include "pwm-timer.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
@@ -144,6 +145,7 @@ static void pru_shutdown(char flush_queue) {
   pru_motor_enable_nowait(0);
   clr_gpio(LED_GPIO);  // turn off the status LED
   unmap_gpio();
+  pwm_timers_unmap();
 }
 
 int init_pru_motion_queue(struct MotionQueue *queue) {
@@ -151,10 +153,29 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
     return 1;
   }
+  if (!pwm_timers_map()) {
+    fprintf(stderr, "Couldn't mmap() TIMER ranges.\n");
+    return 1;
+  }
 
   clr_gpio(LED_GPIO);  // turn off the status LED
 
   pru_motor_enable_nowait(0);  // motors off initially.
+
+  // The PWM_*_GPIO pins can produce PWM signals if they are mapped to one
+  // of the TIMER pins and the dts set the pins to the correct mode (0x02).
+  // If they are mapped to other pins, or the mode is wrong (0x07), they will
+  // only work as GPIO outputs. Either way the pwm_timer_*() calls are safe.
+  //
+  // Make sure all the PWM timers are stopped and set the default base frequency.
+  pwm_timer_start(PWM_1_GPIO, 0);
+  pwm_timer_start(PWM_2_GPIO, 0);
+  pwm_timer_start(PWM_3_GPIO, 0);
+  pwm_timer_start(PWM_4_GPIO, 0);
+  pwm_timer_set_freq(PWM_1_GPIO, 0);
+  pwm_timer_set_freq(PWM_2_GPIO, 0);
+  pwm_timer_set_freq(PWM_3_GPIO, 0);
+  pwm_timer_set_freq(PWM_4_GPIO, 0);
 
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
   prussdrv_init();
