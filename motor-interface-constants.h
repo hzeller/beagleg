@@ -263,4 +263,9 @@
 #define END_6_GPIO         GPIO_NOT_MAPPED
 #endif
 
+// Friendly names for the GPIO signals
+#ifndef FAN_GPIO
+#define FAN_GPIO           GPIO_NOT_MAPPED
+#endif
+
 #endif // __MOTOR_INTERFACE_CONSTANTS_H

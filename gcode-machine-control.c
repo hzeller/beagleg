@@ -36,6 +36,7 @@
 #include "motor-operations.h"
 #include "gcode-parser.h"
 #include "generic-gpio.h"
+#include "pwm-timer.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
@@ -203,10 +204,6 @@ static void dummy_set_temperature(void *userdata, float f) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   mprintf(state, "// BeagleG: set_temperature(%.1f) not implemented.\n", f);
 }
-static void dummy_set_fanspeed(void *userdata, float speed) {
-  GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
-  mprintf(state, "// BeagleG: set_fanspeed(%.0f) not implemented.\n", speed);
-}
 static void dummy_wait_temperature(void *userdata) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   mprintf(state, "// BeagleG: wait_temperature() not implemented.\n");
@@ -227,6 +224,21 @@ static void inform_origin_offset(void *userdata, const float *origin) {
   GCodeMachineControl_t *state = (GCodeMachineControl_t*)userdata;
   memcpy(state->coordinate_display_origin, origin,
          sizeof(state->coordinate_display_origin));
+}
+
+static void machine_set_fanspeed(void *userdata, float speed) {
+  if (speed < 0.0 || speed > 255.0) return;
+  float duty_cycle = speed / 255.0;
+  // The fan can be controlled by a GPIO or PWM (TIMER) signal
+  if (duty_cycle == 0.0) {
+    clr_gpio(FAN_GPIO);
+    pwm_timer_start(FAN_GPIO, 0);
+  } else {
+    set_gpio(FAN_GPIO);
+    pwm_timer_set_duty(FAN_GPIO, duty_cycle);
+    pwm_timer_start(FAN_GPIO, 1);
+  }
+  fprintf(stderr, "set_fanspeed(%.0f) -> PWM duty_cycle %.3f\n", speed, duty_cycle);
 }
 
 static void machine_start(void *userdata) {
@@ -1201,6 +1213,7 @@ GCodeMachineControl_t *gcode_machine_control_new(const struct MachineControlConf
 void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
                                           struct GCodeParserCb *callbacks) {
   callbacks->user_data = object;
+  callbacks->set_fanspeed = &machine_set_fanspeed;
   callbacks->wait_for_start = &machine_start;
   callbacks->coordinated_move = &machine_G1;
   callbacks->rapid_move = &machine_G0;
@@ -1218,7 +1231,6 @@ void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
   callbacks->gcode_finished = &finish_machine_control;
 
   // Not yet implemented
-  callbacks->set_fanspeed = &dummy_set_fanspeed;
   callbacks->set_temperature = &dummy_set_temperature;
   callbacks->wait_temperature = &dummy_wait_temperature;
 }

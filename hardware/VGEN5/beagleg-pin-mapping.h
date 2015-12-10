@@ -53,3 +53,5 @@
 #define END_4_GPIO         PIN_P8_12  // IN3 - Z suface (min)
 #define END_5_GPIO         PIN_P8_13  // IN4 - LIM4
 #define END_6_GPIO         PIN_P8_14  // IN5 - LIM5
+
+#define FAN_GPIO           PWM_4_GPIO
