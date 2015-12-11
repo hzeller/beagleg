@@ -50,7 +50,8 @@
 #define AUX_BIT_VACUUM      (1 << 2)
 #define AUX_BIT_SPINDLE_ON  (1 << 3)
 #define AUX_BIT_SPINDLE_DIR (1 << 4)
-#define MAX_AUX_PIN         4
+#define MAX_AUX_PIN         15
+
 #define NUM_ENDSTOPS        6
 
 // Some default settings. These are most likely overrridden via flags by user.
@@ -79,7 +80,7 @@ struct AxisTarget {
   int delta_steps[GCODE_NUM_AXES];     // Difference to previous position.
   enum GCodeParserAxis defining_axis;  // index into defining axis.
   float speed;                         // (desired) speed in steps/s on defining axis.
-  unsigned int aux_bits;               // Auxiliarry bits in this segment; set with M42
+  unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
 };
 
 // TargetBuffer implementation
@@ -173,7 +174,7 @@ struct GCodeMachineControl {
   float coordinate_display_origin[GCODE_NUM_AXES]; // parser tells us
   float current_feedrate_mm_per_sec;     // Set via Fxxx and remembered
   float prog_speed_factor;               // Speed factor set by program (M220)
-  unsigned int aux_bits;                 // Set via M42.
+  unsigned short aux_bits;               // Set via M42.
   unsigned int spindle_rpm;              // Set via Sxxx of M3/M4 and remembered
 
   // Next buffered positions. Written by incoming gcode, read by outgoing

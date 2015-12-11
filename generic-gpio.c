@@ -127,6 +127,20 @@ static void cfg_gpio_outputs() {
   // Aux and PWM signals
   set_gpio_output_mask(output_mask, AUX_1_GPIO);
   set_gpio_output_mask(output_mask, AUX_2_GPIO);
+  set_gpio_output_mask(output_mask, AUX_3_GPIO);
+  set_gpio_output_mask(output_mask, AUX_4_GPIO);
+  set_gpio_output_mask(output_mask, AUX_5_GPIO);
+  set_gpio_output_mask(output_mask, AUX_6_GPIO);
+  set_gpio_output_mask(output_mask, AUX_7_GPIO);
+  set_gpio_output_mask(output_mask, AUX_8_GPIO);
+  set_gpio_output_mask(output_mask, AUX_9_GPIO);
+  set_gpio_output_mask(output_mask, AUX_10_GPIO);
+  set_gpio_output_mask(output_mask, AUX_11_GPIO);
+  set_gpio_output_mask(output_mask, AUX_12_GPIO);
+  set_gpio_output_mask(output_mask, AUX_13_GPIO);
+  set_gpio_output_mask(output_mask, AUX_14_GPIO);
+  set_gpio_output_mask(output_mask, AUX_15_GPIO);
+  set_gpio_output_mask(output_mask, AUX_16_GPIO);
   set_gpio_output_mask(output_mask, PWM_1_GPIO);
   set_gpio_output_mask(output_mask, PWM_2_GPIO);
   set_gpio_output_mask(output_mask, PWM_3_GPIO);

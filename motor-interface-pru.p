@@ -39,7 +39,7 @@
 	.u16 loops_travel	 // Phase 2: steps spent in travel.
 	.u16 loops_decel         // Phase 3: steps spent in deceleration.
 
-	.u16 aux		 // lowest two bits only used.
+	.u16 aux		 // all 16 bits can be used
 
 	.u32 accel_series_index  // index into the taylor series.
 	.u32 hires_accel_cycles  // initial delay cycles, for acceleration

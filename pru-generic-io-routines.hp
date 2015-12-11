@@ -53,19 +53,36 @@ EnableMotors:
 	SetGPIO r3, 0, MOTOR_ENABLE_GPIO
 	RET
 
-;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..2
+;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..15
 ;;; The aux bits are mapped as:
-;;; Aux 1 = Mist control on/off (M7: on; M9: off)
-;;; Aux 2 = Flood control on/off (M8: on; M9: off)
-;;; Aux 3 = Vacuum control on/off (M10: on; M11: off)
-;;; Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
-;;; Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
+;;;   Aux 1 = Mist control on/off (M7: on; M9: off)
+;;;   Aux 2 = Flood control on/off (M8: on; M9: off)
+;;;   Aux 3 = Vacuum control on/off (M10: on; M11: off)
+;;;   Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
+;;;   Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
+;;; The aux bits can also be controlled using M42/M62/M63/M64/M65
+;;;   M42 Pnn Sxx - Set AUX Pin nn to value xx
+;;;   M62 Pnn     - Set AUX Pin nn to 1
+;;;   M63 Pnn     - Set AUX Pin nn to 0
+;;;   M64 Pnn     - Set AUX Pin nn to 1
+;;;   M65 Pnn     - Set AUX Pin nn to 0
 SetAuxBits:
 	SetGPIO r3, 0, AUX_1_GPIO
 	SetGPIO r3, 1, AUX_2_GPIO
 	SetGPIO r3, 2, AUX_3_GPIO
 	SetGPIO r3, 3, AUX_4_GPIO
 	SetGPIO r3, 4, AUX_5_GPIO
+	SetGPIO r3, 5, AUX_6_GPIO
+	SetGPIO r3, 6, AUX_7_GPIO
+	SetGPIO r3, 7, AUX_8_GPIO
+	SetGPIO r3, 8, AUX_9_GPIO
+	SetGPIO r3, 9, AUX_10_GPIO
+	SetGPIO r3, 10, AUX_11_GPIO
+	SetGPIO r3, 11, AUX_12_GPIO
+	SetGPIO r3, 12, AUX_13_GPIO
+	SetGPIO r3, 13, AUX_14_GPIO
+	SetGPIO r3, 14, AUX_15_GPIO
+	SetGPIO r3, 15, AUX_16_GPIO
 	RET
 
 ;;; Set the motor direction signals based from queue_header.direction_bits (r3)

@@ -54,7 +54,7 @@ struct MotionSegment {
   uint16_t loops_accel;    // Phase 1: loops spent in acceleration
   uint16_t loops_travel;   // Phase 2: lops spent in travel
   uint16_t loops_decel;    // Phase 3: loops spent in deceleration
-  uint16_t aux;            // right now: only lowest 2 bits.
+  uint16_t aux;            // all 16 bits can be used
   uint32_t accel_series_index;  // index in taylor
 
   uint32_t hires_accel_cycles;  // acceleration delay cycles.

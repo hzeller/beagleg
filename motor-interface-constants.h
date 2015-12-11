@@ -228,6 +228,39 @@
 #ifndef AUX_5_GPIO
 #define AUX_5_GPIO         GPIO_NOT_MAPPED
 #endif
+#ifndef AUX_6_GPIO
+#define AUX_6_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_7_GPIO
+#define AUX_7_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_8_GPIO
+#define AUX_8_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_9_GPIO
+#define AUX_9_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_10_GPIO
+#define AUX_10_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_11_GPIO
+#define AUX_11_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_12_GPIO
+#define AUX_12_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_13_GPIO
+#define AUX_13_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_14_GPIO
+#define AUX_14_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_15_GPIO
+#define AUX_15_GPIO        GPIO_NOT_MAPPED
+#endif
+#ifndef AUX_16_GPIO
+#define AUX_16_GPIO        GPIO_NOT_MAPPED
+#endif
 
 // OUTPUTs - PWM outputs
 #ifndef PWM_1_GPIO

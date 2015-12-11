@@ -40,7 +40,7 @@ struct MotorMovement {
   
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.
-  unsigned char aux_bits;   // Aux-bits to switch.
+  unsigned short aux_bits;   // Aux-bits to switch.
 
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
