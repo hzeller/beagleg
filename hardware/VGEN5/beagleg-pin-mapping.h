@@ -43,8 +43,8 @@
 #define AUX_1_GPIO         PIN_P8_8   // OUT1 - Mister
 #define AUX_2_GPIO         PIN_P8_9   // OUT2 - Flood
 #define AUX_3_GPIO         PIN_P8_7   // OUT0 - Vacuum
+#define AUX_16_GPIO        PIN_P9_14  // OUT4 - Laser (Z axis dry run)
 
-#define PWM_3_GPIO         PIN_P9_14  // OUT4 - Laser (Z axis dry run)
 #define PWM_4_GPIO         PIN_P8_10  // OUT3 - Fan
 
 #define END_1_GPIO         PIN_P8_15  // IN0 - X home (min)
