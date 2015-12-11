@@ -101,8 +101,8 @@ M42 Pnn          | Get state of AUX Pin nn.
 M42 Pnn Sxx      | Set AUX Pin nn to value xx; happens synchronously with next move.
 M62 Pnn          | Set AUX Pin nn to 1; happens synchronously with next move.
 M63 Pnn          | Set AUX Pin nn to 0; happens synchronously with next move.
-M64 Pnn          | Set AUX Pin nn to 1; should happen immediately, currently mimics M62.
-M65 Pnn          | Set AUX Pin nn to 0; should happen immediately, currently mimics M63.
+M64 Pnn          | Set AUX Pin nn to 1; updates immediately, should only be used when not moving.
+M65 Pnn          | Set AUX Pin nn to 0; updates immediately, should only be used when not moving.
 M80              | ATX Power On (only on capes that have MACHINE_PWR_GPIO)
 M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.

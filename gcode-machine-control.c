@@ -309,9 +309,35 @@ static const char *special_commands(void *userdata, char letter, float value,
         if (aux_bit >= 0 && aux_bit <= 1) {
           if (aux_bit) state->aux_bits |= 1 << pin;
           else state->aux_bits &= ~(1 << pin);
+          if (code == 64 || code == 65) {
+            // update the AUX pin now
+            uint32_t gpio_def = GPIO_NOT_MAPPED;
+            switch (pin) {
+            case 0:  gpio_def = AUX_1_GPIO; break;
+            case 1:  gpio_def = AUX_2_GPIO; break;
+            case 2:  gpio_def = AUX_3_GPIO; break;
+            case 3:  gpio_def = AUX_4_GPIO; break;
+            case 4:  gpio_def = AUX_5_GPIO; break;
+            case 5:  gpio_def = AUX_6_GPIO; break;
+            case 6:  gpio_def = AUX_7_GPIO; break;
+            case 7:  gpio_def = AUX_8_GPIO; break;
+            case 8:  gpio_def = AUX_9_GPIO; break;
+            case 9:  gpio_def = AUX_10_GPIO; break;
+            case 10: gpio_def = AUX_11_GPIO; break;
+            case 11: gpio_def = AUX_12_GPIO; break;
+            case 12: gpio_def = AUX_13_GPIO; break;
+            case 13: gpio_def = AUX_14_GPIO; break;
+            case 14: gpio_def = AUX_15_GPIO; break;
+            case 15: gpio_def = AUX_16_GPIO; break;
+            }
+            if (gpio_def != GPIO_NOT_MAPPED) {
+              if (aux_bit) set_gpio(gpio_def);
+              else clr_gpio(gpio_def);
+            }
+          }
         } else if (code == 42 && state->msg_stream) {  // Just read operation.
           mprintf(state, "%d\n", (state->aux_bits >> pin) & 1);
-	}
+        }
       }
       break;
     case 80: set_gpio(MACHINE_PWR_GPIO); break;
