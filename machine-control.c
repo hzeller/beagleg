@@ -69,6 +69,7 @@ static int usage(const char *prog, const char *msg) {
 	  "                                Use '1' or '+' for logic high trigger.\n"
 	  "                                Use '0' or '-' for logic low trigger.\n"
 	  "                                Use '_' for unused endstops.\n"
+	  "  --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)\n"
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
@@ -242,6 +243,7 @@ int main(int argc, char *argv[]) {
     OPT_SET_MIN_ENDSWITCH,
     OPT_SET_MAX_ENDSWITCH,
     OPT_SET_ENDSWITCH_POLARITY,
+    OPT_SET_THRESHOLD_ANGLE,
     OPT_REQUIRE_HOMING,
     OPT_DISABLE_RANGE_CHECK,
     OPT_LOOP,
@@ -257,6 +259,7 @@ int main(int argc, char *argv[]) {
     { "min-endswitch",      required_argument, NULL, OPT_SET_MIN_ENDSWITCH },
     { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
     { "endswitch-polarity", required_argument, NULL, OPT_SET_ENDSWITCH_POLARITY },
+    { "threshold-angle",    required_argument, NULL, OPT_SET_THRESHOLD_ANGLE },
     { "homing-required",    no_argument,       NULL, OPT_REQUIRE_HOMING },
     { "disable-range-check",no_argument,       NULL, OPT_DISABLE_RANGE_CHECK },
     { "port",               required_argument, NULL, 'p'},
@@ -304,6 +307,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_SET_ENDSWITCH_POLARITY:
       config.endswitch_polarity = strdup(optarg);
+      break;
+    case OPT_SET_THRESHOLD_ANGLE:
+      config.threshold_angle = (float)atof(optarg);
       break;
     case OPT_SET_HOME_ORDER:
       config.home_order = strdup(optarg);

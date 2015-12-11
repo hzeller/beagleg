@@ -80,6 +80,7 @@ struct AxisTarget {
   int delta_steps[GCODE_NUM_AXES];     // Difference to previous position.
   enum GCodeParserAxis defining_axis;  // index into defining axis.
   float speed;                         // (desired) speed in steps/s on defining axis.
+  float angle;
   unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
 };
 
@@ -483,7 +484,9 @@ static char within_acceptable_range(float new, float old, float fraction) {
 // most times, which is inconvenient. TODO(hzeller): speed matching is not
 // cutting it :)
 static float determine_joining_speed(const struct AxisTarget *from,
-                                     const struct AxisTarget *to) {
+                                     const struct AxisTarget *to,
+                                     const float threshold,
+                                     const float angle) {
   // Our goal is to figure out what our from defining speed should
   // be at the end of the move.
   char is_first = 1;
@@ -493,6 +496,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
     const int to_delta = to->delta_steps[axis];
 
     // Quick integer decisions
+    if (angle < threshold) continue;
     if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
     if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
     if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
@@ -580,7 +584,9 @@ static void move_machine_steps(GCodeMachineControl_t *state,
   // We need to arrive at a speed that the upcoming move does not have
   // to decelerate further (after all, it has a fixed feed-rate it should not
   // go over).
-  float next_speed = determine_joining_speed(target_pos, upcoming);
+  float next_speed = determine_joining_speed(target_pos, upcoming,
+                                             state->cfg.threshold_angle,
+                                             fabsf(last_pos->angle - target_pos->angle));
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
@@ -715,6 +721,7 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
   }
   new_pos->aux_bits = state->aux_bits;
   new_pos->defining_axis = defining_axis;
+  new_pos->angle = previous->angle + 180.0f; // default angle to force a speed change
 
   // Now let's calculate the travel speed in steps/s on the defining axis.
   if (max_steps > 0) {
@@ -726,14 +733,18 @@ static void machine_move(void *userdata, float feedrate, const float axis[]) {
     if (defining_axis == AXIS_X || defining_axis == AXIS_Y || defining_axis == AXIS_Z) {
       // We need to calculate the feedrate in real-world coordinates as each
       // axis can have a different amount of steps/mm
-      const float total_xyz_len_mm =
-        euclid_distance(new_pos->delta_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X],
-                        new_pos->delta_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y],
-                        new_pos->delta_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z]);
+      const float x = new_pos->delta_steps[AXIS_X] / state->cfg.steps_per_mm[AXIS_X];
+      const float y = new_pos->delta_steps[AXIS_Y] / state->cfg.steps_per_mm[AXIS_Y];
+      const float z = new_pos->delta_steps[AXIS_Z] / state->cfg.steps_per_mm[AXIS_Z];
+      const float total_xyz_len_mm = euclid_distance(x, y, z);
       const float steps_per_mm = state->cfg.steps_per_mm[defining_axis];
       const float defining_axis_len_mm = new_pos->delta_steps[defining_axis] / steps_per_mm;
       const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
       travel_speed *= euclid_fraction;
+
+      // If this is a true XY vector, calculate the angle of the vector
+      if (z == 0)
+        new_pos->angle = (atan2f(y, x) / 3.14159265359) * 180.0f;
     }
     if (travel_speed > state->max_axis_speed[defining_axis]) {
       travel_speed = state->max_axis_speed[defining_axis];
@@ -1294,4 +1305,5 @@ void gcode_machine_control_default_config(struct MachineControlConfig *config) {
   config->range_check = 1;
   config->axis_mapping = kAxisMapping;
   config->home_order = kHomeOrder;
+  config->threshold_angle = 10.0;
 }

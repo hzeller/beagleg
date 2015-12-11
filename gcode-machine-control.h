@@ -36,6 +36,7 @@ struct MachineControlConfig {
   float acceleration[GCODE_NUM_AXES];   // Max acceleration for axis (mm/s^2)
 
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
+  float threshold_angle;      // Threshold angle to ignore speed changes
 
   // The follwing parameter determines which logical axis ends up
   // on which physical plug location.
