@@ -118,13 +118,14 @@ void pwm_timer_start(uint32_t gpio_def, char start) {
     timer->regs[TCLR/4] = 0;                              // stop timer
     timer->running = 0;
   } else {
-    timer->regs[TCLR/4] = TCLR_ST |                       // start timer
-                          TCLR_AR |                       // auto-reload
-                          TCLR_PTV(timer->ptv)  |         // prescale value
-                          ((timer->pre) ? TCLR_PRE : 0) | // enable prescale if necessary
-                          TCLR_CE |                       // compare mode enabled
-                          TCLR_TRG_OVF_MAT |              // trigger on overflow and match
-                          TCLR_PT;                        // PWM toggle mode
+    timer->regs[TCLR/4] = (TCLR_ST |                       // start timer
+                           TCLR_AR |                       // auto-reload
+                           TCLR_PTV(timer->ptv)  |         // prescale value
+                           ((timer->pre) ? TCLR_PRE : 0) | // enable prescale if necessary
+                           TCLR_CE |                       // compare mode enabled
+                           TCLR_TRG_OVF_MAT |              // trigger on overflow and match
+                           TCLR_PT                         // PWM toggle mode
+                           );
     timer->running = 1;
   }
 }
@@ -267,7 +268,7 @@ int pwm_timers_map() {
 
   ret = 1;
 
-exit:
+ exit:
   close(fd);
   if (!ret)
     pwm_timers_unmap();
