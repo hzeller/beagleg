@@ -186,8 +186,7 @@ QUEUE_READ:
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 
-	;; Enable the stepper motors (lo-active)
-	MOV r3, 0
+	;; Enable the stepper motors.
 	CALL EnableMotors
 
 	;; Set direction bits
