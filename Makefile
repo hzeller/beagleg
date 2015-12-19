@@ -36,10 +36,11 @@ GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o arc-gen.o pwm-timer.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
-TARGETS=machine-control gcode-print-stats
-TEST_BINARIES=gcode-machine-control_test gcode-parser_test pwm-timer_test
 
-all : $(TARGETS) $(TEST_BINARIES)
+TARGETS=machine-control gcode-print-stats
+UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test
+
+all : $(TARGETS) $(UNITTEST_BINARIES)
 
 gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -47,8 +48,8 @@ gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
 machine-control: machine-control.o $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
-test: $(TEST_BINARIES)
-	for test_bin in $(TEST_BINARIES) ; do ./$$test_bin ; done
+test: $(UNITTEST_BINARIES)
+	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
 
 %_test: %_test.c $(OBJECTS)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
@@ -73,4 +74,4 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h $(CAPE_INCLUDE)/pru-io-routines.hp
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(TEST_BINARIES)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES)
