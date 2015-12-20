@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -98,40 +98,46 @@ plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using
  * a couple of measurements.
  * The minimum is 2 to look at two adjacent values.
  */
-#define AVERAGE_RINBGUFFER_SIZE 10
-static double avg_ringbuffer[AVERAGE_RINBGUFFER_SIZE];
-static double avg_dt_sum = 0;
-static uint32_t avg_pos = 0;
 
-static void avg_reset() {
-  avg_dt_sum = 0;
-  avg_pos = 0;
-  bzero(&avg_ringbuffer, AVERAGE_RINBGUFFER_SIZE * sizeof(double));
-}
-static double avg_get_acceleration() {
-  if (avg_pos < 2)
-    return 0;
-  // We go back as far as the ringbuffer reaches. In the beginning, that is not far.
-  int back = AVERAGE_RINBGUFFER_SIZE - 1;
-  if (back >= avg_pos) {
-    back = avg_pos - 1;
+#define AVERAGE_RINBGUFFER_SIZE 10
+class SimFirmwareQueue::Averager {
+public:
+  Averager() : dt_sum_(0), pos_(0) {
+    bzero(&ringbuffer_, AVERAGE_RINBGUFFER_SIZE * sizeof(double));
   }
-  double dt0 = avg_ringbuffer[(avg_pos + AVERAGE_RINBGUFFER_SIZE - back) % AVERAGE_RINBGUFFER_SIZE];
-  double dt1 = avg_ringbuffer[avg_pos % AVERAGE_RINBGUFFER_SIZE];
-  if (dt0 <= 0 || dt1 <= 0)
-    return 0;
-  
-  double v0 = (1 / dt0) / LOOPS_PER_STEP;
-  double v1 = (1 / dt1) / LOOPS_PER_STEP;
-  return (v1 - v0) / (avg_dt_sum - dt1);
+
+  double GetAcceleration() {
+    if (pos_ < 2)
+      return 0;
+    // We go back as far as the ringbuffer reaches. In the beginning, that is not far.
+    int back = AVERAGE_RINBGUFFER_SIZE - 1;
+    if (back >= pos_) {
+      back = pos_ - 1;
+    }
+    double dt0 = ringbuffer_[(pos_ + AVERAGE_RINBGUFFER_SIZE - back) % AVERAGE_RINBGUFFER_SIZE];
+    double dt1 = ringbuffer_[pos_ % AVERAGE_RINBGUFFER_SIZE];
+    if (dt0 <= 0 || dt1 <= 0)
+      return 0;
+
+    double v0 = (1 / dt0) / LOOPS_PER_STEP;
+    double v1 = (1 / dt1) / LOOPS_PER_STEP;
+    return (v1 - v0) / (dt_sum_ - dt1);
 }
-static void avg_push_delta_time(double t) {
-  int next_pos = (avg_pos + 1) % AVERAGE_RINBGUFFER_SIZE;
-  avg_dt_sum -= avg_ringbuffer[next_pos];
-  avg_ringbuffer[next_pos] = t;
-  avg_dt_sum += t;
-  avg_pos++;
-}
+
+  void PushDeltaTime(double t) {
+    const int next_pos = (pos_ + 1) % AVERAGE_RINBGUFFER_SIZE;
+    dt_sum_ -= ringbuffer_[next_pos];
+    ringbuffer_[next_pos] = t;
+    dt_sum_ += t;
+    pos_++;
+  }
+
+private:
+  double ringbuffer_[AVERAGE_RINBGUFFER_SIZE];
+  double dt_sum_;
+  int pos_;
+};
+
 
 struct HardwareState {
   // Internal state
@@ -155,11 +161,11 @@ static double euclid(double x, double y, double z) {
 }
 
 // This simulates what happens in the PRU. For testing purposes.
-static void sim_enqueue(struct MotionSegment *segment) {
+void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
   if (segment->state == STATE_EXIT)
     return;
   // setting output direction according to segment->direction_bits;
-  
+
   bzero(&state, sizeof(state));
 
   // For convenience, this is the relative speed of each motor.
@@ -171,7 +177,7 @@ static void sim_enqueue(struct MotionSegment *segment) {
   const double euklid_factor = euclid(motor_speeds[X_MOTOR],
                                       motor_speeds[Y_MOTOR],
                                       motor_speeds[Z_MOTOR]);
-  
+
 #if JERK_EXPERIMENT
   uint32_t jerk_index = 1;
 #endif
@@ -193,9 +199,9 @@ static void sim_enqueue(struct MotionSegment *segment) {
 
     msg = "";
     sim_time += 160e-9;  // Updating the motor takes this time.
-    
+
     uint32_t delay_loops = 0;
-    
+
     // Higher resolution delay if we had fractional counts. Used to better calculate acceleration
     // for display purposes.
     double hires_delay = 0;
@@ -293,42 +299,34 @@ static void sim_enqueue(struct MotionSegment *segment) {
       break;  // done.
     }
     double wait_time = 1.0 * delay_loops / TIMER_FREQUENCY;
-    avg_push_delta_time(1.0 * hires_delay / TIMER_FREQUENCY);
-    double acceleration = avg_get_acceleration();
+    averager_->PushDeltaTime(1.0 * hires_delay / TIMER_FREQUENCY);
+    double acceleration = averager_->GetAcceleration();
     sim_time += wait_time;
     double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
 
     // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
-    printf("%12.8f %10d %12.4f %12.4f      ",
-           sim_time, delay_loops,
-           euklid_factor * velocity,
-           euklid_factor * acceleration);
+    fprintf(out_, "%12.8f %10d %12.4f %12.4f      ",
+            sim_time, delay_loops,
+            euklid_factor * velocity,
+            euklid_factor * acceleration);
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-      printf("%5d %8.4f %8.4f ", sim_steps[i],
-             motor_speeds[i] * velocity,
-             motor_speeds[i] * acceleration);
+      fprintf(out_, "%5d %8.4f %8.4f ", sim_steps[i],
+              motor_speeds[i] * velocity,
+              motor_speeds[i] * acceleration);
     }
-    printf("%s\n", msg);
+    fprintf(out_, "%s\n", msg);
   }
 }
 
-static void sim_wait_queue_empty() {}
-static void sim_motor_enable(char on) {}
-static void sim_shutdown(char do_flush) {}
-void init_sim_motion_queue(struct MotionQueue *queue) {
-  bzero(&state, sizeof(state));
-  sim_time = 0;
-  bzero(&sim_steps, sizeof(&sim_steps));
-  avg_reset();
-  queue->enqueue = &sim_enqueue;
-  queue->wait_queue_empty = &sim_wait_queue_empty;
-  queue->motor_enable = &sim_motor_enable;
-  queue->shutdown = &sim_shutdown;
-
+SimFirmwareQueue::SimFirmwareQueue(FILE *out) : out_(out), averager_(new Averager()) {
   // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
   printf("%12s %10s %12s %12s      ", "time", "timer-loop", "Euclid-speed", "Euclid-accel");
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-    printf("%4s%d %7s%d %7s%d ", "s", i, "v", i, "a", i);
+    fprintf(out_, "%4s%d %7s%d %7s%d ", "s", i, "v", i, "a", i);
   }
-  printf("\n");
+  fprintf(out_, "\n");
+}
+
+SimFirmwareQueue::~SimFirmwareQueue() {
+  delete averager_;
 }

@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -17,8 +17,23 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Simulation of what happens in the firmware. We implement the motor-queue
-// interface but directly execute the commands.
-struct MotionQueue;
+#include "motion-queue.h"
 
-void init_sim_motion_queue(struct MotionQueue *queue);
+#include <stdio.h>
+
+class SimFirmwareQueue : public MotionQueue {
+public:
+  SimFirmwareQueue(FILE *out);
+  virtual ~SimFirmwareQueue();
+
+  virtual void Enqueue(MotionSegment *segment);
+  virtual void WaitQueueEmpty() {}
+  virtual void MotorEnable(bool on) {}
+  virtual void Shutdown(bool flush_queue) {}
+
+private:
+  class Averager;
+
+  FILE *out_;
+  Averager *averager_;
+};

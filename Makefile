@@ -25,7 +25,9 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=hardware/$(HARDWARE_TARGET)
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -std=c99 -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
+CXXFLAGS+=$(CFLAGS)
+
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=-Wl,-rpath=$(LIBDIR_APP_LOADER) -L$(LIBDIR_APP_LOADER) -lprussdrv
 
@@ -55,7 +57,11 @@ test: $(UNITTEST_BINARIES)
 	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
 
 %.o: %.c
-	$(CROSS_COMPILE)gcc $(CFLAGS) -c -o $@ $<
+	$(CROSS_COMPILE)gcc $(CFLAGS) -std=c99 -c -o $@ $<
+
+# Using old < c++11 version as not all embedded devices have recent compilers. Sigh.
+%.o: %.cc
+	$(CROSS_COMPILE)gcc $(CXXFLAGS) -std=c++98 -c -o $@ $<
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<

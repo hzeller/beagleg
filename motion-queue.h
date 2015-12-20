@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -49,7 +49,7 @@ struct MotionSegment {
   uint8_t state;           // see motor-interface-constants.h STATE_* constants.
 
   uint8_t direction_bits;
-  
+
   // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
   uint16_t loops_accel;    // Phase 1: loops spent in acceleration
   uint16_t loops_travel;   // Phase 2: lops spent in travel
@@ -72,13 +72,24 @@ struct MotionSegment {
 #endif
 } __attribute__((packed));
 
-// Available operations towards the queue.
-struct MotionQueue {
-  // Enqueue motion segment into queue.
-  void (*enqueue)(struct MotionSegment *segment);
-  void (*wait_queue_empty)();     // block and wait for queue to be empty.
-  void (*motor_enable)(char on);  // immediately enable motor, indepenent of queue.
-  void (*shutdown)(char flush_queue); // Shutdown. If !flush_queue: immediate.
+// Low level motion queue operations.
+class MotionQueue {
+public:
+  virtual ~MotionQueue() {}
+
+  // Enqueue a motion segment into queue. Blocks until capacity of queue allows
+  // to receive more elements.
+  // Might change values in MotionSegment.
+  virtual void Enqueue(MotionSegment *segment) = 0;
+
+  // Block and wait for queue to be empty.
+  virtual void WaitQueueEmpty() = 0;
+
+  // Immediately enable motors, indepenent of queue.
+  virtual void MotorEnable(bool on) = 0;
+
+  // Shutdown. If !flush_queue: immediate, even if motors are still moving.
+  virtual void Shutdown(bool flush_queue) = 0;
 };
 
 // Standard implementation.
@@ -86,9 +97,22 @@ struct MotionQueue {
 // Returns 0 on success. Requires to run as root to initialize.
 // There is only one PRU, so it can only be initialzed once until shutdown() is
 // called.
-int init_pru_motion_queue(struct MotionQueue *queue);
+class PRUMotionQueue {
+public:
+  void Enqueue(MotionSegment *segment) {}
+  void WaitQueueEmpty() {}
+  void MotorEnable(bool on) {}
+  void Shutdown(bool flush_queue) {}
+};
 
-// Ignores all commands.
-void init_dummy_motion_queue(struct MotionQueue *queue);
+
+// Queue that does nothing. For testing purposes.
+class DummyMotionQueue {
+public:
+  void Enqueue(MotionSegment *segment) {}
+  void WaitQueueEmpty() {}
+  void MotorEnable(bool on) {}
+  void Shutdown(bool flush_queue) {}
+};
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_
