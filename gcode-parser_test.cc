@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * Test for gcode parser.
  */
 #include "gcode-parser.h"
@@ -238,26 +238,24 @@ static char rapid_move(void *p, float speed, const float *axes) {
   do_copy_register(p, axes);
   return 1;
 }
-static struct GCodeParserCb mock_calls = {
-  .gcode_start = &gcode_start,
-  .gcode_finished = &gcode_finished,
-  .inform_origin_offset = &inform_origin_offset,
-  .go_home = &go_home,
-  .probe_axis = &probe_axis,
-  .motors_enable = &motors_enable,
-  .coordinated_move = &coordinated_move,
-  .rapid_move = &rapid_move,
-
-  .set_temperature = &swallow_scalar,
-  .set_fanspeed = &swallow_scalar,
-  .set_speed_factor = &swallow_scalar,
-};
 
 static void GCodeTestParseLine(const char *block, struct CallCounter *counter) {
   if (counter->parser == NULL) {
     struct GCodeParserConfig config;
     bzero(&config, sizeof(config));
-    config.callbacks = mock_calls;
+    config.callbacks.gcode_start = &gcode_start;
+    config.callbacks.gcode_finished = &gcode_finished;
+    config.callbacks.inform_origin_offset = &inform_origin_offset;
+    config.callbacks.go_home = &go_home;
+    config.callbacks.probe_axis = &probe_axis;
+    config.callbacks.motors_enable = &motors_enable;
+    config.callbacks.coordinated_move = &coordinated_move;
+    config.callbacks.rapid_move = &rapid_move;
+
+    config.callbacks.set_temperature = &swallow_scalar;
+    config.callbacks.set_fanspeed = &swallow_scalar;
+    config.callbacks.set_speed_factor = &swallow_scalar;
+
     config.callbacks.user_data = counter;
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;

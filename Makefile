@@ -53,15 +53,12 @@ machine-control: machine-control.o $(OBJECTS)
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
 
-%_test: %_test.c $(OBJECTS)
-	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
-
-%.o: %.c
-	$(CROSS_COMPILE)gcc $(CFLAGS) -std=c99 -c -o $@ $<
+%_test: %_test.cc $(OBJECTS)
+	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
 
 # Using old < c++11 version as not all embedded devices have recent compilers. Sigh.
 %.o: %.cc
-	$(CROSS_COMPILE)gcc $(CXXFLAGS) -std=c++98 -c -o $@ $<
+	$(CROSS_COMPILE)g++ $(CXXFLAGS) -std=c++98 -c -o $@ $<
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
@@ -74,7 +71,7 @@ motor-operations.o : motor-interface-constants.h
 sim-firmware.o : motor-interface-constants.h
 
 # test dependencies.
-gcode-machine-control_test.c: gcode-machine-control.cc
+gcode-machine-control_test.cc: gcode-machine-control.cc
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h $(CAPE_INCLUDE)/pru-io-routines.hp
