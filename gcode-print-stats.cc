@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -40,7 +40,7 @@ int usage(const char *prog) {
 }
 
 static void print_file_stats(const char *filename, int indentation,
-			     struct MachineControlConfig *config) {
+			     const MachineControlConfig &config) {
   struct BeagleGPrintStats result;
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
   if (determine_print_stats(fd, config, &result) == 0) {
@@ -57,14 +57,13 @@ static void print_file_stats(const char *filename, int indentation,
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
-  gcode_machine_control_default_config(&config);
 
   int max_feedrate = 200;  // mm/s
   float factor = 1.0;        // print speed factor.
   char print_header = 1;
 
   // TODO: read other parameters for the MachineControlConfig from long options.
- 
+
   int opt;
   while ((opt = getopt(argc, argv, "f:m:H")) != -1) {
     switch (opt) {
@@ -90,7 +89,7 @@ int main(int argc, char *argv[]) {
   config.max_feedrate[AXIS_X] = max_feedrate;
   config.max_feedrate[AXIS_Y] = max_feedrate;
   config.speed_factor = factor;
-  
+
   int longest_filename = strlen("#[filename]"); // table header
   for (int i = optind; i < argc; ++i) {
     int len = strlen(argv[i]);
@@ -102,7 +101,7 @@ int main(int argc, char *argv[]) {
            "[filament{mm}]");
   }
   for (int i = optind; i < argc; ++i) {
-    print_file_stats(argv[i], longest_filename, &config);
+    print_file_stats(argv[i], longest_filename, config);
   }
   return 0;
 }

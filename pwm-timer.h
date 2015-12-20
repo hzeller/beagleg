@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2015 H Hartley Sweeten <hsweeten@visionengravers.com>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg

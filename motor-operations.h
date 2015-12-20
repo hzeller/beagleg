@@ -47,8 +47,7 @@ struct MotorMovement {
 
 class MotorOperations {
 public:
-  // Initialize motor operations, sending planned results into the motion backend.
-  MotorOperations(MotionQueue *backend) : backend_(backend) {}
+  virtual ~MotorOperations() {}
 
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
@@ -57,14 +56,24 @@ public:
   // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  int Enqueue(const MotorMovement &param, FILE *err_stream);
+  virtual int Enqueue(const MotorMovement &param, FILE *err_stream) = 0;
 
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
-  void MotorEnable(bool on);
+  virtual void MotorEnable(bool on) = 0;
 
   // Wait, until all elements in the ring-buffer are consumed.
-  void WaitQueueEmpty();
+  virtual void WaitQueueEmpty() = 0;
+};
+
+class MotionQueueMotorOperations : public MotorOperations {
+public:
+  // Initialize motor operations, sending planned results into the motion backend.
+  MotionQueueMotorOperations(MotionQueue *backend) : backend_(backend) {}
+
+  virtual int Enqueue(const MotorMovement &param, FILE *err_stream);
+  virtual void MotorEnable(bool on);
+  virtual void WaitQueueEmpty();
 
 private:
   void EnqueueInternal(const MotorMovement &param,

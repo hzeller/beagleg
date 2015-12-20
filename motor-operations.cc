@@ -83,8 +83,8 @@ static char test_acceleration_ok(float acceleration) {
 }
 #endif
 
-void MotorOperations::EnqueueInternal(const MotorMovement &param,
-                                      int defining_axis_steps) {
+void MotionQueueMotorOperations::EnqueueInternal(const MotorMovement &param,
+                                                 int defining_axis_steps) {
   struct MotionSegment new_element = {0};
   new_element.direction_bits = 0;
 
@@ -161,7 +161,7 @@ static int get_defining_axis_steps(const MotorMovement &param) {
   return defining_axis_steps;
 }
 
-int MotorOperations::Enqueue(const MotorMovement &param, FILE *err_stream) {
+int MotionQueueMotorOperations::Enqueue(const MotorMovement &param, FILE *err_stream) {
   const int defining_axis_steps = get_defining_axis_steps(param);
   if (defining_axis_steps == 0) {
     fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
@@ -212,11 +212,11 @@ int MotorOperations::Enqueue(const MotorMovement &param, FILE *err_stream) {
   return 0;
 }
 
-void MotorOperations::MotorEnable(bool on) {
+void MotionQueueMotorOperations::MotorEnable(bool on) {
   backend_->WaitQueueEmpty();
   backend_->MotorEnable(on);
 }
 
-void MotorOperations::WaitQueueEmpty() {
+void MotionQueueMotorOperations::WaitQueueEmpty() {
   backend_->WaitQueueEmpty();
 }

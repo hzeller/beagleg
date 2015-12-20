@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -19,7 +19,7 @@
 #ifndef _BEAGLEG_DETERMINE_PRINT_STATS_H
 #define _BEAGLEG_DETERMINE_PRINT_STATS_H
 
-struct MachineControlConfig;
+struct MachineControlConfig;   // gcode-machine-control.h
 
 struct BeagleGPrintStats {
   float total_time_seconds;      // Total time real execution would take.
@@ -32,6 +32,7 @@ struct BeagleGPrintStats {
 // Given the input file-descriptor (which is read to EOF and then closed)
 // and the given constraints, determine statistics about the gcode-file.
 // Returns 0 on success.
-int determine_print_stats(int input_fd, struct MachineControlConfig *config,
+int determine_print_stats(int input_fd,
+                          const MachineControlConfig &config,
 			  struct BeagleGPrintStats *result);
 #endif // _BEAGLEG_DETERMINE_PRINT_STATS_H

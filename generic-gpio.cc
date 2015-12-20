@@ -154,7 +154,7 @@ static void cfg_gpio_outputs() {
 }
 
 static volatile uint32_t *map_port(int fd, size_t length, off_t offset) {
-  return mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+  return (volatile uint32_t*) mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
 }
 
 static void ena_gpio_clk(volatile uint32_t *cm, uint32_t reg, int bank) {

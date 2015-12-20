@@ -378,7 +378,7 @@ int main(int argc, char *argv[]) {
     motion_backend = new PRUMotionQueue();
   }
 
-  MotorOperations motor_operations(motion_backend);
+  MotionQueueMotorOperations motor_operations(motion_backend);
 
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &motor_operations, stderr);

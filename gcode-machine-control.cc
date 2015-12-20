@@ -246,7 +246,6 @@ static void machine_set_fanspeed(void *userdata, float speed) {
     pwm_timer_set_duty(FAN_GPIO, duty_cycle);
     pwm_timer_start(FAN_GPIO, 1);
   }
-  fprintf(stderr, "set_fanspeed(%.0f) -> PWM duty_cycle %.3f\n", speed, duty_cycle);
 }
 
 static void machine_start(void *userdata) {
@@ -386,8 +385,8 @@ static const char *special_commands(void *userdata, char letter, float value,
       break;
     case 119: {
       char any_enstops_found = 0;
-      for (int a = 0; a < GCODE_NUM_AXES; ++a) {
-        GCodeParserAxis axis = (GCodeParserAxis) a;
+      for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
+        GCodeParserAxis axis = (GCodeParserAxis) ai;
         struct EndstopConfig config = state->min_endstop[axis];
         if (config.endstop_number) {
           int value = get_gpio(get_endstop_gpio_descriptor(config));
@@ -498,8 +497,8 @@ static float determine_joining_speed(const struct AxisTarget *from,
   // be at the end of the move.
   char is_first = 1;
   float from_defining_speed = from->speed;
-  for (int a = 0; a < GCODE_NUM_AXES; ++a) {
-    const GCodeParserAxis axis = (GCodeParserAxis) a;
+  for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
+    const GCodeParserAxis axis = (GCodeParserAxis) ai;
     const int from_delta = from->delta_steps[axis];
     const int to_delta = to->delta_steps[axis];
 
@@ -653,7 +652,7 @@ static void move_machine_steps(GCodeMachineControlImpl *state,
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
       const int accel_steps = round2int(accel_fraction * axis_steps[i]);
-      assign_steps_to_motors(state, &accel_command, (GCodeParserAxis)a,
+      assign_steps_to_motors(state, &accel_command, (GCodeParserAxis)i,
                              accel_steps);
     }
   }

@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -18,6 +18,7 @@
  */
 #include "determine-print-stats.h"
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,34 +99,34 @@ static void forwarding_info_origin_offset(void *userdata, const float *val) {
   s->machine_delegatee.inform_origin_offset(s->machine_delegatee.user_data, val);
 }
 
-// Motor operation simulation that determines the time spent.
-static void stats_motor_enable(void *ctx, char on) {}
+namespace {
+class StatsMotorOperations : public MotorOperations {
+public:
+  StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
-static int stats_enqueue(void *ctx, const struct MotorMovement *param, FILE *err_stream) {
-  struct BeagleGPrintStats *stats = (struct BeagleGPrintStats*)ctx;
-  int max_steps = 0;
-  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    int steps = abs(param->steps[i]);
-    if (steps > max_steps)
-      max_steps = steps;
+  virtual int Enqueue(const MotorMovement &param, FILE *err_stream) {
+    int max_steps = 0;
+    for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+      int steps = abs(param.steps[i]);
+      if (steps > max_steps)
+        max_steps = steps;
+    }
+
+    // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
+    print_stats_->total_time_seconds += 2 * max_steps / (param.v0 + param.v1);
+    //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param->v0, param->v1, max_steps);
+    return 0;
   }
 
-  // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
-  stats->total_time_seconds += 2 * max_steps / (param->v0 + param->v1);
-  //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param->v0, param->v1, max_steps);
-  return 0;
-}
-static void stats_wait_queue_empty(void *ctx) {}
+  virtual void MotorEnable(bool on) {}
+  virtual void WaitQueueEmpty() {}
 
-static void init_stats_motor_control(struct StatsData *data,
-                                     struct MotorOperations *control) {
-  control->user_data = data->stats;
-  control->motor_enable = &stats_motor_enable;
-  control->enqueue = &stats_enqueue;
-  control->wait_queue_empty = &stats_wait_queue_empty;
+private:
+  BeagleGPrintStats *const print_stats_;
+};
 }
 
-int determine_print_stats(int input_fd, struct MachineControlConfig *config,
+int determine_print_stats(int input_fd, const MachineControlConfig &config,
 			  struct BeagleGPrintStats *result) {
   struct StatsData data;
   bzero(&data, sizeof(data));
@@ -133,13 +134,12 @@ int determine_print_stats(int input_fd, struct MachineControlConfig *config,
   data.stats = result;
 
   // Motor control that just determines the time spent turning the motor.
-  struct MotorOperations stats_motor_control;
-  init_stats_motor_control(&data, &stats_motor_control);
+  StatsMotorOperations stats_motor_ops(result);
+  GCodeMachineControl *machine_control
+    = GCodeMachineControl::Create(config, &stats_motor_ops, NULL);
+  assert(machine_control);
 
-  GCodeMachineControl_t *machine_control
-    = gcode_machine_control_new(config, &stats_motor_control, NULL);
-
-  gcode_machine_control_init_callbacks(machine_control, &data.machine_delegatee);
+  machine_control->FillEventCallbacks(&data.machine_delegatee);
 
   struct GCodeParserConfig parser_config;
   bzero(&parser_config, sizeof(parser_config));
