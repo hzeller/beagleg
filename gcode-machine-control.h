@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -28,6 +28,8 @@ struct MotorOperations;
  * The output mapping to the physical driver is controlled by output_mapping
  */
 struct MachineControlConfig {
+  MachineControlConfig();   // Default constructor.
+
   // Arrays with values for each axis
   float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.
   float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis]). -1: no limit
@@ -68,42 +70,40 @@ struct MachineControlConfig {
   char synchronous;             // Don't queue, wait for command to finish if 1.
 };
 
+class GCodeMachineControlImpl;  // TODO(hzeller): will go after transition.
 
-typedef struct GCodeMachineControl GCodeMachineControl_t;  // Opaque type.
+// A class that controls a machine via gcode.
+class GCodeMachineControl {
+ public:
+  // Factor to create a GCodeMachineControl.
+  // The MotorOperations provide the low-level motor control ops.
+  // msg_stream, if non-NULL, sends back return messages on the GCode channel.
+  // Returns NULL on failure.
+  static GCodeMachineControl *Create(const MachineControlConfig &config,
+                              MotorOperations *motor_backend,
+                              FILE *msg_stream);
 
-// Initializes configuration with default values.
-void gcode_machine_control_default_config(struct MachineControlConfig *cfg);
+  ~GCodeMachineControl();
 
-// Initialize the motor control with the given configuration and backend
-// motor control operations.
-// This internally creates a copy of the configuration so no need for
-// the value to stay around after this call (also, the configuration might
-// change internally depending on GCode commands.)
-//
-// The MotorOperations struct provide the low-level motor control ops.
-// msg_stream, if non-NULL, sends back return messages on the GCode channel.
-// Returns 0 on success.
-GCodeMachineControl_t *gcode_machine_control_new(
-                       const struct MachineControlConfig *config,
-                       struct MotorOperations *motor_ops,
-                       FILE *msg_stream);
+  // Set where messages should go.
+  void SetMsgOut(FILE *msg_stream);
 
-// Sets where the messages go.
-void gcode_machine_control_set_msg_out(GCodeMachineControl_t *object,
-                                       FILE *msg_stream);
+  // Get the home position of this machine, return in *pos array. The passed
+  // pointer must be pre-allocated and have space for GCODE_NUM_AXES.
+  void GetHomePos(float *pos);
 
-// ---
-// TODO(hzeller) the following are only needed to configure the gcode parser. Maybe
-// this is something the gcode_machine_control should actually do by itself.
-// ---
+  // Fill event callbacks into given struct. (TODO: will change when parser is
+  // converted to C++)
+  void FillEventCallbacks(struct GCodeParserCb *callbacks);
 
-// Get the struct to receive events.
-void gcode_machine_control_init_callbacks(GCodeMachineControl_t *object,
-                                          struct GCodeParserCb *callbacks);
+ private:
+  typedef GCodeMachineControlImpl Impl;
+  // The MotorOperations struct provide the low-level motor control ops.
+  // msg_stream, if non-NULL, sends back return messages on the GCode channel.
+  GCodeMachineControl(Impl *Impl);
+  static GCodeMachineControl *Cleanup(Impl *impl);
 
-// Get home position of this machine. This depends on the axis switches.
-void gcode_machine_control_get_homepos(GCodeMachineControl_t *obj, float *pos);
-
-void gcode_machine_control_delete(GCodeMachineControl_t *object);
+  Impl *const impl_;  // opaque state.
+};
 
 #endif //  _BEAGLEG_GCODE_MACHINE_CONTROL_H_

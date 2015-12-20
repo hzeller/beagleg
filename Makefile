@@ -74,7 +74,7 @@ motor-operations.o : motor-interface-constants.h
 sim-firmware.o : motor-interface-constants.h
 
 # test dependencies.
-gcode-machine-control_test.c: gcode-machine-control.c
+gcode-machine-control_test.c: gcode-machine-control.cc
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h $(CAPE_INCLUDE)/pru-io-routines.hp

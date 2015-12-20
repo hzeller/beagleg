@@ -91,11 +91,11 @@ static int usage(const char *prog, const char *msg) {
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "loop_count" is >= 0, repeats this number after the first execution.
-static int send_file_to_machine(GCodeMachineControl_t *machine,
+static int send_file_to_machine(GCodeMachineControl *machine,
                                 GCodeParser_t *parser,
                                 const char *gcode_filename, int loop_count) {
   int ret;
-  gcode_machine_control_set_msg_out(machine, stderr);
+  machine->SetMsgOut(stderr);
   while (loop_count < 0 || loop_count-- > 0) {
     int fd = open(gcode_filename, O_RDONLY);
     ret = gcodep_parse_stream(parser, fd, stderr);
@@ -108,7 +108,7 @@ static int send_file_to_machine(GCodeMachineControl_t *machine,
 // Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
 // Interprets GCode coming from a connection. Only one connection at a
 // time can be active.
-static int run_server(GCodeMachineControl_t *machine,
+static int run_server(GCodeMachineControl *machine,
                       GCodeParser_t *parser,
                       const char *bind_addr, int port) {
   if (port > 65535) {
@@ -155,7 +155,7 @@ static int run_server(GCodeMachineControl_t *machine,
 				     ip_buffer, sizeof(ip_buffer));
     printf("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
-    gcode_machine_control_set_msg_out(machine, msg_stream);
+    machine->SetMsgOut(msg_stream);
     process_result = gcodep_parse_stream(parser, connection, msg_stream);
 
     fclose(msg_stream);
@@ -229,7 +229,6 @@ static int parse_float_array(const char *input, float result[], int count) {
 
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
-  gcode_machine_control_default_config(&config);
 
   char dry_run = 0;
   char simulation_output = 0;
@@ -379,17 +378,16 @@ int main(int argc, char *argv[]) {
     motion_backend = new PRUMotionQueue();
   }
 
-  struct MotorOperations motor_operations;
-  beagleg_init_motor_ops(&motion_backend, &motor_operations);
+  MotorOperations motor_operations(motion_backend);
 
-  GCodeMachineControl_t *machine_control
-    = gcode_machine_control_new(&config, &motor_operations, stderr);
+  GCodeMachineControl *machine_control
+    = GCodeMachineControl::Create(config, &motor_operations, stderr);
   if (machine_control == NULL)
     return 1;
   struct GCodeParserConfig parser_cfg;
   bzero(&parser_cfg, sizeof(parser_cfg));
-  gcode_machine_control_init_callbacks(machine_control, &parser_cfg.callbacks);
-  gcode_machine_control_get_homepos(machine_control, parser_cfg.machine_origin);
+  machine_control->FillEventCallbacks(&parser_cfg.callbacks);
+  machine_control->GetHomePos(parser_cfg.machine_origin);
   GCodeParser_t *parser = gcodep_new(&parser_cfg);
 
   int ret = 0;
@@ -401,7 +399,7 @@ int main(int argc, char *argv[]) {
     ret = run_server(machine_control, parser, bind_addr, listen_port);
   }
 
-  gcode_machine_control_delete(machine_control);
+  delete machine_control;
   gcodep_delete(parser);
 
   const char caught_signal = (ret == 2);
