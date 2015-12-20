@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -88,7 +88,8 @@ static void dummy_gcode_finished(void *user) {}
 static void dummy_inform_display_offset(void *user, const float *o) {
   fprintf(stderr, "GCodeParser: display offset [");
   for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
-    fprintf(stderr, "%s%c:%.3f", i == 0 ? "" : ", ", gcodep_axis2letter(i),o[i]);
+    fprintf(stderr, "%s%c:%.3f", i == 0 ? "" : ", ",
+            gcodep_axis2letter((enum GCodeParserAxis)i),o[i]);
   }
   fprintf(stderr, "]\n");
 }
@@ -404,9 +405,9 @@ static const char *handle_G92(float sub_command,
       if (axis == GCODE_NUM_AXES)
         break;    // Possibly start of new command.
       // This sets the given value to be the new zero.
-      p->global_offset_g92[axis] = (p->axes_pos[axis] - unit_val) - 
+      p->global_offset_g92[axis] = (p->axes_pos[axis] - unit_val) -
         p->current_origin[axis];
-      
+
       line = remaining_line;
     }
     set_current_origin(p, p->current_origin, p->global_offset_g92);
@@ -679,7 +680,7 @@ void gcodep_parse_line(struct GCodeParser *p, const char *line,
 // So we're intercepting signals and exit gcode_machine_control_from_stream()
 // cleanly.
 static volatile char caught_signal = 0;
-static void receive_signal() {
+static void receive_signal(int signo) {
   caught_signal = 1;
   static char msg[] = "Caught signal. Shutting down ASAP.\n";
   (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
