@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -361,12 +361,12 @@ int main(int argc, char *argv[]) {
 
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
-  struct MotionQueue motion_backend;
+  MotionQueue *motion_backend;
   if (dry_run) {
     if (simulation_output) {
-      init_sim_motion_queue(&motion_backend);
+      motion_backend = new SimFirmwareQueue(stdout);
     } else {
-      init_dummy_motion_queue(&motion_backend);
+      motion_backend = new DummyMotionQueue();
     }
   } else {
     if (geteuid() != 0) {
@@ -376,7 +376,7 @@ int main(int argc, char *argv[]) {
 	      "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
-    init_pru_motion_queue(&motion_backend);
+    motion_backend = new PRUMotionQueue();
   }
 
   struct MotorOperations motor_operations;
@@ -408,7 +408,9 @@ int main(int argc, char *argv[]) {
   if (caught_signal) {
     fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
   }
-  motion_backend.shutdown(!caught_signal);
+  motion_backend->Shutdown(!caught_signal);
+
+  delete motion_backend;
 
   free(bind_addr);
   return ret;

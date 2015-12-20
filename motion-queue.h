@@ -97,7 +97,7 @@ public:
 // Returns 0 on success. Requires to run as root to initialize.
 // There is only one PRU, so it can only be initialzed once until shutdown() is
 // called.
-class PRUMotionQueue {
+class PRUMotionQueue : public MotionQueue {
 public:
   PRUMotionQueue();
 
@@ -112,7 +112,7 @@ private:
 
 
 // Queue that does nothing. For testing purposes.
-class DummyMotionQueue {
+class DummyMotionQueue : public MotionQueue {
 public:
   void Enqueue(MotionSegment *segment) {}
   void WaitQueueEmpty() {}
