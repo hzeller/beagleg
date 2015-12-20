@@ -99,10 +99,15 @@ public:
 // called.
 class PRUMotionQueue {
 public:
-  void Enqueue(MotionSegment *segment) {}
-  void WaitQueueEmpty() {}
-  void MotorEnable(bool on) {}
-  void Shutdown(bool flush_queue) {}
+  PRUMotionQueue();
+
+  void Enqueue(MotionSegment *segment);
+  void WaitQueueEmpty();
+  void MotorEnable(bool on);
+  void Shutdown(bool flush_queue);
+
+private:
+  int Init();
 };
 
 

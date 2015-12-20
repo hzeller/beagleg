@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -45,7 +45,7 @@ struct PRUCommunication {
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
 };
 
-// This is a physical singleton, so simply reflect that here.
+// The queue is a physical singleton, so simply reflect that here.
 static volatile struct PRUCommunication *pru_data_;
 static unsigned int queue_pos_;
 
@@ -68,11 +68,6 @@ static volatile struct MotionSegment *next_queue_element() {
     prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
   }
   return &pru_data_->ring_buffer[queue_pos_++];
-}
-
-static void pru_motor_enable_nowait(char on) {
-  if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
-  else set_gpio(MOTOR_ENABLE_GPIO);
 }
 
 #ifdef DEBUG_QUEUE
@@ -109,13 +104,15 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e) {
 }
 #endif
 
-static void pru_enqueue_segment(struct MotionSegment *element) {
+void PRUMotionQueue::Enqueue(MotionSegment *element) {
   const uint8_t state_to_send = element->state;
   assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
   // Initially, we copy everything with 'STATE_EMPTY', then flip the state
   // to avoid a race condition while copying.
   element->state = STATE_EMPTY;
-  volatile struct MotionSegment *queue_element = next_queue_element();
+
+  // Need to case volatile away, otherwise c++ complains.
+  MotionSegment *queue_element = (MotionSegment*) next_queue_element();
   *queue_element = *element;
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
@@ -125,7 +122,7 @@ static void pru_enqueue_segment(struct MotionSegment *element) {
 #endif
 }
 
-static void pru_wait_queue_empty() {
+void PRUMotionQueue::WaitQueueEmpty() {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
@@ -133,22 +130,34 @@ static void pru_wait_queue_empty() {
   }
 }
 
-static void pru_shutdown(char flush_queue) {
+void PRUMotionQueue::MotorEnable(bool on) {
+  if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
+  else set_gpio(MOTOR_ENABLE_GPIO);
+}
+
+void PRUMotionQueue::Shutdown(bool flush_queue) {
   if (flush_queue) {
     struct MotionSegment end_element = {0};
     end_element.state = STATE_EXIT;
-    pru_enqueue_segment(&end_element);
-    pru_wait_queue_empty();
+    Enqueue(&end_element);
+    WaitQueueEmpty();
   }
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
-  pru_motor_enable_nowait(0);
+  MotorEnable(false);
   clr_gpio(LED_GPIO);  // turn off the status LED
   unmap_gpio();
   pwm_timers_unmap();
 }
 
-int init_pru_motion_queue(struct MotionQueue *queue) {
+PRUMotionQueue::PRUMotionQueue() {
+  const int init_result = Init();
+  // For now, we just assert-fail here, if things fail.
+  // Typically hardware-doomed event anyway.
+  assert(init_result == 0);
+}
+
+  int PRUMotionQueue::Init() {
   if (!map_gpio()) {
     fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
     return 1;
@@ -160,7 +169,7 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
 
   clr_gpio(LED_GPIO);  // turn off the status LED
 
-  pru_motor_enable_nowait(0);  // motors off initially.
+  MotorEnable(false);  // motors off initially.
 
   // The PWM_*_GPIO pins can produce PWM signals if they are mapped to one
   // of the TIMER pins and the dts set the pins to the correct mode (0x02).
@@ -195,24 +204,5 @@ int init_pru_motion_queue(struct MotionQueue *queue) {
   prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, PRUcode, sizeof(PRUcode));
   prussdrv_pru_enable(0);
 
-  // Initialize operations.
-  queue->enqueue = &pru_enqueue_segment;
-  queue->wait_queue_empty = &pru_wait_queue_empty;
-  queue->motor_enable = &pru_motor_enable_nowait;
-  queue->shutdown = &pru_shutdown;
-
   return 0;
-}
-
-// Dummy implementation of a MotionQueue. For convenience, just implemented here.
-static void dummy_enqueue(struct MotionSegment *segment) {}
-static void dummy_wait_queue_empty() {}
-static void dummy_motor_enable(char on) {}
-static void dummy_shutdown(char do_flush) {}
-
-void init_dummy_motion_queue(struct MotionQueue *queue) {
-  queue->enqueue = &dummy_enqueue;
-  queue->wait_queue_empty = &dummy_wait_queue_empty;
-  queue->motor_enable = &dummy_motor_enable;
-  queue->shutdown = &dummy_shutdown;
 }

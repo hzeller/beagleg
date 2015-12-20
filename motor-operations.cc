@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -149,7 +149,7 @@ static void beagleg_enqueue_internal(struct MotionQueue *backend,
 
   new_element.aux = param->aux_bits;
   new_element.state = STATE_FILLED;
-  backend->enqueue(&new_element);
+  backend->Enqueue(&new_element);
 }
 
 static int get_defining_axis_steps(const struct MotorMovement *param) {
@@ -217,13 +217,13 @@ static int beagleg_enqueue(void *ctx, const struct MotorMovement *param,
 
 static void beagleg_motor_enable(void *ctx, char on) {
   struct MotionQueue *backend = (struct MotionQueue*)ctx;
-  backend->wait_queue_empty();
-  backend->motor_enable(on);
+  backend->WaitQueueEmpty();
+  backend->MotorEnable(on);
 }
 
 static void beagleg_wait_queue_empty(void *ctx) {
   struct MotionQueue *backend = (struct MotionQueue*)ctx;
-  backend->wait_queue_empty();
+  backend->WaitQueueEmpty();
 }
 
 int beagleg_init_motor_ops(struct MotionQueue *backend,
