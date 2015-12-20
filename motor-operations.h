@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 
-struct MotionQueue;
+class MotionQueue;
 
 enum {
   BEAGLEG_NUM_MOTORS = 8
@@ -37,7 +37,7 @@ struct MotorMovement {
   // acceleration is zero at the end of the move.
   float v0;     // initial speed
   float v1;     // final speed
-  
+
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.
   unsigned short aux_bits;   // Aux-bits to switch.
@@ -45,13 +45,11 @@ struct MotorMovement {
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
-struct MotorOperations {
-  void *user_data;
-  
-  // Waits for the queue to be empty and Enables/disables motors according to the
-  // given boolean value (Right now, motors cannot be individually addressed).
-  void (*motor_enable)(void *user, char on);
-  
+class MotorOperations {
+public:
+  // Initialize motor operations, sending planned results into the motion backend.
+  MotorOperations(MotionQueue *backend) : backend_(backend) {}
+
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
   // otherwise it waits until a slot frees up.
@@ -59,19 +57,20 @@ struct MotorOperations {
   // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  int (*enqueue)(void *user, const struct MotorMovement *param, FILE *err_stream);
+  int Enqueue(const MotorMovement &param, FILE *err_stream);
+
+  // Waits for the queue to be empty and Enables/disables motors according to the
+  // given boolean value (Right now, motors cannot be individually addressed).
+  void MotorEnable(bool on);
 
   // Wait, until all elements in the ring-buffer are consumed.
-  void (*wait_queue_empty)(void *user);
-};
+  void WaitQueueEmpty();
 
-// Initialize beagleg motor operations.
-// The MotorOperations struct is initialized with functions to enqueue MotorMovement requests.
-// The implementation connects that with the MotionQueue that accepts lower level
-// MotionSegments. MotionQueue is our backend.
-//
-// Returns 0 on success, != 0 on some error.
-int beagleg_init_motor_ops(struct MotionQueue *backend,
-                           struct MotorOperations *control);
+private:
+  void EnqueueInternal(const MotorMovement &param,
+                       int defining_axis_steps);
+
+  MotionQueue *backend_;
+};
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

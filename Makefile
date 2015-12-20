@@ -45,10 +45,10 @@ UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test
 all : $(TARGETS) $(UNITTEST_BINARIES)
 
 gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
-	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 machine-control: machine-control.o $(OBJECTS)
-	$(CROSS_COMPILE)gcc $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
