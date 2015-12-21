@@ -86,8 +86,10 @@ class GCodeMachineControl {
   // Set where messages should go.
   void SetMsgOut(FILE *msg_stream);
 
-  // Get the home position of this machine, return in *pos array. The passed
-  // pointer must be pre-allocated and have space for GCODE_NUM_AXES.
+  // Get the physical home position of this machine which depend
+  // on the position of the endstops configured for homing.
+  // return in *pos array which needs to be pre-allocated and have
+  // space for GCODE_NUM_AXES.
   void GetHomePos(float *pos);
 
   // Return the receiver for parse events. The caller must not assume ownership

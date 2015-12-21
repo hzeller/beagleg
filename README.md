@@ -2,72 +2,73 @@ BeagleG
 =======
 
 Step-motor controller for CNC-like devices (or 3D printers) using the
-PRU (Programmable Realtime Unit) of the Beaglebone Black to create precisely timed and
-fast stepper-pulses for acceleration and travel.
-(And with fast, we're talking up to 1Mhz fast.
-For 8 motors in parallel. In a controlled move (G1). So this is not a limit in real-world
-applications).
+PRU (Programmable Realtime Unit) of the Beaglebone Black to create precisely
+timed and fast stepper-pulses for acceleration and travel.
+(And with fast, we're talking up to 1Mhz fast. For 8 motors in parallel.
+In a controlled move (G1). So this is not a limit in real-world applications).
 
 Works with a cape designed by the author (the [BUMPS] cape), but also provides
 relatively easy adaption to new hardware (currently: support for CRAMPS). See
 [hardware](./hardware) subdirectory.
 
-This is one of my early tests:
+This was one of my very early tests:
 [![First Test][run-vid]](http://youtu.be/hIEY9077D64)
 
 The {accl-,decel-}eration and travel motion profile is entirely
-created within the PRU from parameters sent by the host CPU decoupled via a ring-buffer.
-The BeagleBone main CPU prepares the data, such as parsing the [G-Code](./G-code.md) and
-doing travel planning, while all the real-time critical parts are
-done in the PRU. The host CPU typically needs less than 1% CPU-time doing everything else (and
-there is no need for a real-time kernel).
+created within the PRU from parameters sent by the host CPU decoupled via a
+ring-buffer.
+The BeagleBone main CPU prepares the data, such as parsing the
+[G-Code](./G-code.md) and doing travel planning, while all the real-time
+critical parts are done in the PRU. The host CPU typically needs less
+than 1% CPU-time doing everything else (and there is no need for a real-time
+kernel).
 
 The main `machine-control` program is parsing G-Code, extracting axes moves and
-enqueues them to the realtime unit. It can receive G-Code from a file or socket (you
-can just telnet to it for an interactive session).
+enqueues them to the realtime unit. It can receive G-Code from a file or
+socket (you can just telnet to it for an interactive session, how cool is that?).
 
 ## APIs
 The functionality is implemented in a stack of independently usable APIs.
 
-   - [gcode-parser.h](./gcode-parser.h) : C-API for parsing
+   - [gcode-parser.h](./gcode-parser.h) : C++-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
-      care of many internals, e.g. it automatically translates
-      everything into metric, absolute coordinates.
+      care of many internals, e.g. interpreting slightly different dialects and
+      automatically translates everything into metric, absolute coordinates for
+      ease of downstream receivers. This API in itself is independent of the
+      rest, so it might be useful in other contexts as well.
 
-   - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C-API to
-      control a machine via G-Code: it receives G-Code events (implementing the
-      callbacks called by the parser), does motion
+   - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C++-API to
+      control a machine via G-Code: it receives G-Code events, does motion
       planning, axis mapping, speed/accleration segment joining and emits
-      the necessary machine commands to MotorOperations.
-      Depends on the motor-operations and gcode-parser APIs.
+      the resuling motor commands to MotorOperations.
+      Depends on the gcode-parser APIs as input and motor-operations as output.
       Provides the functionality provided by the `machine-control` binary.
 
-   - [motor-operations.h](./motor-operations.h) : Low-level motor motion C-API.
-      Receives travel speeds or speed transitions and prepares parameters
-      for the discrete approximation in the motion-queue backend.
+   - [motor-operations.h](./motor-operations.h) : Low-level motor motion C++-API.
+      Receives travel speeds and speed transitions from gcode machine control
+      planner. This is a good place to implement stepmotor driver backends.
+      The implementation here prepares parameters for the discrete
+      approximation in the PRU motion-queue backend.
       The print-stats binary has a different implementation that uses it to
-      determine print-time calculations.
+      determine print-time calculations, simulating how long motor movements
+      would take.
 
    - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
       between motor-operations and hardware creating motion profiles in realtime.
       The implementation is done in the BeagleBone-PRU, but is separated out
       enough that it is not dependent on it: The required operations could be
       implemented in microcontrollers or FPGAs (32 bit operations help...).
-      There is a simulation implementation (sim-firmware.c) that illustrates
+      There is a simulation implementation (sim-firmware.cc) that illustrates
       what to do with the parameters. The simulation just outputs the would-be
       result as CSV file (good for debugging).
-   - [determine-print-stats.h](./determine-print-stats.h): Highlevel C-API
+
+   - [determine-print-stats.h](./determine-print-stats.h): Highlevel API
       facade to determine some basic stats about a G-Code file; it processes
       the entire file and determines estimated print time, filament used etc.
       Since this takes the actual travel planning into account, the values are
       a correct prediction of the actual print or CNC time.
 
-The interfaces are C-structs with function pointers which allows for
-easy testing or simple integrating with languages such as Go or C++.
-
-*(Note: I am experimenting with improving acceleration planning and add jerk calculations
-  right now, so don't expect everything 100% to work all the time while things are in flux.
-  Contact me if you have questions for a particular use-case of BeagleG)*
+The interfaces are C++ objects.
 
 ## Build
 To build, we need the BeagleG code and the PRU assembler with supporting library.
@@ -85,8 +86,8 @@ Then just
      cd beagleg
      make
 
-If you are looking at the code and developing on a non-Beaglebone machine, pass an empty
-`ARM_COMPILE_FLAGS` environment variable:
+If you are looking at the code and developing on a non-Beaglebone machine,
+pass an empty `ARM_COMPILE_FLAGS` environment variable:
 
      ARM_COMPILE_FLAGS="" make
 

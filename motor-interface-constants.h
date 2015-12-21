@@ -17,7 +17,7 @@
 // along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-// To be read by *.c and *.p file, so only // comments and simple defines.
+// To be read by *.cc and *.p file, so only // comments and simple defines.
 
 #ifndef __MOTOR_INTERFACE_CONSTANTS_H
 #define __MOTOR_INTERFACE_CONSTANTS_H
