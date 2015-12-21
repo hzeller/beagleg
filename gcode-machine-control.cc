@@ -151,13 +151,13 @@ enum HomingState {
 // The GCode control implementation. Essentially we are a state machine
 // driven by the events we get from the gcode parsing.
 // We implement the event receiver interface directly.
-class GCodeMachineControlImpl : public GCodeParser::Events {
+class GCodeMachineControl::Impl : public GCodeParser::Events {
 public:
-  GCodeMachineControlImpl(const MachineControlConfig &config,
-                          MotorOperations *motor_ops,
-                          FILE *msg_stream);
+  Impl(const MachineControlConfig &config,
+       MotorOperations *motor_ops,
+       FILE *msg_stream);
 
-  ~GCodeMachineControlImpl() {}
+  ~Impl() {}
 
   uint32_t GetHomeEndstop(enum GCodeParserAxis axis,
                           int *dir, int *trigger_value) const;
@@ -253,9 +253,9 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config);
 
 static inline int round2int(float x) { return (int) roundf(x); }
 
-GCodeMachineControlImpl::GCodeMachineControlImpl(const MachineControlConfig &config,
-                                                 MotorOperations *motor_ops,
-                                                 FILE *msg_stream)
+GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
+                                MotorOperations *motor_ops,
+                                FILE *msg_stream)
   : cfg_(config), motor_ops_(motor_ops), msg_stream_(msg_stream) {
   bzero(max_axis_speed_, sizeof(max_axis_speed_));
   bzero(max_axis_accel_, sizeof(max_axis_accel_));
@@ -267,7 +267,7 @@ GCodeMachineControlImpl::GCodeMachineControlImpl(const MachineControlConfig &con
 }
 
 // machine-printf. Only prints if there is a msg-stream.
-void GCodeMachineControlImpl::mprintf(const char *format, ...) {
+void GCodeMachineControl::Impl::mprintf(const char *format, ...) {
   va_list ap;
   va_start(ap, format);
   if (msg_stream_) vfprintf(msg_stream_, format, ap);
@@ -275,27 +275,27 @@ void GCodeMachineControlImpl::mprintf(const char *format, ...) {
 }
 
 // Dummy implementations of callbacks not yet handled.
-void GCodeMachineControlImpl::set_temperature(float f) {
+void GCodeMachineControl::Impl::set_temperature(float f) {
   mprintf("// BeagleG: set_temperature(%.1f) not implemented.\n", f);
 }
-void GCodeMachineControlImpl::wait_temperature() {
+void GCodeMachineControl::Impl::wait_temperature() {
   mprintf("// BeagleG: wait_temperature() not implemented.\n");
 }
-void GCodeMachineControlImpl::motors_enable(bool b) {
+void GCodeMachineControl::Impl::motors_enable(bool b) {
   bring_path_to_halt();
   motor_ops_->MotorEnable(b);
   if (homing_state_ == HOMING_STATE_HOMED) {
     homing_state_ = HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED;
   }
 }
-void GCodeMachineControlImpl::gcode_command_done(char l, float v) {
+void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
   mprintf("ok\n");
 }
-void GCodeMachineControlImpl::inform_origin_offset(const float *origin) {
+void GCodeMachineControl::Impl::inform_origin_offset(const float *origin) {
   memcpy(coordinate_display_origin_, origin, sizeof(coordinate_display_origin_));
 }
 
-void GCodeMachineControlImpl::set_fanspeed(float speed) {
+void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   if (speed < 0.0 || speed > 255.0) return;
   float duty_cycle = speed / 255.0;
   // The fan can be controlled by a GPIO or PWM (TIMER) signal
@@ -309,7 +309,7 @@ void GCodeMachineControlImpl::set_fanspeed(float speed) {
   }
 }
 
-void GCodeMachineControlImpl::wait_for_start() {
+void GCodeMachineControl::Impl::wait_for_start() {
   int flash_usec = 100 * 1000;
   int value = get_gpio(START_GPIO);
   while (value == 1) {
@@ -321,13 +321,13 @@ void GCodeMachineControlImpl::wait_for_start() {
   }
 }
 
-const char *GCodeMachineControlImpl::unprocessed(char letter, float value,
-                                                 const char *remaining) {
+const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
+                                                   const char *remaining) {
   return special_commands(letter, value, remaining);
 }
 
-const char *GCodeMachineControlImpl::special_commands(char letter, float value,
-                                                      const char *remaining) {
+const char *GCodeMachineControl::Impl::special_commands(char letter, float value,
+                                                        const char *remaining) {
   const int code = (int)value;
 
   if (letter == 'M') {
@@ -487,7 +487,7 @@ const char *GCodeMachineControlImpl::special_commands(char letter, float value,
   return remaining;
 }
 
-void GCodeMachineControlImpl::gcode_finished() {
+void GCodeMachineControl::Impl::gcode_finished() {
   bring_path_to_halt();
 }
 
@@ -512,8 +512,8 @@ static float steps_for_speed_change(float a, float v0, float *v1, int max_steps)
   return max_steps;
 }
 
-float GCodeMachineControlImpl::acceleration_for_move(const int *axis_steps,
-                                                     enum GCodeParserAxis defining_axis) {
+float GCodeMachineControl::Impl::acceleration_for_move(const int *axis_steps,
+                                                       enum GCodeParserAxis defining_axis) {
   return max_axis_accel_[defining_axis];
   // TODO: we need to scale the acceleration if one of the other axes could't
   // deal with it. Look at axis steps for that.
@@ -588,9 +588,9 @@ static float determine_joining_speed(const struct AxisTarget *from,
 }
 
 // Assign steps to all the motors responsible for given axis.
-void GCodeMachineControlImpl::assign_steps_to_motors(struct MotorMovement *command,
-                                                     enum GCodeParserAxis axis,
-                                                     int steps) {
+void GCodeMachineControl::Impl::assign_steps_to_motors(struct MotorMovement *command,
+                                                       enum GCodeParserAxis axis,
+                                                       int steps) {
   const DriverBitmap motormap_for_axis = axis_to_driver_[axis];
   for (int motor = 0; motor < BEAGLEG_NUM_MOTORS; ++motor) {
     if (motormap_for_axis & (1 << motor)) {
@@ -621,9 +621,9 @@ static uint8_t substract_steps(struct MotorMovement *value,
 //
 // Since we calculate the deceleration, this modifies the speed of target_pos
 // to reflect what the last speed was at the end of the move.
-void GCodeMachineControlImpl::move_machine_steps(const struct AxisTarget *last_pos,
-                                                 struct AxisTarget *target_pos,
-                                                 const struct AxisTarget *upcoming) {
+void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last_pos,
+                                                   struct AxisTarget *target_pos,
+                                                   const struct AxisTarget *upcoming) {
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
     return;
   }
@@ -751,7 +751,7 @@ void GCodeMachineControlImpl::move_machine_steps(const struct AxisTarget *last_p
 }
 
 // If we have enough data in the queue, issue motor move.
-void GCodeMachineControlImpl::issue_motor_move_if_possible() {
+void GCodeMachineControl::Impl::issue_motor_move_if_possible() {
   if (planning_buffer_.size() >= 3) {
     move_machine_steps(planning_buffer_[0],  // Current established position.
                        planning_buffer_[1],  // Position we want to move to.
@@ -760,7 +760,7 @@ void GCodeMachineControlImpl::issue_motor_move_if_possible() {
   }
 }
 
-void GCodeMachineControlImpl::machine_move(float feedrate, const float axis[]) {
+void GCodeMachineControl::Impl::machine_move(float feedrate, const float axis[]) {
   // We always have a previous position.
   struct AxisTarget *previous = planning_buffer_.back();
   struct AxisTarget *new_pos = planning_buffer_.append();
@@ -820,7 +820,7 @@ void GCodeMachineControlImpl::machine_move(float feedrate, const float axis[]) {
   issue_motor_move_if_possible();
 }
 
-void GCodeMachineControlImpl::bring_path_to_halt() {
+void GCodeMachineControl::Impl::bring_path_to_halt() {
   // Enqueue a new position that is the same position as the last
   // one seen, but zero speed. That will allow the previous segment to
   // slow down. Enqueue.
@@ -836,7 +836,7 @@ void GCodeMachineControlImpl::bring_path_to_halt() {
   issue_motor_move_if_possible();
 }
 
-bool GCodeMachineControlImpl::test_homing_status_ok() {
+bool GCodeMachineControl::Impl::test_homing_status_ok() {
   if (!cfg_.require_homing)
     return true;
   if (homing_state_ > HOMING_STATE_NEVER_HOMED)
@@ -845,7 +845,7 @@ bool GCodeMachineControlImpl::test_homing_status_ok() {
   return false;
 }
 
-bool GCodeMachineControlImpl::test_within_machine_limits(const float *axis) {
+bool GCodeMachineControl::Impl::test_within_machine_limits(const float *axis) {
   if (!cfg_.range_check)
     return true;
 
@@ -890,7 +890,7 @@ bool GCodeMachineControlImpl::test_within_machine_limits(const float *axis) {
   return true;
 }
 
-bool GCodeMachineControlImpl::coordinated_move(float feed, const float *axis) {
+bool GCodeMachineControl::Impl::coordinated_move(float feed, const float *axis) {
   if (!test_homing_status_ok())
     return false;
   if (!test_within_machine_limits(axis))
@@ -903,7 +903,7 @@ bool GCodeMachineControlImpl::coordinated_move(float feed, const float *axis) {
   return true;
 }
 
-bool GCodeMachineControlImpl::rapid_move(float feed, const float *axis) {
+bool GCodeMachineControl::Impl::rapid_move(float feed, const float *axis) {
   if (!test_homing_status_ok())
     return false;
   if (!test_within_machine_limits(axis))
@@ -914,17 +914,17 @@ bool GCodeMachineControlImpl::rapid_move(float feed, const float *axis) {
   return true;
 }
 
-void GCodeMachineControlImpl::dwell(float value) {
+void GCodeMachineControl::Impl::dwell(float value) {
   bring_path_to_halt();
   motor_ops_->WaitQueueEmpty();
   usleep((int) (value * 1000));
 }
 
-void GCodeMachineControlImpl::input_idle() {
+void GCodeMachineControl::Impl::input_idle() {
   bring_path_to_halt();
 }
 
-void GCodeMachineControlImpl::set_speed_factor(float value) {
+void GCodeMachineControl::Impl::set_speed_factor(float value) {
   if (value < 0) {
     value = 1.0f + value;   // M220 S-10 interpreted as: 90%
   }
@@ -949,8 +949,8 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
 }
 
 // Get the endstop for the axis.
-uint32_t GCodeMachineControlImpl::GetHomeEndstop(enum GCodeParserAxis axis,
-                                                 int *dir, int *trigger_value) const {
+uint32_t GCodeMachineControl::Impl::GetHomeEndstop(enum GCodeParserAxis axis,
+                                                   int *dir, int *trigger_value) const {
   *dir = 1;
   struct EndstopConfig config = max_endstop_[axis];
   if (min_endstop_[axis].endstop_number
@@ -965,10 +965,10 @@ uint32_t GCodeMachineControlImpl::GetHomeEndstop(enum GCodeParserAxis axis,
 }
 
 // Moves to endstop and returns how many steps it moved in the process.
-int GCodeMachineControlImpl::move_to_endstop(enum GCodeParserAxis axis,
-                                             float feedrate, int backoff,
-                                             int dir, int trigger_value,
-                                             uint32_t gpio_def) {
+int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
+                                               float feedrate, int backoff,
+                                               int dir, int trigger_value,
+                                               uint32_t gpio_def) {
   int total_movement = 0;
   struct MotorMovement move_command = {0};
   const float steps_per_mm = cfg_.steps_per_mm[axis];
@@ -1002,10 +1002,10 @@ int GCodeMachineControlImpl::move_to_endstop(enum GCodeParserAxis axis,
     }
   }
 
-    return total_movement;
+  return total_movement;
 }
 
-void GCodeMachineControlImpl::home_axis(enum GCodeParserAxis axis) {
+void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   struct AxisTarget *last = planning_buffer_.back();
   float home_pos = 0; // assume HOME_POS_ORIGIN
   int dir;
@@ -1018,7 +1018,7 @@ void GCodeMachineControlImpl::home_axis(enum GCodeParserAxis axis) {
   last->position_steps[axis] = round2int(home_pos * cfg_.steps_per_mm[axis]);
 }
 
-void GCodeMachineControlImpl::go_home(AxisBitmap_t axes_bitmap) {
+void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   bring_path_to_halt();
   for (const char *order = cfg_.home_order; *order; order++) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
@@ -1029,9 +1029,9 @@ void GCodeMachineControlImpl::go_home(AxisBitmap_t axes_bitmap) {
   homing_state_ = HOMING_STATE_HOMED;
 }
 
-bool GCodeMachineControlImpl::probe_axis(float feedrate,
-                                         enum GCodeParserAxis axis,
-                                         float *probe_result) {
+bool GCodeMachineControl::Impl::probe_axis(float feedrate,
+                                           enum GCodeParserAxis axis,
+                                           float *probe_result) {
   if (!test_homing_status_ok())
     return false;
 

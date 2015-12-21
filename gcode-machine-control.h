@@ -70,8 +70,6 @@ struct MachineControlConfig {
   char synchronous;             // Don't queue, wait for command to finish if 1.
 };
 
-class GCodeMachineControlImpl;  // TODO(hzeller): will go after transition.
-
 // A class that controls a machine via gcode.
 class GCodeMachineControl {
  public:
@@ -97,7 +95,8 @@ class GCodeMachineControl {
   GCodeParser::Events *ParseEventReceiver();
 
  private:
-  typedef GCodeMachineControlImpl Impl;
+  class Impl;
+
   // The MotorOperations struct provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
   GCodeMachineControl(Impl *Impl);
