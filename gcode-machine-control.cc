@@ -69,11 +69,15 @@ static const char kAxisMapping[] = "XYZEA";
 // Default order in which axes should be homed.
 static const char kHomeOrder[] = "ZXY";
 
-// The vector is essentially a position in the GCODE_NUM_AXES dimensional
-// space. An AxisTarget has a position vector, in absolute machine coordinates, and a
+// The target position vector is essentially a position in the
+// GCODE_NUM_AXES-dimensional space.
+//
+// An AxisTarget has a position vector, in absolute machine coordinates, and a
 // speed when arriving at that position.
-// The speed is generally an aimed goal; if it cannot be reached, the AxisTarget will
-// be modified
+//
+// The speed is initially the aimed goal; if it cannot be reached, the
+// AxisTarget will be modified to contain the actually reachable value. That is
+// used in planning along the path.
 struct AxisTarget {
   int position_steps[GCODE_NUM_AXES];  // Absolute position at end of segment. In steps.
 
@@ -85,49 +89,47 @@ struct AxisTarget {
   unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
 };
 
-// TODO(hzeller): convert target buffer to class.
-// TargetBuffer implementation
-struct TargetBuffer {
-  unsigned write_pos;
-  unsigned read_pos;
-  struct AxisTarget ring_buffer[4];
+// A simple fixed size, compile-time allocated deque.
+template <typename T, int CAPACITY>
+class RingDeque {
+public:
+  RingDeque() : write_pos_(0), read_pos_(0) {}
+
+  size_t size() const {
+    return (write_pos_ + CAPACITY - read_pos_) % CAPACITY;
+  }
+
+  // Add a new element and return pointer to it.
+  // Element is not initialized.
+  T* append() {
+    assert(size() < CAPACITY - 1);
+    T *result = buffer_ + write_pos_;
+    write_pos_ = (write_pos_ + 1) % CAPACITY;
+    return result;
+  }
+
+  // Return the content relative to the read position.
+  T* operator [] (size_t pos) {
+    assert(size() > pos);
+    return &buffer_[(read_pos_ + pos) % CAPACITY];
+  }
+
+  // Return last inserted position
+  T* back() {
+    assert(size() > 0);
+    return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
+  }
+
+  void pop_front() {
+    assert(size() > 0);
+    read_pos_ = (read_pos_ + 1) % CAPACITY;
+  }
+
+private:
+  unsigned write_pos_;
+  unsigned read_pos_;
+  T buffer_[CAPACITY];
 };
-
-// Initialize a new buffer.
-static void target_buffer_init(struct TargetBuffer *b) {
-  bzero(b, sizeof(*b));
-}
-
-// Returns number of available read items.
-static int buffer_available(struct TargetBuffer *b) {
-  return (b->write_pos + 4 - b->read_pos) % 4;
-}
-
-// Add a new target and return pointer. Makes sure that we never override
-static struct AxisTarget *buffer_add_next_target(struct TargetBuffer *b) {
-  assert(buffer_available(b) < 3);
-  struct AxisTarget *result = &b->ring_buffer[b->write_pos];
-  b->write_pos = (b->write_pos + 1) % 4;
-  return result;
-}
-
-// Get the last item written.
-static struct AxisTarget *buffer_get_last_written(struct TargetBuffer *b) {
-  assert(buffer_available(b) > 0);
-  return &b->ring_buffer[(b->write_pos + 3) % 4];
-}
-
-// Get the given target, delta 0 up to buffer_peek_available();
-static struct AxisTarget *buffer_at(struct TargetBuffer *b, int delta) {
-  assert(buffer_available(b) > delta);
-  return &b->ring_buffer[(b->read_pos + delta) % 4];
-}
-
-// Move on to the next read position.
-static void buffer_next(struct TargetBuffer *b) {
-  assert(buffer_available(b) > 0);
-  b->read_pos = (b->read_pos + 1) % 4;
-}
 
 typedef uint8_t DriverBitmap;
 
@@ -242,7 +244,7 @@ public:  // TODO(hzeller): these need to be private and have underscores.
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
-  struct TargetBuffer buffer_;
+  RingDeque<AxisTarget, 4> planning_buffer_;
 
   enum HomingState homing_state_;
 };
@@ -262,7 +264,6 @@ GCodeMachineControlImpl::GCodeMachineControlImpl(const MachineControlConfig &con
   bzero(min_endstop_, sizeof(min_endstop_));
   bzero(max_endstop_, sizeof(max_endstop_));
   bzero(coordinate_display_origin_, sizeof(coordinate_display_origin_));
-  bzero(&buffer_, sizeof(buffer_));
 }
 
 // machine-printf. Only prints if there is a msg-stream.
@@ -414,8 +415,8 @@ const char *GCodeMachineControlImpl::special_commands(char letter, float value,
     case 81: clr_gpio(MACHINE_PWR_GPIO); break;
     case 105: mprintf("T-300\n"); break;  // no temp yet.
     case 114:
-      if (buffer_available(&buffer_)) {
-        struct AxisTarget *current = buffer_at(&buffer_, 0);
+      if (planning_buffer_.size() > 0) {
+        struct AxisTarget *current = planning_buffer_[0];
         const int *mpos = current->position_steps;
         const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
         const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
@@ -751,18 +752,18 @@ void GCodeMachineControlImpl::move_machine_steps(const struct AxisTarget *last_p
 
 // If we have enough data in the queue, issue motor move.
 void GCodeMachineControlImpl::issue_motor_move_if_possible() {
-  if (buffer_available(&buffer_) >= 3) {
-    move_machine_steps(buffer_at(&buffer_, 0),  // Current established position.
-                       buffer_at(&buffer_, 1),  // Position we want to move to.
-                       buffer_at(&buffer_, 2)); // Next upcoming.
-    buffer_next(&buffer_);
+  if (planning_buffer_.size() >= 3) {
+    move_machine_steps(planning_buffer_[0],  // Current established position.
+                       planning_buffer_[1],  // Position we want to move to.
+                       planning_buffer_[2]); // Next upcoming.
+    planning_buffer_.pop_front();
   }
 }
 
 void GCodeMachineControlImpl::machine_move(float feedrate, const float axis[]) {
   // We always have a previous position.
-  struct AxisTarget *previous = buffer_get_last_written(&buffer_);
-  struct AxisTarget *new_pos = buffer_add_next_target(&buffer_);
+  struct AxisTarget *previous = planning_buffer_.back();
+  struct AxisTarget *new_pos = planning_buffer_.append();
   int max_steps = -1;
   enum GCodeParserAxis defining_axis = AXIS_X;
 
@@ -823,8 +824,8 @@ void GCodeMachineControlImpl::bring_path_to_halt() {
   // Enqueue a new position that is the same position as the last
   // one seen, but zero speed. That will allow the previous segment to
   // slow down. Enqueue.
-  struct AxisTarget *previous = buffer_get_last_written(&buffer_);
-  struct AxisTarget *new_pos = buffer_add_next_target(&buffer_);
+  struct AxisTarget *previous = planning_buffer_.back();
+  struct AxisTarget *new_pos = planning_buffer_.append();
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     new_pos->position_steps[i] = previous->position_steps[i];
     new_pos->delta_steps[i] = 0;
@@ -1005,7 +1006,7 @@ int GCodeMachineControlImpl::move_to_endstop(enum GCodeParserAxis axis,
 }
 
 void GCodeMachineControlImpl::home_axis(enum GCodeParserAxis axis) {
-  struct AxisTarget *last = buffer_get_last_written(&buffer_);
+  struct AxisTarget *last = planning_buffer_.back();
   float home_pos = 0; // assume HOME_POS_ORIGIN
   int dir;
   int trigger_value;
@@ -1055,10 +1056,10 @@ bool GCodeMachineControlImpl::probe_axis(float feedrate,
     // We are only looking for probes that are _not_ used for homing.
     mprintf("// BeagleG: No probe - axis %c does not have a travel endstop\n",
             gcodep_axis2letter(axis));
-    return 0;
+    return false;
   }
 
-  struct AxisTarget *last = buffer_get_last_written(&buffer_);
+  struct AxisTarget *last = planning_buffer_.back();
   if (feedrate <= 0) feedrate = 20;
   // TODO: if the probe fails to trigger, there is no mechanism to stop
   // it right now...
@@ -1066,7 +1067,7 @@ bool GCodeMachineControlImpl::probe_axis(float feedrate,
                                     config.trigger_value, gpio_def);
   last->position_steps[axis] += total_steps;
   *probe_result = 1.0f * last->position_steps[axis] / cfg_.steps_per_mm[axis];
-  return 1;
+  return true;
 }
 
 // Cleanup whatever is allocated. Return NULL for convenience.
@@ -1080,6 +1081,9 @@ GCodeMachineControl::GCodeMachineControl(Impl *impl) : impl_(impl) {
 GCodeMachineControl::~GCodeMachineControl() {
   Cleanup(impl_);
 }
+
+// We first do some parameter checking before we create the object.
+// TODO(hzeller): this is still pretty much C-ish of the version before.
 GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &config,
                                                  MotorOperations *motor_ops,
                                                  FILE *msg_stream) {
@@ -1103,9 +1107,6 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
     }
   }
 
-  // Here we assign it to the 'const' cfg, all other accesses will check for
-  // the readonly ness. So some nasty override here: we know what we're doing.
-  *((struct MachineControlConfig*) &result->cfg_) = cfg;
   result->current_feedrate_mm_per_sec_ = cfg.max_feedrate[AXIS_X] / 10;
   float lowest_accel = cfg.max_feedrate[AXIS_X] * cfg.steps_per_mm[AXIS_X];
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -1275,11 +1276,9 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
   if (error_count)
     return Cleanup(result);
 
-  target_buffer_init(&result->buffer_);
-
   // Initial machine position. We assume the homed position here, which is
   // wherever the endswitch is for each axis.
-  struct AxisTarget *init_axis = buffer_add_next_target(&result->buffer_);
+  struct AxisTarget *init_axis = result->planning_buffer_.append();
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
     int dir, dummy;
     if (result->GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy)) {
