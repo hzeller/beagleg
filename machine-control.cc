@@ -92,13 +92,13 @@ static int usage(const char *prog, const char *msg) {
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "loop_count" is >= 0, repeats this number after the first execution.
 static int send_file_to_machine(GCodeMachineControl *machine,
-                                GCodeParser_t *parser,
+                                GCodeParser *parser,
                                 const char *gcode_filename, int loop_count) {
   int ret;
   machine->SetMsgOut(stderr);
   while (loop_count < 0 || loop_count-- > 0) {
     int fd = open(gcode_filename, O_RDONLY);
-    ret = gcodep_parse_stream(parser, fd, stderr);
+    ret = parser->ParseStream(fd, stderr);
     if (ret != 0)
       break;
   }
@@ -109,7 +109,7 @@ static int send_file_to_machine(GCodeMachineControl *machine,
 // Interprets GCode coming from a connection. Only one connection at a
 // time can be active.
 static int run_server(GCodeMachineControl *machine,
-                      GCodeParser_t *parser,
+                      GCodeParser *parser,
                       const char *bind_addr, int port) {
   if (port > 65535) {
     fprintf(stderr, "Invalid port %d\n", port);
@@ -156,7 +156,7 @@ static int run_server(GCodeMachineControl *machine,
     printf("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
     machine->SetMsgOut(msg_stream);
-    process_result = gcodep_parse_stream(parser, connection, msg_stream);
+    process_result = parser->ParseStream(connection, msg_stream);
 
     fclose(msg_stream);
     printf("Connection to %s closed.\n", print_ip);
@@ -384,11 +384,10 @@ int main(int argc, char *argv[]) {
     = GCodeMachineControl::Create(config, &motor_operations, stderr);
   if (machine_control == NULL)
     return 1;
-  struct GCodeParserConfig parser_cfg;
-  bzero(&parser_cfg, sizeof(parser_cfg));
-  machine_control->FillEventCallbacks(&parser_cfg.callbacks);
+  GCodeParser::Config parser_cfg;
   machine_control->GetHomePos(parser_cfg.machine_origin);
-  GCodeParser_t *parser = gcodep_new(&parser_cfg);
+  GCodeParser *parser = new GCodeParser(parser_cfg,
+                                        machine_control->ParseEventReceiver());
 
   int ret = 0;
   if (has_filename) {
@@ -400,7 +399,7 @@ int main(int argc, char *argv[]) {
   }
 
   delete machine_control;
-  gcodep_delete(parser);
+  delete parser;
 
   const char caught_signal = (ret == 2);
   if (caught_signal) {

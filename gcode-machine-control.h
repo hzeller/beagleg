@@ -92,9 +92,9 @@ class GCodeMachineControl {
   // pointer must be pre-allocated and have space for GCODE_NUM_AXES.
   void GetHomePos(float *pos);
 
-  // Fill event callbacks into given struct. (TODO: will change when parser is
-  // converted to C++)
-  void FillEventCallbacks(struct GCodeParserCb *callbacks);
+  // Return the receiver for parse events. The caller must not assume ownership
+  // of the returned pointer.
+  GCodeParser::Events *ParseEventReceiver();
 
  private:
   typedef GCodeMachineControlImpl Impl;

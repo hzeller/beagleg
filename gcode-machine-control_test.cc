@@ -84,16 +84,18 @@ class Harness {
  public:
   // Initialize harness with the expected sequence of motor movements
   // and return the callback struct to receive simulated gcode calls.
-  Harness(const MotorMovement *expected,
-          struct GCodeParserCb *callbacks)
+  Harness(const MotorMovement *expected)
     : expect_motor_ops(expected) {
     init_test_config(&config);
     machine_control = GCodeMachineControl::Create(config, &expect_motor_ops, NULL);
-    machine_control->FillEventCallbacks(callbacks);
   }
 
   ~Harness() {
     delete machine_control;
+  }
+
+  GCodeParser::Events *gcode_emit() {
+    return machine_control->ParseEventReceiver();
   }
 
   struct MachineControlConfig config;
@@ -115,19 +117,18 @@ void TEST_straight_segments_same_speed() {
     { /*v0*/ 10000.0, /*v1*/     0.0, 0, /*steps*/ { 500}},  // decel back to 0
     { 0.0, 0.0, END_SENTINEL},
   };
-  struct GCodeParserCb call;
-  Harness harness(expected, &call);
+  Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call.coordinated_move(call.user_data, 100, coordinates);  // 100mm/s
+  harness.gcode_emit()->coordinated_move(100, coordinates);  // 100mm/s
 
   // second half, same speed
   coordinates[0] = 200;
-  call.coordinated_move(call.user_data, 100, coordinates);  // also 100mm/s
+  harness.gcode_emit()->coordinated_move(100, coordinates);  // also 100mm/s
 
-  call.motors_enable(call.user_data, 0);  // finish movement.
+  harness.gcode_emit()->motors_enable(false);  // finish movement.
 
   printf(" DONE %s\n", __func__);
 }
@@ -145,19 +146,18 @@ void TEST_straight_segments_speed_change() {
     { /*v0*/  5000.0, /*v1*/     0.0, 0, /*steps*/ { 125}},  // final slow to zero
     { 0.0, 0.0, END_SENTINEL},
   };
-  struct GCodeParserCb call;
-  Harness harness(expected, &call);
+  Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   float coordinates[GCODE_NUM_AXES] = {0};
   coordinates[0] = 100;
-  call.coordinated_move(call.user_data, 100, coordinates); // 100mm/s
+  harness.gcode_emit()->coordinated_move(100, coordinates); // 100mm/s
 
   // second half, less speed.
   coordinates[0] = 200;
-  call.coordinated_move(call.user_data, 50, coordinates);  // 50mm/s
+  harness.gcode_emit()->coordinated_move(50, coordinates);  // 50mm/s
 
-  call.motors_enable(call.user_data, 0);  // finish movement.
+  harness.gcode_emit()->motors_enable(false);  // finish movement.
 
   printf(" DONE %s\n", __func__);
 }

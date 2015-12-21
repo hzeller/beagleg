@@ -28,78 +28,63 @@
 #include "gcode-parser.h"
 #include "motor-operations.h"
 
-struct StatsData {
-  struct BeagleGPrintStats *stats;
-  struct GCodeParserCb machine_delegatee;
+namespace {
+// An event receiver for GCodeParser events that are intercepted, stats
+// recorded, then further delegated to an original GCodeParser::Events
+// receiver
+class StatsCollectingEventDelegator : public GCodeParser::Events {
+public:
+  StatsCollectingEventDelegator(BeagleGPrintStats *stats,
+                                GCodeParser::Events *delegatee)
+    : stats_(stats), delegatee_(delegatee) {
+  }
+
+  // GCode parser event receivers, that forward calls to the delegate
+  // but also determine relevant height information.
+  virtual void set_speed_factor(float f) { delegatee_->set_speed_factor(f);  }
+  virtual void set_temperature(float f) { delegatee_->set_temperature(f); }
+  virtual void set_fanspeed(float speed) { delegatee_->set_fanspeed(speed);  }
+  virtual void wait_temperature() { delegatee_->wait_temperature(); }
+  virtual void motors_enable(bool b) { delegatee_->motors_enable(b); }
+  virtual void go_home(AxisBitmap_t axes) { delegatee_->go_home(axes); }
+  virtual void inform_origin_offset(const float *val) {
+    delegatee_->inform_origin_offset(val);
+  }
+
+  virtual void dwell(float value) {
+    stats_->total_time_seconds += value / 1000.0f;
+    // We call the original dell() with zero time as we don't want to spend _real_ time.
+    delegatee_->dwell(0);
+  }
+
+  virtual bool rapid_move(float feed, const float *axes) {
+    update_coordinate_stats(axes);
+    return delegatee_->rapid_move(feed, axes);
+  }
+  virtual bool coordinated_move(float feed, const float *axes) {
+    update_coordinate_stats(axes);
+    return delegatee_->coordinated_move(feed, axes);
+  }
+
+  virtual const char *unprocessed(char letter, float value, const char *remain) {
+    return delegatee_->unprocessed(letter, value, remain);
+  }
+
+private:
+  void update_coordinate_stats(const float *axis) {
+    stats_->last_x = axis[AXIS_X];
+    stats_->last_y = axis[AXIS_Y];
+    stats_->last_z = axis[AXIS_Z];
+    if (axis[AXIS_E] > stats_->filament_len) {
+      stats_->last_z_extruding = stats_->last_z;
+    }
+    stats_->filament_len = axis[AXIS_E];
+  }
+
+  struct BeagleGPrintStats *const stats_;
+  GCodeParser::Events *const delegatee_;
 };
 
-// GCode parser event receivers, that forward calls to the delegate
-// but also determine relevant height information.
-static void forwarding_set_speed_factor(void *userdata, float f) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.set_speed_factor(data->machine_delegatee.user_data, f);
-}
-static void forwarding_set_temperature(void *userdata, float f) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.set_temperature(data->machine_delegatee.user_data, f);
-}
-static void forwarding_set_fanspeed(void *userdata, float speed) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.set_fanspeed(data->machine_delegatee.user_data, speed);
-}
-static void forwarding_wait_temperature(void *userdata) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.wait_temperature(data->machine_delegatee.user_data);
-}
-static void forwarding_dwell(void *userdata, float value) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->stats->total_time_seconds += value / 1000.0f;
-  // We call the original dell() with zero time as we don't want to spend _real_ time.
-  data->machine_delegatee.dwell(data->machine_delegatee.user_data, 0);
-}
-static void forwarding_motors_enable(void *userdata, char b) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.motors_enable(data->machine_delegatee.user_data, b);
-}
-
-static void update_coordinate_stats(struct BeagleGPrintStats *stats,
-                                    const float *axis) {
-  stats->last_x = axis[AXIS_X];
-  stats->last_y = axis[AXIS_Y];
-  stats->last_z = axis[AXIS_Z];
-  if (axis[AXIS_E] > stats->filament_len) {
-    stats->last_z_extruding = stats->last_z;
-  }
-  stats->filament_len = axis[AXIS_E];
-}
-
-static char forwarding_rapid_move(void *userdata, float feed, const float *axes) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  update_coordinate_stats(data->stats, axes);
-  return data->machine_delegatee.rapid_move(data->machine_delegatee.user_data, feed, axes);
-}
-static char forwarding_coordinated_move(void *userdata, float feed, const float *axes) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  update_coordinate_stats(data->stats, axes);
-  return data->machine_delegatee.coordinated_move(data->machine_delegatee.user_data, feed, axes);
-}
-static void forwarding_go_home(void *userdata, AxisBitmap_t axes) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  data->machine_delegatee.go_home(data->machine_delegatee.user_data, axes);
-}
-static const char *forwarding_unprocessed(void *userdata, char letter, float value,
-                                          const char *remaining) {
-  struct StatsData *data = (struct StatsData*)userdata;
-  return data->machine_delegatee.unprocessed(data->machine_delegatee.user_data,
-                                             letter, value, remaining);
-}
-
-static void forwarding_info_origin_offset(void *userdata, const float *val) {
-  struct StatsData *s = (struct StatsData*)userdata;
-  s->machine_delegatee.inform_origin_offset(s->machine_delegatee.user_data, val);
-}
-
-namespace {
 class StatsMotorOperations : public MotorOperations {
 public:
   StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
@@ -128,39 +113,23 @@ private:
 
 int determine_print_stats(int input_fd, const MachineControlConfig &config,
 			  struct BeagleGPrintStats *result) {
-  struct StatsData data;
-  bzero(&data, sizeof(data));
   bzero(result, sizeof(*result));
-  data.stats = result;
 
   // Motor control that just determines the time spent turning the motor.
+  // We do that by intercepting the motor operations by replacing the
+  // implementation with our own.
   StatsMotorOperations stats_motor_ops(result);
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &stats_motor_ops, NULL);
   assert(machine_control);
 
-  machine_control->FillEventCallbacks(&data.machine_delegatee);
+  // We intercept gcode events to update some stats, then pass on to
+  // machine event receiver.
+  StatsCollectingEventDelegator
+    stats_event_receiver(result, machine_control->ParseEventReceiver());
 
-  struct GCodeParserConfig parser_config;
-  bzero(&parser_config, sizeof(parser_config));
-
-  parser_config.callbacks.user_data = &data;
-
-  parser_config.callbacks.go_home = &forwarding_go_home;
-  parser_config.callbacks.set_speed_factor = forwarding_set_speed_factor;
-  parser_config.callbacks.set_fanspeed = forwarding_set_fanspeed;
-  parser_config.callbacks.set_temperature = forwarding_set_temperature;
-  parser_config.callbacks.wait_temperature = forwarding_wait_temperature;
-  parser_config.callbacks.rapid_move = &forwarding_rapid_move;
-  parser_config.callbacks.coordinated_move = &forwarding_coordinated_move;
-  parser_config.callbacks.dwell = &forwarding_dwell;
-  parser_config.callbacks.motors_enable = &forwarding_motors_enable;
-  parser_config.callbacks.unprocessed = &forwarding_unprocessed;
-  parser_config.callbacks.inform_origin_offset = &forwarding_info_origin_offset;
-
-  GCodeParser_t *parser = gcodep_new(&parser_config);
-  gcodep_parse_stream(parser, input_fd, stderr);
-  gcodep_delete(parser);
+  GCodeParser parser(GCodeParser::Config(), &stats_event_receiver);
+  parser.ParseStream(input_fd, stderr);
 
   return 0;
 }

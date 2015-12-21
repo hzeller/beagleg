@@ -92,7 +92,7 @@ void GCodeParser::Events::gcode_start() {}
 void GCodeParser::Events::gcode_finished() {}
 void GCodeParser::Events::wait_for_start() {}
 void GCodeParser::Events::inform_origin_offset(const float *o) {
-  fprintf(stderr, "GCodeParser: display offset [");
+  fprintf(stderr, "GCodeParser: (display) origin offset [");
   for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
     fprintf(stderr, "%s%c:%.3f", i == 0 ? "" : ", ",
             gcodep_axis2letter((enum GCodeParserAxis)i),o[i]);
@@ -279,7 +279,7 @@ private:
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
                         GCodeParser::Events *parse_events)
-  : callbacks(parse_events ? parse_events : new Events()), config(parse_config),
+  : callbacks(parse_events), config(parse_config),
     program_in_progress(false),
     err_msg(NULL), modal_g0_g1(0),
     line_number(0), provided_axes(0),
@@ -287,6 +287,8 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     current_origin(NULL), current_global_offset(NULL),
     arc_normal(AXIS_Z)
 {
+  assert(callbacks);  // otherwise, this is not very useful.
+
   reset_G92();
 
   // This is the only time we set the const value. Cast.
