@@ -47,8 +47,8 @@ public:
   virtual void wait_temperature() { delegatee_->wait_temperature(); }
   virtual void motors_enable(bool b) { delegatee_->motors_enable(b); }
   virtual void go_home(AxisBitmap_t axes) { delegatee_->go_home(axes); }
-  virtual void inform_origin_offset(const float *val) {
-    delegatee_->inform_origin_offset(val);
+  virtual void inform_origin_offset(const AxesRegister& axes) {
+    delegatee_->inform_origin_offset(axes);
   }
 
   virtual void dwell(float value) {
@@ -57,11 +57,11 @@ public:
     delegatee_->dwell(0);
   }
 
-  virtual bool rapid_move(float feed, const float *axes) {
+  virtual bool rapid_move(float feed, const AxesRegister &axes) {
     update_coordinate_stats(axes);
     return delegatee_->rapid_move(feed, axes);
   }
-  virtual bool coordinated_move(float feed, const float *axes) {
+  virtual bool coordinated_move(float feed, const AxesRegister &axes) {
     update_coordinate_stats(axes);
     return delegatee_->coordinated_move(feed, axes);
   }
@@ -71,7 +71,7 @@ public:
   }
 
 private:
-  void update_coordinate_stats(const float *axis) {
+  void update_coordinate_stats(const AxesRegister &axis) {
     stats_->last_x = axis[AXIS_X];
     stats_->last_y = axis[AXIS_Y];
     stats_->last_z = axis[AXIS_Z];

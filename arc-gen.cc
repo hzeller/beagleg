@@ -41,10 +41,10 @@
 // Generate an arc. Input is the
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
 	     char is_cw,                        // 0 CCW, 1 CW
-	     float position[],   // start position. Will be updated.
-	     float offset[],     // Offset to center.
-	     float target[],     // Target position.
-	     void (*segment_output)(void *, float[]),
+	     AxesRegister &position,   // start position. Will be updated.
+	     const AxesRegister &offset,     // Offset to center.
+	     const AxesRegister &target,     // Target position.
+	     void (*segment_output)(void *, const AxesRegister&),
              void *segment_output_user_data) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];

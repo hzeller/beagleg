@@ -166,7 +166,7 @@ public:
   virtual void gcode_start() {}    // Start program. Use for initialization.
   virtual void gcode_finished();   // End of program or stream.
 
-  virtual void inform_origin_offset(const float[]);
+  virtual void inform_origin_offset(const AxesRegister &origin);
 
   virtual void gcode_command_done(char letter, float val);
   virtual void input_idle();
@@ -180,15 +180,15 @@ public:
   virtual void wait_temperature();                // M109, M116: Wait for temp. reached.
   virtual void dwell(float time_ms);              // G4: dwell for milliseconds.
   virtual void motors_enable(bool enable);        // M17,M84,M18: Switch on/off motors
-  virtual bool coordinated_move(float feed_mm_p_sec, const float[]);  // G1
-  virtual bool rapid_move(float feed_mm_p_sec, const float[]);        // G0
+  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target);
+  virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &target);
   virtual const char *unprocessed(char letter, float value, const char *);
 
 private:
   void issue_motor_move_if_possible();
-  void machine_move(float feedrate, const float axis[]);
+  void machine_move(float feedrate, const AxesRegister &axes);
   bool test_homing_status_ok();
-  bool test_within_machine_limits(const float *axis);
+  bool test_within_machine_limits(const AxesRegister &axes);
   void bring_path_to_halt();
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -218,8 +218,8 @@ public:  // TODO(hzeller): these need to be private and have underscores.
                                          // (will be trimmed if needed)
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
-  float max_axis_speed_[GCODE_NUM_AXES];  // max travel speed hz
-  float max_axis_accel_[GCODE_NUM_AXES];  // acceleration hz/s
+  AxesRegister max_axis_speed_;  // max travel speed hz
+  AxesRegister max_axis_accel_;  // acceleration hz/s
   float highest_accel_;                   // hightest accel of all axes.
 
   // "axis_to_driver": Which axis is mapped to which physical output drivers.
@@ -228,15 +228,15 @@ public:  // TODO(hzeller): these need to be private and have underscores.
   // Bitmap of drivers output should go.
   DriverBitmap axis_to_driver_[GCODE_NUM_AXES];
 
-  int axis_flip_[GCODE_NUM_AXES];        // 1 or -1 for direction flip of axis
-  int driver_flip_[BEAGLEG_NUM_MOTORS];  // 1 or -1 for for individual driver
+  FixedArray<int, GCODE_NUM_AXES> axis_flip_;  // 1 or -1 for direction flip of axis
+  FixedArray<int, BEAGLEG_NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
 
   // Mapping of Axis to which endstop it affects.
-  struct EndstopConfig min_endstop_[GCODE_NUM_AXES];
-  struct EndstopConfig max_endstop_[GCODE_NUM_AXES];
+  FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
+  FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
 
   // Current machine configuration
-  float coordinate_display_origin_[GCODE_NUM_AXES]; // parser tells us
+  AxesRegister coordinate_display_origin_; // parser tells us
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
   unsigned short aux_bits_;              // Set via M42.
@@ -257,13 +257,6 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
                                 MotorOperations *motor_ops,
                                 FILE *msg_stream)
   : cfg_(config), motor_ops_(motor_ops), msg_stream_(msg_stream) {
-  bzero(max_axis_speed_, sizeof(max_axis_speed_));
-  bzero(max_axis_accel_, sizeof(max_axis_accel_));
-  bzero(axis_to_driver_, sizeof(axis_to_driver_));
-  bzero(axis_flip_, sizeof(axis_flip_));
-  bzero(min_endstop_, sizeof(min_endstop_));
-  bzero(max_endstop_, sizeof(max_endstop_));
-  bzero(coordinate_display_origin_, sizeof(coordinate_display_origin_));
 }
 
 // machine-printf. Only prints if there is a msg-stream.
@@ -291,8 +284,8 @@ void GCodeMachineControl::Impl::motors_enable(bool b) {
 void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
   mprintf("ok\n");
 }
-void GCodeMachineControl::Impl::inform_origin_offset(const float *origin) {
-  memcpy(coordinate_display_origin_, origin, sizeof(coordinate_display_origin_));
+void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o) {
+  coordinate_display_origin_ = o;
 }
 
 void GCodeMachineControl::Impl::set_fanspeed(float speed) {
@@ -422,7 +415,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
         const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
         const float z = 1.0f * mpos[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
         const float e = 1.0f * mpos[AXIS_E] / cfg_.steps_per_mm[AXIS_E];
-        const float *origin = coordinate_display_origin_;
+        const AxesRegister &origin = coordinate_display_origin_;
         mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
                 x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
                 e - origin[AXIS_E]);
@@ -760,7 +753,8 @@ void GCodeMachineControl::Impl::issue_motor_move_if_possible() {
   }
 }
 
-void GCodeMachineControl::Impl::machine_move(float feedrate, const float axis[]) {
+void GCodeMachineControl::Impl::machine_move(float feedrate,
+                                             const AxesRegister &axis) {
   // We always have a previous position.
   struct AxisTarget *previous = planning_buffer_.back();
   struct AxisTarget *new_pos = planning_buffer_.append();
@@ -845,13 +839,13 @@ bool GCodeMachineControl::Impl::test_homing_status_ok() {
   return false;
 }
 
-bool GCodeMachineControl::Impl::test_within_machine_limits(const float *axis) {
+bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &axes) {
   if (!cfg_.range_check)
     return true;
 
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     // Min range ...
-    if (axis[i] < 0) {
+    if (axes[i] < 0) {
       // Machine cube must be in positive range.
       if (coordinate_display_origin_[i] != 0) {
         mprintf("// ERROR outside machine limit: Axis %c < min allowed "
@@ -870,7 +864,7 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const float *axis) {
     if (cfg_.move_range_mm[i] <= 0)
       continue;  // max range not configured.
     const float max_limit = cfg_.move_range_mm[i];
-    if (axis[i] > max_limit) {
+    if (axes[i] > max_limit) {
       // Machine cube must be within machine limits if defined.
       if (coordinate_display_origin_[i] != 0) {
         mprintf("// ERROR outside machine limit: Axis %c > max allowed %+.1fmm "
@@ -890,7 +884,8 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const float *axis) {
   return true;
 }
 
-bool GCodeMachineControl::Impl::coordinated_move(float feed, const float *axis) {
+bool GCodeMachineControl::Impl::coordinated_move(float feed,
+                                                 const AxesRegister &axis) {
   if (!test_homing_status_ok())
     return false;
   if (!test_within_machine_limits(axis))
@@ -903,7 +898,8 @@ bool GCodeMachineControl::Impl::coordinated_move(float feed, const float *axis) 
   return true;
 }
 
-bool GCodeMachineControl::Impl::rapid_move(float feed, const float *axis) {
+bool GCodeMachineControl::Impl::rapid_move(float feed,
+                                           const AxesRegister &axis) {
   if (!test_homing_status_ok())
     return false;
   if (!test_within_machine_limits(axis))
@@ -1294,14 +1290,14 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
   return new GCodeMachineControl(result);
 }
 
-void GCodeMachineControl::GetHomePos(float *home_pos) {
-  bzero(home_pos, sizeof(AxesRegister));
+void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
+  home_pos->clear();
   int dir;
   int dummy;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
     if (!impl_->GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy))
       continue;
-    home_pos[axis] = (dir < 0) ? 0 : impl_->cfg_.move_range_mm[axis];
+    (*home_pos)[axis] = (dir < 0) ? 0 : impl_->cfg_.move_range_mm[axis];
   }
 }
 

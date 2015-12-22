@@ -120,7 +120,7 @@ void TEST_straight_segments_same_speed() {
   Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
-  float coordinates[GCODE_NUM_AXES] = {0};
+  AxesRegister coordinates;
   coordinates[0] = 100;
   harness.gcode_emit()->coordinated_move(100, coordinates);  // 100mm/s
 
@@ -149,7 +149,7 @@ void TEST_straight_segments_speed_change() {
   Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
-  float coordinates[GCODE_NUM_AXES] = {0};
+  AxesRegister coordinates;
   coordinates[0] = 100;
   harness.gcode_emit()->coordinated_move(100, coordinates); // 100mm/s
 

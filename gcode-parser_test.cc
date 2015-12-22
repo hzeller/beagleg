@@ -57,8 +57,8 @@ public:
 
   virtual void gcode_start()     { Count(CALL_gcode_start); }
   virtual void gcode_finished()  { Count(CALL_gcode_finished); }
-  virtual void inform_origin_offset(const float *offset) {
-    memcpy(parser_offset, offset, sizeof(AxesRegister));
+  virtual void inform_origin_offset(const AxesRegister &offset) {
+    parser_offset.CopyFrom(offset);
   }
   virtual void go_home(AxisBitmap_t axis_bitmap) { Count(CALL_go_home); }
   virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
@@ -69,14 +69,14 @@ public:
   }
 
   virtual void motors_enable(bool enable) { Count(CALL_motors_enable); }
-  virtual bool coordinated_move(float feed_mm_p_sec, const float *axes) {
+  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_coordinated_move);
-    StoreAbsPos(axes);
+    abs_pos.CopyFrom(axes);
     return true;
   }
-  virtual bool rapid_move(float feed_mm_p_sec, const float *axes) {
+  virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_rapid_move);
-    StoreAbsPos(axes);
+    abs_pos.CopyFrom(axes);
     return true;
   }
   virtual const char *unprocessed(char letter, float value, const char *line) {
@@ -97,10 +97,6 @@ public:
 
 private:
   void Count(int what) { call_count[what]++; }
-
-  void StoreAbsPos(const float axes[]) {
-    memcpy(abs_pos, axes, sizeof(AxesRegister));
-  }
 
   GCodeParser *parser_;
 };

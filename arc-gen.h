@@ -32,10 +32,10 @@
 // to the new machine position.
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
 	     char is_cw,         // 1 if CW, 0 if CCW
-	     float position[],   // start position. Will be updated.
-	     float offset[],     // Offset to center.
-	     float target[],     // Target position.
-	     void (*segment_output)(void *, float[]),
+	     AxesRegister &position,   // start position. Will be updated.
+	     const AxesRegister &offset,     // Offset to center.
+	     const AxesRegister &target,     // Target position.
+	     void (*segment_output)(void *, const AxesRegister &),
              void *segment_output_user_data);
 
 #endif  // _BEAGLEG_ARC_GEN_H

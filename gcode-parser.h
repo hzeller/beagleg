@@ -29,6 +29,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include "container.h"
 
 typedef uint32_t AxisBitmap_t;
 
@@ -42,7 +43,7 @@ enum GCodeParserAxis {
 };
 
 // Convenient type: a register to store machine coordinates.
-typedef float AxesRegister[GCODE_NUM_AXES];
+typedef FixedArray<float, GCODE_NUM_AXES> AxesRegister;
 
 // Maps axis enum to letter. AXIS_Z -> 'Z'
 char gcodep_axis2letter(enum GCodeParserAxis axis);
@@ -74,7 +75,7 @@ public:
     // machine cube.
     // If needed after the callback returns, the receiver should make a copy
     // of the array.
-    virtual void inform_origin_offset(const float[]);
+    virtual void inform_origin_offset(const AxesRegister& offset);
 
     // "gcode_command_done" is always executed when a command is completed,
     // which is after internally executed ones (such as G21) or commands that
@@ -118,8 +119,10 @@ public:
     // by GCodeParserAxis.
     // Returns 1, if the move was successful or 0 if the machine could not move
     // the machine (e.g. because it was beyond limits or other condition).
-    virtual bool coordinated_move(float feed_mm_p_sec, const float[]);  // G1
-    virtual bool rapid_move(float feed_mm_p_sec, const float[]);        // G0
+    virtual bool coordinated_move(float feed_mm_p_sec,
+                                  const AxesRegister&);  // G1
+    virtual bool rapid_move(float feed_mm_p_sec,
+                            const AxesRegister&);        // G0
 
     // Hand out G-code command that could not be interpreted.
     // Parameters: letter + value of the command that was not understood,
@@ -133,8 +136,6 @@ public:
 
   // Configuration for the parser.
   struct Config {
-    Config();
-
     // The machine origin. This is where the end-switches are. Typically,
     // for CNC machines, that might have Z at the highest point for instance,
     // while 3D printers have Z at zero.

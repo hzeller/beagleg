@@ -385,7 +385,7 @@ int main(int argc, char *argv[]) {
   if (machine_control == NULL)
     return 1;
   GCodeParser::Config parser_cfg;
-  machine_control->GetHomePos(parser_cfg.machine_origin);
+  machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
                                         machine_control->ParseEventReceiver());
 
