@@ -58,7 +58,7 @@ public:
   virtual void gcode_start()     { Count(CALL_gcode_start); }
   virtual void gcode_finished()  { Count(CALL_gcode_finished); }
   virtual void inform_origin_offset(const AxesRegister &offset) {
-    parser_offset.CopyFrom(offset);
+    parser_offset = offset;
   }
   virtual void go_home(AxisBitmap_t axis_bitmap) { Count(CALL_go_home); }
   virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
@@ -71,12 +71,12 @@ public:
   virtual void motors_enable(bool enable) { Count(CALL_motors_enable); }
   virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_coordinated_move);
-    abs_pos.CopyFrom(axes);
+    abs_pos = axes;
     return true;
   }
   virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_rapid_move);
-    abs_pos.CopyFrom(axes);
+    abs_pos = axes;
     return true;
   }
   virtual const char *unprocessed(char letter, float value, const char *line) {

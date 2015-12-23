@@ -485,7 +485,7 @@ const char *GCodeParser::Impl::handle_move(const char *line, int force_change) {
     }
   }
   if (did_move) {
-    axes_pos_.CopyFrom(new_pos);
+    axes_pos_ = new_pos;
   }
   return line;
 }

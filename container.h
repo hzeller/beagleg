@@ -22,30 +22,73 @@
 
 #include <strings.h>
 #include <string.h>
+#include <assert.h>
 
+// Fixed array of POD types (that can be zeroed with bzero()).
 template <typename T, int N>
 class FixedArray {
 public:
-  FixedArray() {
-    clear();
-  }
+  FixedArray() { zero(); }
   FixedArray(const FixedArray<T,N> &other) { CopyFrom(other); }
 
   FixedArray<T,N> &operator= (const FixedArray<T,N> &other) {
     CopyFrom(other); return *this;
   }
-  T &operator[] (int i) { return data_[i]; }
-  const T & operator[] (int i) const { return data_[i]; }
+  T &operator[] (int i) { assert(i < N); return data_[i]; }
+  const T & operator[] (int i) const { assert(i < N); return data_[i]; }
 
   size_t size() const { return N; }
 
-  void clear() { bzero(data_, sizeof(data_)); }
+  void zero() { bzero(data_, sizeof(data_)); }
+
+private:
   void CopyFrom(const FixedArray<T,N> &other) {
     memcpy(data_, other.data_, sizeof(data_));
   }
 
-private:
   T data_[N];
+};
+
+// A simple fixed size, compile-time allocated deque.
+template <typename T, int CAPACITY>
+class RingDeque {
+public:
+  RingDeque() : write_pos_(0), read_pos_(0) {}
+
+  size_t size() const {
+    return (write_pos_ + CAPACITY - read_pos_) % CAPACITY;
+  }
+
+  // Add a new element and return pointer to it.
+  // Element is not initialized.
+  T* append() {
+    assert(size() < CAPACITY - 1);
+    T *result = buffer_ + write_pos_;
+    write_pos_ = (write_pos_ + 1) % CAPACITY;
+    return result;
+  }
+
+  // Return the content relative to the read position.
+  T* operator [] (size_t pos) {
+    assert(size() > pos);
+    return &buffer_[(read_pos_ + pos) % CAPACITY];
+  }
+
+  // Return last inserted position
+  T* back() {
+    assert(size() > 0);
+    return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
+  }
+
+  void pop_front() {
+    assert(size() > 0);
+    read_pos_ = (read_pos_ + 1) % CAPACITY;
+  }
+
+private:
+  unsigned write_pos_;
+  unsigned read_pos_;
+  T buffer_[CAPACITY];
 };
 
 #endif  // _BEAGLEG_CONTAINER_H_

@@ -34,9 +34,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "motor-operations.h"
+#include "container.h"
 #include "gcode-parser.h"
 #include "generic-gpio.h"
+#include "motor-operations.h"
 #include "pwm-timer.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
@@ -87,48 +88,6 @@ struct AxisTarget {
   float speed;                         // (desired) speed in steps/s on defining axis.
   float angle;
   unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
-};
-
-// A simple fixed size, compile-time allocated deque.
-template <typename T, int CAPACITY>
-class RingDeque {
-public:
-  RingDeque() : write_pos_(0), read_pos_(0) {}
-
-  size_t size() const {
-    return (write_pos_ + CAPACITY - read_pos_) % CAPACITY;
-  }
-
-  // Add a new element and return pointer to it.
-  // Element is not initialized.
-  T* append() {
-    assert(size() < CAPACITY - 1);
-    T *result = buffer_ + write_pos_;
-    write_pos_ = (write_pos_ + 1) % CAPACITY;
-    return result;
-  }
-
-  // Return the content relative to the read position.
-  T* operator [] (size_t pos) {
-    assert(size() > pos);
-    return &buffer_[(read_pos_ + pos) % CAPACITY];
-  }
-
-  // Return last inserted position
-  T* back() {
-    assert(size() > 0);
-    return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
-  }
-
-  void pop_front() {
-    assert(size() > 0);
-    read_pos_ = (read_pos_ + 1) % CAPACITY;
-  }
-
-private:
-  unsigned write_pos_;
-  unsigned read_pos_;
-  T buffer_[CAPACITY];
 };
 
 typedef uint8_t DriverBitmap;
@@ -1291,7 +1250,7 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
 }
 
 void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
-  home_pos->clear();
+  home_pos->zero();
   int dir;
   int dummy;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
