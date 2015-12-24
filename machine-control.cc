@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
   }
 
   Log_init(logfile);
-  Log_info("startup.");
+  Log_info("Startup.");
 
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
@@ -424,19 +424,20 @@ int main(int argc, char *argv[]) {
     ret = run_server(machine_control, parser, bind_addr, listen_port);
   }
 
-  delete machine_control;
   delete parser;
+  delete machine_control;
 
   const bool caught_signal = (ret == 2);
   if (caught_signal) {
-    Log_error("Immediate exit. Skipping potential remaining queue.");
+    Log_info("Caught signal: immediate exit. "
+             "Skipping potential remaining queue.");
   }
   motion_backend->Shutdown(!caught_signal);
 
   delete motion_backend;
 
-  Log_info("shutdown.");
-
   free(bind_addr);
+
+  Log_info("Shutdown.");
   return ret;
 }
