@@ -43,7 +43,8 @@ public:
 
 private:
   void CopyFrom(const FixedArray<T,N> &other) {
-    memcpy(data_, other.data_, sizeof(data_));
+    if (data_ != other.data_)
+      memcpy(data_, other.data_, sizeof(data_));
   }
 
   T data_[N];
