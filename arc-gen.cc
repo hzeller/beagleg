@@ -22,6 +22,7 @@
 #include <stdio.h>
 
 #include "arc-gen.h"
+#include "logging.h"
 
 // Arc generation based on smoothieware implementation
 // https://github.com/Smoothieware/Smoothieware.git
@@ -67,11 +68,11 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
   float rt_1 = target[plane[1]] - center_1;
 
 #if 0
-  fprintf(stderr, "arc from %c,%c: %.3f,%.3f to %.3f,%.3f (radius:%.3f) helix %c:%.3f\n",
-	  gcodep_axis2letter(plane[0]), gcodep_axis2letter(plane[1]),
-	  position[plane[0]], position[plane[1]],
-	  target[plane[0]], target[plane[1]], radius,
-	  gcodep_axis2letter(plane[2]), linear_travel);
+  Log_debug("arc from %c,%c: %.3f,%.3f to %.3f,%.3f (radius:%.3f) helix %c:%.3f\n",
+            gcodep_axis2letter(plane[0]), gcodep_axis2letter(plane[1]),
+            position[plane[0]], position[plane[1]],
+            target[plane[0]], target[plane[1]], radius,
+            gcodep_axis2letter(plane[2]), linear_travel);
 #endif
 
   // CCW angle between position and target from circle center. Only one atan2()

@@ -30,6 +30,7 @@
 
 #include "motor-interface-constants.h"
 #include "motion-queue.h"
+#include "logging.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2
@@ -164,7 +165,7 @@ static int get_defining_axis_steps(const MotorMovement &param) {
 int MotionQueueMotorOperations::Enqueue(const MotorMovement &param, FILE *err_stream) {
   const int defining_axis_steps = get_defining_axis_steps(param);
   if (defining_axis_steps == 0) {
-    fprintf(err_stream ? err_stream : stderr, "zero steps. Ignoring command.\n");
+    Log_debug("Zero steps. Ignoring command.");
     return 1;
   }
 
