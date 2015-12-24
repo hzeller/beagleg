@@ -64,6 +64,7 @@ struct MachineControlConfig {
 
   const char *home_order;        // Order in which axes are homed.
 
+  bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
   bool require_homing;          // Require homing before any moves.
   bool range_check;             // Do machine limit checks. Default 1.
   bool debug_print;             // Print step-tuples to output_fd if 1.

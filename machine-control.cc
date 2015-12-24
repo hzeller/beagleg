@@ -361,13 +361,16 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  const char has_filename = (optind < argc);
+  const bool has_filename = (optind < argc);
   if (! (has_filename ^ (listen_port > 0))) {
     return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
   }
   if (!has_filename && file_loop_count != 1) {
     return usage(argv[0], "--loop only makes sense with a filename.");
   }
+
+  // If reading from file: don't print 'ok' for every line.
+  config.acknowledge_lines = !has_filename;
 
   if (run_as_daemon) {
     if (fork() != 0)
@@ -424,7 +427,7 @@ int main(int argc, char *argv[]) {
   delete machine_control;
   delete parser;
 
-  const char caught_signal = (ret == 2);
+  const bool caught_signal = (ret == 2);
   if (caught_signal) {
     Log_error("Immediate exit. Skipping potential remaining queue.");
   }

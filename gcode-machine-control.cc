@@ -460,7 +460,7 @@ void GCodeMachineControl::Impl::motors_enable(bool b) {
   }
 }
 void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
-  mprintf("ok\n");
+  if (cfg_.acknowledge_lines) mprintf("ok\n");
 }
 void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o) {
   coordinate_display_origin_ = o;
@@ -1286,6 +1286,7 @@ MachineControlConfig::MachineControlConfig() {
   memcpy(max_feedrate, kMaxFeedrate, sizeof(max_feedrate));
   memcpy(acceleration, kDefaultAccel, sizeof(acceleration));
   speed_factor = 1;
+  acknowledge_lines = true;
   debug_print = false;
   synchronous = false;
   range_check = true;
