@@ -230,9 +230,10 @@ static int parse_float_array(const char *input, float result[], int count) {
 
 int main(int argc, char *argv[]) {
   MachineControlConfig config;
-  char dry_run = 0;
-  char simulation_output = 0;
+  bool dry_run = false;
+  bool simulation_output = false;
   const char *logfile = "/dev/stderr";
+  bool run_as_daemon = false;
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -266,6 +267,7 @@ int main(int argc, char *argv[]) {
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
     { "logfile",            required_argument, NULL, 'l'},
+    { "daemon",             no_argument,       NULL, 'd'},
     { 0,                    0,                 0,    0  },
   };
 
@@ -274,7 +276,7 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:d",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -316,27 +318,27 @@ int main(int argc, char *argv[]) {
       config.home_order = strdup(optarg);
       break;
     case OPT_REQUIRE_HOMING:
-      config.require_homing = 1;
+      config.require_homing = true;
       break;
     case OPT_DISABLE_RANGE_CHECK:
-      config.range_check = 0;
+      config.range_check = false;
       break;
     case 'r':
       if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))
 	return usage(argv[0], "Failed to parse ranges.");
       break;
     case 'n':
-      dry_run = 1;
+      dry_run = true;
       break;
     case 'N':
-      dry_run = 1;
-      simulation_output = 1;
+      dry_run = true;
+      simulation_output = true;
       break;
     case 'P':
-      config.debug_print = 1;
+      config.debug_print = true;
       break;
     case 'S':
-      config.synchronous = 1;
+      config.synchronous = true;
       break;
     case OPT_LOOP:
       file_loop_count = (optarg) ? atoi(optarg) : -1;
@@ -350,6 +352,9 @@ int main(int argc, char *argv[]) {
     case 'l':
       logfile = strdup(optarg);
       break;
+    case 'd':
+      run_as_daemon = true;
+      break;
     default:
       return usage(argv[0], "Unknown flag");
     }
@@ -361,6 +366,15 @@ int main(int argc, char *argv[]) {
   }
   if (!has_filename && file_loop_count != 1) {
     return usage(argv[0], "--loop only makes sense with a filename.");
+  }
+
+  if (run_as_daemon) {
+    if (fork() != 0)
+      return 0;
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    logfile = NULL;
   }
 
   Log_init(logfile);

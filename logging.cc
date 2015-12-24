@@ -42,18 +42,21 @@ static const char *error_markup_start_ = "ERROR ";
 static const char *markup_end_ = "";
 
 void Log_init(const char *filename) {
-  if (filename == NULL || strlen(filename) == 0)
-    return;
-  log_fd = open(filename, O_CREAT|O_APPEND|O_WRONLY, 0644);
-  if (log_fd < 0) {
-    perror("Cannot open logfile");
-    return;
-  }
-  bool enable_color = isatty(log_fd);
-  if (enable_color) {
-    info_markup_start_ = kInfoHighlight;
-    error_markup_start_ = kErrorHighlight;
-    markup_end_ = kTermReset;
+  if (filename == NULL || strlen(filename) == 0) {
+    openlog(NULL, LOG_PID|LOG_CONS, LOG_DAEMON);
+  } else {
+    log_fd = open(filename, O_CREAT|O_APPEND|O_WRONLY, 0644);
+    if (log_fd < 0) {
+      perror("Cannot open logfile");
+      openlog(NULL, LOG_PID|LOG_CONS, LOG_DAEMON); // fallback.
+      return;
+    }
+    bool enable_color = isatty(log_fd);
+    if (enable_color) {
+      info_markup_start_ = kInfoHighlight;
+      error_markup_start_ = kErrorHighlight;
+      markup_end_ = kTermReset;
+    }
   }
 }
 
