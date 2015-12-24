@@ -101,7 +101,6 @@ class GCodeMachineControl {
   // The MotorOperations struct provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
   GCodeMachineControl(Impl *Impl);
-  static GCodeMachineControl *Cleanup(Impl *impl);
 
   Impl *const impl_;  // opaque state.
 };
