@@ -64,10 +64,10 @@ struct MachineControlConfig {
 
   const char *home_order;        // Order in which axes are homed.
 
-  char require_homing;          // Require homing before any moves.
-  char range_check;             // Do machine limit checks. Default 1.
-  char debug_print;             // Print step-tuples to output_fd if 1.
-  char synchronous;             // Don't queue, wait for command to finish if 1.
+  bool require_homing;          // Require homing before any moves.
+  bool range_check;             // Do machine limit checks. Default 1.
+  bool debug_print;             // Print step-tuples to output_fd if 1.
+  bool synchronous;             // Don't queue, wait for command to finish if 1.
 };
 
 // A class that controls a machine via gcode.

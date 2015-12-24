@@ -25,13 +25,10 @@
 
 #include "gcode-parser.h"
 
-#include "arc-gen.h"
-
-#include <assert.h>  // remove.
-
+#include <assert.h>
 #include <ctype.h>
-#include <signal.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +36,9 @@
 #include <sys/select.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "arc-gen.h"
+#include "logging.h"
 
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
                                                      const char *line,
@@ -90,68 +90,66 @@ void GCodeParser::Events::gcode_start() {}
 void GCodeParser::Events::gcode_finished() {}
 void GCodeParser::Events::wait_for_start() {}
 void GCodeParser::Events::inform_origin_offset(const AxesRegister &offset) {
-  fprintf(stderr, "GCodeParser: (display) origin offset [");
+  std::string line;
+  line = StringPrintf("GCodeParser: (display) origin offset [");
   for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
-    fprintf(stderr, "%s%c:%.3f", i == 0 ? "" : ", ",
-            gcodep_axis2letter((enum GCodeParserAxis)i), offset[i]);
+    line += StringPrintf("%s%c:%.3f", i == 0 ? "" : ", ",
+                         gcodep_axis2letter((enum GCodeParserAxis)i), offset[i]);
   }
-  fprintf(stderr, "]\n");
+  line += "]";
+  Log_debug("%s", line.c_str());
 }
 
 void GCodeParser::Events::gcode_command_done(char letter, float val) {}
 
 void GCodeParser::Events::set_speed_factor(float f) {
-  fprintf(stderr, "GCodeParser: set_speed_factor(%.1f)\n", f);
+  Log_debug("GCodeParser: set_speed_factor(%.1f)\n", f);
 }
 void GCodeParser::Events::set_temperature(float f) {
-  fprintf(stderr, "GCodeParser: set_temperature(%.1f)\n", f);
+  Log_debug("GCodeParser: set_temperature(%.1f)\n", f);
 }
 void GCodeParser::Events::set_fanspeed(float speed) {
-  fprintf(stderr, "GCodeParser: set_fanspeed(%.0f)\n", speed);
+  Log_debug("GCodeParser: set_fanspeed(%.0f)\n", speed);
 }
 void GCodeParser::Events::wait_temperature() {
-  fprintf(stderr, "GCodeParser: wait_temperature()\n");
+  Log_debug("GCodeParser: wait_temperature()\n");
 }
 void GCodeParser::Events::dwell(float f) {
-  fprintf(stderr, "GCodeParser: dwell(%.1f)\n", f);
+  Log_debug("GCodeParser: dwell(%.1f)\n", f);
 }
 void GCodeParser::Events::motors_enable(bool b) {
-  fprintf(stderr, "GCodeParser: %s motors\n", b ? "enable" : "disable");
+  Log_debug("GCodeParser: %s motors\n", b ? "enable" : "disable");
 }
 bool GCodeParser::Events::coordinated_move(float feed,
                                            const AxesRegister& axes) {
-  fprintf(stderr, "GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
-	  axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
-  if (feed > 0)
-    fprintf(stderr, " feed=%.1f\n", feed);
-  else
-    fprintf(stderr, "\n");
-  return 1;
+  Log_debug("GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
+            axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
+  
+  Log_debug("feed=%.1f", feed);
+  return true;
 }
 bool GCodeParser::Events::rapid_move(float feed, const AxesRegister& axes) {
   return coordinated_move(feed, axes);
 }
 
 void GCodeParser::Events::go_home(AxisBitmap_t axes) {
-  fprintf(stderr, "GCodeParser: go-home(0x%02x)\n", axes);
+  Log_debug("GCodeParser: go-home(0x%02x)\n", axes);
 }
 bool GCodeParser::Events::probe_axis(float feed, enum GCodeParserAxis axis,
                                      float *reached_pos) {
-  fprintf(stderr, "GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
+  Log_debug("GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
   if (feed > 0)
-    fprintf(stderr, " feed=%.1f\n", feed);
-  else
-    fprintf(stderr, "\n");
+    Log_debug("feed=%.1f", feed);
   return false;
 }
 const char *GCodeParser::Events::unprocessed( char letter, float value,
                                              const char *remaining) {
-  fprintf(stderr, "GCodeParser: unprocessed('%c', %d, '%s')\n",
+  Log_debug("GCodeParser: unprocessed('%c', %d, '%s')\n",
 	  letter, (int) value, remaining);
   return NULL;
 }
 void GCodeParser::Events::input_idle() {
-  fprintf(stderr, "GCodeParser: input idle\n");
+  Log_debug("GCodeParser: input idle\n");
 }
 
 
@@ -536,7 +534,8 @@ const char *GCodeParser::Impl::handle_arc(const char *line, int is_cw) {
 
   // Should the arc parameters be sanity checked?
   if (turns < 0 || turns > 4) {
-    fprintf(stderr, "G-Code Syntax Error: handle_arc: turns=%d (must be 1-4)\n",
+    fprintf(err_msg_ ? err_msg_ : stderr,
+            "// G-Code Syntax Error: handle_arc: turns=%d (must be 1-4)\n",
             turns);
     return remaining_line;
   }

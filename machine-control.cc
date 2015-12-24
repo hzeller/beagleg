@@ -35,9 +35,9 @@
 
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
-#include "motor-operations.h"
+#include "logging.h"
 #include "motion-queue.h"
-
+#include "motor-operations.h"
 #include "sim-firmware.h"
 
 static int usage(const char *prog, const char *msg) {
@@ -72,6 +72,7 @@ static int usage(const char *prog, const char *msg) {
 	  "  --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)\n"
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
+          "  --logfile             (-l): Logfile to use. Default stderr. If empty, errors are logged to syslog\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
@@ -112,7 +113,7 @@ static int run_server(GCodeMachineControl *machine,
                       GCodeParser *parser,
                       const char *bind_addr, int port) {
   if (port > 65535) {
-    fprintf(stderr, "Invalid port %d\n", port);
+    Log_error("Invalid port %d\n", port);
     return 1;
   }
   int s = socket(AF_INET, SOCK_STREAM, 0);
@@ -125,7 +126,7 @@ static int run_server(GCodeMachineControl *machine,
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
-    fprintf(stderr, "Invalid bind IP address %s\n", bind_addr);
+    Log_error("Invalid bind IP address %s\n", bind_addr);
     return 1;
   }
   serv_addr.sin_port = htons(port);
@@ -139,7 +140,7 @@ static int run_server(GCodeMachineControl *machine,
   signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
 
   listen(s, 2);
-  printf("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
+  Log_info("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
 
   int process_result;
   do {
@@ -153,18 +154,18 @@ static int run_server(GCodeMachineControl *machine,
     char ip_buffer[INET_ADDRSTRLEN];
     const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
 				     ip_buffer, sizeof(ip_buffer));
-    printf("Accepting new connection from %s\n", print_ip);
+    Log_info("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
     machine->SetMsgOut(msg_stream);
     process_result = parser->ParseStream(connection, msg_stream);
 
     fclose(msg_stream);
-    printf("Connection to %s closed.\n", print_ip);
+    Log_info("Connection to %s closed.\n", print_ip);
   } while (process_result == 0);
 
   close(s);
-  fprintf(stderr, "Last gcode_machine_control_from_stream() == %d. Exiting\n",
-	  process_result);
+  Log_error("Last gcode_machine_control_from_stream() == %d. Exiting\n",
+            process_result);
 
   return process_result;
 }
@@ -228,10 +229,10 @@ static int parse_float_array(const char *input, float result[], int count) {
 }
 
 int main(int argc, char *argv[]) {
-  struct MachineControlConfig config;
-
+  MachineControlConfig config;
   char dry_run = 0;
   char simulation_output = 0;
+  const char *logfile = "/dev/stderr";
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -264,6 +265,7 @@ int main(int argc, char *argv[]) {
     { "port",               required_argument, NULL, 'p'},
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
+    { "logfile",            required_argument, NULL, 'l'},
     { 0,                    0,                 0,    0  },
   };
 
@@ -272,7 +274,7 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:",
+  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -345,6 +347,9 @@ int main(int argc, char *argv[]) {
     case 'b':
       bind_addr = strdup(optarg);
       break;
+    case 'l':
+      logfile = strdup(optarg);
+      break;
     default:
       return usage(argv[0], "Unknown flag");
     }
@@ -357,6 +362,9 @@ int main(int argc, char *argv[]) {
   if (!has_filename && file_loop_count != 1) {
     return usage(argv[0], "--loop only makes sense with a filename.");
   }
+
+  Log_init(logfile);
+  Log_info("startup.");
 
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
@@ -371,8 +379,8 @@ int main(int argc, char *argv[]) {
     if (geteuid() != 0) {
       // TODO: running as root is generally not a good idea. Setup permissions
       // to just access these GPIOs.
-      fprintf(stderr, "Need to run as root to access GPIO pins. "
-	      "(use the dryrun option -n to not write to GPIO)\n");
+      Log_error("Need to run as root to access GPIO pins. "
+                "(use the dryrun option -n to not write to GPIO)\n");
       return 1;
     }
     motion_backend = new PRUMotionQueue();
@@ -403,11 +411,13 @@ int main(int argc, char *argv[]) {
 
   const char caught_signal = (ret == 2);
   if (caught_signal) {
-    fprintf(stderr, "Immediate exit. Skipping potential remaining queue.\n");
+    Log_error("Immediate exit. Skipping potential remaining queue.");
   }
   motion_backend->Shutdown(!caught_signal);
 
   delete motion_backend;
+
+  Log_info("shutdown.");
 
   free(bind_addr);
   return ret;

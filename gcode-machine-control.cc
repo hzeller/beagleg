@@ -37,6 +37,7 @@
 #include "container.h"
 #include "gcode-parser.h"
 #include "generic-gpio.h"
+#include "logging.h"
 #include "motor-operations.h"
 #include "pwm-timer.h"
 
@@ -237,12 +238,12 @@ bool GCodeMachineControl::Impl::Init() {
     const_cast<MachineControlConfig&>(cfg_).steps_per_mm[i]
                                            = fabsf(cfg_.steps_per_mm[i]);
     if (cfg_.max_feedrate[i] < 0) {
-      fprintf(stderr, "Invalid negative feedrate %.1f for axis %c\n",
+      Log_error("Invalid negative feedrate %.1f for axis %c\n",
               cfg_.max_feedrate[i], gcodep_axis2letter((GCodeParserAxis)i));
       return false;
     }
     if (cfg_.acceleration[i] < 0) {
-      fprintf(stderr, "Invalid negative acceleration %.1f for axis %c\n",
+      Log_error("Invalid negative acceleration %.1f for axis %c\n",
               cfg_.acceleration[i], gcodep_axis2letter((GCodeParserAxis)i));
       return false;
     }
@@ -270,7 +271,7 @@ bool GCodeMachineControl::Impl::Init() {
   if (axis_map == NULL) axis_map = kAxisMapping;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
     if (pos >= BEAGLEG_NUM_MOTORS) {
-      fprintf(stderr, "Error: Axis mapping string has more elements than "
+      Log_error("Error: Axis mapping string has more elements than "
               "available %d connectors (remaining=\"..%s\").\n", pos, axis_map);
       return false;
     }
@@ -298,7 +299,7 @@ bool GCodeMachineControl::Impl::Init() {
       } else if (*map == '1' || *map == '+' || *map == 'H') {
         endstop_trigger[switch_connector] = 1;
       } else {
-        fprintf(stderr, "Illegal endswitch polarity character '%c' in '%s'.\n",
+        Log_error("Illegal endswitch polarity character '%c' in '%s'.\n",
                 *map, cfg_.endswitch_polarity);
         return false;
       }
@@ -363,7 +364,7 @@ bool GCodeMachineControl::Impl::Init() {
         && max_endstop_[axis].endstop_number != 0) {
       if (min_endstop_[axis].homing_use
           && max_endstop_[axis].homing_use) {
-        fprintf(stderr, "Error: There can only be one home-origin for axis %c, "
+        Log_error("Error: There can only be one home-origin for axis %c, "
                 "but both min/max are set for homing (Uppercase letter)\n",
                 gcodep_axis2letter((GCodeParserAxis)axis));
         ++error_count;
@@ -373,41 +374,42 @@ bool GCodeMachineControl::Impl::Init() {
   }
 
   // Now let's see what motors are mapped to any useful output.
-  if (cfg_.debug_print) fprintf(stderr, "-- Config --\n");
+  if (cfg_.debug_print) Log_debug("-- Config --\n");
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (axis_to_driver_[i] == 0)
       continue;
     char is_error = (cfg_.steps_per_mm[i] <= 0
                      || cfg_.max_feedrate[i] <= 0);
     if (cfg_.debug_print || is_error) {
-      fprintf(stderr, "%c axis: %5.1fmm/s, %7.1fmm/s^2, %9.4f steps/mm%s ",
-              gcodep_axis2letter((GCodeParserAxis)i), cfg_.max_feedrate[i],
-              cfg_.acceleration[i],
-              cfg_.steps_per_mm[i],
-              axis_flip_[i] < 0 ? " (reversed)" : "");
+      std::string line;
+      line = StringPrintf("%c axis: %5.1fmm/s, %7.1fmm/s^2, %9.4f steps/mm%s ",
+                          gcodep_axis2letter((GCodeParserAxis)i),
+                          cfg_.max_feedrate[i],
+                          cfg_.acceleration[i],
+                          cfg_.steps_per_mm[i],
+                          axis_flip_[i] < 0 ? " (reversed)" : "");
       if (cfg_.move_range_mm[i] > 0) {
-        fprintf(stderr, "[ limit %5.1fmm ] ",
-                cfg_.move_range_mm[i]);
+        line += StringPrintf("[ limit %5.1fmm ] ", cfg_.move_range_mm[i]);
       } else {
-        fprintf(stderr, "[ unknown limit ] ");
+        line += "[ unknown limit ] ";
       }
       int endstop = min_endstop_[i].endstop_number;
       const char *trg = min_endstop_[i].trigger_value ? "hi" : "lo";
       if (endstop) {
-        fprintf(stderr, "min-switch %d (%s-trigger)%s; ",
-		endstop, trg,
-                min_endstop_[i].homing_use ? " [HOME]" : "       ");
+        line += StringPrintf("min-switch %d (%s-trigger)%s; ",
+                             endstop, trg,
+                             min_endstop_[i].homing_use ? " [HOME]" : "       ");
       }
       endstop = max_endstop_[i].endstop_number;
       trg = max_endstop_[i].trigger_value ? "hi" : "lo";
       if (endstop) {
-        fprintf(stderr, "max-switch %d (%s-trigger)%s;",
-		endstop, trg,
-                max_endstop_[i].homing_use ? " [HOME]" : "");
+        line += StringPrintf("max-switch %d (%s-trigger)%s;",
+                             endstop, trg,
+                             max_endstop_[i].homing_use ? " [HOME]" : "");
       }
       if (!cfg_.range_check)
-        fprintf(stderr, "Limit checks disabled!");
-      fprintf(stderr, "\n");
+        line += "Limit checks disabled!";
+      Log_debug("%s", line.c_str());
     }
     if (is_error) {
       fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
@@ -672,7 +674,7 @@ static float steps_for_speed_change(float a, float v0, float *v1, int max_steps)
   // v1 = v0 + a*t
   const float t = (*v1 - v0) / a;
   // TODO:
-  if (t < 0) fprintf(stderr, "Error condition: t=%.1f INSUFFICIENT LOOKAHEAD\n", t);
+  if (t < 0) Log_error("Error condition: t=%.1f INSUFFICIENT LOOKAHEAD\n", t);
   float steps = a/2 * t*t + v0 * t;
   if (steps <= max_steps) return steps;
   // Ok, we would need more steps than we have available. We correct the speed to what
@@ -1284,9 +1286,9 @@ MachineControlConfig::MachineControlConfig() {
   memcpy(max_feedrate, kMaxFeedrate, sizeof(max_feedrate));
   memcpy(acceleration, kDefaultAccel, sizeof(acceleration));
   speed_factor = 1;
-  debug_print = 0;
-  synchronous = 0;
-  range_check = 1;
+  debug_print = false;
+  synchronous = false;
+  range_check = true;
   axis_mapping = kAxisMapping;
   home_order = kHomeOrder;
   threshold_angle = 10.0;

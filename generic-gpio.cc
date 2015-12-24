@@ -25,6 +25,7 @@
 
 #include "motor-interface-constants.h"
 #include "generic-gpio.h"
+#include "logging.h"
 
 // Memory space mapped to the Clock Module registers
 #define CM_BASE                 0x44e00000
@@ -162,7 +163,7 @@ static void ena_gpio_clk(volatile uint32_t *cm, uint32_t reg, int bank) {
 
   val = cm[reg/4];
   if (val & IDLEST_MASK) {
-    fprintf(stderr, "Enabling GPIO-%d clock", bank);
+    Log_debug("Enabling GPIO-%d clock", bank);
     val |= MODULEMODE_ENABLE;
     cm[reg/4] = val;
     do {

@@ -30,6 +30,7 @@
 
 #include "generic-gpio.h"
 #include "pwm-timer.h"
+#include "logging.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
@@ -73,33 +74,34 @@ static volatile struct MotionSegment *next_queue_element() {
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e) {
   if (e->state == STATE_EXIT) {
-    fprintf(stderr, "enqueue[%02td]: EXIT\n", e - pru_data_->ring_buffer);
+    Log_debug("enqueue[%02td]: EXIT", e - pru_data_->ring_buffer);
   } else {
-    struct MotionSegment copy = *e;
-    fprintf(stderr, "enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
-	    e - pru_data_->ring_buffer, copy.direction_bits,
-	    copy.loops_accel, copy.loops_travel, copy.loops_decel,
-	    copy.loops_accel + copy.loops_travel + copy.loops_decel);
+    MotionSegment copy = (MotionSegment&) *e;
+    std::string line;
+    line = StringPrintf("enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
+                        e - pru_data_->ring_buffer, copy.direction_bits,
+                        copy.loops_accel, copy.loops_travel, copy.loops_decel,
+                        copy.loops_accel + copy.loops_travel + copy.loops_decel);
 
     if (copy.hires_accel_cycles > 0) {
-      fprintf(stderr, "accel : %5.0fHz (%d loops);",
-              TIMER_FREQUENCY /
-              (2.0*(copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT)),
-              copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT);
+      line += StringPrintf("accel : %5.0fHz (%d loops);",
+                           TIMER_FREQUENCY /
+                           (2.0*(copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT)),
+                           copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT);
     }
     if (copy.travel_delay_cycles > 0) {
-      fprintf(stderr, "travel: %5.0fHz (%d loops);",
-              TIMER_FREQUENCY / (2.0*copy.travel_delay_cycles),
-              copy.travel_delay_cycles);
+      line += StringPrintf("travel: %5.0fHz (%d loops);",
+                           TIMER_FREQUENCY / (2.0*copy.travel_delay_cycles),
+                           copy.travel_delay_cycles);
     }
 #if 0
     // The fractional parts.
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
       if (copy.fractions[i] == 0) continue;  // not interesting.
-      fprintf(stderr, "f%d:0x%08x ", i, copy.fractions[i]);
+      line += StringPrintf("f%d:0x%08x ", i, copy.fractions[i]);
     }
 #endif
-    fprintf(stderr, "\n");
+    Log_debug("%s", line.c_str());
   }
 }
 #endif
@@ -159,11 +161,11 @@ PRUMotionQueue::PRUMotionQueue() {
 
   int PRUMotionQueue::Init() {
   if (!map_gpio()) {
-    fprintf(stderr, "Couldn't mmap() GPIO ranges.\n");
+    Log_error("Couldn't mmap() GPIO ranges.\n");
     return 1;
   }
   if (!pwm_timers_map()) {
-    fprintf(stderr, "Couldn't mmap() TIMER ranges.\n");
+    Log_error("Couldn't mmap() TIMER ranges.\n");
     return 1;
   }
 
@@ -192,12 +194,12 @@ PRUMotionQueue::PRUMotionQueue() {
   /* Get the interrupt initialized */
   int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
   if (ret) {
-    fprintf(stderr, "prussdrv_open() failed (%d)\n", ret);
+    Log_error("prussdrv_open() failed (%d)\n", ret);
     return ret;
   }
   prussdrv_pruintc_init(&pruss_intc_initdata);
   if (map_pru_communication() == NULL) {
-    fprintf(stderr, "Couldn't map PRU memory for queue.\n");
+    Log_error("Couldn't map PRU memory for queue.\n");
     return 1;
   }
 

@@ -75,8 +75,8 @@ static char test_acceleration_ok(float acceleration) {
   const float start_accel_cycle_value = (1 << (DELAY_CYCLE_SHIFT + 2))
     * calcAccelerationCurveValueAt(0, acceleration);
   if (start_accel_cycle_value > 0xFFFFFFFF) {
-    fprintf(stderr, "Too slow acceleration to deal with. If really needed, "
-	    "reduce value of #define DELAY_CYCLE_SHIFT\n");
+    Log_error("Too slow acceleration to deal with. If really needed, "
+              "reduce value of #define DELAY_CYCLE_SHIFT\n");
     return 0;
   }
   return 1;
