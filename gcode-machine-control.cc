@@ -1291,5 +1291,5 @@ MachineControlConfig::MachineControlConfig() {
   range_check = true;
   axis_mapping = kAxisMapping;
   home_order = kHomeOrder;
-  threshold_angle = 10.0;
+  threshold_angle = -1;
 }
