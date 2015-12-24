@@ -72,7 +72,8 @@ static int usage(const char *prog, const char *msg) {
 	  "  --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)\n"
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
-          "  --logfile             (-l): Logfile to use. Default stderr. If empty, errors are logged to syslog\n"
+          "  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
+          "  --daemon              (-d): Run as daemon.\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.

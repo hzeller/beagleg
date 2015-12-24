@@ -134,6 +134,8 @@ Options:
   --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)
   --port <port>         (-p): Listen on this TCP port for GCode.
   --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
+  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).
+  --daemon              (-d): Run as daemon.
   -f <factor>               : Print speed factor (Default 1.0).
   -n                        : Dryrun; don't send to motors (Default: off).
   -P                        : Verbose: Print motor commands (Default: off).
