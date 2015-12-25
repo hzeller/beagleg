@@ -237,8 +237,8 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
       if (segment->loops_accel > 0) {
       if (is_first) {
         msg = "# accel.";
-        fprintf(stderr, "SIM: Accel start: accel-series-idx=%5u, "
-                "accel-timer-cycles=%.3f (%d half-steps)\n",
+        fprintf(stderr, "SIM: Accel start _/ : accel-series-idx=%5u, "
+                "accel-timer-cycles=%10.3f (%d loops)\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
                 segment->loops_accel);
@@ -255,7 +255,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       hires_delay = 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT);
       if (segment->loops_accel == 0) {
-        fprintf(stderr, "SIM: Accel end  : accel-series-idx=%5u, accel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Accel end   /‾ : accel-series-idx=%5u, accel-timer-cycles=%10.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
@@ -265,7 +265,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
       hires_delay = segment->travel_delay_cycles;
       if (is_first) {
         msg = "# travel.";
-        fprintf(stderr, "SIM: travel. timer-delay-cycles=%u (%d half-steps)\n", delay_loops,
+        fprintf(stderr, "SIM: travel      -- :                               timer-cycles=%6u     (%d loops)\n", delay_loops,
                 segment->loops_travel);
         is_first = 0;
       }
@@ -274,8 +274,8 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
     else if (segment->loops_decel > 0) {
       if (is_first) {
         msg = "# decel.";
-        fprintf(stderr, "SIM: Decel start: accel-series-idx=%5u, "
-                "decel-timer-cycles=%.3f (%d half-steps)\n",
+        fprintf(stderr, "SIM: Decel start ‾\\ : accel-series-idx=%5u, "
+                "decel-timer-cycles=%10.3f (%d loops)\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
                 segment->loops_decel);
@@ -290,7 +290,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
       hires_delay = 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT);
       if (segment->loops_decel == 0) {
-        fprintf(stderr, "SIM: Decel end  : accel-series-idx=%5u, decel-timer-cycles=%.3f\n",
+        fprintf(stderr, "SIM: Decel end   \\_ : accel-series-idx=%5u, decel-timer-cycles=%10.3f\n",
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT));
       }
