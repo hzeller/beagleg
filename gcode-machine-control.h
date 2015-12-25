@@ -21,7 +21,7 @@
 
 #include "gcode-parser.h"
 
-struct MotorOperations;
+class MotorOperations;
 
 /* Configuration constants for the controller.
  * Parameters in the arrays are always indexed by logical axes, e.g. AXIS_X.

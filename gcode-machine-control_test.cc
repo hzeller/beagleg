@@ -103,9 +103,6 @@ class Harness {
   GCodeMachineControl *machine_control;
 };
 
-void finish_harness(struct Harness *harness) {
-}
-
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
 void TEST_straight_segments_same_speed() {

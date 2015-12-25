@@ -25,6 +25,7 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=hardware/$(HARDWARE_TARGET)
 
+CXX=g++
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3  $(ARM_COMPILE_FLAGS)
 CXXFLAGS+=$(CFLAGS)
 
@@ -45,20 +46,20 @@ UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test
 all : $(TARGETS) $(UNITTEST_BINARIES)
 
 gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
-	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 machine-control: machine-control.o $(OBJECTS)
-	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
 
 %_test: %_test.cc $(OBJECTS)
-	$(CROSS_COMPILE)g++ $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
 
 # Using old < c++11 version as not all embedded devices have recent compilers. Sigh.
 %.o: %.cc
-	$(CROSS_COMPILE)g++ $(CXXFLAGS) -std=c++98 -c -o $@ $<
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -c -o $@ $<
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
