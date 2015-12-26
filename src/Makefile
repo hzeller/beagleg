@@ -25,6 +25,9 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 
+# where the google test source has been unpacked.
+GTEST_SOURCE=/usr/src/gtest
+
 CXX=g++
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3  $(ARM_COMPILE_FLAGS)
 CXXFLAGS+=$(CFLAGS)
@@ -43,7 +46,7 @@ MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TARGETS=../machine-control ../gcode-print-stats
 UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test
 
-all : $(TARGETS) $(UNITTEST_BINARIES)
+all : $(TARGETS)
 
 ../gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -58,8 +61,12 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-%_test: %_test.cc $(OBJECTS)
-	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
+gtest/libgtest.a:
+	mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
+	make -C gtest
+
+%_test: %_test.cc $(OBJECTS) gtest/libgtest.a
+	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a
 
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.

@@ -12,9 +12,10 @@
 #include "motor-operations.h"
 #include "gcode-parser.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
+
+#include <gtest/gtest.h>
 
 #define END_SENTINEL 0x42
 
@@ -37,14 +38,14 @@ public:
     : expect_(expected), current_(expected), errors_(0) {}
 
   ~MockMotorOps() {
-    assert(errors_ == 0);
+    EXPECT_EQ(0, errors_);
     // Did we walk through all states ?
-    assert(current_->aux_bits == END_SENTINEL);  // reached end ?
+    EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
   }
 
   virtual int Enqueue(const MotorMovement &param, FILE *err_stream) {
     const int number = (int)(current_ - expect_);
-    assert(current_->aux_bits != END_SENTINEL);
+    EXPECT_NE(END_SENTINEL, current_->aux_bits);
     ExpectEq(current_, param, number);
     ++current_;
     return 0;
@@ -54,7 +55,6 @@ public:
   virtual void WaitQueueEmpty(){}
 
 private:
-
   // Helpers to compare and print MotorMovements.
   static void PrintMovement(const char *msg, const struct MotorMovement *m) {
     printf("%s: v0=%.1f -> v1=%.1f {%d, %d, %d}", msg, m->v0, m->v1,
@@ -105,8 +105,8 @@ class Harness {
 
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
-void TEST_straight_segments_same_speed() {
-  printf(" %s\n", __func__);
+TEST(GCodeMachineControlTest, straight_segments_same_speed) {
+  // TODO(hzeller): use mock functionality for this to compare.
   static const struct MotorMovement expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 1st move @100mm/s
@@ -126,15 +126,12 @@ void TEST_straight_segments_same_speed() {
   harness.gcode_emit()->coordinated_move(100, coordinates);  // also 100mm/s
 
   harness.gcode_emit()->motors_enable(false);  // finish movement.
-
-  printf(" DONE %s\n", __func__);
 }
 
 // If we have two line segments in a straight line and one is slower than the
 // other, slow down the first segment at the end to the travel speed of the
 // next segment.
-void TEST_straight_segments_speed_change() {
-  printf(" %s\n", __func__);
+TEST(GCodeMachineControlTest, straight_segments_speed_change) {
   static const struct MotorMovement expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9125}},  // move @100mm/s
@@ -155,15 +152,9 @@ void TEST_straight_segments_speed_change() {
   harness.gcode_emit()->coordinated_move(50, coordinates);  // 50mm/s
 
   harness.gcode_emit()->motors_enable(false);  // finish movement.
-
-  printf(" DONE %s\n", __func__);
 }
 
-int main() {
-  printf("RUN (%s)\n", __FILE__);
-
-  TEST_straight_segments_same_speed();
-  TEST_straight_segments_speed_change();
-
-  printf("PASS (%s)\n", __FILE__);
+int main(int argc, char *argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
