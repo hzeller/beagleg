@@ -54,13 +54,6 @@ all : $(TARGETS) $(UNITTEST_BINARIES)
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
 
-pru-motion-queue.o : motor-interface-constants.h $(PRU_BIN)
-motor-operations.o : motor-interface-constants.h
-sim-firmware.o : motor-interface-constants.h
-
-# test dependencies.
-gcode-machine-control_test.cc: gcode-machine-control.cc
-
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
@@ -68,9 +61,11 @@ $(PRU_BIN) : motor-interface-constants.h \
 %_test: %_test.cc $(OBJECTS)
 	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS)
 
-# Using old < c++11 version as not all embedded devices have recent compilers. Sigh.
+# Using old < c++11 standard as not all embedded devices have recent compilers.
+# Sigh.
 %.o: %.cc
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -c -o $@ $<
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -c  $< -o $@
+	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -MM $< > $*.d
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
@@ -78,5 +73,11 @@ $(PRU_BIN) : motor-interface-constants.h \
 $(PASM):
 	make -C $(AM335_BASE)
 
+# Explicit dependencies
+pru-motion-queue.o : $(PRU_BIN)
+
+# Auto generated dependencies
+-include $(OBJECTS:.o=.d)
+
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
