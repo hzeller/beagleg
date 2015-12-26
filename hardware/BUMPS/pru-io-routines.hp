@@ -2,4 +2,4 @@
 ;;; BUMPS specific PRU routines.
 
 ;; For now, we just use the generic ones.
-#include "../../pru-generic-io-routines.hp"
+#include "../../src/pru-generic-io-routines.hp"
