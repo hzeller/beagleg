@@ -29,8 +29,11 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 GTEST_SOURCE=/usr/src/gtest
 
 CXX=g++
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3  $(ARM_COMPILE_FLAGS)
-CXXFLAGS+=$(CFLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -g -O0  $(ARM_COMPILE_FLAGS)
+
+# Using old < c++11 standard as not all embedded devices have recent compilers.
+# Sigh.
+CXXFLAGS+=$(CFLAGS) -std=c++03
 
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
@@ -66,13 +69,11 @@ gtest/libgtest.a:
 	make -C gtest
 
 %_test: %_test.cc $(OBJECTS) gtest/libgtest.a
-	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a
 
-# Using old < c++11 standard as not all embedded devices have recent compilers.
-# Sigh.
 %.o: %.cc
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -c  $< -o $@
-	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -std=c++98 -MM $< > $*.d
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
+	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -MM $< > $*.d
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<

@@ -194,7 +194,7 @@ private:
   // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
   // or a set of multiple drivers (mirroring).
   // Bitmap of drivers output should go.
-  DriverBitmap axis_to_driver_[GCODE_NUM_AXES];
+  FixedArray<DriverBitmap, GCODE_NUM_AXES> axis_to_driver_;
 
   FixedArray<int, GCODE_NUM_AXES> axis_flip_;  // 1 or -1 for direction flip of axis
   FixedArray<int, BEAGLEG_NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
@@ -224,7 +224,14 @@ static inline int round2int(float x) { return (int) roundf(x); }
 GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
                                 MotorOperations *motor_ops,
                                 FILE *msg_stream)
-  : cfg_(config), motor_ops_(motor_ops), msg_stream_(msg_stream) {
+  : cfg_(config),
+    motor_ops_(motor_ops), msg_stream_(msg_stream),
+    g0_feedrate_mm_per_sec_(-1),
+    highest_accel_(-1),
+    current_feedrate_mm_per_sec_(-1),
+    prog_speed_factor_(1),
+    aux_bits_(0), spindle_rpm_(0),
+    homing_state_(HOMING_STATE_NEVER_HOMED) {
 }
 
 // The actual initialization. Can fail, hence we make it a separate method.

@@ -33,8 +33,8 @@ struct MotorMovement {
   // Speed is steps/s. If initial speed and final speed differ, the motor will
   // accelerate or decelerate to reach the final speed within the given number of
   // alotted steps of the axis with the most number of steps; all other axes are
-  // scaled accordingly. Uses jerk-settings to increase/decrease acceleration; the
-  // acceleration is zero at the end of the move.
+  // scaled accordingly. Uses jerk-settings to increase/decrease acceleration;
+  // the acceleration is zero at the end of the move.
   float v0;     // initial speed
   float v1;     // final speed
 
