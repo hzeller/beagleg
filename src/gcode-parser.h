@@ -61,6 +61,7 @@ public:
   // The units in these callbacks are always mm and always absolute: the parser
   // takes care of interpreting G20/G21, G90/G91/G92 internally.
   // (TODO: rotational axes are probably to be handled differently).
+  // Also see ../G-code.md
   class Events {
   public:
     virtual ~Events() {}
@@ -70,11 +71,11 @@ public:
     // The parser handles relative positions and coordinate systems internally,
     // so the machine does not have to worry about that.
     // But for display purposes, the machine might be interested in the current
-    // offset to apply.
+    // offset that applies.
     // This callback informs about the current origin, relative to the (0/0/0)
     // machine cube.
-    // If needed after the callback returns, the receiver should make a copy
-    // of the array.
+    // If needed after the callback returns, the receiver needs to make a copy
+    // of the register.
     virtual void inform_origin_offset(const AxesRegister& offset);
 
     // "gcode_command_done" is always executed when a command is completed,
@@ -98,40 +99,42 @@ public:
     // the GCodeParserConfig for the given axes.
     virtual void go_home(AxisBitmap_t axis_bitmap);
 
-    // G30: Probe Z axis to travel_endstop. Returns true on success.
-    // The actual position reached within the machine cube (in mm) is
-    // returned in "probed_position" in that case.
+    // G30: Probe Z axis to travel_endstop. Returns 'true' if the receiver
+    // successfully probed the position and returned it in "probed_position".
+    // The value represents the actual position reached within the machine
+    // cube for the queried axis (in mm).
     virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
                             float *probed_position);
 
-    virtual void set_speed_factor(float factor);    // M220 feedrate factor 0..1
-    virtual void set_fanspeed(float value);         // M106, M107: speed 0...255
-    virtual void set_temperature(float degrees_c);  // M104, M109: Set temp. in Celsius.
-    virtual void wait_temperature();                // M109, M116: Wait for temp. reached.
-    virtual void dwell(float time_ms);              // G4: dwell for milliseconds.
-    virtual void motors_enable(bool enable);        // M17,M84,M18: Switch on/off motors
+    virtual void set_speed_factor(float factor);   // M220 feedrate factor 0..1
+    virtual void set_fanspeed(float value);        // M106, M107: speed 0...255
+    virtual void set_temperature(float degrees_c); // M104, M109: Set temp. in Celsius
+    virtual void wait_temperature();       // M109, M116: Wait for temp. reached.
+    virtual void dwell(float time_ms);     // G4: dwell for milliseconds.
+    virtual void motors_enable(bool enable);   // M17, M84, M18: Switch on/off motors
 
     // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates.
-    // First parameter is the userdata.
-    // Second parameter is feedrate in mm/sec if provided, or -1 otherwise.
+    // First parameter is feedrate in mm/sec if provided, or -1 otherwise.
     //   (typically, the user would need to remember the positive values).
-    // The third parameter is an array of absolute coordinates (in mm), indexed
-    // by GCodeParserAxis.
+    // The second parameter is an array of absolute coordinates (already
+    // preprocessed to be in millimeter), indexed by GCodeParserAxis.
     // Returns 1, if the move was successful or 0 if the machine could not move
     // the machine (e.g. because it was beyond limits or other condition).
     virtual bool coordinated_move(float feed_mm_p_sec,
-                                  const AxesRegister&);  // G1
+                                  const AxesRegister &absolute_pos);  // G1
     virtual bool rapid_move(float feed_mm_p_sec,
-                            const AxesRegister&);        // G0
+                            const AxesRegister &absolute_pos);        // G0
 
     // Hand out G-code command that could not be interpreted.
     // Parameters: letter + value of the command that was not understood,
     // string of rest of line (the letter is always upper-case).
-    // Should return pointer to remaining line that has not been processed or NULL
-    // if the whole remaining line was consumed.
-    // Implementors might want to use gcodep_parse_pair() if they need to read
-    // G-code words from the remaining line.
-    virtual const char *unprocessed(char letter, float value, const char *);
+    // Should return pointer to remaining line that has not been processed
+    // or NULL if the whole remaining line was consumed (or you want to skip
+    // this part).
+    // Implementors might want to use GCodeParser::ParsePair() if they need
+    // to read G-code words from the remaining line.
+    virtual const char *unprocessed(char letter, float value,
+                                    const char *rest_of_line);
   };
 
   // Configuration for the parser.
