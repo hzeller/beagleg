@@ -111,8 +111,8 @@ private:
 };
 }
 
-int determine_print_stats(int input_fd, const MachineControlConfig &config,
-			  struct BeagleGPrintStats *result) {
+bool determine_print_stats(int input_fd, const MachineControlConfig &config,
+                           struct BeagleGPrintStats *result) {
   bzero(result, sizeof(*result));
 
   // Motor control that just determines the time spent turning the motor.
@@ -121,7 +121,8 @@ int determine_print_stats(int input_fd, const MachineControlConfig &config,
   StatsMotorOperations stats_motor_ops(result);
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &stats_motor_ops, NULL);
-  assert(machine_control);
+  if (!machine_control)
+    return false;
 
   // We intercept gcode events to update some stats, then pass on to
   // machine event receiver.
@@ -129,7 +130,5 @@ int determine_print_stats(int input_fd, const MachineControlConfig &config,
     stats_event_receiver(result, machine_control->ParseEventReceiver());
 
   GCodeParser parser(GCodeParser::Config(), &stats_event_receiver);
-  parser.ParseStream(input_fd, stderr);
-
-  return 0;
+  return parser.ParseStream(input_fd, stderr) == 0;
 }

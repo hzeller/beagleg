@@ -43,7 +43,7 @@ static void print_file_stats(const char *filename, int indentation,
 			     const MachineControlConfig &config) {
   struct BeagleGPrintStats result;
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
-  if (determine_print_stats(fd, config, &result) == 0) {
+  if (determine_print_stats(fd, config, &result)) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s %10.0f %12.1f %14.1f",
            indentation, filename,

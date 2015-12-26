@@ -31,8 +31,6 @@
 #include <stdio.h>
 #include "container.h"
 
-typedef uint32_t AxisBitmap_t;
-
 // Axis supported by this parser.
 enum GCodeParserAxis {
   AXIS_X, AXIS_Y, AXIS_Z,
@@ -44,6 +42,9 @@ enum GCodeParserAxis {
 
 // Convenient type: a register to store machine coordinates.
 typedef FixedArray<float, GCODE_NUM_AXES> AxesRegister;
+
+// Bitmap of axis bools. Test with usual (1<<AXIS_X)
+typedef uint32_t AxisBitmap_t;
 
 // Maps axis enum to letter. AXIS_Z -> 'Z'
 char gcodep_axis2letter(enum GCodeParserAxis axis);

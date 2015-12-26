@@ -28,7 +28,7 @@ class MotorOperations;
  * The output mapping to the physical driver is controlled by output_mapping
  */
 struct MachineControlConfig {
-  MachineControlConfig();   // Default constructor.
+  MachineControlConfig();
 
   // Arrays with values for each axis
   float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.

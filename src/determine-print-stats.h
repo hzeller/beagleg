@@ -31,8 +31,8 @@ struct BeagleGPrintStats {
 
 // Given the input file-descriptor (which is read to EOF and then closed)
 // and the given constraints, determine statistics about the gcode-file.
-// Returns 0 on success.
-int determine_print_stats(int input_fd,
-                          const MachineControlConfig &config,
-			  struct BeagleGPrintStats *result);
+// Returns true on success.
+bool determine_print_stats(int input_fd,
+                           const MachineControlConfig &config,
+                           struct BeagleGPrintStats *result);
 #endif // _BEAGLEG_DETERMINE_PRINT_STATS_H
