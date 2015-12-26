@@ -30,21 +30,22 @@ socket (you can just telnet to it for an interactive session, how cool is that?)
 ## APIs
 The functionality is implemented in a stack of independently usable APIs.
 
-   - [gcode-parser.h](./gcode-parser.h) : C++-API for parsing
+   - [gcode-parser.h](./src/gcode-parser.h) : C++-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
       care of many internals, e.g. interpreting slightly different dialects and
       automatically translates everything into metric, absolute coordinates for
       ease of downstream receivers. This API in itself is independent of the
       rest, so it might be useful in other contexts as well.
 
-   - [gcode-machine-control.h](./gcode-machine-control.h) : highlevel C++-API to
-      control a machine via G-Code: it receives G-Code events, does motion
-      planning, axis mapping, speed/accleration segment joining and emits
+   - [gcode-machine-control.h](./src/gcode-machine-control.h) : highlevel
+      C++-API to control a machine via G-Code: it receives G-Code events, does
+      motion planning, axis mapping, speed/accleration segment joining and emits
       the resuling motor commands to MotorOperations.
       Depends on the gcode-parser APIs as input and motor-operations as output.
       Provides the functionality provided by the `machine-control` binary.
 
-   - [motor-operations.h](./motor-operations.h) : Low-level motor motion C++-API.
+   - [motor-operations.h](./src/motor-operations.h) : Low-level motor motion
+      C++-API.
       Receives travel speeds and speed transitions from gcode machine control
       planner. This is a good place to implement stepmotor driver backends.
       The implementation here prepares parameters for the discrete
@@ -53,7 +54,7 @@ The functionality is implemented in a stack of independently usable APIs.
       determine print-time calculations, simulating how long motor movements
       would take.
 
-   - [motion-queue.h](./motion-queue.h) : Even lower level interface: queue
+   - [motion-queue.h](./src/motion-queue.h) : Even lower level interface: queue
       between motor-operations and hardware creating motion profiles in realtime.
       The implementation is done in the BeagleBone-PRU, but is separated out
       enough that it is not dependent on it: The required operations could be
@@ -62,7 +63,7 @@ The functionality is implemented in a stack of independently usable APIs.
       what to do with the parameters. The simulation just outputs the would-be
       result as CSV file (good for debugging).
 
-   - [determine-print-stats.h](./determine-print-stats.h): Highlevel API
+   - [determine-print-stats.h](./src/determine-print-stats.h): Highlevel API
       facade to determine some basic stats about a G-Code file; it processes
       the entire file and determines estimated print time, filament used etc.
       Since this takes the actual travel planning into account, the values are
