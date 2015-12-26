@@ -111,7 +111,7 @@ enum HomingState {
 // The GCode control implementation. Essentially we are a state machine
 // driven by the events we get from the gcode parsing.
 // We implement the event receiver interface directly.
-class GCodeMachineControl::Impl : public GCodeParser::Events {
+class GCodeMachineControl::Impl : public GCodeParser::EventReceiver {
 public:
   // Create Impl. It is not fully initialized yet, call Init()
   Impl(const MachineControlConfig &config,
@@ -1272,7 +1272,7 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   }
 }
 
-GCodeParser::Events *GCodeMachineControl::ParseEventReceiver() {
+GCodeParser::EventReceiver *GCodeMachineControl::ParseEventReceiver() {
   return impl_;
 }
 

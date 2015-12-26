@@ -94,7 +94,7 @@ class GCodeMachineControl {
 
   // Return the receiver for parse events. The caller must not assume ownership
   // of the returned pointer.
-  GCodeParser::Events *ParseEventReceiver();
+  GCodeParser::EventReceiver *ParseEventReceiver();
 
  private:
   class Impl;

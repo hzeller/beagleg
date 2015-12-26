@@ -63,9 +63,9 @@ public:
   // takes care of interpreting G20/G21, G90/G91/G92 internally.
   // (TODO: rotational axes are probably to be handled differently).
   // Also see ../G-code.md
-  class Events {
+  class EventReceiver {
   public:
-    virtual ~Events() {}
+    virtual ~EventReceiver() {}
     virtual void gcode_start();    // Start program. Use for initialization.
     virtual void gcode_finished(); // End of program or stream.
 
@@ -154,7 +154,7 @@ public:
 public:
   // Create a parser with the given config, emitting parse events
   // to "parse_events".
-  GCodeParser(const Config &config, Events *parse_events);
+  GCodeParser(const Config &config, EventReceiver *parse_events);
   ~GCodeParser();
 
   // Main workhorse: Parse a gcode line, call callbacks if needed.

@@ -32,10 +32,10 @@ namespace {
 // An event receiver for GCodeParser events that are intercepted, stats
 // recorded, then further delegated to an original GCodeParser::Events
 // receiver
-class StatsCollectingEventDelegator : public GCodeParser::Events {
+class StatsCollectingEventDelegator : public GCodeParser::EventReceiver {
 public:
   StatsCollectingEventDelegator(BeagleGPrintStats *stats,
-                                GCodeParser::Events *delegatee)
+                                GCodeParser::EventReceiver *delegatee)
     : stats_(stats), delegatee_(delegatee) {
   }
 
@@ -82,7 +82,7 @@ private:
   }
 
   struct BeagleGPrintStats *const stats_;
-  GCodeParser::Events *const delegatee_;
+  GCodeParser::EventReceiver *const delegatee_;
 };
 
 class StatsMotorOperations : public MotorOperations {

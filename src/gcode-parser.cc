@@ -86,10 +86,10 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
 }
 
 // -- default implementation of parse events.
-void GCodeParser::Events::gcode_start() {}
-void GCodeParser::Events::gcode_finished() {}
-void GCodeParser::Events::wait_for_start() {}
-void GCodeParser::Events::inform_origin_offset(const AxesRegister &offset) {
+void GCodeParser::EventReceiver::gcode_start() {}
+void GCodeParser::EventReceiver::gcode_finished() {}
+void GCodeParser::EventReceiver::wait_for_start() {}
+void GCodeParser::EventReceiver::inform_origin_offset(const AxesRegister &offset) {
   std::string line;
   line = StringPrintf("GCodeParser: (display) origin offset [");
   for (int i = 0; i < GCODE_NUM_AXES;  ++i) {
@@ -100,55 +100,57 @@ void GCodeParser::Events::inform_origin_offset(const AxesRegister &offset) {
   Log_debug("%s", line.c_str());
 }
 
-void GCodeParser::Events::gcode_command_done(char letter, float val) {}
+void GCodeParser::EventReceiver::gcode_command_done(char letter, float val) {}
 
-void GCodeParser::Events::set_speed_factor(float f) {
+void GCodeParser::EventReceiver::set_speed_factor(float f) {
   Log_debug("GCodeParser: set_speed_factor(%.1f)\n", f);
 }
-void GCodeParser::Events::set_temperature(float f) {
+void GCodeParser::EventReceiver::set_temperature(float f) {
   Log_debug("GCodeParser: set_temperature(%.1f)\n", f);
 }
-void GCodeParser::Events::set_fanspeed(float speed) {
+void GCodeParser::EventReceiver::set_fanspeed(float speed) {
   Log_debug("GCodeParser: set_fanspeed(%.0f)\n", speed);
 }
-void GCodeParser::Events::wait_temperature() {
+void GCodeParser::EventReceiver::wait_temperature() {
   Log_debug("GCodeParser: wait_temperature()\n");
 }
-void GCodeParser::Events::dwell(float f) {
+void GCodeParser::EventReceiver::dwell(float f) {
   Log_debug("GCodeParser: dwell(%.1f)\n", f);
 }
-void GCodeParser::Events::motors_enable(bool b) {
+void GCodeParser::EventReceiver::motors_enable(bool b) {
   Log_debug("GCodeParser: %s motors\n", b ? "enable" : "disable");
 }
-bool GCodeParser::Events::coordinated_move(float feed,
-                                           const AxesRegister& axes) {
+bool GCodeParser::EventReceiver::coordinated_move(float feed,
+                                                  const AxesRegister& axes) {
   Log_debug("GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
             axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
   
   Log_debug("feed=%.1f", feed);
   return true;
 }
-bool GCodeParser::Events::rapid_move(float feed, const AxesRegister& axes) {
+bool GCodeParser::EventReceiver::rapid_move(float feed,
+                                            const AxesRegister& axes) {
   return coordinated_move(feed, axes);
 }
 
-void GCodeParser::Events::go_home(AxisBitmap_t axes) {
+void GCodeParser::EventReceiver::go_home(AxisBitmap_t axes) {
   Log_debug("GCodeParser: go-home(0x%02x)\n", axes);
 }
-bool GCodeParser::Events::probe_axis(float feed, enum GCodeParserAxis axis,
-                                     float *reached_pos) {
+bool GCodeParser::EventReceiver::probe_axis(float feed,
+                                            enum GCodeParserAxis axis,
+                                            float *reached_pos) {
   Log_debug("GCodeParser: probe-axis(%c)", gcodep_axis2letter(axis));
   if (feed > 0)
     Log_debug("feed=%.1f", feed);
   return false;
 }
-const char *GCodeParser::Events::unprocessed( char letter, float value,
-                                             const char *remaining) {
+const char *GCodeParser::EventReceiver::unprocessed(char letter, float value,
+                                                    const char *remaining) {
   Log_debug("GCodeParser: unprocessed('%c', %d, '%s')\n",
-	  letter, (int) value, remaining);
+            letter, (int) value, remaining);
   return NULL;
 }
-void GCodeParser::Events::input_idle() {
+void GCodeParser::EventReceiver::input_idle() {
   Log_debug("GCodeParser: input idle\n");
 }
 
@@ -157,7 +159,8 @@ void GCodeParser::Events::input_idle() {
 // in this implementation.
 class GCodeParser::Impl {
 public:
-  Impl(const GCodeParser::Config &config, GCodeParser::Events *parse_events);
+  Impl(const GCodeParser::Config &config,
+       GCodeParser::EventReceiver *parse_events);
 
   void ParseLine(const char *line, FILE *err_stream);
   int ParseStream(int input_fd, FILE *err_stream);
@@ -235,7 +238,7 @@ private:
   // Read parameter from letter "param_letter" and call the event callback
   // "ValueSetter" in the events callbacks. Pass the parameter, multiplied
   // with "factor", to the member function.
-  typedef void (Events::*EventValueSetter)(float d);
+  typedef void (EventReceiver::*EventValueSetter)(float d);
   const char *set_param(char param_letter, EventValueSetter setter,
                         float factor, const char *line);
 
@@ -244,7 +247,7 @@ private:
 
   static AxesRegister kZeroOffset;
 
-  GCodeParser::Events *const callbacks;
+  GCodeParser::EventReceiver *const callbacks;
   const GCodeParser::Config config;
 
   bool program_in_progress_;
@@ -279,7 +282,7 @@ private:
   const AxesRegister *current_origin_;         // active origin.
 
   // Active offsets from origin. They can be kNullOffset
-  const AxesRegister *current_global_offset_;  // offset relative to current origin.
+  const AxesRegister *current_global_offset_;  // offset rel. to current origin.
   // more: tool offset.
 
   enum GCodeParserAxis arc_normal_;  // normal vector of arcs.
@@ -288,7 +291,7 @@ private:
 AxesRegister GCodeParser::Impl::kZeroOffset;
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
-                        GCodeParser::Events *parse_events)
+                        GCodeParser::EventReceiver *parse_events)
   : callbacks(parse_events), config(parse_config),
     program_in_progress_(false),
     err_msg_(NULL), modal_g0_g1_(0),
@@ -489,7 +492,7 @@ const char *GCodeParser::Impl::handle_move(const char *line, int force_change) {
 }
 
 struct ArcCallbackData {
-  GCodeParser::Events *callbacks;
+  GCodeParser::EventReceiver *callbacks;
   float feedrate;
 };
 
@@ -593,7 +596,9 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
       case  1: modal_g0_g1_ = 1; line = handle_move(line, 0); break;
       case  2: line = handle_arc(line, 1); break;
       case  3: line = handle_arc(line, 0); break;
-      case  4: line = set_param('P', &GCodeParser::Events::dwell, 1.0f, line); break;
+      case  4: line = set_param('P', &GCodeParser::EventReceiver::dwell,
+                                1.0f, line);
+        break;
       case 17: arc_normal_ = AXIS_Z; break;
       case 18: arc_normal_ = AXIS_Y; break;
       case 19: arc_normal_ = AXIS_X; break;
@@ -619,16 +624,23 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
       case 82: axis_is_absolute_[AXIS_E] = true; break;
       case 83: axis_is_absolute_[AXIS_E] = false; break;
       case 84: callbacks->motors_enable(false); break;
-      case 104: line = set_param('S', &GCodeParser::Events::set_temperature, 1.0f, line); break;
-      case 106: line = set_param('S', &GCodeParser::Events::set_fanspeed, 1.0f, line); break;
+      case 104: line = set_param('S',
+                                 &GCodeParser::EventReceiver::set_temperature,
+                                 1.0f, line);
+        break;
+      case 106: line = set_param('S', &GCodeParser::EventReceiver::set_fanspeed,
+                                 1.0f, line);
+        break;
       case 107: callbacks->set_fanspeed(0); break;
       case 109:
-	line = set_param('S', &GCodeParser::Events::set_temperature, 1.0f, line);
+	line = set_param('S', &GCodeParser::EventReceiver::set_temperature,
+                         1.0f, line);
 	callbacks->wait_temperature();
 	break;
       case 116: callbacks->wait_temperature(); break;
       case 220:
-	line = set_param('S', &GCodeParser::Events::set_speed_factor, 0.01f, line);
+	line = set_param('S', &GCodeParser::EventReceiver::set_speed_factor,
+                         0.01f, line);
 	break;
       default: line = callbacks->unprocessed(letter, value, line); break;
       }
@@ -734,7 +746,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
   return caught_signal ? 2 : 0;
 }
 
-GCodeParser::GCodeParser(const Config &config, Events *parse_events)
+GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events)
   : impl_(new Impl(config, parse_events)) {
 }
 GCodeParser::~GCodeParser() {

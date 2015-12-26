@@ -94,7 +94,7 @@ class Harness {
     delete machine_control;
   }
 
-  GCodeParser::Events *gcode_emit() {
+  GCodeParser::EventReceiver *gcode_emit() {
     return machine_control->ParseEventReceiver();
   }
 

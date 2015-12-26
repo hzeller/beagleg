@@ -37,7 +37,7 @@ enum {
   NUM_COUNTED_CALLS,
 };
 
-class ParseTester : public GCodeParser::Events {
+class ParseTester : public GCodeParser::EventReceiver {
 public:
   ParseTester() {
     bzero(call_count, sizeof(call_count));
