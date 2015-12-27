@@ -97,7 +97,7 @@ To avoid re-inventing the testing-framework wheel, we use the
 [Google test framework](https://github.com/google/googletest), for which there
 are typically already packages available:
 
-    sudo aptitude install libgtest-dev cmake
+    sudo aptitude install libgtest-dev google-mock cmake
     make test
     # Or, for more thorough memory-leak or initialization issue check:
     make valgrind-test

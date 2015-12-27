@@ -27,7 +27,7 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 
 # where the google test source has been unpacked.
 GTEST_SOURCE=/usr/src/gtest
-
+GMOCK_SOURCE=/usr/src/gmock
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
@@ -50,12 +50,12 @@ PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
 PRU_BIN=motor-interface-pru_bin.h
 
 GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
-              generic-gpio.o arc-gen.o pwm-timer.o logging.o
+              generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 
 TARGETS=../machine-control ../gcode-print-stats
-UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test
+UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test
 
 all : $(TARGETS)
 
@@ -79,8 +79,12 @@ gtest/libgtest.a: compiler-flags
 	rm -rf gtest ; mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
 	make -C gtest
 
-%_test: %_test.cc $(OBJECTS) gtest/libgtest.a compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a
+gmock/libgmock.a: compiler-flags
+	rm -rf gmock ; mkdir -p gmock ; cd gmock ; cmake $(GMOCK_SOURCE)
+	make -C gmock
+
+%_test: %_test.cc $(OBJECTS) gtest/libgtest.a gmock/libgmock.a compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a gmock/libgmock.a
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
