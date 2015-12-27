@@ -99,12 +99,19 @@ TEST(GCodeParserTest, axes_letter_conversion) {
   // one way ..
   EXPECT_EQ('X', gcodep_axis2letter(AXIS_X));
   EXPECT_EQ('A', gcodep_axis2letter(AXIS_A));
+
+  // invalid value.
+  EXPECT_EQ('?', gcodep_axis2letter(static_cast<GCodeParserAxis>(42)));
+
   // .. and back
   EXPECT_EQ(AXIS_X, gcodep_letter2axis('X'));
   EXPECT_EQ(AXIS_X, gcodep_letter2axis('x'));
   EXPECT_EQ(AXIS_Z, gcodep_letter2axis('z'));
   EXPECT_EQ(AXIS_A, gcodep_letter2axis('A'));
   EXPECT_EQ(AXIS_A, gcodep_letter2axis('a'));
+
+  // invalid valud.
+  EXPECT_EQ(GCODE_NUM_AXES, gcodep_letter2axis('%'));
 }
 
 TEST(GCodeParserTest, simple_move) {
