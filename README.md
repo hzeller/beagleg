@@ -87,6 +87,7 @@ Then just
      cd beagleg
      make
 
+## Developing
 If you are looking at the code and developing on a non-Beaglebone machine,
 pass an empty `ARM_COMPILE_FLAGS` environment variable:
 
@@ -101,6 +102,12 @@ are typically already packages available:
     make test
     # Or, for more thorough memory-leak or initialization issue check:
     make valgrind-test
+
+Tests are compiling pretty slowly on the BeagleBone due to heavy use of
+C++ features. You should definitely install `ccache` (read the manpage to make
+sure to properly enable it) to speed up compiling if you have many `make clean`
+cycles (In general, `ccache` is adisable, on all machines, not only the
+BeagleBone).
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
