@@ -75,16 +75,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-gtest/libgtest.a: compiler-flags
-	rm -rf gtest ; mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
-	make -C gtest
-
-gmock/libgmock.a: compiler-flags
-	rm -rf gmock ; mkdir -p gmock ; cd gmock ; cmake $(GMOCK_SOURCE)
-	make -C gmock
-
-%_test: %_test.cc $(OBJECTS) gtest/libgtest.a gmock/libgmock.a compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a gmock/libgmock.a
+%_test: %_test.cc $(OBJECTS) gtest-all.o gmock-all.o compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gmock-all.o gtest-all.o
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -102,8 +94,15 @@ pru-motion-queue.o : $(PRU_BIN)
 # Auto generated dependencies
 -include $(OBJECTS:.o=.d)
 
+# Test and Mock framework.
+gtest-all.o : $(GTEST_SOURCE)/src/gtest-all.cc compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GTEST_SOURCE) -c  $< -o $@
+
+gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GMOCK_SOURCE) -c  $< -o $@
+
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) gtest-all.o gmock-all.o
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
