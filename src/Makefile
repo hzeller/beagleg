@@ -28,7 +28,6 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 # where the google test source has been unpacked.
 GTEST_SOURCE=/usr/src/gtest
 
-CXX=g++
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
@@ -37,9 +36,12 @@ BEAGLEG_OPT_FLAGS?=-O3
 
 CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_FLAGS)
 
+# We export the following variables so that the googletest library will get
+# the same variables when compiling.
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.
-CXXFLAGS+=$(CFLAGS) -std=c++03
+export CXXFLAGS+=$(CFLAGS) -std=c++03
+export CXX=g++
 
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
@@ -73,8 +75,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-gtest/libgtest.a:
-	mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
+gtest/libgtest.a: compiler-flags
+	rm -rf gtest ; mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
 	make -C gtest
 
 %_test: %_test.cc $(OBJECTS) gtest/libgtest.a compiler-flags
@@ -100,6 +102,6 @@ clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
 
 compiler-flags: FORCE
-	@echo '$(CXXFLAGS)' | cmp -s - $@ || echo '$(CXXFLAGS)' > $@
+	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
 
 .PHONY: FORCE
