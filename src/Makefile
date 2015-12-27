@@ -102,7 +102,7 @@ gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GMOCK_SOURCE) -c  $< -o $@
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) gtest-all.o gmock-all.o
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
