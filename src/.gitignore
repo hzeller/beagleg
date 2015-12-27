@@ -6,4 +6,5 @@ gcode-parser_test
 gcode-print-stats
 machine-control
 motor-interface-pru_bin.h
-
+compiler-flags
+gtest

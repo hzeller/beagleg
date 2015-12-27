@@ -77,10 +77,10 @@ gtest/libgtest.a:
 	mkdir -p gtest ; cd gtest ; cmake $(GTEST_SOURCE)
 	make -C gtest
 
-%_test: %_test.cc $(OBJECTS) gtest/libgtest.a
+%_test: %_test.cc $(OBJECTS) gtest/libgtest.a compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gtest/libgtest.a
 
-%.o: %.cc
+%.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
 	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -MM $< > $*.d
 
@@ -98,3 +98,8 @@ pru-motion-queue.o : $(PRU_BIN)
 
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
+
+compiler-flags: FORCE
+	@echo '$(CXXFLAGS)' | cmp -s - $@ || echo '$(CXXFLAGS)' > $@
+
+.PHONY: FORCE
