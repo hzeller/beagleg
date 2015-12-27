@@ -75,8 +75,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-%_test: %_test.cc $(OBJECTS) gtest-all.o gmock-all.o compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) gmock-all.o gtest-all.o
+%_test: %_test.cc $(OBJECTS) gmocktest.so compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) -Wl,-rpath=. gmocktest.so
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -96,11 +96,13 @@ pru-motion-queue.o : $(PRU_BIN)
 
 # Test and Mock framework.
 gtest-all.o : $(GTEST_SOURCE)/src/gtest-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GTEST_SOURCE) -c  $< -o $@
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -fPIC -I$(GTEST_SOURCE) -c  $< -o $@
 
 gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GMOCK_SOURCE) -c  $< -o $@
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -fPIC -I$(GMOCK_SOURCE) -c  $< -o $@
 
+gmocktest.so: gtest-all.o gmock-all.o
+	gcc -shared -Wl,-soname,gmocktest.so -o $@ $^
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d)
 
