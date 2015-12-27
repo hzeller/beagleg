@@ -29,7 +29,7 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 GTEST_SOURCE=/usr/src/gtest
 
 CXX=g++
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -g -O0  $(ARM_COMPILE_FLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
 
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.

@@ -25,5 +25,5 @@ export ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 all:
 	$(MAKE) -e -C src ../machine-control ../gcode-print-stats
 
-test clean:
+clean test valgrind-test:
 	$(MAKE) -C src $@
