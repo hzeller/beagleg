@@ -60,6 +60,9 @@ all : $(TARGETS)
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
 
+valgrind-test: $(UNITTEST_BINARIES)
+	for test_bin in $(UNITTEST_BINARIES) ; do valgrind ./$$test_bin ; done
+
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
