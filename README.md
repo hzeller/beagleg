@@ -90,17 +90,19 @@ Then just
 ## Developing
 Due to the speed of the compiler on the BeagleBone, you might want to do
 development on other machines for faster turn-around times (unless you really
-need to actually access the hardwar GPIOs or run PRU code, this works just fine).
+need to actually access the hardware GPIOs or run PRU code, this works just
+fine).
 
 On a non-Beaglebone machine, pass an empty `ARM_COMPILE_FLAGS` environment
 variable:
 
      ARM_COMPILE_FLAGS="" make
+     # or export to environment.
 
-To speed up development (in particular if you compile on the BeagleBone), it
-is definitely useful to have `ccache` installed (package-installing is not
-enough, read the manpage to make sure to properly enable it). It
-makes `make clean ; make` cycles much faster.
+To speed up development (on all machines, but in particular if you compile on
+the BeagleBone), it is definitely useful to have `ccache` installed
+(package-installing is not enough, read the manpage to make sure to
+properly enable it). It makes `make clean ; make` cycles _much_ faster.
 
 When doing development, is advisable to run the tests (and write your own).
 To avoid re-inventing the testing-framework wheel, we use the
