@@ -88,26 +88,29 @@ Then just
      make
 
 ## Developing
-If you are looking at the code and developing on a non-Beaglebone machine,
-pass an empty `ARM_COMPILE_FLAGS` environment variable:
+Due to the speed of the compiler on the BeagleBone, you might want to do
+development on other machines for faster turn-around times (unless you really
+need to actually access the hardwar GPIOs or run PRU code, this works just fine).
+
+On a non-Beaglebone machine, pass an empty `ARM_COMPILE_FLAGS` environment
+variable:
 
      ARM_COMPILE_FLAGS="" make
 
-In particular if you work on BeagleG development, is advisable to run the tests.
+To speed up development (in particular if you compile on the BeagleBone), it
+is definitely useful to have `ccache` installed (package-installing is not
+enough, read the manpage to make sure to properly enable it). It
+makes `make clean ; make` cycles much faster.
+
+When doing development, is advisable to run the tests (and write your own).
 To avoid re-inventing the testing-framework wheel, we use the
 [Google test framework](https://github.com/google/googletest), for which there
 are typically already packages available:
 
-    sudo aptitude install libgtest-dev google-mock cmake
+    sudo aptitude install libgtest-dev google-mock
     make test
     # Or, for more thorough memory-leak or initialization issue check:
     make valgrind-test
-
-Tests are compiling pretty slowly on the BeagleBone due to heavy use of
-C++ features. You should definitely install `ccache` (read the manpage to make
-sure to properly enable it) to speed up compiling if you have many `make clean`
-cycles (In general, `ccache` is adisable, on all machines, not only the
-BeagleBone).
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
