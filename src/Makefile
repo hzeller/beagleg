@@ -29,7 +29,13 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 GTEST_SOURCE=/usr/src/gtest
 
 CXX=g++
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 -O3 $(ARM_COMPILE_FLAGS)
+
+# Optmization flags. Typically, that should be -O3 for regluar use, but for
+# debugging and development "-g -O0" can be more helpful. Overridable by
+# environment variable.
+BEAGLEG_OPT_FLAGS?=-O3
+
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_FLAGS)
 
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.

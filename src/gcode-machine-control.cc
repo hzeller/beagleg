@@ -1012,6 +1012,7 @@ void GCodeMachineControl::Impl::bring_path_to_halt() {
   new_pos->defining_axis = AXIS_X;
   new_pos->speed = 0;
   new_pos->aux_bits = aux_bits_;
+  new_pos->angle = 0;
   issue_motor_move_if_possible();
 }
 
