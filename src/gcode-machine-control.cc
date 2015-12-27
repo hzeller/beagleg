@@ -429,6 +429,7 @@ bool GCodeMachineControl::Impl::Init() {
   // Initial machine position. We assume the homed position here, which is
   // wherever the endswitch is for each axis.
   struct AxisTarget *init_axis = planning_buffer_.append();
+  bzero(init_axis, sizeof(*init_axis));
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
     int dir, dummy;
     if (GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy)) {
@@ -439,7 +440,6 @@ bool GCodeMachineControl::Impl::Init() {
       init_axis->position_steps[axis] = 0;
     }
   }
-  init_axis->speed = 0;
 
   return true;
 }
@@ -594,7 +594,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     case 105: mprintf("T-300\n"); break;  // no temp yet.
     case 114:
       if (planning_buffer_.size() > 0) {
-        struct AxisTarget *current = planning_buffer_[0];
+        const struct AxisTarget *current = planning_buffer_[0];
         const int *mpos = current->position_steps;
         const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
         const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
