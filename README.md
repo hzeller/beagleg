@@ -92,13 +92,15 @@ pass an empty `ARM_COMPILE_FLAGS` environment variable:
 
      ARM_COMPILE_FLAGS="" make
 
-In particular, if you develop on BeagleG, is advisable to run the tests. To
-avoid re-inventing the testing-framework wheel, we use the
+In particular if you work on BeagleG development, is advisable to run the tests.
+To avoid re-inventing the testing-framework wheel, we use the
 [Google test framework](https://github.com/google/googletest), for which there
 are typically already packages available:
 
     sudo aptitude install libgtest-dev cmake
     make test
+    # Or, for more thorough memory-leak or initialization issue check:
+    make valgrind-test
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
