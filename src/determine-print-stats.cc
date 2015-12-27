@@ -130,5 +130,7 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
     stats_event_receiver(result, machine_control->ParseEventReceiver());
 
   GCodeParser parser(GCodeParser::Config(), &stats_event_receiver);
-  return parser.ParseStream(input_fd, stderr) == 0;
+  const bool success = parser.ParseStream(input_fd, stderr) == 0;
+  delete machine_control;
+  return success;
 }
