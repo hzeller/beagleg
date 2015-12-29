@@ -40,6 +40,10 @@
 #include "logging.h"
 #include "motor-operations.h"
 #include "pwm-timer.h"
+#include "config-parser.h"
+
+#include <iostream>  // HZ: remove.
+#include "string-util.h"  // HZ: move in other file ?
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
@@ -57,13 +61,11 @@
 
 #define NUM_ENDSTOPS        6
 
-// Some default settings. These are most likely overrridden via flags by user.
+static bool is_rotational(int axis) {
+  return axis == AXIS_A || axis == AXIS_B || axis == AXIS_C;
+}
 
-// All these settings are in sequence of enum GCodeParserAxes: XYZEABCUVW. Axes not
-// used by default are initialized to 0
-static const float kMaxFeedrate[GCODE_NUM_AXES] = {  200,  200,   90,    10, 1 };
-static const float kDefaultAccel[GCODE_NUM_AXES]= { 4000, 4000, 1000, 10000, 1 };
-static const float kStepsPerMM[GCODE_NUM_AXES]  = {  160,  160,  160,    40, 1 };
+// Some default settings. These are most likely overrridden via flags by user.
 
 // Output mapping of Axis to motor connectors from left to right.
 static const char kAxisMapping[] = "XYZEA";
@@ -92,13 +94,6 @@ struct AxisTarget {
 };
 
 typedef uint8_t DriverBitmap;
-
-// Compact representation of an enstop configuration.
-struct EndstopConfig {
-  unsigned char trigger_value : 1;   // 0: trigged low 1: triggered high.
-  unsigned char homing_use : 1;      // 0: no 1: yes.
-  unsigned char endstop_number : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
-};
 
 // The three levels of homing confidence. If we ever switch off
 // power to the motors after homing, we can't be sure.
@@ -176,6 +171,18 @@ private:
   // Print to msg_stream.
   void mprintf(const char *format, ...);
 
+  std::string print_driver_bitmap(DriverBitmap map) {
+    std::string result;
+    for (int m = 0; m < BEAGLEG_NUM_MOTORS; ++m) {
+      if (map & (1 << m)) {
+        if (!result.empty()) result.append(", ");
+        result.append(StringPrintf("%d", m + 1));
+      }
+    }
+    if (result.empty()) result.append("<none>");
+    return result;
+  }
+
 private:
   const struct MachineControlConfig cfg_;
   MotorOperations *const motor_ops_;
@@ -186,9 +193,9 @@ private:
                                          // (will be trimmed if needed)
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
-  AxesRegister max_axis_speed_;  // max travel speed hz
-  AxesRegister max_axis_accel_;  // acceleration hz/s
-  float highest_accel_;                   // hightest accel of all axes.
+  AxesRegister max_axis_speed_;   // max travel speed hz
+  AxesRegister max_axis_accel_;   // acceleration hz/s
+  float highest_accel_;           // hightest accel of all axes.
 
   // "axis_to_driver": Which axis is mapped to which physical output drivers.
   // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
@@ -196,12 +203,8 @@ private:
   // Bitmap of drivers output should go.
   FixedArray<DriverBitmap, GCODE_NUM_AXES> axis_to_driver_;
 
-  FixedArray<int, GCODE_NUM_AXES> axis_flip_;  // 1 or -1 for direction flip of axis
+  FixedArray<int, GCODE_NUM_AXES> axis_flip_;  // 1 or -1 for dir flip of axis
   FixedArray<int, BEAGLEG_NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
-
-  // Mapping of Axis to which endstop it affects.
-  FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
-  FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
 
   // Current machine configuration
   AxesRegister coordinate_display_origin_; // parser tells us
@@ -274,8 +277,10 @@ bool GCodeMachineControl::Impl::Init() {
 
   // Mapping axes to physical motors. We might have a larger set of logical
   // axes of which we map a subset to actual motors.
-  const char *axis_map = cfg_.axis_mapping;
-  if (axis_map == NULL) axis_map = kAxisMapping;
+  // (TODO(hzeller): this used to be a c-string, now is a std::string. The
+  // processing still looks very c-like here :) ).
+  const char *axis_map = cfg_.axis_mapping.c_str();
+  if (!axis_map[0] || axis_map == NULL) axis_map = kAxisMapping;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
     if (pos >= BEAGLEG_NUM_MOTORS) {
       Log_error("Error: Axis mapping string has more elements than "
@@ -289,35 +294,38 @@ bool GCodeMachineControl::Impl::Init() {
       fprintf(stderr,
               "Illegal axis->connector mapping character '%c' in '%s' "
               "(Only valid axis letter or '_' to skip a connector).\n",
-              toupper(*axis_map), cfg_.axis_mapping);
+              toupper(*axis_map), cfg_.axis_mapping.c_str());
       return false;
     }
     driver_flip_[pos] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
     axis_to_driver_[axis] |= (1 << pos);
   }
 
+#if 0  
   // Extract enstop polarity
-  char endstop_trigger[NUM_ENDSTOPS] = {0};
-  if (cfg_.endswitch_polarity) {
-    const char *map = cfg_.endswitch_polarity;
+  bool endstop_trigger[NUM_ENDSTOPS] = {0};
+  if (!cfg_.endswitch_polarity.empty()) {
+    const char *map = cfg_.endswitch_polarity.c_str();
     for (int switch_connector = 0; *map; switch_connector++, map++) {
       if (*map == '_' || *map == '0' || *map == '-' || *map == 'L') {
-        endstop_trigger[switch_connector] = 0;
+        endstop_trigger[switch_connector] = false;
       } else if (*map == '1' || *map == '+' || *map == 'H') {
-        endstop_trigger[switch_connector] = 1;
+        endstop_trigger[switch_connector] = true;
       } else {
         Log_error("Illegal endswitch polarity character '%c' in '%s'.\n",
-                *map, cfg_.endswitch_polarity);
+                  *map, cfg_.endswitch_polarity.c_str());
         return false;
       }
     }
   }
+#endif
 
   int error_count = 0;
 
+#if 0
   // Now map the endstops. String position is position on the switch connector
-  if (cfg_.min_endswitch) {
-    const char *map = cfg_.min_endswitch;
+  if (!cfg_.min_endswitch.empty()) {
+    const char *map = cfg_.min_endswitch.c_str();
     for (int switch_connector = 0; *map; switch_connector++, map++) {
       if (*map == '_')
         continue;
@@ -326,18 +334,18 @@ bool GCodeMachineControl::Impl::Init() {
         fprintf(stderr,
                 "Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
-                toupper(*map), cfg_.min_endswitch);
+                toupper(*map), cfg_.min_endswitch.c_str());
         ++error_count;
         continue;
       }
-      min_endstop_[axis].endstop_number = switch_connector + 1;
-      min_endstop_[axis].homing_use = (toupper(*map) == *map) ? 1 : 0;
+      min_endstop_[axis].endstop_switch = switch_connector + 1;
+      min_endstop_[axis].homing_use = (toupper(*map) == *map);
       min_endstop_[axis].trigger_value = endstop_trigger[switch_connector];
     }
   }
 
-  if (cfg_.max_endswitch) {
-    const char *map = cfg_.max_endswitch;
+  if (!cfg_.max_endswitch.empty()) {
+    const char *map = cfg_.max_endswitch.c_str();
     for (int switch_connector = 0; *map; switch_connector++, map++) {
       if (*map == '_')
         continue;
@@ -346,7 +354,7 @@ bool GCodeMachineControl::Impl::Init() {
         fprintf(stderr,
                 "Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
-                toupper(*map), cfg_.min_endswitch);
+                toupper(*map), cfg_.min_endswitch.c_str());
         ++error_count;
         continue;
       }
@@ -359,18 +367,19 @@ bool GCodeMachineControl::Impl::Init() {
         ++error_count;
         continue;
       }
-      max_endstop_[axis].endstop_number = switch_connector + 1;
+      max_endstop_[axis].endstop_switch = switch_connector + 1;
       max_endstop_[axis].homing_use = for_homing;
       max_endstop_[axis].trigger_value = endstop_trigger[switch_connector];
     }
   }
+#endif
 
   // Check if things are plausible: we only allow one home endstop per axis.
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
-    if (min_endstop_[axis].endstop_number != 0
-        && max_endstop_[axis].endstop_number != 0) {
-      if (min_endstop_[axis].homing_use
-          && max_endstop_[axis].homing_use) {
+    if (cfg_.min_endstop_[axis].endstop_switch
+        && cfg_.max_endstop_[axis].endstop_switch) {
+      if (cfg_.min_endstop_[axis].homing_use
+          && cfg_.max_endstop_[axis].homing_use) {
         Log_error("Error: There can only be one home-origin for axis %c, "
                 "but both min/max are set for homing (Uppercase letter)\n",
                 gcodep_axis2letter((GCodeParserAxis)axis));
@@ -381,45 +390,50 @@ bool GCodeMachineControl::Impl::Init() {
   }
 
   // Now let's see what motors are mapped to any useful output.
-  if (cfg_.debug_print) Log_debug("-- Config --\n");
+  Log_debug("-- Config --\n");
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (axis_to_driver_[i] == 0)
       continue;
-    char is_error = (cfg_.steps_per_mm[i] <= 0
-                     || cfg_.max_feedrate[i] <= 0);
-    if (cfg_.debug_print || is_error) {
-      std::string line;
-      line = StringPrintf("%c axis: %5.1fmm/s, %7.1fmm/s^2, %9.4f steps/mm%s ",
-                          gcodep_axis2letter((GCodeParserAxis)i),
-                          cfg_.max_feedrate[i],
-                          cfg_.acceleration[i],
-                          cfg_.steps_per_mm[i],
-                          axis_flip_[i] < 0 ? " (reversed)" : "");
-      if (cfg_.move_range_mm[i] > 0) {
-        line += StringPrintf("[ limit %5.1fmm ] ", cfg_.move_range_mm[i]);
-      } else {
-        line += "[ unknown limit ] ";
-      }
-      int endstop = min_endstop_[i].endstop_number;
-      const char *trg = min_endstop_[i].trigger_value ? "hi" : "lo";
-      if (endstop) {
-        line += StringPrintf("min-switch %d (%s-trigger)%s; ",
-                             endstop, trg,
-                             min_endstop_[i].homing_use ? " [HOME]" : "       ");
-      }
-      endstop = max_endstop_[i].endstop_number;
-      trg = max_endstop_[i].trigger_value ? "hi" : "lo";
-      if (endstop) {
-        line += StringPrintf("max-switch %d (%s-trigger)%s;",
-                             endstop, trg,
-                             max_endstop_[i].homing_use ? " [HOME]" : "");
-      }
-      if (!cfg_.range_check)
-        line += "Limit checks disabled!";
-      Log_debug("%s", line.c_str());
+    const bool is_error = (cfg_.steps_per_mm[i] <= 0
+                           || cfg_.max_feedrate[i] <= 0);
+    // Some generic useful output
+    std::string line;
+    const char *unit = is_rotational(i) ? "° " : "mm";
+    line = StringPrintf("%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s%s ",
+                        gcodep_axis2letter((GCodeParserAxis)i),
+                        print_driver_bitmap(axis_to_driver_[i]).c_str(),
+                        cfg_.max_feedrate[i], unit,
+                        cfg_.acceleration[i], unit,
+                        cfg_.steps_per_mm[i], unit,
+                        axis_flip_[i] < 0 ? " (reversed)" : "");
+    if (cfg_.move_range_mm[i] > 0) {
+      line += StringPrintf("[ range %5.1f%s ] ", cfg_.move_range_mm[i], unit);
+    } else {
+      line += "[ unknown range ] ";
     }
+    int endstop = cfg_.min_endstop_[i].endstop_switch;
+    const char *trg = cfg_.min_endstop_[i].trigger_value ? "hi" : "lo";
+    if (endstop) {
+      line += StringPrintf("min-switch %d (%s-trigger)%s; ",
+                           endstop, trg,
+                           cfg_.min_endstop_[i].homing_use ? " [HOME]" : "       ");
+    }
+    endstop = cfg_.max_endstop_[i].endstop_switch;
+    trg = cfg_.max_endstop_[i].trigger_value ? "hi" : "lo";
+    if (endstop) {
+      line += StringPrintf("max-switch %d (%s-trigger)%s;",
+                           endstop, trg,
+                           cfg_.max_endstop_[i].homing_use ? " [HOME]" : "");
+    }
+    if (!cfg_.range_check)
+      line += "Limit checks disabled!";
+    Log_debug("%s", line.c_str());
+
     if (is_error) {
-      fprintf(stderr, "\tERROR: that is an invalid feedrate or steps/mm.\n");
+      Log_error("ERROR: Motor %s configured for axis '%c', but invalid "
+                "feedrate or steps/%s.",
+                print_driver_bitmap(axis_to_driver_[i]).c_str(),
+                gcodep_axis2letter((GCodeParserAxis)i), unit);
       ++error_count;
     }
   }
@@ -630,16 +644,16 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
       char any_enstops_found = 0;
       for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
         GCodeParserAxis axis = (GCodeParserAxis) ai;
-        struct EndstopConfig config = min_endstop_[axis];
-        if (config.endstop_number) {
+        struct EndstopConfig config = cfg_.min_endstop_[axis];
+        if (config.endstop_switch) {
           int value = get_gpio(get_endstop_gpio_descriptor(config));
           mprintf("%c_min:%s ",
                   tolower(gcodep_axis2letter(axis)),
                   value == config.trigger_value ? "TRIGGERED" : "open");
           any_enstops_found = 1;
         }
-        config = max_endstop_[axis];
-        if (config.endstop_number) {
+        config = cfg_.max_endstop_[axis];
+        if (config.endstop_switch) {
           int value = get_gpio(get_endstop_gpio_descriptor(config));
           mprintf("%c_max:%s ",
                   tolower(gcodep_axis2letter(axis)),
@@ -1119,7 +1133,7 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
 }
 
 static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
-  switch (config.endstop_number) {
+  switch (config.endstop_switch) {
   case 1: return END_1_GPIO;
   case 2: return END_2_GPIO;
   case 3: return END_3_GPIO;
@@ -1134,11 +1148,11 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
 uint32_t GCodeMachineControl::Impl::GetHomeEndstop(enum GCodeParserAxis axis,
                                                    int *dir, int *trigger_value) const {
   *dir = 1;
-  struct EndstopConfig config = max_endstop_[axis];
-  if (min_endstop_[axis].endstop_number
-      && min_endstop_[axis].homing_use) {
+  struct EndstopConfig config = cfg_.max_endstop_[axis];
+  if (cfg_.min_endstop_[axis].endstop_switch
+      && cfg_.min_endstop_[axis].homing_use) {
     *dir = -1;
-    config = min_endstop_[axis];
+    config = cfg_.min_endstop_[axis];
   }
   if (!config.homing_use)
     return 0;
@@ -1202,8 +1216,9 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
 
 void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   bring_path_to_halt();
-  for (const char *order = cfg_.home_order; *order; order++) {
-    const enum GCodeParserAxis axis = gcodep_letter2axis(*order);
+  for (std::string::const_iterator o = cfg_.home_order.begin();
+       o != cfg_.home_order.end() ; ++o) {
+    const enum GCodeParserAxis axis = gcodep_letter2axis(*o);
     if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
       continue;
     home_axis(axis);
@@ -1227,11 +1242,11 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   // this is not yet 100% the way it should be. We should actually
   // define the probe-'endstops' somewhat differently.
   // For now, we just do the simple thing
-  struct EndstopConfig config = max_endstop_[axis];
-  if (min_endstop_[axis].endstop_number
-      && !min_endstop_[axis].homing_use) {
+  struct EndstopConfig config = cfg_.max_endstop_[axis];
+  if (cfg_.min_endstop_[axis].endstop_switch
+      && !cfg_.min_endstop_[axis].homing_use) {
     dir = -1;
-    config = min_endstop_[axis];
+    config = cfg_.min_endstop_[axis];
   }
   uint32_t gpio_def = get_endstop_gpio_descriptor(config);
   if (!gpio_def || config.homing_use) {
@@ -1289,16 +1304,204 @@ void GCodeMachineControl::SetMsgOut(FILE *msg_stream) {
 }
 
 MachineControlConfig::MachineControlConfig() {
-  bzero(this, sizeof(*this));
-  memcpy(steps_per_mm, kStepsPerMM, sizeof(steps_per_mm));
-  memcpy(max_feedrate, kMaxFeedrate, sizeof(max_feedrate));
-  memcpy(acceleration, kDefaultAccel, sizeof(acceleration));
   speed_factor = 1;
   acknowledge_lines = true;
   debug_print = false;
   synchronous = false;
   range_check = true;
+  require_homing = true;
   axis_mapping = kAxisMapping;
   home_order = kHomeOrder;
   threshold_angle = -1;
+}
+
+namespace {
+// Expermential. Work in progress.
+class MachineControlConfigReader : public ConfigParser::EventReceiver {
+public:
+  MachineControlConfigReader(MachineControlConfig *config) : config_(config){}
+
+  virtual bool SeenSection(int line_no, const std::string &section_name) {
+    in_general_ = (section_name == "general");
+    in_motor_mapping_ = (section_name == "motor-mapping");
+    if (in_general_ || in_motor_mapping_)
+      return true;
+
+    current_axis_ = gcodep_letter2axis(section_name[0]);
+    if (current_axis_ != GCODE_NUM_AXES
+        && section_name.substr(1) == "-axis") {
+      return true;
+    } else {
+      current_axis_ = GCODE_NUM_AXES;
+    }
+    return false;
+  }
+
+  virtual bool SeenNameValue(int line_no,
+                             const std::string &name,
+                             const std::string &value) {
+#define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
+#define ACCEPT_EXPR(n, result) if (name != n) {} else return ParseFloatExpr(value, result)
+
+    if (in_general_) {
+      ACCEPT_VALUE("home-order",     String, &config_->home_order);
+      ACCEPT_VALUE("require-homing", Bool,   &config_->require_homing);
+      ACCEPT_VALUE("range-check",    Bool,   &config_->range_check);
+      ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
+    }
+    if (in_motor_mapping_) {
+      if (name == "motor_1") return SetMotorAxis(1, value);
+      if (name == "motor_2") return SetMotorAxis(2, value);
+      if (name == "motor_3") return SetMotorAxis(3, value);
+      if (name == "motor_4") return SetMotorAxis(4, value);
+      if (name == "motor_5") return SetMotorAxis(5, value);
+      if (name == "motor_6") return SetMotorAxis(6, value);
+      if (name == "motor_7") return SetMotorAxis(7, value);
+      if (name == "motor_8") return SetMotorAxis(8, value);
+    }
+    if (current_axis_ != GCODE_NUM_AXES) {
+      ACCEPT_EXPR("steps-per-mm",     &config_->steps_per_mm[current_axis_]);
+      ACCEPT_EXPR("steps-per-degree", &config_->steps_per_mm[current_axis_]);
+
+      ACCEPT_EXPR("range",            &config_->move_range_mm[current_axis_]);
+
+      ACCEPT_EXPR("max-feedrate",     &config_->max_feedrate[current_axis_]);
+      ACCEPT_EXPR("max-anglerate",    &config_->max_feedrate[current_axis_]);
+
+      ACCEPT_EXPR("max-acceleration", &config_->acceleration[current_axis_]);
+
+      if (name == "home-pos") {
+        if (value == "min") {
+          if (config_->max_endstop_[current_axis_].homing_use) {
+            ReportError(line_no, "home-pos: already max configured as endstop?");
+            return false;
+          }
+          config_->min_endstop_[current_axis_].homing_use = true;
+          return true;
+        } else if (value == "max") {
+          if (config_->max_endstop_[current_axis_].homing_use) {
+            ReportError(line_no, "home-pos: already min configured as endstop?");
+            return false;
+          }
+          config_->max_endstop_[current_axis_].homing_use = true;
+          return true;
+        } else {
+          ReportError(line_no, "home-pos: valid values are min/max");
+          return false;
+        }
+      }
+    }
+    ReportError(line_no, StringPrintf("Unexpected configuration option '%s'",
+                                      name.c_str()));
+    return false;
+  }
+
+  virtual void ReportError(int line_no, const std::string &msg) {
+    Log_error("Line %d: %s", line_no, msg.c_str());
+  }
+
+private:
+  // All the Accept() functions are done in the way that they always return
+  // 'true' if the expected name is not matched, otherwise they return the
+  // outcome of parsing the value. That way, they can be chained with &&
+  bool ParseString(const std::string &value, std::string *result) {
+    *result = value;
+    return true;
+  }
+
+  bool ParseBool(const std::string &value, bool *result) {
+    if (value == "1" || value == "yes" || value == "true") {
+      *result = true;
+      return true;
+    }
+    if (value == "0" || value == "no" || value == "false") {
+      *result = false;
+      return true;
+    }
+    return false;
+  }
+
+  bool ParseFloatExpr(const std::string &value, float *result) {
+    char *end;
+    double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
+    if (end == NULL || *end == '\0') {
+      *result = eval;
+      return true;
+    }
+    return false;
+  }
+
+  static double ParseDoubleExpression(const char *input, double fallback,
+                                      char **end) {
+    const char *full_expr = input;
+    double value = strtod(input, end);
+    if (*end == input) return fallback;
+    for (;;) {
+      while (isspace(**end)) ++*end;
+      const char op = **end;
+      if (op != '/' && op != '*') {
+        return value;  // done. Not an operation.
+      }
+      ++*end;
+      while (isspace(**end)) ++*end;
+      input = *end;
+      double operand;
+      if (*input == '(') {
+        operand = ParseDoubleExpression(input+1, 1.0, end);
+        if (**end != ')') {
+          fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
+          return fallback;
+        } else {
+          ++*end;
+        }
+      } else {
+        operand = strtod(input, end);
+      }
+      if (*end == input) return fallback;
+      if (op == '/')
+        value /= operand;
+      else if (op == '*')
+        value *= operand;
+    }
+    return value;
+  }
+
+  bool SetMotorAxis(int motor_number, const std::string &value) {
+    StringPiece axis(value);
+    if (HasPrefix(ToLower(axis), "axis:")) {
+      axis = axis.substr(strlen("axis:"));
+    }
+    if (axis.empty()) return false;
+    bool is_negative = false;
+    if (axis[0] == '-') {
+      is_negative = true;
+      axis = axis.substr(1);
+    }
+    if (axis.empty()) return false;
+    const char axis_letter = axis[0];
+    if (gcodep_letter2axis(axis_letter) == GCODE_NUM_AXES) {
+      Log_error("Invalid axis letter '%c'", axis_letter); 
+      return false; // invalid axis.
+    }
+    // This is somehwat an alignment with the old, command-line based
+    // configuration, that should change to be more config-file friendly.
+    if (config_->axis_mapping.length() < (size_t)motor_number) {
+      config_->axis_mapping.resize(motor_number, '_');
+    }
+    config_->axis_mapping[motor_number-1] = (is_negative
+                                             ? tolower(axis_letter)
+                                             : toupper(axis_letter));
+    return true;
+  }
+
+  MachineControlConfig *const config_;
+  enum GCodeParserAxis current_axis_;
+  bool in_general_;
+  bool in_motor_mapping_;
+};
+}
+
+bool MachineControlConfig::InitializeFromFile(ConfigParser *parser) {
+  MachineControlConfigReader reader(this);
+  return parser->EmitConfigValues(&reader);
 }

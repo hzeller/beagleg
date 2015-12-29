@@ -50,7 +50,8 @@ PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
 PRU_BIN=motor-interface-pru_bin.h
 
 GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
-              generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o
+              generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o \
+	      string-util.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TEST_FRAMEORK_OBJECTS=gtest-all.o gmock-all.o

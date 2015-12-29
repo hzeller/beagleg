@@ -39,7 +39,7 @@ public:
 
 TEST(ConfigParserTest, BasicParser) {
   ConfigParser p;
-  p.SetContent(" [ some-section ]\n"
+  p.SetContent(" [ SOME-section ]\n"
                " # just comment\n"
                "\n\n"
                " some line = bar  # foo\n"

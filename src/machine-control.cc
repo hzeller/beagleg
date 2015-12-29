@@ -39,55 +39,65 @@
 #include "motion-queue.h"
 #include "motor-operations.h"
 #include "sim-firmware.h"
+#include "config-parser.h"
 
-static int usage(const char *prog, const char *msg) {
+static int usage(const char *prog, const char *msg, bool detailed) {
   if (msg) {
-    fprintf(stderr, "%s\n\n", msg);
+    fprintf(stderr, "\033[1m\033[31m%s\033[0m\n\n", msg);
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
-	  "Options:\n"
-	  "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).\n"
-	  "                                (negative for reverse)\n"
-	  "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
-	  "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
-	  "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
-	  "                                Use letter or '_' for empty slot.\n"
-          "                                You can use the same letter multiple times for mirroring.\n"
-	  "                                Use lowercase to reverse. (Default: 'XYZEA')\n"
-	  "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
-	  "                                values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
-	  "  --min-endswitch           : Axis letter mapped to which endstop connector for negative travel (=string pos)\n"
-	  "                                Use letter or '_' for unused endstop.\n"
-	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
-	  "  --max-endswitch           : Axis letter mapped to which endstop connector for positive travel (=string pos)\n"
-	  "                                Use letter or '_' for unused endstop.\n"
-	  "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
-          "  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)\n"
-          "  --require-homing          : If set, machine refuses to work unless homed\n"
-          "  --disable-range-check     : Don't limit at machine bounds. Dangerous.\n"
-	  "  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).\n"
-	  "                                Use '1' or '+' for logic high trigger.\n"
-	  "                                Use '0' or '-' for logic low trigger.\n"
-	  "                                Use '_' for unused endstops.\n"
-	  "  --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)\n"
+	  "Options:\n", prog);
+  fprintf(stderr,
+          "  --config <config>     (-c): Configuration file.\n"
 	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
           "  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
           "  --daemon              (-d): Run as daemon.\n"
+          "Mostly for testing and debugging:\n"
 	  "  -f <factor>               : Print speed factor (Default 1.0).\n"
-	  "  -n                        : Dryrun; don't send to motors (Default: off).\n"
+	  "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
-	  "  -P                        : Verbose: Print motor commands (Default: off).\n"
+	  "  -P                        : Verbose: Show some more debug output (Default: off).\n"
 	  "  -S                        : Synchronous: don't queue (Default: off).\n"
-	  "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n",
-	  prog);
-  fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
-  fprintf(stderr, "(the actual mapping to a connector happens with --axis-mapping,\n");
-  fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
-  fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
-  fprintf(stderr, "All numbers can be given as multiplicative expression\n"
-          "which makes microstepping and unit conversions more readable\n"
-          "e.g. --steps-mm '16*200/(25.4/4),8*200/4'\n");
+	  "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n");
+
+  if (detailed) {
+    fprintf(stderr,
+            // We still support these options (for now), but they are now
+            // superseeded by the configuration file. So only show in detailed mode.
+            "\nParameters (can override the values from the configuration file)\n"
+            "  --steps-mm <axis-steps>   : steps/mm, comma separated[*] (Default 160,160,160,40,0, ...).\n"
+            "                                (negative for reverse)\n"
+            "  --max-feedrate <rate> (-m): Max. feedrate per axis (mm/s), comma separated[*] (Default: 200,200,90,10,0, ...).\n"
+            "  --accel <accel>       (-a): Acceleration per axis (mm/s^2), comma separated[*] (Default 4000,4000,1000,10000,0, ...).\n"
+            "  --axis-mapping            : Axis letter mapped to which motor connector (=string pos)\n"
+            "                                Use letter or '_' for empty slot.\n"
+            "                                You can use the same letter multiple times for mirroring.\n"
+            "                                Use lowercase to reverse. (Default: 'XYZEA')\n"
+            "  --range <range-mm>    (-r): Comma separated range of of axes in mm (0..range[axis]). Only\n"
+            "                                values > 0 are actively clipped. (Default: 100,100,100,-1,-1, ...)\n"
+            "  --min-endswitch           : Axis letter mapped to which endstop connector for negative travel (=string pos)\n"
+            "                                Use letter or '_' for unused endstop.\n"
+            "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
+            "  --max-endswitch           : Axis letter mapped to which endstop connector for positive travel (=string pos)\n"
+            "                                Use letter or '_' for unused endstop.\n"
+            "                                Use uppercase if endstop is used for homimg, lowercase if used for travel limit.\n"
+            "  --home-order              : Order to home axes, all axes involved with homing should be listed (Default: ZXY)\n"
+            "  --require-homing          : If set, machine refuses to work unless homed\n"
+            "  --disable-range-check     : Don't limit at machine bounds. Dangerous.\n"
+            "  --endswitch-polarity      : 'Hit' polarity for each endstop connector (=string pos).\n"
+            "                                Use '1' or '+' for logic high trigger.\n"
+            "                                Use '0' or '-' for logic low trigger.\n"
+            "                                Use '_' for unused endstops.\n"
+            "  --threshold-angle         : Threshold angle of XY vectors to ignore speed changes (Default=10.0)\n");
+    fprintf(stderr, "[*] All comma separated axis numerical values are in the sequence X,Y,Z,E,A,B,C,U,V,W\n");
+    fprintf(stderr, "(the actual mapping to a connector happens with --axis-mapping,\n");
+    fprintf(stderr, "the default values map the channels left to right on the Bumps-board as X,Y,Z,E,A)\n");
+    fprintf(stderr, "You can either specify --port <port> to listen for commands or give a GCode-filename\n");
+    fprintf(stderr, "All numbers can be given as multiplicative expression\n"
+            "which makes microstepping and unit conversions more readable\n"
+            "e.g. --steps-mm '16*200/(25.4/4),8*200/4'\n");
+  }
   return 1;
 }
 
@@ -165,7 +175,7 @@ static int run_server(GCodeMachineControl *machine,
   } while (process_result == 0);
 
   close(s);
-  Log_error("Last gcode_machine_control_from_stream() == %d. Exiting\n",
+  Log_error("Error gcode_machine_control_from_stream() == %d. Exiting\n",
             process_result);
 
   return process_result;
@@ -211,9 +221,9 @@ static double parse_double_optional_fraction(const char *input, double fallback,
 
 // Parse comma (or other character) separated array of up to "count" float
 // numbers and fill into result[]. Returns number of elements parsed on success.
-static int parse_float_array(const char *input, float result[], int count) {
+static int parse_float_array(const char *input, FloatAxisConfig &result) {
   const char *full = input;
-  for (int i = 0; i < count; ++i) {
+  for (size_t i = 0; i < result.size(); ++i) {
     char *end;
     result[i] = (float) parse_double_optional_fraction(input, 0, &end);
     if (end == input) return 0;  // parse error.
@@ -226,14 +236,15 @@ static int parse_float_array(const char *input, float result[], int count) {
     }
     input = end + 1;
   }
-  return count;
+  return result.size();
 }
 
 int main(int argc, char *argv[]) {
   MachineControlConfig config;
   bool dry_run = false;
   bool simulation_output = false;
-  const char *logfile = "/dev/stderr";
+  const char *logfile = NULL;
+  const char *config_file = NULL;
   bool run_as_daemon = false;
 
   // Less common options don't have a short option.
@@ -252,6 +263,7 @@ int main(int argc, char *argv[]) {
   };
 
   static struct option long_options[] = {
+    { "config",             required_argument, NULL, 'c'},
     { "max-feedrate",       required_argument, NULL, 'm'},
     { "accel",              required_argument, NULL, 'a'},
     { "range",              required_argument, NULL, 'r' },
@@ -277,46 +289,44 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   int parse_count;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:d",
+  while ((opt = getopt_long(argc, argv, "hm:a:p:b:r:SPnNf:l:dc:",
 			    long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = (float)atof(optarg);
       if (config.speed_factor <= 0)
-	return usage(argv[0], "Speedfactor cannot be <= 0");
+	return usage(argv[0], "Speedfactor cannot be <= 0", false);
       break;
     case 'm':
-      parse_count = parse_float_array(optarg, config.max_feedrate,
-                                      GCODE_NUM_AXES);
-      if (!parse_count) return usage(argv[0], "max-feedrate missing.");
+      parse_count = parse_float_array(optarg, config.max_feedrate);
+      if (!parse_count) return usage(argv[0], "max-feedrate missing.", true);
       break;
     case 'a':
-      parse_count = parse_float_array(optarg, config.acceleration,
-                                      GCODE_NUM_AXES);
-      if (!parse_count) return usage(argv[0], "Acceleration missing.");
+      parse_count = parse_float_array(optarg, config.acceleration);
+      if (!parse_count) return usage(argv[0], "Acceleration missing.", true);
       // Negative or 0 means: 'infinite'.
       break;
     case OPT_SET_STEPS_MM:
-      if (!parse_float_array(optarg, config.steps_per_mm, GCODE_NUM_AXES))
-	return usage(argv[0], "steps/mm failed to parse.");
+      if (!parse_float_array(optarg, config.steps_per_mm))
+	return usage(argv[0], "steps/mm failed to parse.", true);
       break;
     case OPT_SET_MOTOR_MAPPING:
-      config.axis_mapping = strdup(optarg);
+      config.axis_mapping = optarg;
       break;
     case OPT_SET_MIN_ENDSWITCH:
-      config.min_endswitch = strdup(optarg);
+      //HZconfig.min_endswitch = optarg;
       break;
     case OPT_SET_MAX_ENDSWITCH:
-      config.max_endswitch = strdup(optarg);
+      //HZconfig.max_endswitch = optarg;
       break;
     case OPT_SET_ENDSWITCH_POLARITY:
-      config.endswitch_polarity = strdup(optarg);
+      //HZconfig.endswitch_polarity = optarg;
       break;
     case OPT_SET_THRESHOLD_ANGLE:
       config.threshold_angle = (float)atof(optarg);
       break;
     case OPT_SET_HOME_ORDER:
-      config.home_order = strdup(optarg);
+      config.home_order = optarg;
       break;
     case OPT_REQUIRE_HOMING:
       config.require_homing = true;
@@ -325,8 +335,8 @@ int main(int argc, char *argv[]) {
       config.range_check = false;
       break;
     case 'r':
-      if (!parse_float_array(optarg, config.move_range_mm, GCODE_NUM_AXES))
-	return usage(argv[0], "Failed to parse ranges.");
+      if (!parse_float_array(optarg, config.move_range_mm))
+	return usage(argv[0], "Failed to parse ranges.", true);
       break;
     case 'n':
       dry_run = true;
@@ -356,21 +366,44 @@ int main(int argc, char *argv[]) {
     case 'd':
       run_as_daemon = true;
       break;
+    case 'c':
+      config_file = strdup(optarg);
+      break;
+    case 'h':
+      return usage(argv[0], NULL, true);  // detailed help.
     default:
-      return usage(argv[0], "Unknown flag");
+      return usage(argv[0], "Unknown flag", false);
     }
   }
 
   const bool has_filename = (optind < argc);
   if (! (has_filename ^ (listen_port > 0))) {
-    return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
+    return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.", false);
   }
   if (!has_filename && file_loop_count != 1) {
-    return usage(argv[0], "--loop only makes sense with a filename.");
+    return usage(argv[0], "--loop only makes sense with a filename.", false);
   }
+
+  // As daemon, we use whatever the use chose as logfile
+  // (including nothing->syslog). Interactive, nothing means stderr.
+  Log_init(run_as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
+  Log_info("Startup.");
 
   // If reading from file: don't print 'ok' for every line.
   config.acknowledge_lines = !has_filename;
+
+  if (config_file) {
+    ConfigParser parser;
+    if (!parser.SetContentFromFile(config_file)) {
+      Log_error("Exiting. Cannot read config file '%s'", config_file);
+      return 1;
+    }
+    if (!config.InitializeFromFile(&parser)) {
+      Log_error("Exiting. Parse error in configuration file '%s'", config_file);
+      return 1;
+    }
+    // ... other configurations that read from that file.
+  }
 
   if (run_as_daemon) {
     if (fork() != 0)
@@ -378,11 +411,7 @@ int main(int argc, char *argv[]) {
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-    logfile = NULL;
   }
-
-  Log_init(logfile);
-  Log_info("Startup.");
 
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
@@ -408,8 +437,10 @@ int main(int argc, char *argv[]) {
 
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &motor_operations, stderr);
-  if (machine_control == NULL)
+  if (machine_control == NULL) {
+    Log_error("Exiting. Cannot initialize machine control.");
     return 1;
+  }
   GCodeParser::Config parser_cfg;
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,

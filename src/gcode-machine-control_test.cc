@@ -29,6 +29,7 @@ static void init_test_config(struct MachineControlConfig *c) {
     c->max_feedrate[i] = 10000;
   c->axis_mapping   = "XYZEABCU";
   c->threshold_angle = 0;
+  c->require_homing = false;
 }
 
 namespace {

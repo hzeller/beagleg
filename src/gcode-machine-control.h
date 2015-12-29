@@ -20,8 +20,20 @@
 #define _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 
 #include "gcode-parser.h"
+#include "container.h"
+
+#include <string>
 
 class MotorOperations;
+class ConfigParser;
+typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
+
+// Compact representation of an enstop configuration.
+struct EndstopConfig {
+  bool trigger_value : 1;   // 0: trigged low 1: triggered high.
+  bool homing_use : 1;      // 0: no 1: yes.
+  unsigned char endstop_switch : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
+};
 
 /* Configuration constants for the controller.
  * Parameters in the arrays are always indexed by logical axes, e.g. AXIS_X.
@@ -30,12 +42,15 @@ class MotorOperations;
 struct MachineControlConfig {
   MachineControlConfig();
 
-  // Arrays with values for each axis
-  float steps_per_mm[GCODE_NUM_AXES];   // Steps per mm for each logical axis.
-  float move_range_mm[GCODE_NUM_AXES];  // Range of axes in mm (0..range[axis]). -1: no limit
+  // Read values from configuration file.
+  bool InitializeFromFile(ConfigParser *parser);
 
-  float max_feedrate[GCODE_NUM_AXES];   // Max feedrate for axis (mm/s)
-  float acceleration[GCODE_NUM_AXES];   // Max acceleration for axis (mm/s^2)
+  // Arrays with values for each axis
+  FloatAxisConfig steps_per_mm;   // Steps per mm for each logical axis.
+  FloatAxisConfig move_range_mm;  // Range of axes in mm (0..range[axis]). -1: no limit
+
+  FloatAxisConfig max_feedrate;   // Max feedrate for axis (mm/s)
+  FloatAxisConfig acceleration;   // Max acceleration for axis (mm/s^2)
 
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
   float threshold_angle;      // Threshold angle to ignore speed changes
@@ -50,19 +65,23 @@ struct MachineControlConfig {
   // "XZYEABC"; for reasons such as using a double-connector, one might
   // have a different mapping, e.g. "XZE_Y". Underscores represent axis that
   // are not mapped.
-  const char *axis_mapping;     // Mapping of axis-name (character in string)
+  std::string axis_mapping;     // Mapping of axis-name (character in string)
                                 // to physical location (position in string).
-                                // Assumed "XYZEABC" if NULL.
+                                // Assumed "XYZEABC" if empty.
                                 // Axis name '_' for skipped placeholder.
                                 // Not mentioned axes are not handled.
 
+  // Mapping of Axis to which endstop it affects.
+  FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
+  FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
+
   // Position in these strings is the connector position of input switches.
   // Lower case: just regular stopswitch, Upper case: used for homing.
-  const char *min_endswitch;       // Letter: affected axis.
-  const char *max_endswitch;       // Letter: affected axis.
-  const char *endswitch_polarity;  // Letter: trigger logic level.
+  //std::string min_endswitch;       // Letter: affected axis.
+  //std::string max_endswitch;       // Letter: affected axis.
+  //std::string endswitch_polarity;  // Letter: trigger logic level.
 
-  const char *home_order;        // Order in which axes are homed.
+  std::string home_order;        // Order in which axes are homed.
 
   bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
   bool require_homing;          // Require homing before any moves.

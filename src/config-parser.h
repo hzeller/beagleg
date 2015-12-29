@@ -65,11 +65,6 @@ public:
   // EventReceiver is not taken over.
   bool EmitConfigValues(EventReceiver *event_receiver);
 
-  // Get a list of sections that have not been claimed yet. Depending on the
-  // situation, that might indicate typos in the configuration file.
-  // This requires to have EmitConfigValues() at least once.
-  std::vector<std::string> GetUnclaimedSections() const;
-
 private:
   std::string content_;
   bool parse_success_;

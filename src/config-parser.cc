@@ -27,57 +27,7 @@
 #include <ctype.h>
 
 #include "logging.h"
-
-namespace {
-// A StringPiece essentially points at a chunk of data of a particular
-// length. Pointer + length.
-// It allows to have keep cheap substrings of strings without copy.
-// TOOD(hzeller): if needed somewhere else, put in separate header.
-class StringPiece {
-public:
-  typedef const char* iterator;
-  StringPiece() : data_(NULL), len_(0) {}
-  StringPiece(const char *data, size_t len)
-    : data_(data), len_(len) {}
-
-  StringPiece substr(size_t pos, size_t len) const {
-    assert(pos + len <= len_);
-    return StringPiece(data_ + pos, len);
-  }
-
-  void assign(const char *data, size_t len) {
-    data_ = data;
-    len_ = len;
-  }
-
-  std::string ToString() const {
-    return std::string(data_, len_);
-  }
-
-  const char operator[](size_t pos) const { return data_[pos]; }
-  const char *data() const { return data_; }
-  size_t length() const { return len_; }
-  bool empty() const { return len_ == 0; }
-
-  iterator begin() const { return data_; }
-  iterator end() const { return data_ + len_; }
-
-private:
-  const char *data_;
-  size_t len_;
-};
-
-void TrimWhitespace(StringPiece *s) {
-  StringPiece::iterator start = s->begin();
-  while (start < s->end() && isspace(*start))
-    start++;
-  StringPiece::iterator end = s->end() - 1;
-  while (end > start && isspace(*end))
-    end--;
-  s->assign(start, end + 1 - start);
-}
-
-} // namespace
+#include "string-util.h"
 
 void ConfigParser::EventReceiver::ReportError(int line_no,
                                               const std::string &msg) {
@@ -124,6 +74,10 @@ static StringPiece NextLine(StringPiece *source) {
   return result;
 }
 
+static std::string CanonicalizeName(const StringPiece &s) {
+  return ToLower(TrimWhitespace(s));
+}
+
 bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
   // The first pass collects all the parse errors and emits them. Later on,
   // we refuse to run another time.
@@ -131,12 +85,13 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
     return false;
   bool success = true;
   bool current_section_interested = false;
+  std::string current_section;
   int line_no = 0;
   StringPiece content_data(content_.data(), content_.length());
   StringPiece line = NextLine(&content_data);
-  for (/**/; success && line.data() != NULL; line = NextLine(&content_data)) {
+  for (/**/; line.data() != NULL; line = NextLine(&content_data)) {
     ++line_no;
-    TrimWhitespace(&line);
+    line = TrimWhitespace(line);
     if (line.empty())
       continue;
 
@@ -150,9 +105,9 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
       }
 
       StringPiece section = line.substr(1, line.length() - 2);
-      TrimWhitespace(&section);
+      current_section = CanonicalizeName(section);
       current_section_interested = event_receiver
-        ->SeenSection(line_no, section.ToString());
+        ->SeenSection(line_no, current_section);
     }
     else {
       StringPiece::iterator eq_pos = std::find(line.begin(), line.end(), '=');
@@ -162,20 +117,22 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
         continue;
       }
       if (current_section_interested) {
-        StringPiece name(line.begin(), eq_pos - line.begin());
-        TrimWhitespace(&name);
-        StringPiece value(eq_pos + 1, line.end() - eq_pos - 1);
-        TrimWhitespace(&value);
-        success &= event_receiver->SeenNameValue(line_no,
-                                                 name.ToString(),
-                                                 value.ToString());
+        std::string name = CanonicalizeName(StringPiece(line.begin(),
+                                                        eq_pos - line.begin()));
+        StringPiece value_piece
+          = TrimWhitespace(StringPiece(eq_pos + 1, line.end() - eq_pos - 1));
+        std::string value = value_piece.ToString();
+        bool could_parse = event_receiver->SeenNameValue(line_no, name, value);
+        if (!could_parse) {
+          event_receiver
+            ->ReportError(line_no,
+                          StringPrintf("In section [%s]: Problem handling '%s = %s'",
+                                       current_section.c_str(),
+                                       name.c_str(), value.c_str()));
+        }
+        success &= could_parse;
       }
     }
   }
   return parse_success_ && success;
-}
-
-std::vector<std::string> ConfigParser::GetUnclaimedSections() const {
-  std::vector<std::string> result;
-  return result;
 }
