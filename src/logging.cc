@@ -119,20 +119,3 @@ void Log_error(const char *format, ...) {
   }
   va_end(ap);
 }
-
-static void vAppendf(std::string *str, const char *format, va_list ap) {
-  const size_t orig_len = str->length();
-  const size_t space = 1024;   // there should be better ways to do this...
-  str->resize(orig_len + space);
-  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
-  str->resize(orig_len + written);
-}
-
-std::string StringPrintf(const char *format, ...) {
-  va_list ap;
-  va_start(ap, format);
-  std::string result;
-  vAppendf(&result, format, ap);
-  va_end(ap);
-  return result;
-}

@@ -39,6 +39,7 @@
 
 #include "arc-gen.h"
 #include "logging.h"
+#include "string-util.h"
 
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
                                                      const char *line,

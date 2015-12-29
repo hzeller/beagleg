@@ -37,8 +37,6 @@ void Log_info(const char *format, ...)
 void Log_error(const char *format, ...)
   PRINTF_FMT_CHECK(1, 2);
 
-// Not quite logging, but this is a convenient place.
-std::string StringPrintf(const char *format, ...) 
-  PRINTF_FMT_CHECK(1, 2);
+#undef PRINTF_FMT_CHECK
 
 #endif /* BEAGLEG_LOGGING_H */

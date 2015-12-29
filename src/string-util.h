@@ -25,6 +25,10 @@
 #include <assert.h>
 #include <stddef.h>
 
+// Define this with empty, if you're not using gcc.
+#define PRINTF_FMT_CHECK(fmt_pos, args_pos)             \
+  __attribute__ ((format (printf, fmt_pos, args_pos)))
+
 // A StringPiece essentially points at a chunk of data of a particular
 // length. Pointer + length.
 // It allows to have keep cheap substrings of strings without copy while still
@@ -80,5 +84,8 @@ std::string ToLower(const StringPiece &in);
 // Test if given StringPiece is prefix of the other.
 bool HasPrefix(const StringPiece &s, const StringPiece &prefix);
 
-// tolower, has_prefix
+// Formatted printing into a string.
+std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
+
+#undef PRINTF_FMT_CHECK
 #endif // _BEAGLEG_STRING_UTIL_H

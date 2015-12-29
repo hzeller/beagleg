@@ -126,7 +126,7 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
         if (!could_parse) {
           event_receiver
             ->ReportError(line_no,
-                          StringPrintf("In section [%s]: Problem handling '%s = %s'",
+                          StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
                                        current_section.c_str(),
                                        name.c_str(), value.c_str()));
         }
