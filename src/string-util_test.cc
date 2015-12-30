@@ -36,6 +36,26 @@ TEST(StringUtilTest, HasPrefix) {
     EXPECT_FALSE(HasPrefix("hello world", "hellO"));
 }
 
+TEST(StringUtilTest, SplitString) {
+    std::vector<StringPiece> result = SplitString("foo", ',');
+    EXPECT_EQ(1, result.size());
+    EXPECT_EQ(StringPiece("foo"), result[0]);
+
+    result = SplitString(",hello, world", ',');
+    EXPECT_EQ(3, result.size());
+    EXPECT_EQ(StringPiece(""), result[0]);
+    EXPECT_EQ(StringPiece("hello"), result[1]);
+    EXPECT_EQ(StringPiece(" world"), result[2]);
+
+    // Also test with trailing, empty field
+    result = SplitString(",hello, world,", ',');
+    EXPECT_EQ(4, result.size());
+    EXPECT_EQ(StringPiece(""), result[0]);
+    EXPECT_EQ(StringPiece("hello"), result[1]);
+    EXPECT_EQ(StringPiece(" world"), result[2]);
+    EXPECT_EQ(StringPiece(""), result[3]);
+}
+
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

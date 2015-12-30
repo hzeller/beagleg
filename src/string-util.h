@@ -20,6 +20,9 @@
 #define _BEAGLEG_STRING_UTIL_H
 
 #include <string>
+#include <vector>
+#include <ostream>
+
 #include <string.h>
 
 #include <assert.h>
@@ -77,6 +80,11 @@ private:
   size_t len_;
 };
 
+inline std::ostream& operator << (std::ostream &o, const StringPiece &s) {
+  o << s.ToString();
+  return o;
+}
+
 // Trim StringPiece of whitespace font and back and returned trimmed string.
 StringPiece TrimWhitespace(const StringPiece &s);
 
@@ -89,6 +97,9 @@ bool HasPrefix(const StringPiece &s, const StringPiece &prefix);
 
 // Formatted printing into a string.
 std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
+
+// Split a string at given separator.
+std::vector<StringPiece> SplitString(const StringPiece &s, char separator);
 
 #undef PRINTF_FMT_CHECK
 #endif // _BEAGLEG_STRING_UTIL_H

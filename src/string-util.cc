@@ -45,6 +45,20 @@ bool HasPrefix(const StringPiece &s, const StringPiece &prefix) {
   return strncmp(s.data(), prefix.data(), prefix.length()) == 0;
 }
 
+std::vector<StringPiece> SplitString(const StringPiece &s, char separator) {
+  std::vector<StringPiece> result;
+  StringPiece::iterator i = s.begin();
+  StringPiece::iterator start = i;
+  for (/**/; i != s.end(); ++i) {
+    if (*i == separator) {
+      result.push_back(StringPiece(start, i - start));
+      start = i + 1;
+    }
+  }
+  result.push_back(StringPiece(start, i - start));
+  return result;
+}
+
 static void vAppendf(std::string *str, const char *format, va_list ap) {
   const size_t orig_len = str->length();
   const size_t space = 1024;   // there should be better ways to do this...
