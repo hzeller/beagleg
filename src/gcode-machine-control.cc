@@ -58,10 +58,6 @@
 
 #define NUM_ENDSTOPS        6
 
-static bool is_rotational(int axis) {
-  return axis == AXIS_A || axis == AXIS_B || axis == AXIS_C;
-}
-
 // The target position vector is essentially a position in the
 // GCODE_NUM_AXES-dimensional space.
 //
@@ -269,6 +265,7 @@ bool GCodeMachineControl::Impl::Init() {
   // (TODO(hzeller): this used to be a c-string, now is a std::string. The
   // processing still looks very c-like here :) ).
   const char *axis_map = cfg_.axis_mapping.c_str();
+  int map_count = 0;
   for (int pos = 0; *axis_map; pos++, axis_map++) {
     if (pos >= BEAGLEG_NUM_MOTORS) {
       Log_error("Error: Axis mapping string has more elements than "
@@ -287,6 +284,12 @@ bool GCodeMachineControl::Impl::Init() {
     }
     driver_flip_[pos] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
     axis_to_driver_[axis] |= (1 << pos);
+    ++map_count;
+  }
+
+  if (map_count == 0) {
+    Log_error("There is no output motor mapped, which makes things pretty boring. [ Motor-Mapping ] section missing in config file ?");
+    return false;
   }
 
 #if CONFIG_FILE_TRANSITION
@@ -386,7 +389,7 @@ bool GCodeMachineControl::Impl::Init() {
                            || cfg_.max_feedrate[i] <= 0);
     // Some generic useful output
     std::string line;
-    const char *unit = is_rotational(i) ? "° " : "mm";
+    const char *unit = is_rotational_axis(i) ? "° " : "mm";
     line = StringPrintf("%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s%s ",
                         gcodep_axis2letter((GCodeParserAxis)i),
                         print_driver_bitmap(axis_to_driver_[i]).c_str(),

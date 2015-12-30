@@ -225,6 +225,12 @@ private:
     if (config_->axis_mapping.length() < (size_t)motor_number) {
       config_->axis_mapping.resize(motor_number, '_');
     }
+    if (config_->axis_mapping[motor_number-1] != '_') {
+      Log_error("Attempt to use motor twice: Motor %d already mapped to axis %c",
+                motor_number,
+                config_->axis_mapping[motor_number-1]);
+      return false;
+    }
     config_->axis_mapping[motor_number-1] = (is_negative
                                              ? tolower(axis_letter)
                                              : toupper(axis_letter));

@@ -38,7 +38,7 @@ static const char *const kDebugHighlight = "\033[1m\033[34mDEBUG ";
 static const char *const kErrorHighlight = "\033[1m\033[31mERROR ";
 static const char *const kTermReset      = "\033[0m";
 
-static const char *debug_markup_start_  = "DEBUG ";
+static const char *debug_markup_start_ = "DEBUG ";
 static const char *info_markup_start_  = "INFO  ";
 static const char *error_markup_start_ = "ERROR ";
 static const char *markup_end_ = "";

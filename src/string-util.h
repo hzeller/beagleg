@@ -36,12 +36,12 @@
 class StringPiece {
 public:
   typedef const char* iterator;
+
   StringPiece() : data_(NULL), len_(0) {}
+  StringPiece(const char *data, size_t len) : data_(data), len_(len) {}
+
   StringPiece(const std::string &s) : data_(s.data()), len_(s.length()) {}
   StringPiece(const char *str) : data_(str), len_(strlen(str)) {}
-
-  StringPiece(const char *data, size_t len)
-    : data_(data), len_(len) {}
 
   StringPiece substr(size_t pos, size_t len) const {
     assert(pos + len <= len_);
@@ -56,8 +56,10 @@ public:
     len_ = len;
   }
 
-  std::string ToString() const {
-    return std::string(data_, len_);
+  bool operator == (const StringPiece &other) const {
+    if (len_ != other.len_) return false;
+    if (data_ == other.data_) return true;
+    return strncmp(data_, other.data_, len_) == 0;
   }
 
   const char operator[](size_t pos) const { return data_[pos]; }
@@ -68,13 +70,14 @@ public:
   iterator begin() const { return data_; }
   iterator end() const { return data_ + len_; }
 
+  std::string ToString() const { return std::string(data_, len_); }
+
 private:
   const char *data_;
   size_t len_;
 };
 
-// Trim StringPiece of whitespace font and back and returned trimmed
-// string.
+// Trim StringPiece of whitespace font and back and returned trimmed string.
 StringPiece TrimWhitespace(const StringPiece &s);
 
 // Lowercase the string (simple ASCII) and return as newly allocated

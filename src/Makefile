@@ -57,7 +57,7 @@ MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TEST_FRAMEORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats
-UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test
+UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test
 
 all : $(TARGETS)
 

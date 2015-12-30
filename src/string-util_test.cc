@@ -17,23 +17,26 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef BEAGLEG_LOGGING_H
-#define BEAGLEG_LOGGING_H
+#include "string-util.h"
 
-#include <string>
+#include <gtest/gtest.h>
 
-// With filename given, logs debug, info and error to that file.
-// If filename is NULL, info and errors are logged to syslog.
-void Log_init(const char *filename);
+TEST(StringUtilTest, TrimWhitespace) {
+    EXPECT_EQ(StringPiece("hello"), TrimWhitespace(" \t  hello \n\r  "));
+    EXPECT_TRUE(TrimWhitespace(" \t ").empty());
+}
 
-// Define this with empty, if you're not using gcc.
-#define PRINTF_FMT_CHECK(fmt_pos, args_pos)             \
-  __attribute__ ((format (printf, fmt_pos, args_pos)))
+TEST(StringUtilTest, ASCIIToLower) {
+    EXPECT_EQ("hello world", ToLower("Hello WORLD"));
+    EXPECT_EQ("hello world", ToLower("Hello WORLD"));
+}
 
-void Log_debug(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
-void Log_info(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
-void Log_error(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
+TEST(StringUtilTest, HasPrefix) {
+    EXPECT_TRUE(HasPrefix("hello world", "hello"));
+    EXPECT_FALSE(HasPrefix("hello world", "hellO"));
+}
 
-#undef PRINTF_FMT_CHECK
-
-#endif /* BEAGLEG_LOGGING_H */
+int main(int argc, char *argv[]) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
