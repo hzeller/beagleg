@@ -101,9 +101,6 @@ public:
 
       if (name == "home-pos")
         return SetHomePos(line_no, current_axis_, value);
-
-      if (name == "motor-connector")
-        return SetMotorConnector(line_no, current_axis_, value);
     }
     ReportError(line_no, StringPrintf("Unexpected configuration option '%s'",
                                       name.c_str()));
@@ -208,81 +205,6 @@ private:
                 StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
                              gcodep_axis2letter(axis), value.c_str()));
     return false;
-  }
-
-  bool SetMotorConnector(int line_no, enum GCodeParserAxis axis,
-                         const StringPiece &value) {
-    // We can have multiple motors connected. Parameters separated with ';'
-    std::vector<StringPiece> motor_params = SplitString(value, ";");
-    for (size_t i = 0; i < motor_params.size(); ++i) {
-      if (!SetSingleMotor(line_no, axis, motor_params[i]))
-        return false;
-    }
-    return true;
-  }
-  
-  bool SetSingleMotor(int line_no, enum GCodeParserAxis axis,
-                      const StringPiece &parameters) {
-    // We have various parameters that we have per motor.
-    bool is_mirrored = false;
-    int motor_number = -1;
-    std::vector<StringPiece> sub_parts = SplitString(parameters, " \t");
-    for (size_t i = 0; i < sub_parts.size(); ++i) {
-      // Parse a config in the form 'motor:1 mirror'
-      StringPiece value = TrimWhitespace(sub_parts[i]);
-      if (HasPrefix(value, "motor:")) {
-        const int m = ParseDecimal(value.substr(strlen("motor:")), -1);
-        if (m < 0) {
-          std::string v = value.ToString();
-          Log_error("Line %d: Expected motor-number after 'motor:' (%s)",
-                    line_no, v.c_str());
-          return false;
-        }
-
-        if (motor_number < 0) {
-          motor_number = m;
-        } else {
-          Log_error("Line %d: Multiple motors (%d and %d) in motor-connector: "
-                    "did you forget ';'-separator ?", line_no,
-                    motor_number, m);
-          return false;
-        }
-      }
-      else if (value == "mirror") {
-        is_mirrored = true;
-      } else if (!value.empty()) {
-        Log_error("Line %d: Don't know how to deal with '%s'. Typo ?", line_no,
-                  value.ToString().c_str());
-        return false;
-      }
-      // microstepping ...
-    }
-
-    if (motor_number < 1 || motor_number > BEAGLEG_NUM_MOTORS) {
-      Log_error("Line %d: There needs to be a motor:<num> field "
-                "with num := 1..%d; but got %d",
-                line_no, BEAGLEG_NUM_MOTORS, motor_number);
-      return false;
-    }
-      
-    // Now, we copy it to the somehwat old command-line friendly
-    // configuration which encodes that as a string. We do that now for
-    // compatibility, but later we should decommission this.
-    if (config_->axis_mapping.length() < (size_t)motor_number) {
-      config_->axis_mapping.resize(motor_number, '_');
-    }
-
-    if (config_->axis_mapping[motor_number-1] != '_') {
-      Log_error("Line %d: Attempt to use motor twice: Motor %d already "
-                "mapped to axis %c", line_no, motor_number,
-                config_->axis_mapping[motor_number-1]);
-      return false;
-    }
-    const char axis_letter = gcodep_axis2letter(axis);
-    config_->axis_mapping[motor_number-1] = (is_mirrored
-                                             ? tolower(axis_letter)
-                                             : toupper(axis_letter));
-    return true;
   }
 
   bool SetMotorAxis(int line_no, int motor_number, const std::string &value) {
