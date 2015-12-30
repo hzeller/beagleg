@@ -98,8 +98,12 @@ bool HasPrefix(const StringPiece &s, const StringPiece &prefix);
 // Formatted printing into a string.
 std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 
-// Split a string at given separator.
-std::vector<StringPiece> SplitString(const StringPiece &s, char separator);
+// Split a string at any of the given separator characters.
+std::vector<StringPiece> SplitString(const StringPiece &s,
+                                     const StringPiece &separators);
+
+// Parse a decimal from a StringPiece.
+long ParseDecimal(const StringPiece &s, long fallback);
 
 #undef PRINTF_FMT_CHECK
 #endif // _BEAGLEG_STRING_UTIL_H

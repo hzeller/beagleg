@@ -45,17 +45,33 @@ bool HasPrefix(const StringPiece &s, const StringPiece &prefix) {
   return strncmp(s.data(), prefix.data(), prefix.length()) == 0;
 }
 
-std::vector<StringPiece> SplitString(const StringPiece &s, char separator) {
+static inline bool contains(const StringPiece &str, char c) {
+  for (StringPiece::iterator i = str.begin(); i != str.end(); ++i) {
+    if (*i == c) return true;
+  }
+  return false;
+}
+
+std::vector<StringPiece> SplitString(const StringPiece &s,
+                                     const StringPiece &separators) {
   std::vector<StringPiece> result;
   StringPiece::iterator i = s.begin();
   StringPiece::iterator start = i;
   for (/**/; i != s.end(); ++i) {
-    if (*i == separator) {
+    if (contains(separators, *i)) {
       result.push_back(StringPiece(start, i - start));
       start = i + 1;
     }
   }
   result.push_back(StringPiece(start, i - start));
+  return result;
+}
+
+long ParseDecimal(const StringPiece &s, long fallback) {
+  std::string as_str = s.ToString();  // we need safe c-str()
+  char *endptr = NULL;
+  long result = strtol(as_str.c_str(), &endptr, 10);
+  if (*endptr != '\0') return fallback;
   return result;
 }
 

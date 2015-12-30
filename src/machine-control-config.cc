@@ -24,8 +24,9 @@
 #include <stdlib.h>
 
 #include "config-parser.h"
-#include "string-util.h"
 #include "logging.h"
+#include "motor-operations.h"
+#include "string-util.h"
 
 // Default order in which axes should be homed.
 static const char kHomeOrder[] = "ZXY";
@@ -77,14 +78,14 @@ public:
     }
 
     if (in_motor_mapping_) {
-      if (name == "motor_1") return SetMotorAxis(1, value);
-      if (name == "motor_2") return SetMotorAxis(2, value);
-      if (name == "motor_3") return SetMotorAxis(3, value);
-      if (name == "motor_4") return SetMotorAxis(4, value);
-      if (name == "motor_5") return SetMotorAxis(5, value);
-      if (name == "motor_6") return SetMotorAxis(6, value);
-      if (name == "motor_7") return SetMotorAxis(7, value);
-      if (name == "motor_8") return SetMotorAxis(8, value);
+      if (name == "motor_1") return SetMotorAxis(line_no, 1, value);
+      if (name == "motor_2") return SetMotorAxis(line_no, 2, value);
+      if (name == "motor_3") return SetMotorAxis(line_no, 3, value);
+      if (name == "motor_4") return SetMotorAxis(line_no, 4, value);
+      if (name == "motor_5") return SetMotorAxis(line_no, 5, value);
+      if (name == "motor_6") return SetMotorAxis(line_no, 6, value);
+      if (name == "motor_7") return SetMotorAxis(line_no, 7, value);
+      if (name == "motor_8") return SetMotorAxis(line_no, 8, value);
     }
 
     if (current_axis_ != GCODE_NUM_AXES) {
@@ -98,33 +99,11 @@ public:
 
       ACCEPT_EXPR("max-acceleration", &config_->acceleration[current_axis_]);
 
-      if (name == "home-pos") {
-        const std::string choice = ToLower(value);
-        if (choice == "min") {
-          if (config_->max_endstop_[current_axis_].homing_use) {
-            ReportError(line_no,
-                        StringPrintf("home-pos[%c] Prior max configured as endstop.",
-                                     gcodep_axis2letter(current_axis_)));
-            return false;
-          }
-          config_->min_endstop_[current_axis_].homing_use = true;
-          return true;
-        } else if (choice == "max") {
-          if (config_->min_endstop_[current_axis_].homing_use) {
-            ReportError(line_no,
-                        StringPrintf("home-pos[%c] Prior min configured as endstop.",
-                                     gcodep_axis2letter(current_axis_)));
-            return false;
-          }
-          config_->max_endstop_[current_axis_].homing_use = true;
-          return true;
-        } else {
-          ReportError(line_no,
-                      StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
-                                   gcodep_axis2letter(current_axis_), value.c_str()));
-          return false;
-        }
-      }
+      if (name == "home-pos")
+        return SetHomePos(line_no, current_axis_, value);
+
+      if (name == "motor-connector")
+        return SetMotorConnector(line_no, current_axis_, value);
     }
     ReportError(line_no, StringPrintf("Unexpected configuration option '%s'",
                                       name.c_str()));
@@ -203,7 +182,110 @@ private:
     return value;
   }
 
-  bool SetMotorAxis(int motor_number, const std::string &value) {
+  bool SetHomePos(int line_no, enum GCodeParserAxis axis,
+                  const std::string &value) {
+    const std::string choice = ToLower(value);
+    if (choice == "min") {
+      if (config_->max_endstop_[axis].homing_use) {
+        ReportError(line_no,
+                    StringPrintf("home-pos[%c] Prior max configured as endstop.",
+                                 gcodep_axis2letter(axis)));
+        return false;
+      }
+      config_->min_endstop_[axis].homing_use = true;
+      return true;
+    } else if (choice == "max") {
+      if (config_->min_endstop_[axis].homing_use) {
+        ReportError(line_no,
+                    StringPrintf("home-pos[%c] Prior min configured as endstop.",
+                                 gcodep_axis2letter(axis)));
+        return false;
+      }
+      config_->max_endstop_[axis].homing_use = true;
+      return true;
+    }
+    ReportError(line_no,
+                StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
+                             gcodep_axis2letter(axis), value.c_str()));
+    return false;
+  }
+
+  bool SetMotorConnector(int line_no, enum GCodeParserAxis axis,
+                         const StringPiece &value) {
+    // We can have multiple motors connected. Parameters separated with ';'
+    std::vector<StringPiece> motor_params = SplitString(value, ";");
+    for (size_t i = 0; i < motor_params.size(); ++i) {
+      if (!SetSingleMotor(line_no, axis, motor_params[i]))
+        return false;
+    }
+    return true;
+  }
+  
+  bool SetSingleMotor(int line_no, enum GCodeParserAxis axis,
+                      const StringPiece &parameters) {
+    // We have various parameters that we have per motor.
+    bool is_mirrored = false;
+    int motor_number = -1;
+    std::vector<StringPiece> sub_parts = SplitString(parameters, " \t");
+    for (size_t i = 0; i < sub_parts.size(); ++i) {
+      // Parse a config in the form 'motor:1 mirror'
+      StringPiece value = TrimWhitespace(sub_parts[i]);
+      if (HasPrefix(value, "motor:")) {
+        const int m = ParseDecimal(value.substr(strlen("motor:")), -1);
+        if (m < 0) {
+          std::string v = value.ToString();
+          Log_error("Line %d: Expected motor-number after 'motor:' (%s)",
+                    line_no, v.c_str());
+          return false;
+        }
+
+        if (motor_number < 0) {
+          motor_number = m;
+        } else {
+          Log_error("Line %d: Multiple motors (%d and %d) in motor-connector: "
+                    "did you forget ';'-separator ?", line_no,
+                    motor_number, m);
+          return false;
+        }
+      }
+      else if (value == "mirror") {
+        is_mirrored = true;
+      } else if (!value.empty()) {
+        Log_error("Line %d: Don't know how to deal with '%s'. Typo ?", line_no,
+                  value.ToString().c_str());
+        return false;
+      }
+      // microstepping ...
+    }
+
+    if (motor_number < 1 || motor_number > BEAGLEG_NUM_MOTORS) {
+      Log_error("Line %d: There needs to be a motor:<num> field "
+                "with num := 1..%d; but got %d",
+                line_no, BEAGLEG_NUM_MOTORS, motor_number);
+      return false;
+    }
+      
+    // Now, we copy it to the somehwat old command-line friendly
+    // configuration which encodes that as a string. We do that now for
+    // compatibility, but later we should decommission this.
+    if (config_->axis_mapping.length() < (size_t)motor_number) {
+      config_->axis_mapping.resize(motor_number, '_');
+    }
+
+    if (config_->axis_mapping[motor_number-1] != '_') {
+      Log_error("Line %d: Attempt to use motor twice: Motor %d already "
+                "mapped to axis %c", line_no, motor_number,
+                config_->axis_mapping[motor_number-1]);
+      return false;
+    }
+    const char axis_letter = gcodep_axis2letter(axis);
+    config_->axis_mapping[motor_number-1] = (is_mirrored
+                                             ? tolower(axis_letter)
+                                             : toupper(axis_letter));
+    return true;
+  }
+
+  bool SetMotorAxis(int line_no, int motor_number, const std::string &value) {
     StringPiece axis(value);
     if (HasPrefix(ToLower(axis), "axis:")) {
       axis = axis.substr(strlen("axis:"));
@@ -220,14 +302,16 @@ private:
       Log_error("Invalid axis letter '%c'", axis_letter); 
       return false; // invalid axis.
     }
-    // This is somehwat an alignment with the old, command-line based
-    // configuration, that should change to be more config-file friendly.
+
+    // Now, we copy it to the somehwat old command-line friendly
+    // configuration which encodes that as a string. We do that now for
+    // compatibility, but later we should decommission this.
     if (config_->axis_mapping.length() < (size_t)motor_number) {
       config_->axis_mapping.resize(motor_number, '_');
     }
     if (config_->axis_mapping[motor_number-1] != '_') {
-      Log_error("Attempt to use motor twice: Motor %d already mapped to axis %c",
-                motor_number,
+      Log_error("Line %d: Attempt to use motor twice: Motor %d already "
+                "mapped to axis %c", line_no, motor_number,
                 config_->axis_mapping[motor_number-1]);
       return false;
     }
