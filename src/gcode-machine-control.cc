@@ -981,18 +981,23 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
     if (defining_axis == AXIS_X || defining_axis == AXIS_Y || defining_axis == AXIS_Z) {
       // We need to calculate the feedrate in real-world coordinates as each
       // axis can have a different amount of steps/mm
-      const float x = new_pos->delta_steps[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
-      const float y = new_pos->delta_steps[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
-      const float z = new_pos->delta_steps[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
-      const float total_xyz_len_mm = euclid_distance(x, y, z);
+      // TODO(hzeller): avoid this back calculation.
+
+      // DSTEPS: avoid division by zero if there is no config defined for axis.
+#define DSTEPS(ax) (new_pos->delta_steps[ax]) ? new_pos->delta_steps[ax] / cfg_.steps_per_mm[ax] : 0
+      const float dx = DSTEPS(AXIS_X);
+      const float dy = DSTEPS(AXIS_Y);
+      const float dz = DSTEPS(AXIS_Z);
+#undef DSTEPS
+      const float total_xyz_len_mm = euclid_distance(dx, dy, dz);
       const float steps_per_mm = cfg_.steps_per_mm[defining_axis];
       const float defining_axis_len_mm = new_pos->delta_steps[defining_axis] / steps_per_mm;
       const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
       travel_speed *= euclid_fraction;
 
       // If this is a true XY vector, calculate the angle of the vector
-      if (z == 0)
-        new_pos->angle = (atan2f(y, x) / 3.14159265359) * 180.0f;
+      if (dz == 0)
+        new_pos->angle = (atan2f(dy, dx) / 3.14159265359) * 180.0f;
     }
     if (travel_speed > max_axis_speed_[defining_axis]) {
       travel_speed = max_axis_speed_[defining_axis];
@@ -1297,4 +1302,3 @@ GCodeParser::EventReceiver *GCodeMachineControl::ParseEventReceiver() {
 void GCodeMachineControl::SetMsgOut(FILE *msg_stream) {
   impl_->set_msg_stream(msg_stream);
 }
-
