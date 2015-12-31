@@ -319,8 +319,16 @@ int main(int argc, char *argv[]) {
   // just ignore them on dummy.
   MotionQueue *motion_backend;
   if (dry_run) {
+    // For dry-run, we never see switches, so disable them.
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      config.min_endstop_[i].endstop_switch = 0;
+      config.max_endstop_[i].endstop_switch = 0;
+    }
+    config.require_homing = false;
+
+    // The backend
     if (simulation_output) {
-      motion_backend = new SimFirmwareQueue(stdout);
+      motion_backend = new SimFirmwareQueue(stdout, config.axis_mapping.length());
     } else {
       motion_backend = new DummyMotionQueue();
     }

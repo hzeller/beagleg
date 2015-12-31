@@ -37,7 +37,7 @@ gnuplot*line8Dashes:   13
 
 /*
 Gnuplot, showing speed and steps on the left axis, acceleration on
-the right axis.
+the right axis. Config: motor mapping motor_1: axis:x, motor_2:axis:y, motor_3:axis:z
 
 set grid       # easier to follow
 set ytics nomirror  # Don't intervene with y2tics
@@ -65,17 +65,17 @@ set style line 32 linetype 2 linecolor rgb "green" lw 1
 
 # Plotting X,Y axis
 plot "/tmp/foo.data" \
-        using 1:11 title "steps X" with lines ls 10, \
-        '' using 1:12 title "velocity X" with lines ls 11,\
-        '' using 1:13 title "accel X" axes x1y2 with lines ls 12, \
-        '' using 1:14 title "steps Y" with lines ls 20, \
-        '' using 1:15 title "velocity Y" with lines ls 21,\
-        '' using 1:16 title "accel Y" axes x1y2 with lines ls 22
+        using 1:5 title "steps X" with lines ls 10, \
+        '' using 1:6 title "velocity X" with lines ls 11,\
+        '' using 1:7 title "accel X" axes x1y2 with lines ls 12, \
+        '' using 1:8 title "steps Y" with lines ls 20, \
+        '' using 1:9 title "velocity Y" with lines ls 21,\
+        '' using 1:10 title "accel Y" axes x1y2 with lines ls 22
 
 #.. as one-liner
-plot "/tmp/foo.data" using 1:11 title "steps X" with lines ls 10, '' using 1:12 title "velocity X" with lines ls 11, '' using 1:13 title "accel X" axes x1y2 with lines ls 12,'' using 1:14 title "steps Y" with lines ls 20,'' using 1:15 title "velocity Y" with lines ls 21,'' using 1:16 title "accel Y" axes x1y2 with lines ls 22
+plot "/tmp/foo.data" using 1:5 title "steps X" with lines ls 10, '' using 1:6 title "velocity X" with lines ls 11, '' using 1:7 title "accel X" axes x1y2 with lines ls 12, '' using 1:8 title "steps Y" with lines ls 20, '' using 1:9 title "velocity Y" with lines ls 21, '' using 1:10 title "accel Y" axes x1y2 with lines ls 22
 
-# Euclid space
+# Euclid space velocity and acceleration.
 plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using 1:4 title "accel Euclid" axes x1y2 with lines ls 2
 
 */
@@ -149,11 +149,12 @@ static int sim_steps[MOTION_MOTOR_COUNT];  // we are only looking at the definin
 
 static struct HardwareState state;
 
-// Default mapping of our motors to axis (see kChannelLayout)
+// Default mapping of our motors to axis in typical test-setups.
+// Should match Motor-Mapping in config file.
 enum {
-  X_MOTOR = 2,
-  Y_MOTOR = 3,
-  Z_MOTOR = 1,
+  X_MOTOR = 0,
+  Y_MOTOR = 1,
+  Z_MOTOR = 2,
 };
 
 static double euclid(double x, double y, double z) {
@@ -170,7 +171,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
 
   // For convenience, this is the relative speed of each motor.
   double motor_speeds[MOTION_MOTOR_COUNT];
-  double div = 1.0 * 2147483647u;
+  const double div = 1.0 * 2147483647u;   // Simulates fixed point div
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
     motor_speeds[i] = segment->fractions[i] / div;
   }
@@ -309,8 +310,8 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
             sim_time, delay_loops,
             euklid_factor * velocity,
             euklid_factor * acceleration);
-    for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-      fprintf(out_, "%5d %8.4f %8.4f ", sim_steps[i],
+    for (int i = 0; i < relevant_motors_; ++i) {
+      fprintf(out_, "%5d %10.4f %12.4f ", sim_steps[i],
               motor_speeds[i] * velocity,
               motor_speeds[i] * acceleration);
     }
@@ -318,11 +319,19 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
   }
 }
 
-SimFirmwareQueue::SimFirmwareQueue(FILE *out) : out_(out), averager_(new Averager()) {
+SimFirmwareQueue::SimFirmwareQueue(FILE *out, int relevant_motors)
+  : out_(out),
+    relevant_motors_(relevant_motors < MOTION_MOTOR_COUNT
+                     ? relevant_motors
+                     : MOTION_MOTOR_COUNT),
+    averager_(new Averager()) {
   // Total time; speed; acceleration; delay_loops. [steps walked for all motors].
   printf("%12s %10s %12s %12s      ", "time", "timer-loop", "Euclid-speed", "Euclid-accel");
-  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-    fprintf(out_, "%4s%d %7s%d %7s%d ", "s", i, "v", i, "a", i);
+  for (int i = 0; i < relevant_motors_; ++i) {
+    fprintf(out_, "%4s%d %9s%d %11s%d ",
+            "s", i,
+            "v", i,
+            "a", i);
   }
   fprintf(out_, "\n");
 }

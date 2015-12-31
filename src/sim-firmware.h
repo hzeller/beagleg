@@ -23,7 +23,7 @@
 
 class SimFirmwareQueue : public MotionQueue {
 public:
-  SimFirmwareQueue(FILE *out);
+  SimFirmwareQueue(FILE *out, int relevant_motors = MOTION_MOTOR_COUNT);
   virtual ~SimFirmwareQueue();
 
   virtual void Enqueue(MotionSegment *segment);
@@ -34,6 +34,7 @@ public:
 private:
   class Averager;
 
-  FILE *out_;
-  Averager *averager_;
+  FILE *const out_;
+  const int relevant_motors_;
+  Averager *const averager_;
 };
