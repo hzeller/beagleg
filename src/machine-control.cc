@@ -314,12 +314,15 @@ int main(int argc, char *argv[]) {
       config.axis_mapping = optarg;
       break;
     case OPT_SET_MIN_ENDSWITCH:
+      Log_error("Endswitch settings (--min-endswitch) only possible with config file");
       //HZconfig.min_endswitch = optarg;
       break;
     case OPT_SET_MAX_ENDSWITCH:
+      Log_error("Endswitch settings (--max-endswitch) only possible with config file");
       //HZconfig.max_endswitch = optarg;
       break;
     case OPT_SET_ENDSWITCH_POLARITY:
+      Log_error("Endswitch settings (--endswitch-polarity) only possible with config file");
       //HZconfig.endswitch_polarity = optarg;
       break;
     case OPT_SET_THRESHOLD_ANGLE:

@@ -46,21 +46,24 @@ namespace {
 // Expermential. Work in progress.
 class MachineControlConfigReader : public ConfigParser::EventReceiver {
 public:
-  MachineControlConfigReader(MachineControlConfig *config) : config_(config){}
+  MachineControlConfigReader(MachineControlConfig *config)
+    : config_(config) {}
 
   virtual bool SeenSection(int line_no, const std::string &section_name) {
-    in_general_ = (section_name == "general");
-    in_motor_mapping_ = (section_name == "motor-mapping");
-    if (in_general_ || in_motor_mapping_)
+    current_section_ = section_name;
+    if (section_name == "general"
+        || section_name == "motor-mapping"
+        || section_name == "switch-mapping")
       return true;
 
+    // See if this is a valid axis section.
     current_axis_ = gcodep_letter2axis(section_name[0]);
-    if (current_axis_ != GCODE_NUM_AXES
-        && section_name.substr(1) == "-axis") {
+    if (current_axis_ != GCODE_NUM_AXES && section_name.substr(1) == "-axis") {
       return true;
     } else {
       current_axis_ = GCODE_NUM_AXES;
     }
+
     return false;
   }
 
@@ -70,14 +73,15 @@ public:
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
 #define ACCEPT_EXPR(n, result) if (name != n) {} else return ParseFloatExpr(value, result)
 
-    if (in_general_) {
+    if (current_section_ == "general") {
       ACCEPT_VALUE("home-order",     String, &config_->home_order);
       ACCEPT_VALUE("require-homing", Bool,   &config_->require_homing);
       ACCEPT_VALUE("range-check",    Bool,   &config_->range_check);
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
+      return false;
     }
 
-    if (in_motor_mapping_) {
+    if (current_section_ == "motor-mapping") {
       if (name == "motor_1") return SetMotorAxis(line_no, 1, value);
       if (name == "motor_2") return SetMotorAxis(line_no, 2, value);
       if (name == "motor_3") return SetMotorAxis(line_no, 3, value);
@@ -86,18 +90,29 @@ public:
       if (name == "motor_6") return SetMotorAxis(line_no, 6, value);
       if (name == "motor_7") return SetMotorAxis(line_no, 7, value);
       if (name == "motor_8") return SetMotorAxis(line_no, 8, value);
+      return false;
+    }
+
+    if (current_section_ == "switch-mapping") {
+      if (name == "switch_1") return SetSwitchOptions(line_no, 1, value);
+      if (name == "switch_2") return SetSwitchOptions(line_no, 2, value);
+      if (name == "switch_3") return SetSwitchOptions(line_no, 3, value);
+      if (name == "switch_4") return SetSwitchOptions(line_no, 4, value);
+      if (name == "switch_5") return SetSwitchOptions(line_no, 5, value);
+      if (name == "switch_6") return SetSwitchOptions(line_no, 6, value);
+      return false;
     }
 
     if (current_axis_ != GCODE_NUM_AXES) {
       ACCEPT_EXPR("steps-per-mm",     &config_->steps_per_mm[current_axis_]);
       ACCEPT_EXPR("steps-per-degree", &config_->steps_per_mm[current_axis_]);
 
-      ACCEPT_EXPR("range",            &config_->move_range_mm[current_axis_]);
-
       ACCEPT_EXPR("max-feedrate",     &config_->max_feedrate[current_axis_]);
       ACCEPT_EXPR("max-anglerate",    &config_->max_feedrate[current_axis_]);
 
       ACCEPT_EXPR("max-acceleration", &config_->acceleration[current_axis_]);
+
+      ACCEPT_EXPR("range",            &config_->move_range_mm[current_axis_]);
 
       if (name == "home-pos")
         return SetHomePos(line_no, current_axis_, value);
@@ -207,46 +222,88 @@ private:
     return false;
   }
 
-  bool SetMotorAxis(int line_no, int motor_number, const std::string &value) {
-    StringPiece axis(value);
-    if (HasPrefix(ToLower(axis), "axis:")) {
-      axis = axis.substr(strlen("axis:"));
+  bool SetMotorAxis(int line_no, int motor_number, const std::string &in_val) {
+    std::vector<StringPiece> options = SplitString(in_val, " \t,");
+    for (size_t i = 0; i < options.size(); ++i) {
+      const std::string option = ToLower(options[i]);
+      if (HasPrefix(option, "axis:")) {
+        std::string axis = option.substr(strlen("axis:"));
+        if (axis.empty()) return false;
+        bool is_negative = false;
+        if (axis[0] == '-') {
+          is_negative = true;
+          axis = axis.substr(1);
+        }
+        if (axis.empty()) return false;
+        const char axis_letter = axis[0];
+        if (gcodep_letter2axis(axis_letter) == GCODE_NUM_AXES) {
+          Log_error("Invalid axis letter '%c'", axis_letter); 
+          return false; // invalid axis.
+        }
+      
+        // Now, we copy it to the somehwat old command-line friendly
+        // configuration which encodes that as a string. We do that now for
+        // compatibility, but later we should decommission this.
+        if (config_->axis_mapping.length() < (size_t)motor_number) {
+          config_->axis_mapping.resize(motor_number, '_');
+        }
+        if (config_->axis_mapping[motor_number-1] != '_') {
+          Log_error("Line %d: Attempt to use motor twice: Motor %d already "
+                    "mapped to axis %c", line_no, motor_number,
+                    config_->axis_mapping[motor_number-1]);
+          return false;
+        }
+        config_->axis_mapping[motor_number-1] = (is_negative
+                                                 ? tolower(axis_letter)
+                                                 : toupper(axis_letter));
+      }
+      // TODO: maybe option 'mirror' 
+      else {
+        Log_error("Line %d: Unknown motor option '%s'", line_no, option.c_str());
+        return false;
+      }
     }
-    if (axis.empty()) return false;
-    bool is_negative = false;
-    if (axis[0] == '-') {
-      is_negative = true;
-      axis = axis.substr(1);
-    }
-    if (axis.empty()) return false;
-    const char axis_letter = axis[0];
-    if (gcodep_letter2axis(axis_letter) == GCODE_NUM_AXES) {
-      Log_error("Invalid axis letter '%c'", axis_letter); 
-      return false; // invalid axis.
+    return true;
+  }
+
+  bool SetSwitchOptions(int line_no, int switch_number,
+                        const std::string &value) {
+    std::vector<StringPiece> options = SplitString(value, " \t,");
+    for (size_t i = 0; i < options.size(); ++i) {
+      const std::string option = ToLower(options[i]);
+      if (option.empty()) continue;
+      if (option.length() == 5) {
+        const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
+        if (axis == GCODE_NUM_AXES) {
+          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. Last character not a valid axis (got %s).", line_no, option.c_str());
+          return false;
+        }
+
+        if (HasPrefix(option, "min_")) {
+          config_->min_endstop_[axis].endstop_switch = switch_number;
+        } else if (HasPrefix(option, "max_")) {
+          config_->max_endstop_[axis].endstop_switch = switch_number;
+        } else {
+          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. Got %s", line_no, option.c_str());
+          return false;
+        }
+      }
+      else if (option == "active:low") {
+        config_->trigger_level_[switch_number - 1] = false;
+      }
+      else if (option == "active:high") {
+        config_->trigger_level_[switch_number - 1] = true;
+      } else {
+        return false;
+      }
     }
 
-    // Now, we copy it to the somehwat old command-line friendly
-    // configuration which encodes that as a string. We do that now for
-    // compatibility, but later we should decommission this.
-    if (config_->axis_mapping.length() < (size_t)motor_number) {
-      config_->axis_mapping.resize(motor_number, '_');
-    }
-    if (config_->axis_mapping[motor_number-1] != '_') {
-      Log_error("Line %d: Attempt to use motor twice: Motor %d already "
-                "mapped to axis %c", line_no, motor_number,
-                config_->axis_mapping[motor_number-1]);
-      return false;
-    }
-    config_->axis_mapping[motor_number-1] = (is_negative
-                                             ? tolower(axis_letter)
-                                             : toupper(axis_letter));
-    return true;
+    return true;  // All went fine.
   }
 
   MachineControlConfig *const config_;
   enum GCodeParserAxis current_axis_;
-  bool in_general_;
-  bool in_motor_mapping_;
+  std::string current_section_;
 };
 }
 

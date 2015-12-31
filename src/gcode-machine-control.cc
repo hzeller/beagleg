@@ -105,7 +105,7 @@ public:
   ~Impl() {}
 
   uint32_t GetHomeEndstop(enum GCodeParserAxis axis,
-                          int *dir, int *trigger_value) const;
+                          int *dir, bool *trigger_value) const;
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
@@ -403,14 +403,14 @@ bool GCodeMachineControl::Impl::Init() {
       line += "[ unknown range ] ";
     }
     int endstop = cfg_.min_endstop_[i].endstop_switch;
-    const char *trg = cfg_.min_endstop_[i].trigger_value ? "hi" : "lo";
+    const char *trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
     if (endstop) {
       line += StringPrintf("min-switch %d (%s-trigger)%s; ",
                            endstop, trg,
                            cfg_.min_endstop_[i].homing_use ? " [HOME]" : "       ");
     }
     endstop = cfg_.max_endstop_[i].endstop_switch;
-    trg = cfg_.max_endstop_[i].trigger_value ? "hi" : "lo";
+    trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
     if (endstop) {
       line += StringPrintf("max-switch %d (%s-trigger)%s;",
                            endstop, trg,
@@ -436,7 +436,8 @@ bool GCodeMachineControl::Impl::Init() {
   struct AxisTarget *init_axis = planning_buffer_.append();
   bzero(init_axis, sizeof(*init_axis));
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
-    int dir, dummy;
+    int dir;
+    bool dummy;
     if (GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy)) {
       const float home_pos = (dir < 0) ? 0 : cfg_.move_range_mm[axis];
       init_axis->position_steps[axis]
@@ -640,7 +641,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
           int value = get_gpio(get_endstop_gpio_descriptor(config));
           mprintf("%c_min:%s ",
                   tolower(gcodep_axis2letter(axis)),
-                  value == config.trigger_value ? "TRIGGERED" : "open");
+                  value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
           any_enstops_found = 1;
         }
         config = cfg_.max_endstop_[axis];
@@ -648,7 +649,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
           int value = get_gpio(get_endstop_gpio_descriptor(config));
           mprintf("%c_max:%s ",
                   tolower(gcodep_axis2letter(axis)),
-                  value == config.trigger_value ? "TRIGGERED" : "open");
+                  value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
           any_enstops_found = 1;
         }
       }
@@ -1137,7 +1138,7 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
 
 // Get the endstop for the axis.
 uint32_t GCodeMachineControl::Impl::GetHomeEndstop(enum GCodeParserAxis axis,
-                                                   int *dir, int *trigger_value) const {
+                                                   int *dir, bool *trigger_value) const {
   *dir = 1;
   struct EndstopConfig config = cfg_.max_endstop_[axis];
   if (cfg_.min_endstop_[axis].endstop_switch
@@ -1147,7 +1148,9 @@ uint32_t GCodeMachineControl::Impl::GetHomeEndstop(enum GCodeParserAxis axis,
   }
   if (!config.homing_use)
     return 0;
-  *trigger_value = config.trigger_value;
+  if (config.endstop_switch == 0)
+    return 0;
+  *trigger_value = cfg_.trigger_level_[config.endstop_switch-1];
   return get_endstop_gpio_descriptor(config);
 }
 
@@ -1196,7 +1199,7 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   struct AxisTarget *last = planning_buffer_.back();
   float home_pos = 0; // assume HOME_POS_ORIGIN
   int dir;
-  int trigger_value;
+  bool trigger_value;
   uint32_t gpio_def = GetHomeEndstop(axis, &dir, &trigger_value);
   if (!gpio_def)
     return;
@@ -1251,8 +1254,9 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   if (feedrate <= 0) feedrate = 20;
   // TODO: if the probe fails to trigger, there is no mechanism to stop
   // it right now...
+  const bool trigger_level = cfg_.trigger_level_[config.endstop_switch-1];
   int total_steps = move_to_endstop(axis, feedrate, 0, dir,
-                                    config.trigger_value, gpio_def);
+                                    trigger_level, gpio_def);
   last->position_steps[axis] += total_steps;
   *probe_result = 1.0f * last->position_steps[axis] / cfg_.steps_per_mm[axis];
   return true;
@@ -1278,7 +1282,7 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
 void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   home_pos->zero();
   int dir;
-  int dummy;
+  bool dummy;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
     if (!impl_->GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy))
       continue;

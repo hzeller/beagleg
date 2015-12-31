@@ -28,9 +28,14 @@ class MotorOperations;
 class ConfigParser;
 typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
 
+// Number of supported input switches.
+// (TODO: needs to go somewhere else)
+enum {
+  BEAGLEG_NUM_SWITCHES = 6
+};
+
 // Compact representation of an enstop configuration.
 struct EndstopConfig {
-  bool trigger_value : 1;   // 0: trigged low 1: triggered high.
   bool homing_use : 1;      // 0: no 1: yes.
   unsigned char endstop_switch : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
 };
@@ -74,6 +79,7 @@ struct MachineControlConfig {
   // Mapping of Axis to which endstop it affects.
   FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
   FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
+  FixedArray<bool, BEAGLEG_NUM_SWITCHES> trigger_level_;
 
   // Position in these strings is the connector position of input switches.
   // Lower case: just regular stopswitch, Upper case: used for homing.
