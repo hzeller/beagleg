@@ -43,6 +43,8 @@ The functionality is implemented in a stack of independently usable APIs.
       the resuling motor commands to MotorOperations.
       Depends on the gcode-parser APIs as input and motor-operations as output.
       Provides the functionality provided by the `machine-control` binary.
+      If you want, you can use this API to programmatically control your machine
+      without the detour through GCode.
 
    - [motor-operations.h](./src/motor-operations.h) : Low-level motor motion
       C++-API.
@@ -50,7 +52,7 @@ The functionality is implemented in a stack of independently usable APIs.
       planner. This is a good place to implement stepmotor driver backends.
       The implementation here prepares parameters for the discrete
       approximation in the PRU motion-queue backend.
-      The print-stats binary has a different implementation that uses it to
+      The `gcode-print-stats` binary has a different implementation that uses it to
       determine print-time calculations, simulating how long motor movements
       would take.
 
@@ -90,7 +92,7 @@ Then just
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
 we have to tell the pin multiplexer to connect them to the output pins. For
-that, just run the start-devicetree-overlay.sh script with your hardware
+that, just run the `start-devicetree-overlay.sh` script with your hardware
 to install the device overlay. You find it in the `hardware/` subdirectory.
 
     sudo hardware/start-devicetree-overlay.sh hardware/BUMPS/BeagleG.dts
@@ -117,7 +119,7 @@ Mostly for testing and debugging:
   --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)
 ```
 
-The axis configurations (max feedrate, acceleration and travel) is configured
+The axis configurations (max feedrate, acceleration, travel, motor mapping,...) is configured
 in a [configuration file like in this example](./sample.config).
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W.
@@ -141,7 +143,7 @@ This command directly executes some GCode coming from stdin. This is in
 particular useful when you're calibrating your machine and need to work on
 little tweaks.
 
-    sudo ./machine-control --port 4444
+    sudo ./machine-control -c my.config --port 4444
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
@@ -157,22 +159,12 @@ to a pseudo-terminal in case your printer-software only talks to a terminal
 Note, there can only be one open TCP connection at any given time (after all,
 there is only one physical machine).
 
-### Axis to Motor mapping
-
-Each board has a number of connectors for motors and switches to which you
-connect your physical motors and end-switches to.
-
-To map these connector positions to logical axes names, the `machine-control`
-binary has a configuration file in which you can configure not only the
-various axis parameters (max speed, acceleration, steps/mm), but also assign
-these axes to motor drivers provided by the cape (`motor_1`, `motor_2`,...)
-and end switches (`switch_1`, `switch_2`,...) to logical functions
-(e.g. `min_x`). See the [annotated config file](./sample.config).
-
 ## G-Code stats binary
 There is a binary `gcode-print-stats` to extract information from the G-Code
 file e.g. accurate expected print-time, Object height (=maximum Z-axis),
-filament length.
+filament length. This is in particular useful because many GCode runtime
+estimators are widely off; this is accurate to the second because it takes all
+acceleration phases into account.
 
 ```
 Usage: ./gcode-print-stats [options] <gcode-file> [<gcode-file> ..]
@@ -191,26 +183,42 @@ time
 
 ## Cape
 
-The [BUMPS]-cape is one of the capes to use, but reportedly also the CRAMPS
-cape is working (check the [hardware](./hardware) sub-directory how to configure
-BeagleG for different hardware.
+The [BUMPS]-cape is one of the capes to use, it was developed together with
+BeagleG (but it is not widely distributed yet).
+BeagleG also works with the CRAMPS board, which is a popular motor driver cape
+for the BeagleBone Black. You can easily adapt your own hardware, check the
+[hardware](./hardware) sub-directory.
 
 ![Bumps board][BUMPS-img]
+
+### Axis to Motor mapping
+
+Each board has a number of connectors for motors and switches to which you
+connect your physical motors and end-switches to.
+
+To map these connector positions to logical axes names, the `machine-control`
+binary has a configuration file in which you can configure not only the
+various axis parameters (max speed, acceleration, steps/mm), but also assign
+these axes to motor drivers provided by the cape (`motor_1`, `motor_2`,...)
+and end switches (`switch_1`, `switch_2`,...) to logical functions
+(e.g. `min_x`). See the [annotated config file](./sample.config).
 
 ## Developing
 Due to the speed of the compiler on the BeagleBone, you might want to do
 development on other machines for faster turn-around times (unless you really
 need to actually access the hardware GPIOs or run PRU code, this works just
-fine).
+fine. With `-n`, you can just simulate).
 
 On a non-Beaglebone machine, pass an empty `ARM_COMPILE_FLAGS` environment
 variable:
 
-     ARM_COMPILE_FLAGS="" make
-     # or export to environment.
+```bash
+ ARM_COMPILE_FLAGS="" make
+ # or export to environment.
+```
 
 To speed up development (on all machines, but in particular if you compile on
-the BeagleBone), it is definitely useful to have `ccache` installed
+the BeagleBone), it is definitely useful to have [ccache] installed
 (package-installing is not enough, read the manpage to make sure to
 properly enable it). It makes `make clean ; make` cycles _much_ faster.
 
@@ -219,11 +227,12 @@ To avoid re-inventing the testing-framework wheel, we use the
 [Google test framework](https://github.com/google/googletest), for which there
 are typically already packages available:
 
-    sudo aptitude install libgtest-dev google-mock
-    make test
-    # Or, for more thorough memory-leak or initialization issue check:
-    make valgrind-test
-
+```bash
+ sudo aptitude install libgtest-dev google-mock
+ make test
+ # Or, for more thorough memory-leak or initialization issue check:
+ make valgrind-test
+```
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -242,3 +251,4 @@ hacking permits.
 [run-vid]: ./img/beagleg-vid-thumb.jpg
 [BUMPS]: https://github.com/hzeller/bumps
 [BUMPS-img]: ./img/bumps-connect.jpg
+[ccache]: https://ccache.samba.org/
