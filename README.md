@@ -191,7 +191,10 @@ time
 
 ## Cape
 
-The [BUMPS]-cape is one
+The [BUMPS]-cape is one of the capes to use, but reportedly also the CRAMPS
+cape is working (check the [hardware](./hardware) sub-directory how to configure
+BeagleG for different hardware.
+
 ![Bumps board][BUMPS-img]
 
 ## Developing
