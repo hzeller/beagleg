@@ -3,8 +3,8 @@
 *.d
 gcode-machine-control_test
 gcode-parser_test
-gcode-print-stats
-machine-control
+config-parser_test
+string-util_test
 motor-interface-pru_bin.h
 compiler-flags
 gtest

@@ -1,3 +1,5 @@
 *~
 *.o
 *.d
+machine-control
+gcode-print-stats

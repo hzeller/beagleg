@@ -31,7 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static int log_fd = -1;
+static int log_fd = 2;
 
 static const char *const kInfoHighlight  = "\033[1mINFO  ";
 static const char *const kDebugHighlight = "\033[1m\033[34mDEBUG ";

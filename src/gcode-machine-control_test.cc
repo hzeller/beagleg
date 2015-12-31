@@ -9,13 +9,14 @@
  */
 #include "gcode-machine-control.h"
 
-#include "motor-operations.h"
-#include "gcode-parser.h"
-
 #include <stdio.h>
 #include <string.h>
 
 #include <gtest/gtest.h>
+
+#include "motor-operations.h"
+#include "gcode-parser.h"
+#include "logging.h"
 
 #define END_SENTINEL 0x42
 
@@ -156,6 +157,7 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
 }
 
 int main(int argc, char *argv[]) {
+  Log_init("/dev/null");
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

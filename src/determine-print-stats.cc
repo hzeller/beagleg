@@ -46,7 +46,7 @@ public:
   virtual void set_fanspeed(float speed) { delegatee_->set_fanspeed(speed);  }
   virtual void wait_temperature() { delegatee_->wait_temperature(); }
   virtual void motors_enable(bool b) { delegatee_->motors_enable(b); }
-  virtual void go_home(AxisBitmap_t axes) { delegatee_->go_home(axes); }
+  virtual void go_home(AxisBitmap_t axes) { /* ignore */ }
   virtual void inform_origin_offset(const AxesRegister& axes) {
     delegatee_->inform_origin_offset(axes);
   }
@@ -99,7 +99,7 @@ public:
 
     // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
     print_stats_->total_time_seconds += 2 * max_steps / (param.v0 + param.v1);
-    //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param->v0, param->v1, max_steps);
+    //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param.v0, param.v1, max_steps);
     return 0;
   }
 

@@ -28,12 +28,14 @@
 
 #include "determine-print-stats.h"
 #include "gcode-machine-control.h"
+#include "config-parser.h"
+#include "logging.h"
 
 int usage(const char *prog) {
   fprintf(stderr, "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
 	  "Options:\n"
-	  "\t-m <max-feedrate> : Maximum feedrate in mm/s\n"
-	  "\t-f <factor>       : Speedup-factor for print\n"
+          "\t-c <config>       : Machine config\n"
+	  "\t-f <factor>       : Speedup-factor for feedrate.\n"
           "\t-H                : Toggle print header line\n"
 	  "Use filename '-' for stdin.\n", prog);
   return 1;
@@ -58,22 +60,19 @@ static void print_file_stats(const char *filename, int indentation,
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
 
-  int max_feedrate = 200;  // mm/s
   float factor = 1.0;        // print speed factor.
   char print_header = 1;
-
-  // TODO: read other parameters for the MachineControlConfig from long options.
+  const char *config_file = NULL;
 
   int opt;
-  while ((opt = getopt(argc, argv, "f:m:H")) != -1) {
+  while ((opt = getopt(argc, argv, "c:f:H")) != -1) {
     switch (opt) {
+    case 'c':
+      config_file = strdup(optarg);
+      break;
     case 'f':
       factor = (float)atof(optarg);
       if (factor <= 0) return usage(argv[0]);
-      break;
-    case 'm':
-      max_feedrate = atoi(optarg);
-      if (max_feedrate <= 0) return usage(argv[0]);
       break;
     case 'H':
       print_header = !print_header;
@@ -86,9 +85,25 @@ int main(int argc, char *argv[]) {
   if (optind >= argc)
     return usage(argv[0]);
 
-  config.max_feedrate[AXIS_X] = max_feedrate;
-  config.max_feedrate[AXIS_Y] = max_feedrate;
+  if (!config_file) {
+    fprintf(stderr, "Expected config file -c <config>\n");
+    return 1;
+  }
+
+  Log_init("/dev/null");
+
+  ConfigParser config_parser;
+  if (!config_parser.SetContentFromFile(config_file)) {
+    fprintf(stderr, "Cannot read config file '%s'\n", config_file);
+    return 1;
+  }
+  if (!config.InitializeFromFile(&config_parser)) {
+    fprintf(stderr, "Exiting. Parse error in configuration file '%s'\n", config_file);
+    return 1;
+  }
+
   config.speed_factor = factor;
+  config.require_homing = false;
 
   int longest_filename = strlen("#[filename]"); // table header
   for (int i = optind; i < argc; ++i) {
