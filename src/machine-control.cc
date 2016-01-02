@@ -367,11 +367,9 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // ... other configurations that read from that file.
-
-  if (as_daemon) {
-    if (daemon(0, 0) != 0) {
-      Log_error("Can't become daemon: %s", strerror(errno));
-    }
+  
+  if (as_daemon && daemon(0, 0) != 0) {
+    Log_error("Can't become daemon: %s", strerror(errno));
   }
 
   // Open socket early, so that we
