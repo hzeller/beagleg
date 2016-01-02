@@ -377,15 +377,16 @@ int main(int argc, char *argv[]) {
 
     // Bug in PRU library: if there are no file-descriptors, and 0 is the
     // file descriptor of the next open, then prussdrv_open() fails.
-    // So let's re-open the default file-desriptors.
+    // So let's re-open the default file-descriptors.
     open("/dev/null", O_RDONLY);  // STDIN_FILENO
     open("/dev/null", O_RDWR);    // STDOUT_FILENO
     open("/dev/null", O_RDWR);    // STDERR_FILENO
   }
 
-  // Open socket early, so that we (a) can bail out early before messing
-  // with PRU settings if someone is alrady listening (starting as daemon
-  // twice?). (b) open socket while we have not dropped privileges yet.
+  // Open socket early, so that we
+  //  (a) can bail out early before messing with GPIO/PRU settings if
+  //      someone is alrady listening (starting as daemon twice?).
+  //  (b) open socket while we have not dropped privileges yet.
   int listen_socket = -1;
   if (!has_filename) {
     listen_socket = open_server(bind_addr, listen_port);
@@ -423,7 +424,7 @@ int main(int argc, char *argv[]) {
     motion_backend = new PRUMotionQueue();
   }
 
-  // TODO(hzeller): drop after we open listen port in case that is < 1024
+  // Listen port bound, GPIO initialized. Ready to drop privileges.
   if (geteuid() == 0 && strlen(privs) > 0) {
     if (drop_privileges(privs)) {
       Log_info("Dropped privileges to '%s'", privs);
