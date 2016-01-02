@@ -390,7 +390,7 @@ int main(int argc, char *argv[]) {
   if (!has_filename) {
     listen_socket = open_server(bind_addr, listen_port);
     if (listen_socket < 0) {
-      Log_error("Exiting. Couldn't open socket to listen.");
+      Log_error("Exiting. Couldn't bind to socket to listen.");
       return 1;
     }
   }
