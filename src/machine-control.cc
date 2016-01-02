@@ -18,10 +18,13 @@
  */
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <grp.h>
 #include <math.h>
 #include <netinet/in.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,16 +33,16 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/types.h>
 #include <unistd.h>
 
+#include "config-parser.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
 #include "logging.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
 #include "sim-firmware.h"
-#include "config-parser.h"
+#include "string-util.h"
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {
@@ -53,7 +56,8 @@ static int usage(const char *prog, const char *msg) {
 	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
           "  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
           "  --daemon              (-d): Run as daemon.\n"
-          "Mostly for testing and debugging:\n"
+          "  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
+          "\nMostly for testing and debugging:\n"
 	  "  -f <factor>               : Feedrate speed factor (Default 1.0).\n"
 	  "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
@@ -69,6 +73,44 @@ static int fyi_option_gone() {
           "Provide it with -c <config-file>.\n"
           "See https://github.com/hzeller/beagleg/blob/master/sample.config\n");
   return 1;
+}
+
+// Call with <uid>:<gid> string.
+static bool drop_privileges(StringPiece privs) {
+  std::vector<StringPiece> pair = SplitString(privs, ":");
+  if (pair.size() < 1 || pair.size() > 2) {
+    Log_error("Drop privileges: Require colon separated <uid>[:<gid>]");
+    return false;
+  }
+
+  std::string name;
+  if (pair.size() == 2) {
+    name = pair[1].ToString();
+    struct group *g = getgrnam(name.c_str());
+    if (g == NULL) {
+      Log_error("Drop privileges: Couldn't look up group '%s'.", name.c_str());
+      return false;
+    }
+    if (setresgid(g->gr_gid, g->gr_gid, g->gr_gid) != 0) {
+      Log_error("Couldn't drop group privs to '%s' (gid %d): %s",
+                name.c_str(), g->gr_gid, strerror(errno));
+      return false;
+    }
+  }
+
+  name = pair[0].ToString();
+  struct passwd *p = getpwnam(name.c_str());
+  if (p == NULL) {
+    Log_error("Drop privileges: Couldn't look up user '%s'.", name.c_str());
+    return false;
+  }
+  if (setresuid(p->pw_uid, p->pw_uid, p->pw_uid) != 0) {
+    Log_error("Couldn't drop user privs to '%s' (uid %d): %s",
+              name.c_str(), p->pw_uid, strerror(errno));
+    return false;
+  }
+
+  return true;
 }
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
@@ -158,6 +200,7 @@ int main(int argc, char *argv[]) {
   const char *logfile = NULL;
   const char *config_file = NULL;
   bool run_as_daemon = false;
+  const char *privs = "daemon:daemon";
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
@@ -172,6 +215,7 @@ int main(int argc, char *argv[]) {
     OPT_REQUIRE_HOMING,
     OPT_DISABLE_RANGE_CHECK,
     OPT_LOOP,
+    OPT_PRIVS,
   };
 
   static struct option long_options[] = {
@@ -184,6 +228,7 @@ int main(int argc, char *argv[]) {
     { "loop",               optional_argument, NULL, OPT_LOOP },
     { "logfile",            required_argument, NULL, 'l'},
     { "daemon",             no_argument,       NULL, 'd'},
+    { "priv",               required_argument, NULL, OPT_PRIVS },
 
     // possibly deprecated soon.
     { "home-order",         required_argument, NULL, OPT_SET_HOME_ORDER },
@@ -257,6 +302,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'c':
       config_file = strdup(optarg);
+      break;
+    case OPT_PRIVS:
+      privs = strdup(optarg);
       break;
 
       // Deprecated options.
@@ -334,13 +382,23 @@ int main(int argc, char *argv[]) {
     }
   } else {
     if (geteuid() != 0) {
-      // TODO: running as root is generally not a good idea. Setup permissions
-      // to just access these GPIOs.
-      Log_error("Need to run as root to access GPIO pins. "
-                "(use the dryrun option -n to not write to GPIO)\n");
+      Log_error("Need to run as root to access GPIO pins "
+                "(use the dryrun option -n to not write to GPIO).");
+      Log_error("If you start as root, privileges will be dropped to '%s' "
+                "after opening GPIO", privs);
       return 1;
     }
     motion_backend = new PRUMotionQueue();
+  }
+
+  // TODO(hzeller): drop after we open listen port in case that is < 1024
+  if (geteuid() == 0 && strlen(privs) > 0) {
+    if (drop_privileges(privs)) {
+      Log_info("Dropped privileges to '%s'", privs);
+    } else {
+      Log_error("Exiting. Could not drop privileges to %s", privs);
+      return 1;
+    }
   }
 
   MotionQueueMotorOperations motor_operations(motion_backend);
