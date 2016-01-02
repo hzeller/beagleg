@@ -369,18 +369,9 @@ int main(int argc, char *argv[]) {
   // ... other configurations that read from that file.
 
   if (as_daemon) {
-    if (fork() != 0)
-      return 0;
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
-    // Bug in PRU library: if there are no file-descriptors, and 0 is the
-    // file descriptor of the next open, then prussdrv_open() fails.
-    // So let's re-open the default file-descriptors.
-    open("/dev/null", O_RDONLY);  // STDIN_FILENO
-    open("/dev/null", O_RDWR);    // STDOUT_FILENO
-    open("/dev/null", O_RDWR);    // STDERR_FILENO
+    if (daemon(0, 0) != 0) {
+      Log_error("Can't become daemon: %s", strerror(errno));
+    }
   }
 
   // Open socket early, so that we
