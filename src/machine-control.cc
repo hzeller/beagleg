@@ -199,7 +199,7 @@ int main(int argc, char *argv[]) {
   bool simulation_output = false;
   const char *logfile = NULL;
   const char *config_file = NULL;
-  bool run_as_daemon = false;
+  bool as_daemon = false;
   const char *privs = "daemon:daemon";
 
   // Less common options don't have a short option.
@@ -298,7 +298,7 @@ int main(int argc, char *argv[]) {
       logfile = strdup(optarg);
       break;
     case 'd':
-      run_as_daemon = true;
+      as_daemon = true;
       break;
     case 'c':
       config_file = strdup(optarg);
@@ -331,6 +331,11 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "--loop only makes sense with a filename.");
   }
 
+  // As daemon, we use whatever the use chose as logfile
+  // (including nothing->syslog). Interactive, nothing means stderr.
+  Log_init(as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
+  Log_info("Startup.");
+
   // If reading from file: don't print 'ok' for every line.
   config.acknowledge_lines = !has_filename;
 
@@ -350,20 +355,20 @@ int main(int argc, char *argv[]) {
   }
   // ... other configurations that read from that file.
 
-  if (run_as_daemon) {
+  if (as_daemon) {
     if (fork() != 0)
       return 0;
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-  }
 
-  // As daemon, we use whatever the use chose as logfile
-  // (including nothing->syslog). Interactive, nothing means stderr.
-  Log_init(run_as_daemon
-           ? logfile
-           : (logfile == NULL ? "/dev/stderr" : logfile));
-  Log_info("Startup.");
+    // Bug in PRU library: if there are no file-descriptors, and 0 is the
+    // file descriptor of the next open, then prussdrv_open() fails.
+    // So let's re-open the default file-desriptors.
+    open("/dev/null", O_RDONLY);  // STDIN_FILENO
+    open("/dev/null", O_RDWR);    // STDOUT_FILENO
+    open("/dev/null", O_RDWR);    // STDERR_FILENO
+  }
 
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
