@@ -31,7 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static int log_fd = 2;
+static int log_fd = 2;  // Allow logging before Log_init().
 
 static const char *const kInfoHighlight  = "\033[1mINFO  ";
 static const char *const kDebugHighlight = "\033[1m\033[34mDEBUG ";
@@ -46,6 +46,7 @@ static const char *markup_end_ = "";
 void Log_init(const char *filename) {
   if (filename == NULL || strlen(filename) == 0) {
     openlog(NULL, LOG_PID|LOG_CONS, LOG_DAEMON);
+    log_fd = -1;
   } else {
     log_fd = open(filename, O_CREAT|O_APPEND|O_WRONLY, 0644);
     if (log_fd < 0) {
