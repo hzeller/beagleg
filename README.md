@@ -65,6 +65,8 @@ Options:
   --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
   --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).
   --daemon              (-d): Run as daemon.
+  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)
+
 Mostly for testing and debugging:
   -f <factor>               : Feedrate speed factor (Default 1.0).
   -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).
