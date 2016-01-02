@@ -331,11 +331,6 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "--loop only makes sense with a filename.");
   }
 
-  // As daemon, we use whatever the use chose as logfile
-  // (including nothing->syslog). Interactive, nothing means stderr.
-  Log_init(run_as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
-  Log_info("Startup.");
-
   // If reading from file: don't print 'ok' for every line.
   config.acknowledge_lines = !has_filename;
 
@@ -363,6 +358,13 @@ int main(int argc, char *argv[]) {
     close(STDERR_FILENO);
   }
 
+  // As daemon, we use whatever the use chose as logfile
+  // (including nothing->syslog). Interactive, nothing means stderr.
+  Log_init(run_as_daemon
+           ? logfile
+           : (logfile == NULL ? "/dev/stderr" : logfile));
+  Log_info("Startup.");
+
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
   MotionQueue *motion_backend;
@@ -382,7 +384,7 @@ int main(int argc, char *argv[]) {
     }
   } else {
     if (geteuid() != 0) {
-      Log_error("Need to run as root to access GPIO pins "
+      Log_error("Exiting. Need to run as root to access GPIO pins "
                 "(use the dryrun option -n to not write to GPIO).");
       Log_error("If you start as root, privileges will be dropped to '%s' "
                 "after opening GPIO", privs);
