@@ -129,20 +129,16 @@ static int send_file_to_machine(GCodeMachineControl *machine,
   return ret;
 }
 
-// Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
-// Interprets GCode coming from a connection. Only one connection at a
-// time can be active.
-static int run_server(GCodeMachineControl *machine,
-                      GCodeParser *parser,
-                      const char *bind_addr, int port) {
+// Open server. Return file-descriptor or -1 if listen fails.
+static int open_server(const char *bind_addr, int port) {
   if (port > 65535) {
     Log_error("Invalid port %d\n", port);
-    return 1;
+    return -1;
   }
   int s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0) {
-    perror("creating socket");
-    return 1;
+    Log_error("creating socket: %s", strerror(errno));
+    return -1;
   }
 
   struct sockaddr_in serv_addr = {0};
@@ -150,28 +146,41 @@ static int run_server(GCodeMachineControl *machine,
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
     Log_error("Invalid bind IP address %s\n", bind_addr);
-    return 1;
+    return -1;
   }
   serv_addr.sin_port = htons(port);
   int on = 1;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
   if (bind(s, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-    perror("trouble binding");
-    return 1;
+    Log_error("Trouble binding to %s:%d: %s",
+              bind_addr ? bind_addr : "0.0.0.0", port,
+              strerror(errno));
+    return -1;
   }
+  Log_info("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
 
+  return s;
+}
+
+// Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
+// Interprets GCode coming from a connection. Only one connection at a
+// time can be active.
+static int run_server(int listen_socket,
+                      GCodeMachineControl *machine, GCodeParser *parser) {
   signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
 
-  listen(s, 2);
-  Log_info("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
+  if (listen(listen_socket, 2) < 0) {
+    Log_error("listen() failed: %s", strerror(errno));
+    return 1;
+  }
 
   int process_result;
   do {
     struct sockaddr_in client;
     socklen_t socklen = sizeof(client);
-    int connection = accept(s, (struct sockaddr*) &client, &socklen);
+    int connection = accept(listen_socket, (struct sockaddr*) &client, &socklen);
     if (connection < 0) {
-      perror("accept");
+      Log_error("accept(): %s", strerror(errno));
       return 1;
     }
     char ip_buffer[INET_ADDRSTRLEN];
@@ -186,7 +195,7 @@ static int run_server(GCodeMachineControl *machine,
     Log_info("Connection to %s closed.\n", print_ip);
   } while (process_result == 0);
 
-  close(s);
+  close(listen_socket);
   Log_error("Error gcode_machine_control_from_stream() == %d. Exiting\n",
             process_result);
 
@@ -370,6 +379,18 @@ int main(int argc, char *argv[]) {
     open("/dev/null", O_RDWR);    // STDERR_FILENO
   }
 
+  // Open socket early, so that we (a) can bail out early before messing
+  // with PRU settings if someone is alrady listening (starting as daemon
+  // twice?). (b) open socket while we have not dropped privileges yet.
+  int listen_socket = -1;
+  if (!has_filename) {
+    listen_socket = open_server(bind_addr, listen_port);
+    if (listen_socket < 0) {
+      Log_error("Exiting. Couldn't open socket to listen");
+      return 1;
+    }
+  }
+
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
   MotionQueue *motion_backend;
@@ -427,7 +448,7 @@ int main(int argc, char *argv[]) {
     ret = send_file_to_machine(machine_control, parser,
                                filename, file_loop_count);
   } else {
-    ret = run_server(machine_control, parser, bind_addr, listen_port);
+    ret = run_server(listen_socket, machine_control, parser);
   }
 
   delete parser;
