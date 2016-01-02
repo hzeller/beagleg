@@ -130,6 +130,7 @@ static int send_file_to_machine(GCodeMachineControl *machine,
 }
 
 // Open server. Return file-descriptor or -1 if listen fails.
+// Bind to "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
 static int open_server(const char *bind_addr, int port) {
   if (port > 65535) {
     Log_error("Invalid port %d\n", port);
@@ -157,22 +158,25 @@ static int open_server(const char *bind_addr, int port) {
               strerror(errno));
     return -1;
   }
-  Log_info("Listening on %s:%d\n", bind_addr ? bind_addr : "0.0.0.0", port);
-
   return s;
 }
 
-// Run TCP server on "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
-// Interprets GCode coming from a connection. Only one connection at a
-// time can be active.
+// Accept connections and receive GCode.
+// Only one connection can be active at a time.
+// Socket must already be opened by open_server(). "bind_addr" and "port"
+// are just FYI information for nicer log-messages.
 static int run_server(int listen_socket,
-                      GCodeMachineControl *machine, GCodeParser *parser) {
+                      GCodeMachineControl *machine, GCodeParser *parser,
+                      const char *bind_addr, int port) {
   signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
 
   if (listen(listen_socket, 2) < 0) {
     Log_error("listen() failed: %s", strerror(errno));
     return 1;
   }
+
+  Log_info("Ready to accept GCode-connections on %s:%d",
+           bind_addr ? bind_addr : "0.0.0.0", port);
 
   int process_result;
   do {
@@ -386,7 +390,7 @@ int main(int argc, char *argv[]) {
   if (!has_filename) {
     listen_socket = open_server(bind_addr, listen_port);
     if (listen_socket < 0) {
-      Log_error("Exiting. Couldn't open socket to listen");
+      Log_error("Exiting. Couldn't open socket to listen.");
       return 1;
     }
   }
@@ -448,7 +452,8 @@ int main(int argc, char *argv[]) {
     ret = send_file_to_machine(machine_control, parser,
                                filename, file_loop_count);
   } else {
-    ret = run_server(listen_socket, machine_control, parser);
+    ret = run_server(listen_socket, machine_control, parser,
+                     bind_addr, listen_port);
   }
 
   delete parser;
