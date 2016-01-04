@@ -45,7 +45,7 @@ struct LinearSegmentSteps {
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
-class MotorOperations {
+class MotorOperations {  // Rename SegmentQueue ?
 public:
   virtual ~MotorOperations() {}
 

@@ -36,7 +36,7 @@ static void init_test_config(struct MachineControlConfig *c) {
 namespace {
 class MockMotorOps : public MotorOperations {
 public:
-  MockMotorOps(const MotorMovement *expected)
+  MockMotorOps(const LinearSegmentSteps *expected)
     : expect_(expected), current_(expected), errors_(0) {}
 
   ~MockMotorOps() {
@@ -45,7 +45,7 @@ public:
     EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
   }
 
-  virtual int Enqueue(const MotorMovement &param, FILE *err_stream) {
+  virtual int Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
     const int number = (int)(current_ - expect_);
     EXPECT_NE(END_SENTINEL, current_->aux_bits);
     ExpectEq(current_, param, number);
@@ -58,15 +58,15 @@ public:
 
 private:
   // Helpers to compare and print MotorMovements.
-  static void PrintMovement(const char *msg, const struct MotorMovement *m) {
+  static void PrintMovement(const char *msg, const struct LinearSegmentSteps *m) {
     printf("%s: v0=%.1f -> v1=%.1f {%d, %d, %d}", msg, m->v0, m->v1,
            m->steps[0], m->steps[1], m->steps[2]);
   }
 
-  void ExpectEq(const struct MotorMovement *expected,
-                const struct MotorMovement &reality,
+  void ExpectEq(const struct LinearSegmentSteps *expected,
+                const struct LinearSegmentSteps &reality,
                 int info_segment_number) {
-    if (memcmp(expected, &reality, sizeof(*expected)) != 0) {
+    if (memcmp(&expected, &reality, sizeof(*expected)) != 0) {
       printf("segment #%d: ", info_segment_number);
       PrintMovement("expected", expected);
       PrintMovement("; but was", &reality);
@@ -75,8 +75,8 @@ private:
     }
   }
 
-  const MotorMovement *const expect_;
-  const MotorMovement *current_;
+  const LinearSegmentSteps *const expect_;
+  const LinearSegmentSteps *current_;
 
   int errors_;
 };
@@ -86,7 +86,7 @@ class Harness {
  public:
   // Initialize harness with the expected sequence of motor movements
   // and return the callback struct to receive simulated gcode calls.
-  Harness(const MotorMovement *expected)
+  Harness(const LinearSegmentSteps *expected)
     : expect_motor_ops(expected) {
     init_test_config(&config);
     machine_control = GCodeMachineControl::Create(config, &expect_motor_ops, NULL);
@@ -109,7 +109,7 @@ class Harness {
 // expect no slow-down.
 TEST(GCodeMachineControlTest, straight_segments_same_speed) {
   // TODO(hzeller): use mock functionality for this to compare.
-  static const struct MotorMovement expected[] = {
+  static const struct LinearSegmentSteps expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 1st move @100mm/s
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 2nd move @100mm/s
@@ -134,7 +134,7 @@ TEST(GCodeMachineControlTest, straight_segments_same_speed) {
 // other, slow down the first segment at the end to the travel speed of the
 // next segment.
 TEST(GCodeMachineControlTest, straight_segments_speed_change) {
-  static const struct MotorMovement expected[] = {
+  static const struct LinearSegmentSteps expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9125}},  // move @100mm/s
     { /*v0*/ 10000.0, /*v1*/  5000.0, 0, /*steps*/ { 375}},  // slow: match next speed
