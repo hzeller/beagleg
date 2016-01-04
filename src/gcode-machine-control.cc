@@ -141,7 +141,7 @@ private:
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
                               enum GCodeParserAxis defining_axis);
-  void assign_steps_to_motors(struct MotorMovement *command,
+  void assign_steps_to_motors(struct LinearSegmentSteps *command,
                               enum GCodeParserAxis axis,
                               int steps);
   void move_machine_steps(const struct AxisTarget *last_pos,
@@ -772,7 +772,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
 }
 
 // Assign steps to all the motors responsible for given axis.
-void GCodeMachineControl::Impl::assign_steps_to_motors(struct MotorMovement *command,
+void GCodeMachineControl::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
                                                        enum GCodeParserAxis axis,
                                                        int steps) {
   const DriverBitmap motormap_for_axis = axis_to_driver_[axis];
@@ -785,11 +785,11 @@ void GCodeMachineControl::Impl::assign_steps_to_motors(struct MotorMovement *com
 }
 
 // Returns true, if all results in zero movement
-static uint8_t substract_steps(struct MotorMovement *value,
-                               const struct MotorMovement *substract) {
+static uint8_t substract_steps(struct LinearSegmentSteps *value,
+                               const struct LinearSegmentSteps &substract) {
   uint8_t has_nonzero = 0;
   for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    value->steps[i] -= substract->steps[i];
+    value->steps[i] -= substract.steps[i];
     has_nonzero |= (value->steps[i] != 0);
   }
   return has_nonzero;
@@ -811,9 +811,9 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
     return;
   }
-  struct MotorMovement accel_command = {0};
-  struct MotorMovement move_command = {0};
-  struct MotorMovement decel_command = {0};
+  struct LinearSegmentSteps accel_command = {0};
+  struct LinearSegmentSteps move_command = {0};
+  struct LinearSegmentSteps decel_command = {0};
 
   assert(target_pos->speed > 0);  // Speed is always a positive scalar.
 
@@ -923,8 +923,8 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
     assign_steps_to_motors(&move_command, (GCodeParserAxis)i,
                            axis_steps[i]);
   }
-  substract_steps(&move_command, &accel_command);
-  has_move = substract_steps(&move_command, &decel_command);
+  substract_steps(&move_command, accel_command);
+  has_move = substract_steps(&move_command, decel_command);
 
   if (cfg_.synchronous) {
     motor_ops_->WaitQueueEmpty();
@@ -1165,7 +1165,7 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
                                                int dir, int trigger_value,
                                                uint32_t gpio_def) {
   int total_movement = 0;
-  struct MotorMovement move_command = {0};
+  struct LinearSegmentSteps move_command = {0};
   const float steps_per_mm = cfg_.steps_per_mm[axis];
   float target_speed = feedrate * steps_per_mm;
   if (target_speed > max_axis_speed_[axis]) {

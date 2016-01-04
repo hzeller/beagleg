@@ -28,8 +28,8 @@ enum {
 };
 
 // The movement command send to motor operations either changes speed, or
-// provides a steady speed.
-struct MotorMovement {
+// provides a steady speed. Already low-level broken down for motors.
+struct LinearSegmentSteps {
   // Speed is steps/s. If initial speed and final speed differ, the motor will
   // accelerate or decelerate to reach the final speed within the given number of
   // alotted steps of the axis with the most number of steps; all other axes are
@@ -56,7 +56,7 @@ public:
   // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  virtual int Enqueue(const MotorMovement &param, FILE *err_stream) = 0;
+  virtual int Enqueue(const LinearSegmentSteps &segment, FILE *err_stream) = 0;
 
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
@@ -71,12 +71,12 @@ public:
   // Initialize motor operations, sending planned results into the motion backend.
   MotionQueueMotorOperations(MotionQueue *backend) : backend_(backend) {}
 
-  virtual int Enqueue(const MotorMovement &param, FILE *err_stream);
+  virtual int Enqueue(const LinearSegmentSteps &segment, FILE *err_stream);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
 
 private:
-  void EnqueueInternal(const MotorMovement &param,
+  void EnqueueInternal(const LinearSegmentSteps &param,
                        int defining_axis_steps);
 
   MotionQueue *backend_;

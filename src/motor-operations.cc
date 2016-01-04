@@ -84,7 +84,7 @@ static char test_acceleration_ok(float acceleration) {
 }
 #endif
 
-void MotionQueueMotorOperations::EnqueueInternal(const MotorMovement &param,
+void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param,
                                                  int defining_axis_steps) {
   struct MotionSegment new_element = {0};
   new_element.direction_bits = 0;
@@ -152,7 +152,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const MotorMovement &param,
   backend_->Enqueue(&new_element);
 }
 
-static int get_defining_axis_steps(const MotorMovement &param) {
+static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   int defining_axis_steps = abs(param.steps[0]);
   for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
     if (abs(param.steps[i]) > defining_axis_steps) {
@@ -162,7 +162,8 @@ static int get_defining_axis_steps(const MotorMovement &param) {
   return defining_axis_steps;
 }
 
-int MotionQueueMotorOperations::Enqueue(const MotorMovement &param, FILE *err_stream) {
+int MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
+                                        FILE *err_stream) {
   const int defining_axis_steps = get_defining_axis_steps(param);
   if (defining_axis_steps == 0) {
     Log_debug("Zero steps. Ignoring command.");
@@ -180,7 +181,7 @@ int MotionQueueMotorOperations::Enqueue(const MotorMovement &param, FILE *err_st
       hires_steps_per_div[i] = ((int64_t)param.steps[i] << 32)/divisions + 1;
     }
 
-    struct MotorMovement previous = {0}, accumulator = {0}, output;
+    struct LinearSegmentSteps previous = {0}, accumulator = {0}, output;
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
     double previous_speed = param.v0;   // speed calculation in double
 

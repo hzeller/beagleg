@@ -89,7 +89,7 @@ class StatsMotorOperations : public MotorOperations {
 public:
   StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
-  virtual int Enqueue(const MotorMovement &param, FILE *err_stream) {
+  virtual int Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       int steps = abs(param.steps[i]);
