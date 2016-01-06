@@ -206,7 +206,17 @@ private:
   enum HomingState homing_state_;
 };
 
-static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config);
+static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
+  switch (config.endstop_switch) {
+  case 1:  return END_1_GPIO;
+  case 2:  return END_2_GPIO;
+  case 3:  return END_3_GPIO;
+  case 4:  return END_4_GPIO;
+  case 5:  return END_5_GPIO;
+  case 6:  return END_6_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
+}
 
 static uint32_t get_aux_bit_gpio_descriptor(int pin) {
   switch (pin) {
@@ -1149,18 +1159,6 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
     return;
   }
   prog_speed_factor_ = value;
-}
-
-static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
-  switch (config.endstop_switch) {
-  case 1: return END_1_GPIO;
-  case 2: return END_2_GPIO;
-  case 3: return END_3_GPIO;
-  case 4: return END_4_GPIO;
-  case 5: return END_5_GPIO;
-  case 6: return END_6_GPIO;
-  }
-  return 0;
 }
 
 // Get the endstop for the axis.
