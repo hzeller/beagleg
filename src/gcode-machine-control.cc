@@ -138,6 +138,7 @@ private:
   bool test_homing_status_ok();
   bool test_within_machine_limits(const AxesRegister &axes);
   void bring_path_to_halt();
+  const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
                               enum GCodeParserAxis defining_axis);
@@ -206,6 +207,28 @@ private:
 };
 
 static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config);
+
+static uint32_t get_aux_bit_gpio_descriptor(int pin) {
+  switch (pin) {
+  case 0:  return AUX_1_GPIO;
+  case 1:  return AUX_2_GPIO;
+  case 2:  return AUX_3_GPIO;
+  case 3:  return AUX_4_GPIO;
+  case 4:  return AUX_5_GPIO;
+  case 5:  return AUX_6_GPIO;
+  case 6:  return AUX_7_GPIO;
+  case 7:  return AUX_8_GPIO;
+  case 8:  return AUX_9_GPIO;
+  case 9:  return AUX_10_GPIO;
+  case 10: return AUX_11_GPIO;
+  case 11: return AUX_12_GPIO;
+  case 12: return AUX_13_GPIO;
+  case 13: return AUX_14_GPIO;
+  case 14: return AUX_15_GPIO;
+  case 15: return AUX_16_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
+}
 
 static inline int round2int(float x) { return (int) roundf(x); }
 
@@ -515,85 +538,22 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   const int code = (int)value;
 
   if (letter == 'M') {
-    int pin = -1;
-    int aux_bit = -1;
-
     switch (code) {
     case 0: set_gpio(ESTOP_SW_GPIO); break;
     case 3:
     case 4:
-      for (;;) {
-        const char* after_pair
-          = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
-        if (after_pair == NULL) break;
-        else if (letter == 'S') spindle_rpm_ = round2int(value);
-        else break;
-        remaining = after_pair;
-      }
-      if (spindle_rpm_) {
-        aux_bits_ |= AUX_BIT_SPINDLE_ON;
-        if (code == 3) aux_bits_ &= ~AUX_BIT_SPINDLE_DIR;
-        else aux_bits_ |= AUX_BIT_SPINDLE_DIR;
-      }
-      break;
-    case 5: aux_bits_ &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); break;
-    case 7: aux_bits_ |= AUX_BIT_MIST; break;
-    case 8: aux_bits_ |= AUX_BIT_FLOOD; break;
-    case 9: aux_bits_ &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); break;
-    case 10: aux_bits_ |= AUX_BIT_VACUUM; break;
-    case 11: aux_bits_ &= ~AUX_BIT_VACUUM; break;
+    case 5:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 11:
     case 42:
     case 62:
     case 63:
     case 64:
     case 65:
-      for (;;) {
-        const char* after_pair
-          = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
-        if (after_pair == NULL) break;
-        if (letter == 'P') pin = round2int(value);
-        else if (letter == 'S' && code == 42) aux_bit = round2int(value);
-        else break;
-        remaining = after_pair;
-      }
-      if (code == 62 || code == 64)
-        aux_bit = 1;
-      else if (code == 63 || code == 65)
-        aux_bit = 0;
-      if (pin >= 0 && pin <= MAX_AUX_PIN) {
-        if (aux_bit >= 0 && aux_bit <= 1) {
-          if (aux_bit) aux_bits_ |= 1 << pin;
-          else aux_bits_ &= ~(1 << pin);
-          if (code == 64 || code == 65) {
-            // update the AUX pin now
-            uint32_t gpio_def = GPIO_NOT_MAPPED;
-            switch (pin) {
-            case 0:  gpio_def = AUX_1_GPIO; break;
-            case 1:  gpio_def = AUX_2_GPIO; break;
-            case 2:  gpio_def = AUX_3_GPIO; break;
-            case 3:  gpio_def = AUX_4_GPIO; break;
-            case 4:  gpio_def = AUX_5_GPIO; break;
-            case 5:  gpio_def = AUX_6_GPIO; break;
-            case 6:  gpio_def = AUX_7_GPIO; break;
-            case 7:  gpio_def = AUX_8_GPIO; break;
-            case 8:  gpio_def = AUX_9_GPIO; break;
-            case 9:  gpio_def = AUX_10_GPIO; break;
-            case 10: gpio_def = AUX_11_GPIO; break;
-            case 11: gpio_def = AUX_12_GPIO; break;
-            case 12: gpio_def = AUX_13_GPIO; break;
-            case 13: gpio_def = AUX_14_GPIO; break;
-            case 14: gpio_def = AUX_15_GPIO; break;
-            case 15: gpio_def = AUX_16_GPIO; break;
-            }
-            if (gpio_def != GPIO_NOT_MAPPED) {
-              if (aux_bit) set_gpio(gpio_def);
-              else clr_gpio(gpio_def);
-            }
-          }
-        } else if (code == 42 && msg_stream_) {  // Just read operation.
-          mprintf("%d\n", (aux_bits_ >> pin) & 1);
-        }
-      }
+      remaining = aux_bit_commands(letter, value, remaining);
       break;
     case 80: set_gpio(MACHINE_PWR_GPIO); break;
     case 81: clr_gpio(MACHINE_PWR_GPIO); break;
@@ -667,6 +627,68 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
       remaining = NULL;  // In this case, let's just discard remainig block.
       break;
     }
+  }
+  return remaining;
+}
+
+const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value,
+                                                        const char *remaining) {
+  const int code = (int)value;
+  int pin = -1;
+  int aux_bit = -1;
+  const char* after_pair;
+
+  switch (code) {
+  case 3:
+  case 4:
+    for (;;) {
+      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      if (after_pair == NULL) break;
+      else if (letter == 'S') spindle_rpm_ = round2int(value);
+      else break;
+      remaining = after_pair;
+    }
+    if (spindle_rpm_) {
+      aux_bits_ |= AUX_BIT_SPINDLE_ON;
+      if (code == 3) aux_bits_ &= ~AUX_BIT_SPINDLE_DIR;
+      else aux_bits_ |= AUX_BIT_SPINDLE_DIR;
+    }
+    break;
+  case 5: aux_bits_ &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); break;
+  case 7: aux_bits_ |= AUX_BIT_MIST; break;
+  case 8: aux_bits_ |= AUX_BIT_FLOOD; break;
+  case 9: aux_bits_ &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); break;
+  case 10: aux_bits_ |= AUX_BIT_VACUUM; break;
+  case 11: aux_bits_ &= ~AUX_BIT_VACUUM; break;
+  case 42:
+  case 62:
+  case 63:
+  case 64:
+  case 65:
+    for (;;) {
+      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      if (after_pair == NULL) break;
+      if (letter == 'P') pin = round2int(value);
+      else if (letter == 'S' && code == 42) aux_bit = round2int(value);
+      else break;
+      remaining = after_pair;
+    }
+    if (code == 62 || code == 64) aux_bit = 1;
+    else if (code == 63 || code == 65) aux_bit = 0;
+    if (pin >= 0 && pin <= MAX_AUX_PIN) {
+      if (aux_bit >= 0 && aux_bit <= 1) {
+        if (aux_bit) aux_bits_ |= 1 << pin;
+        else aux_bits_ &= ~(1 << pin);
+        if (code == 64 || code == 65) {
+          // update the AUX pin now
+          if (aux_bit) set_gpio(get_aux_bit_gpio_descriptor(pin));
+          else clr_gpio(get_aux_bit_gpio_descriptor(pin));
+        }
+      } else if (code == 42 && msg_stream_) {  // Just read operation.
+        mprintf("%d\n", (aux_bits_ >> pin) & 1);
+      }
+    }
+    break;
   }
   return remaining;
 }
