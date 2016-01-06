@@ -138,6 +138,7 @@ private:
   bool test_homing_status_ok();
   bool test_within_machine_limits(const AxesRegister &axes);
   void bring_path_to_halt();
+  void get_endstop_status();
   void get_current_position();
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
@@ -567,34 +568,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     mprintf("// Msg: %s\n", remaining); // TODO: different output ?
     remaining = NULL;  // consume the full line.
     break;
-  case 119: {
-    char any_enstops_found = 0;
-    for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
-      GCodeParserAxis axis = (GCodeParserAxis) ai;
-      struct EndstopConfig config = cfg_.min_endstop_[axis];
-      if (config.endstop_switch) {
-        int value = get_gpio(get_endstop_gpio_descriptor(config));
-        mprintf("%c_min:%s ",
-                tolower(gcodep_axis2letter(axis)),
-                value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-        any_enstops_found = 1;
-      }
-      config = cfg_.max_endstop_[axis];
-      if (config.endstop_switch) {
-        int value = get_gpio(get_endstop_gpio_descriptor(config));
-        mprintf("%c_max:%s ",
-                tolower(gcodep_axis2letter(axis)),
-                value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-        any_enstops_found = 1;
-      }
-    }
-    if (any_enstops_found) {
-      mprintf("\n");
-    } else {
-      mprintf("// This machine has no endstops configured.\n");
-    }
-  }
-    break;
+  case 119: get_endstop_status(); break;
   case 999: clr_gpio(ESTOP_SW_GPIO); break;
   default:
     mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
@@ -693,6 +667,34 @@ void GCodeMachineControl::Impl::get_current_position() {
     }
   } else {
     mprintf("// no current pos\n");
+  }
+}
+
+void GCodeMachineControl::Impl::get_endstop_status() {
+  bool any_enstops_found = false;
+  for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
+    GCodeParserAxis axis = (GCodeParserAxis) ai;
+    struct EndstopConfig config = cfg_.min_endstop_[axis];
+    if (config.endstop_switch) {
+      int value = get_gpio(get_endstop_gpio_descriptor(config));
+      mprintf("%c_min:%s ",
+              tolower(gcodep_axis2letter(axis)),
+              value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
+      any_enstops_found = true;
+    }
+    config = cfg_.max_endstop_[axis];
+    if (config.endstop_switch) {
+      int value = get_gpio(get_endstop_gpio_descriptor(config));
+      mprintf("%c_max:%s ",
+              tolower(gcodep_axis2letter(axis)),
+              value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
+      any_enstops_found = true;
+    }
+  }
+  if (any_enstops_found) {
+    mprintf("\n");
+  } else {
+    mprintf("// This machine has no endstops configured.\n");
   }
 }
 
