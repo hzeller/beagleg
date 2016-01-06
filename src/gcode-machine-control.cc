@@ -138,6 +138,7 @@ private:
   bool test_homing_status_ok();
   bool test_within_machine_limits(const AxesRegister &axes);
   void bring_path_to_halt();
+  void get_current_position();
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -560,34 +561,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 80: set_gpio(MACHINE_PWR_GPIO); break;
   case 81: clr_gpio(MACHINE_PWR_GPIO); break;
   case 105: mprintf("T-300\n"); break;  // no temp yet.
-  case 114:
-    if (planning_buffer_.size() > 0) {
-      const struct AxisTarget *current = planning_buffer_[0];
-      const int *mpos = current->position_steps;
-      const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
-      const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
-      const float z = 1.0f * mpos[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
-      const float e = 1.0f * mpos[AXIS_E] / cfg_.steps_per_mm[AXIS_E];
-      const AxesRegister &origin = coordinate_display_origin_;
-      mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
-              x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
-              e - origin[AXIS_E]);
-      mprintf(" [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]", x, y, z);
-      switch (homing_state_) {
-      case HOMING_STATE_NEVER_HOMED:
-        mprintf(" (Unsure: machine never homed!)\n");
-        break;
-      case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
-        mprintf(" (Lower confidence: motor power off at least once after homing)\n");
-        break;
-      case HOMING_STATE_HOMED:
-        mprintf(" (confident: machine was homed)\n");
-        break;
-      }
-    } else {
-      mprintf("// no current pos\n");
-    }
-    break;
+  case 114: get_current_position(); break;
   case 115: mprintf("%s\n", VERSION_STRING); break;
   case 117:
     mprintf("// Msg: %s\n", remaining); // TODO: different output ?
@@ -691,6 +665,35 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
     break;
   }
   return remaining;
+}
+
+void GCodeMachineControl::Impl::get_current_position() {
+  if (planning_buffer_.size() > 0) {
+    const struct AxisTarget *current = planning_buffer_[0];
+    const int *mpos = current->position_steps;
+    const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
+    const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
+    const float z = 1.0f * mpos[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
+    const float e = 1.0f * mpos[AXIS_E] / cfg_.steps_per_mm[AXIS_E];
+    const AxesRegister &origin = coordinate_display_origin_;
+    mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
+            x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
+            e - origin[AXIS_E]);
+    mprintf(" [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]", x, y, z);
+    switch (homing_state_) {
+    case HOMING_STATE_NEVER_HOMED:
+      mprintf(" (Unsure: machine never homed!)\n");
+      break;
+    case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
+      mprintf(" (Lower confidence: motor power off at least once after homing)\n");
+      break;
+    case HOMING_STATE_HOMED:
+      mprintf(" (confident: machine was homed)\n");
+      break;
+    }
+  } else {
+    mprintf("// no current pos\n");
+  }
 }
 
 void GCodeMachineControl::Impl::gcode_finished() {
