@@ -545,98 +545,88 @@ const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
 
 const char *GCodeMachineControl::Impl::special_commands(char letter, float value,
                                                         const char *remaining) {
-  const int code = (int)value;
+  // Only M commands are handled here
+  if (letter != 'M') return remaining;
 
-  if (letter == 'M') {
-    switch (code) {
-    case 0: set_gpio(ESTOP_SW_GPIO); break;
-    case 3:
-    case 4:
-    case 5:
-    case 7:
-    case 8:
-    case 9:
-    case 10:
-    case 11:
-    case 42:
-    case 62:
-    case 63:
-    case 64:
-    case 65:
-      remaining = aux_bit_commands(letter, value, remaining);
-      break;
-    case 80: set_gpio(MACHINE_PWR_GPIO); break;
-    case 81: clr_gpio(MACHINE_PWR_GPIO); break;
-    case 105: mprintf("T-300\n"); break;  // no temp yet.
-    case 114:
-      if (planning_buffer_.size() > 0) {
-        const struct AxisTarget *current = planning_buffer_[0];
-        const int *mpos = current->position_steps;
-        const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
-        const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
-        const float z = 1.0f * mpos[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
-        const float e = 1.0f * mpos[AXIS_E] / cfg_.steps_per_mm[AXIS_E];
-        const AxesRegister &origin = coordinate_display_origin_;
-        mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
-                x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
-                e - origin[AXIS_E]);
-        mprintf(" [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]", x, y, z);
-        switch (homing_state_) {
-        case HOMING_STATE_NEVER_HOMED:
-          mprintf(" (Unsure: machine never homed!)\n");
-          break;
-        case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
-          mprintf(" (Lower confidence: motor power off at "
-                  "least once after homing)\n");
-          break;
-        case HOMING_STATE_HOMED:
-          mprintf(" (confident: machine was homed)\n");
-          break;
-        }
-      } else {
-        mprintf("// no current pos\n");
+  const int code = (int)value;
+  switch (code) {
+  case 0: set_gpio(ESTOP_SW_GPIO); break;
+  case 3 ... 5:    // aux pin spindle control
+  case 7 ... 11:   // aux pin mist/flood/vacuum control
+  case 42:         // aux pin state query
+  case 62 ... 65:  // aux pin set
+    remaining = aux_bit_commands(letter, value, remaining);
+    break;
+  case 80: set_gpio(MACHINE_PWR_GPIO); break;
+  case 81: clr_gpio(MACHINE_PWR_GPIO); break;
+  case 105: mprintf("T-300\n"); break;  // no temp yet.
+  case 114:
+    if (planning_buffer_.size() > 0) {
+      const struct AxisTarget *current = planning_buffer_[0];
+      const int *mpos = current->position_steps;
+      const float x = 1.0f * mpos[AXIS_X] / cfg_.steps_per_mm[AXIS_X];
+      const float y = 1.0f * mpos[AXIS_Y] / cfg_.steps_per_mm[AXIS_Y];
+      const float z = 1.0f * mpos[AXIS_Z] / cfg_.steps_per_mm[AXIS_Z];
+      const float e = 1.0f * mpos[AXIS_E] / cfg_.steps_per_mm[AXIS_E];
+      const AxesRegister &origin = coordinate_display_origin_;
+      mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
+              x - origin[AXIS_X], y - origin[AXIS_Y], z - origin[AXIS_Z],
+              e - origin[AXIS_E]);
+      mprintf(" [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]", x, y, z);
+      switch (homing_state_) {
+      case HOMING_STATE_NEVER_HOMED:
+        mprintf(" (Unsure: machine never homed!)\n");
+        break;
+      case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
+        mprintf(" (Lower confidence: motor power off at least once after homing)\n");
+        break;
+      case HOMING_STATE_HOMED:
+        mprintf(" (confident: machine was homed)\n");
+        break;
       }
-      break;
-    case 115: mprintf("%s\n", VERSION_STRING); break;
-    case 117:
-      mprintf("// Msg: %s\n", remaining); // TODO: different output ?
-      remaining = NULL;  // consume the full line.
-      break;
-    case 119: {
-      char any_enstops_found = 0;
-      for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
-        GCodeParserAxis axis = (GCodeParserAxis) ai;
-        struct EndstopConfig config = cfg_.min_endstop_[axis];
-        if (config.endstop_switch) {
-          int value = get_gpio(get_endstop_gpio_descriptor(config));
-          mprintf("%c_min:%s ",
-                  tolower(gcodep_axis2letter(axis)),
-                  value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-          any_enstops_found = 1;
-        }
-        config = cfg_.max_endstop_[axis];
-        if (config.endstop_switch) {
-          int value = get_gpio(get_endstop_gpio_descriptor(config));
-          mprintf("%c_max:%s ",
-                  tolower(gcodep_axis2letter(axis)),
-                  value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-          any_enstops_found = 1;
-        }
+    } else {
+      mprintf("// no current pos\n");
+    }
+    break;
+  case 115: mprintf("%s\n", VERSION_STRING); break;
+  case 117:
+    mprintf("// Msg: %s\n", remaining); // TODO: different output ?
+    remaining = NULL;  // consume the full line.
+    break;
+  case 119: {
+    char any_enstops_found = 0;
+    for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
+      GCodeParserAxis axis = (GCodeParserAxis) ai;
+      struct EndstopConfig config = cfg_.min_endstop_[axis];
+      if (config.endstop_switch) {
+        int value = get_gpio(get_endstop_gpio_descriptor(config));
+        mprintf("%c_min:%s ",
+                tolower(gcodep_axis2letter(axis)),
+                value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
+        any_enstops_found = 1;
       }
-      if (any_enstops_found) {
-        mprintf("\n");
-      } else {
-        mprintf("// This machine has no endstops configured.\n");
+      config = cfg_.max_endstop_[axis];
+      if (config.endstop_switch) {
+        int value = get_gpio(get_endstop_gpio_descriptor(config));
+        mprintf("%c_max:%s ",
+                tolower(gcodep_axis2letter(axis)),
+                value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
+        any_enstops_found = 1;
       }
     }
-      break;
-    case 999: clr_gpio(ESTOP_SW_GPIO); break;
-    default:
-      mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
-              letter, code, remaining);
-      remaining = NULL;  // In this case, let's just discard remainig block.
-      break;
+    if (any_enstops_found) {
+      mprintf("\n");
+    } else {
+      mprintf("// This machine has no endstops configured.\n");
     }
+  }
+    break;
+  case 999: clr_gpio(ESTOP_SW_GPIO); break;
+  default:
+    mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
+            letter, code, remaining);
+    remaining = NULL;  // In this case, let's just discard remainig block.
+    break;
   }
   return remaining;
 }
