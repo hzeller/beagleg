@@ -97,22 +97,24 @@ struct pwm_timer_data {
   char running;
 };
 
-struct pwm_timer_data timers[4];
+struct pwm_timer_data timers[4] = { {0}, {0}, {0}, {0} };
 
-static int pwm_timer_get_index(uint32_t gpio_def) {
+static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
+  struct pwm_timer_data *timer = NULL;
   switch (gpio_def) {
-  case PIN_P8_7:  return 0;  // TIMER4
-  case PIN_P8_9:  return 1;  // TIMER5
-  case PIN_P8_10: return 2;  // TIMER6
-  case PIN_P8_8:  return 3;  // TIMER7
-  default:        return -1; // unmapped or unsupported pin
+  case PIN_P8_7:  timer = &timers[0];  // TIMER4
+  case PIN_P8_9:  timer = &timers[1];  // TIMER5
+  case PIN_P8_10: timer = &timers[2];  // TIMER6
+  case PIN_P8_8:  timer = &timers[3];  // TIMER7
+  default:        return NULL;         // unsupported pin
   }
+  if (!timer->regs) return NULL;       // unmapped timer
+  return timer;
 }
 
 void pwm_timer_start(uint32_t gpio_def, char start) {
-  int timer_index = pwm_timer_get_index(gpio_def);
-  if (timer_index < 0) return;
-  struct pwm_timer_data *timer = &timers[timer_index];
+  struct pwm_timer_data *timer = pwm_timer_get_data(gpio_def);
+  if (!timer) return;
 
   if (!start || !timer->pwm_freq || !timer->duty_cycle) {
     timer->regs[TCLR/4] = 0;                              // stop timer
@@ -131,9 +133,8 @@ void pwm_timer_start(uint32_t gpio_def, char start) {
 }
 
 void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle) {
-  int timer_index = pwm_timer_get_index(gpio_def);
-  if (timer_index < 0) return;
-  struct pwm_timer_data *timer = &timers[timer_index];
+  struct pwm_timer_data *timer = pwm_timer_get_data(gpio_def);
+  if (!timer) return;
 
   if (!timer->pwm_freq || duty_cycle < 0.0 || duty_cycle > 1.0) return;
 
@@ -190,9 +191,8 @@ static void pwm_timer_calc_resolution(struct pwm_timer_data *timer, int pwm_freq
 }
 
 void pwm_timer_set_freq(uint32_t gpio_def, int pwm_freq) {
-  int timer_index = pwm_timer_get_index(gpio_def);
-  if (timer_index < 0) return;
-  struct pwm_timer_data *timer = &timers[timer_index];
+  struct pwm_timer_data *timer = pwm_timer_get_data(gpio_def);
+  if (!timer) return;
 
   if (pwm_freq == 0) pwm_freq = TIMER_DEFAULT_FREQ;
 
