@@ -213,6 +213,7 @@
 // Aux 3 = Vacuum control on/off (M10: on; M11: off)
 // Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
 // Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
+// Aux 6 = Cooler control on/off (M245: on; M246: off)
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED
 #endif

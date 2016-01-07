@@ -49,11 +49,12 @@
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 // aux_bits
-#define AUX_BIT_MIST        (1 << 0)
-#define AUX_BIT_FLOOD       (1 << 1)
-#define AUX_BIT_VACUUM      (1 << 2)
-#define AUX_BIT_SPINDLE_ON  (1 << 3)
-#define AUX_BIT_SPINDLE_DIR (1 << 4)
+#define AUX_BIT_MIST        (1 << 0)  // M7: on; M9: off
+#define AUX_BIT_FLOOD       (1 << 1)  // M8: on; M9: off
+#define AUX_BIT_VACUUM      (1 << 2)  // M10: on; M11: off
+#define AUX_BIT_SPINDLE_ON  (1 << 3)  // M3/M4: on; M5: off
+#define AUX_BIT_SPINDLE_DIR (1 << 4)  // M3: clockwise; M4: counterclockwise
+#define AUX_BIT_COOLER      (1 << 5)  // M245: on ; M246: off
 #define MAX_AUX_PIN         15
 
 #define NUM_ENDSTOPS        6
@@ -553,10 +554,11 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   const int code = (int)value;
   switch (code) {
   case 0: set_gpio(ESTOP_SW_GPIO); break;
-  case 3 ... 5:    // aux pin spindle control
-  case 7 ... 11:   // aux pin mist/flood/vacuum control
-  case 42:         // aux pin state query
-  case 62 ... 65:  // aux pin set
+  case 3 ... 5:      // aux pin spindle control
+  case 7 ... 11:     // aux pin mist/flood/vacuum control
+  case 42:           // aux pin state query
+  case 62 ... 65:    // aux pin set
+  case 245 ... 246:  // aux pin cooler control
     remaining = aux_bit_commands(letter, value, remaining);
     break;
   case 80: set_gpio(MACHINE_PWR_GPIO); break;
@@ -637,6 +639,8 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       }
     }
     break;
+  case 245: aux_bits_ |= AUX_BIT_COOLER; break;
+  case 246: aux_bits_ &= ~AUX_BIT_COOLER; break;
   }
   return remaining;
 }
