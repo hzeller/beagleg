@@ -68,10 +68,10 @@ all : $(TARGETS)
 	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 test: $(UNITTEST_BINARIES)
-	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin ; done
+	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done
 
 valgrind-test: $(UNITTEST_BINARIES)
-	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --leak-check=full -q ./$$test_bin ; done
+	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --leak-check=full -q ./$$test_bin || exit 1; done
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \

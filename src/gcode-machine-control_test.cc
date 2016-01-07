@@ -66,7 +66,11 @@ private:
   void ExpectEq(const struct LinearSegmentSteps *expected,
                 const struct LinearSegmentSteps &reality,
                 int info_segment_number) {
-    if (memcmp(&expected, &reality, sizeof(*expected)) != 0) {
+    if (expected->v0 != reality.v0 ||
+        expected->v1 != reality.v1 ||
+        expected->steps[0] != reality.steps[0] ||
+        expected->steps[1] != reality.steps[1] ||
+        expected->steps[2] != reality.steps[2]) {
       printf("segment #%d: ", info_segment_number);
       PrintMovement("expected", expected);
       PrintMovement("; but was", &reality);
