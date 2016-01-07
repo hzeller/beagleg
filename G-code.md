@@ -78,6 +78,7 @@ M116             | `wait_temperature()`  | Wait for temperature to be reached
 M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
 M106 Snnn        | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
+M111 Snnn        | -                     | Set debug level.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
 
 ### M Codes dealt with by gcode-machine-control

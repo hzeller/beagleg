@@ -237,6 +237,7 @@ private:
   const char *handle_move(const char *line, int force_change);
   const char *handle_arc(const char *line, int is_cw);
   const char *handle_z_probe(const char *line);
+  const char *handle_M111(const char *line);
 
   // Read parameter from letter "param_letter" and call the event callback
   // "ValueSetter" in the events callbacks. Pass the parameter, multiplied
@@ -584,6 +585,22 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
   return line;
 }
 
+const char *GCodeParser::Impl::handle_M111(const char *line) {
+  int level = -1;
+  char letter;
+  float value;
+  const char *remaining_line;
+  // Read all the 'S' parameters. Well, we expect exactly one.
+  while ((remaining_line = gparse_pair(line, &letter, &value))) {
+    if (letter != 'S')
+      break;  // possibly next command.
+    level = (int)value;
+    line = remaining_line;
+  }
+  if (level >= 0) set_debug_level((unsigned int)level);
+  return line;
+}
+
 // Note: changes here should be documented in G-code.md as well.
 void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
   ++line_number_;
@@ -644,6 +661,7 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
         callbacks->wait_temperature();
         break;
       case 116: callbacks->wait_temperature(); break;
+      case 111: line = handle_M111(line); break;
       case 220:
         line = set_param('S', &GCodeParser::EventReceiver::set_speed_factor,
                          0.01f, line);
