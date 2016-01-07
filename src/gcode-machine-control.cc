@@ -532,7 +532,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
       }
       if (spindle_rpm_) {
         aux_bits_ |= AUX_BIT_SPINDLE_ON;
-	if (code == 3) aux_bits_ &= ~AUX_BIT_SPINDLE_DIR;
+        if (code == 3) aux_bits_ &= ~AUX_BIT_SPINDLE_DIR;
         else aux_bits_ |= AUX_BIT_SPINDLE_DIR;
       }
       break;

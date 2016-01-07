@@ -49,21 +49,21 @@ static int usage(const char *prog, const char *msg) {
     fprintf(stderr, "\033[1m\033[31m%s\033[0m\n\n", msg);
   }
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
-	  "Options:\n", prog);
+          "Options:\n", prog);
   fprintf(stderr,
           "  --config <config>     (-c): Configuration file.\n"
-	  "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
-	  "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
+          "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
+          "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
           "  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
           "  --daemon              (-d): Run as daemon.\n"
           "  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
           "\nMostly for testing and debugging:\n"
-	  "  -f <factor>               : Feedrate speed factor (Default 1.0).\n"
-	  "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
+          "  -f <factor>               : Feedrate speed factor (Default 1.0).\n"
+          "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
-	  "  -P                        : Verbose: Show some more debug output (Default: off).\n"
-	  "  -S                        : Synchronous: don't queue (Default: off).\n"
-	  "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n");
+          "  -P                        : Verbose: Show some more debug output (Default: off).\n"
+          "  -S                        : Synchronous: don't queue (Default: off).\n"
+          "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n");
   return 1;
 }
 
@@ -189,7 +189,7 @@ static int run_server(int listen_socket,
     }
     char ip_buffer[INET_ADDRSTRLEN];
     const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
-				     ip_buffer, sizeof(ip_buffer));
+                                     ip_buffer, sizeof(ip_buffer));
     Log_info("Accepting new connection from %s\n", print_ip);
     FILE *msg_stream = fdopen(connection, "w");
     machine->SetMsgOut(msg_stream);
@@ -266,12 +266,12 @@ int main(int argc, char *argv[]) {
   char *bind_addr = NULL;
   int opt;
   while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:dc:",
-			    long_options, NULL)) != -1) {
+                            long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = (float)atof(optarg);
       if (config.speed_factor <= 0)
-	return usage(argv[0], "Speedfactor cannot be <= 0");
+        return usage(argv[0], "Speedfactor cannot be <= 0");
       break;
     case OPT_SET_THRESHOLD_ANGLE:
       config.threshold_angle = (float)atof(optarg);
@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // ... other configurations that read from that file.
-  
+
   if (as_daemon && daemon(0, 0) != 0) {
     Log_error("Can't become daemon: %s", strerror(errno));
   }

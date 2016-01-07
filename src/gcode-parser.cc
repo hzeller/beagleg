@@ -125,7 +125,7 @@ bool GCodeParser::EventReceiver::coordinated_move(float feed,
                                                   const AxesRegister& axes) {
   Log_debug("GCodeParser: move(X=%.3f,Y=%.3f,Z=%.3f,E=%.3f,...);",
             axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], axes[AXIS_E]);
-  
+
   Log_debug("feed=%.1f", feed);
   return true;
 }
@@ -344,7 +344,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
   *letter = toupper(*line++);
   if (*line == '\0') {
     fprintf(err_stream ? err_stream : stderr,
-	    "// Line %d G-Code Syntax Error: expected value after '%c'\n",
+            "// Line %d G-Code Syntax Error: expected value after '%c'\n",
             line_num, *letter);
     return NULL;
   }
@@ -367,7 +367,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
 
   if (line == endptr) {
     fprintf(err_stream ? err_stream : stderr, "// Line %d G-Code Syntax Error:"
-	    " Letter '%c' is not followed by a number `%s`.\n",
+            " Letter '%c' is not followed by a number `%s`.\n",
             line_num, *letter, line);
     return NULL;
   }
@@ -529,7 +529,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, int is_cw) {
     else if (letter == 'J') offset[AXIS_Y] = unit_value;
     else if (letter == 'K') offset[AXIS_Z] = unit_value;
     else if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
-    else if (letter == 'P') turns = (int)value;	// currently ignored
+    else if (letter == 'P') turns = (int)value; // currently ignored
     // TODO: 'R'
     else break;
 
@@ -634,15 +634,15 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
         break;
       case 107: callbacks->set_fanspeed(0); break;
       case 109:
-	line = set_param('S', &GCodeParser::EventReceiver::set_temperature,
+        line = set_param('S', &GCodeParser::EventReceiver::set_temperature,
                          1.0f, line);
-	callbacks->wait_temperature();
-	break;
+        callbacks->wait_temperature();
+        break;
       case 116: callbacks->wait_temperature(); break;
       case 220:
-	line = set_param('S', &GCodeParser::EventReceiver::set_speed_factor,
+        line = set_param('S', &GCodeParser::EventReceiver::set_speed_factor,
                          0.01f, line);
-	break;
+        break;
       default: line = callbacks->unprocessed(letter, value, line); break;
       }
     }
@@ -659,10 +659,10 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
         // Update the axis position then handle the move.
         const float unit_value = value * unit_to_mm_factor_;
         axes_pos_[axis] = abs_axis_pos(axis, unit_value);
-	line = handle_move(line, 1);
-	// make gcode_command_done() think this was a 'G0/G1' command
-	letter = 'G';
-	value = modal_g0_g1_;
+        line = handle_move(line, 1);
+        // make gcode_command_done() think this was a 'G0/G1' command
+        letter = 'G';
+        value = modal_g0_g1_;
       }
     }
     if (processed_command) {

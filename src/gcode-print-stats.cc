@@ -33,16 +33,16 @@
 
 int usage(const char *prog) {
   fprintf(stderr, "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
-	  "Options:\n"
+          "Options:\n"
           "\t-c <config>       : Machine config\n"
-	  "\t-f <factor>       : Speedup-factor for feedrate.\n"
+          "\t-f <factor>       : Speedup-factor for feedrate.\n"
           "\t-H                : Toggle print header line\n"
-	  "Use filename '-' for stdin.\n", prog);
+          "Use filename '-' for stdin.\n", prog);
   return 1;
 }
 
 static void print_file_stats(const char *filename, int indentation,
-			     const MachineControlConfig &config) {
+                             const MachineControlConfig &config) {
   struct BeagleGPrintStats result;
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
   if (determine_print_stats(fd, config, &result)) {

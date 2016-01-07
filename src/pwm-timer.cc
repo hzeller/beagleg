@@ -85,7 +85,7 @@
 #define TIMER_BASE_CLOCK        24000000    // CLK_M_OSC is 24 MHz on the BeagleBone Black
 #define TIMER_OVERFLOW          0xffffffff
 
-#define TIMER_DEFAULT_FREQ	16000       // default PWM frequency is 16 KHz
+#define TIMER_DEFAULT_FREQ      16000       // default PWM frequency is 16 KHz
 
 struct pwm_timer_data {
   volatile uint32_t *regs;
@@ -255,7 +255,7 @@ int pwm_timers_map() {
   fd = open("/dev/mem", O_RDWR);
   if (fd == -1) { perror("open()"); return ret; }
 
-  if (!pwm_timers_enable_clocks(fd))	goto exit;
+  if (!pwm_timers_enable_clocks(fd))    goto exit;
 
   timers[0].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER4_BASE);
   if (timers[0].regs == MAP_FAILED) { perror("mmap() TIMER4"); goto exit; }

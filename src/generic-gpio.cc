@@ -196,7 +196,7 @@ int map_gpio() {
   fd = open("/dev/mem", O_RDWR);
   if (fd == -1) { perror("open()"); return ret; }
 
-  if (!enable_gpio_clocks(fd))	goto exit;
+  if (!enable_gpio_clocks(fd))  goto exit;
 
   gpio_0 = map_port(fd, GPIO_MMAP_SIZE, GPIO_0_BASE);
   if (gpio_0 == MAP_FAILED) { perror("mmap() GPIO-0"); goto exit; }

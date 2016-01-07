@@ -65,7 +65,7 @@ void Log_init(const char *filename) {
 }
 
 static void Log_internal(int fd, const char *markup_start,
-			 const char *format, va_list ap) {
+                         const char *format, va_list ap) {
   struct timeval now;
   gettimeofday(&now, NULL);
   struct tm time_breakdown;
@@ -80,7 +80,7 @@ static void Log_internal(int fd, const char *markup_start,
   parts[1].iov_len = vasprintf((char**) &parts[1].iov_base, format, ap);
   parts[2].iov_base = (void*) "\n";
   parts[2].iov_len = 1;
-  int already_newline 
+  int already_newline
     = (parts[1].iov_len > 0 &&
        ((const char*)parts[1].iov_base)[parts[1].iov_len-1] == '\n');
   if (writev(fd, parts, already_newline ? 2 : 3) < 0) {

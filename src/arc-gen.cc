@@ -37,15 +37,15 @@
 // Small arc segments increase accuracy, though might create some
 // CPU load. With 0.1mm arc segments, we can generate about 90 meter/second
 // of arcs with the BeagleBone Black CPU. Sufficient :)
-#define MM_PER_ARC_SEGMENT	0.1
+#define MM_PER_ARC_SEGMENT      0.1
 
 // Generate an arc. Input is the
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
-	     char is_cw,                        // 0 CCW, 1 CW
-	     AxesRegister &position,   // start position. Will be updated.
-	     const AxesRegister &offset,     // Offset to center.
-	     const AxesRegister &target,     // Target position.
-	     void (*segment_output)(void *, const AxesRegister&),
+             char is_cw,                        // 0 CCW, 1 CW
+             AxesRegister &position,   // start position. Will be updated.
+             const AxesRegister &offset,     // Offset to center.
+             const AxesRegister &target,     // Target position.
+             void (*segment_output)(void *, const AxesRegister&),
              void *segment_output_user_data) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
