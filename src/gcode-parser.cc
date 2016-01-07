@@ -166,6 +166,8 @@ public:
   void ParseLine(const char *line, FILE *err_stream);
   int ParseStream(int input_fd, FILE *err_stream);
 
+  void set_debug_level(unsigned int level) { debug_level_ = level; }
+
 private:
   // Reset parser, mostly reset relative coordinate systems to whatever they
   // should be in the beginning.
@@ -287,6 +289,8 @@ private:
   // more: tool offset.
 
   enum GCodeParserAxis arc_normal_;  // normal vector of arcs.
+
+  unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
 };
 
 AxesRegister GCodeParser::Impl::kZeroOffset;
@@ -307,7 +311,8 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     axes_pos_(config.machine_origin),
     home_position_(config.machine_origin),
     current_origin_(&home_position_), current_global_offset_(&kZeroOffset),
-    arc_normal_(AXIS_Z)
+    arc_normal_(AXIS_Z),
+    debug_level_(DEBUG_NONE)
 {
   assert(callbacks);  // otherwise, this is not very useful.
   reset_G92();
@@ -731,6 +736,10 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
     // Filedescriptor readable. Now wait for a line to finish.
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
       break;
+
+    if (debug_level_ & DEBUG_PARSER) {
+      Log_debug("GCodeParser: %s", buffer);
+    }
     ParseLine(buffer, err_stream);
   }
   disarm_signal_handler();
@@ -763,4 +772,7 @@ const char *GCodeParser::ParsePair(const char *line,
                                    char *letter, float *value,
                                    FILE *err_stream) {
   return gcodep_parse_pair_with_linenumber(-1, line, letter, value, err_stream);
+}
+void GCodeParser::set_debug_level(unsigned int level) {
+  impl_->set_debug_level(level);
 }

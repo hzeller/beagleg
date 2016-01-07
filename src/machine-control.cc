@@ -58,6 +58,7 @@ static int usage(const char *prog, const char *msg) {
           "  --daemon              (-d): Run as daemon.\n"
           "  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
           "\nMostly for testing and debugging:\n"
+          "  --log-parser              : Log the parser stream (Default: off).\n"
           "  -f <factor>               : Feedrate speed factor (Default 1.0).\n"
           "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
@@ -229,6 +230,7 @@ int main(int argc, char *argv[]) {
     OPT_DISABLE_RANGE_CHECK,
     OPT_LOOP,
     OPT_PRIVS,
+    OPT_LOG_PARSER,
   };
 
   static struct option long_options[] = {
@@ -242,6 +244,7 @@ int main(int argc, char *argv[]) {
     { "logfile",            required_argument, NULL, 'l'},
     { "daemon",             no_argument,       NULL, 'd'},
     { "priv",               required_argument, NULL, OPT_PRIVS },
+    { "log-parser",         no_argument,       NULL, OPT_LOG_PARSER },
 
     // possibly deprecated soon.
     { "home-order",         required_argument, NULL, OPT_SET_HOME_ORDER },
@@ -263,6 +266,7 @@ int main(int argc, char *argv[]) {
 
   int listen_port = -1;
   int file_loop_count = 1;
+  unsigned int debug_level = GCodeParser::DEBUG_NONE;
   char *bind_addr = NULL;
   int opt;
   while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:dc:",
@@ -318,6 +322,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_PRIVS:
       privs = strdup(optarg);
+      break;
+    case OPT_LOG_PARSER:
+      debug_level |= GCodeParser::DEBUG_PARSER;
       break;
 
       // Deprecated options.
@@ -435,6 +442,7 @@ int main(int argc, char *argv[]) {
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
                                         machine_control->ParseEventReceiver());
+  parser->set_debug_level(debug_level);
 
   int ret = 0;
   if (has_filename) {
