@@ -102,13 +102,13 @@ struct pwm_timer_data timers[4] = { {0}, {0}, {0}, {0} };
 static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
   struct pwm_timer_data *timer = NULL;
   switch (gpio_def) {
-  case PIN_P8_7:  timer = &timers[0];  // TIMER4
-  case PIN_P8_9:  timer = &timers[1];  // TIMER5
-  case PIN_P8_10: timer = &timers[2];  // TIMER6
-  case PIN_P8_8:  timer = &timers[3];  // TIMER7
-  default:        return NULL;         // unsupported pin
+  case PIN_P8_7:  timer = &timers[0]; break; // TIMER4
+  case PIN_P8_9:  timer = &timers[1]; break; // TIMER5
+  case PIN_P8_10: timer = &timers[2]; break; // TIMER6
+  case PIN_P8_8:  timer = &timers[3]; break; // TIMER7
+  default:        return NULL;               // unsupported pin
   }
-  if (!timer->regs) return NULL;       // unmapped timer
+  if (!timer->regs) return NULL;             // unmapped timer
   return timer;
 }
 
