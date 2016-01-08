@@ -40,9 +40,9 @@
 #define START_GPIO         PIN_P8_19  // START (input)
 #define PAUSE_GPIO         PIN_P8_18  // PAUSE (input)
 
-#define AUX_1_GPIO         PIN_P8_8   // OUT1 - Mister
-#define AUX_2_GPIO         PIN_P8_9   // OUT2 - Flood
-#define AUX_3_GPIO         PIN_P8_7   // OUT0 - Vacuum
+#define AUX_1_GPIO         PIN_P8_7   // OUT0 - Vacuum
+#define AUX_2_GPIO         PIN_P8_8   // OUT1 - Mister
+#define AUX_3_GPIO         PIN_P8_9   // OUT2 - Flood
 #define AUX_16_GPIO        PIN_P9_14  // OUT4 - Laser (Z axis dry run)
 
 #define PWM_4_GPIO         PIN_P8_10  // OUT3 - Fan
@@ -53,5 +53,3 @@
 #define END_4_GPIO         PIN_P8_12  // IN3 - Z suface (min)
 #define END_5_GPIO         PIN_P8_13  // IN4 - LIM4
 #define END_6_GPIO         PIN_P8_14  // IN5 - LIM5
-
-#define FAN_GPIO           PWM_4_GPIO

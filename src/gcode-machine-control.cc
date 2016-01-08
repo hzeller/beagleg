@@ -48,20 +48,6 @@
 #define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
-// aux_bits
-// TODO(hzeller): the actual bit->function should be configured in the
-// config file.
-#define AUX_BIT_MIST        (1 << 0)  // M7: on; M9: off
-#define AUX_BIT_FLOOD       (1 << 1)  // M8: on; M9: off
-#define AUX_BIT_VACUUM      (1 << 2)  // M10: on; M11: off
-#define AUX_BIT_SPINDLE_ON  (1 << 3)  // M3/M4: on; M5: off
-#define AUX_BIT_SPINDLE_DIR (1 << 4)  // M3: clockwise; M4: counterclockwise
-#define AUX_BIT_COOLER      (1 << 5)  // M245: on ; M246: off
-#define AUX_BIT_CASE_LIGHT  (1 << 6)  // M355 S1: on; M355 S0: off
-#define MAX_AUX_PIN         15
-
-#define NUM_ENDSTOPS        6
-
 // The target position vector is essentially a position in the
 // GCODE_NUM_AXES-dimensional space.
 //
@@ -144,6 +130,8 @@ private:
   void bring_path_to_halt();
   void get_endstop_status();
   void get_current_position();
+  void set_mapped_aux(enum AuxMap map, int level);
+  void set_mapped_pwm(enum PwmMap map, float duty_cycle);
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -226,23 +214,42 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
 
 static uint32_t get_aux_bit_gpio_descriptor(int pin) {
   switch (pin) {
-  case 0:  return AUX_1_GPIO;
-  case 1:  return AUX_2_GPIO;
-  case 2:  return AUX_3_GPIO;
-  case 3:  return AUX_4_GPIO;
-  case 4:  return AUX_5_GPIO;
-  case 5:  return AUX_6_GPIO;
-  case 6:  return AUX_7_GPIO;
-  case 7:  return AUX_8_GPIO;
-  case 8:  return AUX_9_GPIO;
-  case 9:  return AUX_10_GPIO;
-  case 10: return AUX_11_GPIO;
-  case 11: return AUX_12_GPIO;
-  case 12: return AUX_13_GPIO;
-  case 13: return AUX_14_GPIO;
-  case 14: return AUX_15_GPIO;
-  case 15: return AUX_16_GPIO;
+  case 1:  return AUX_1_GPIO;
+  case 2:  return AUX_2_GPIO;
+  case 3:  return AUX_3_GPIO;
+  case 4:  return AUX_4_GPIO;
+  case 5:  return AUX_5_GPIO;
+  case 6:  return AUX_6_GPIO;
+  case 7:  return AUX_7_GPIO;
+  case 8:  return AUX_8_GPIO;
+  case 9:  return AUX_9_GPIO;
+  case 10:  return AUX_10_GPIO;
+  case 11: return AUX_11_GPIO;
+  case 12: return AUX_12_GPIO;
+  case 13: return AUX_13_GPIO;
+  case 14: return AUX_14_GPIO;
+  case 15: return AUX_15_GPIO;
+  case 16: return AUX_16_GPIO;
   default: return GPIO_NOT_MAPPED;
+  }
+}
+
+static uint32_t get_pwm_gpio_descriptor(int pwm_num) {
+  switch (pwm_num) {
+  case 1:  return PWM_1_GPIO;
+  case 2:  return PWM_2_GPIO;
+  case 3:  return PWM_3_GPIO;
+  case 4:  return PWM_4_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
+}
+
+static void update_aux_gpios(unsigned short aux_bits) {
+  for (int pin = 1; pin <= BEAGLEG_NUM_AUX; ++pin) {
+    if (aux_bits & (1 << (pin - 1)))
+      set_gpio(get_aux_bit_gpio_descriptor(pin));
+    else
+      clr_gpio(get_aux_bit_gpio_descriptor(pin));
   }
 }
 
@@ -333,7 +340,7 @@ bool GCodeMachineControl::Impl::Init() {
 
 #if CONFIG_FILE_TRANSITION
   // Extract enstop polarity
-  bool endstop_trigger[NUM_ENDSTOPS] = {0};
+  bool endstop_trigger[BEAGLEG_NUM_SWITCHES] = {0};
   if (!cfg_.endswitch_polarity.empty()) {
     const char *map = cfg_.endswitch_polarity.c_str();
     for (int switch_connector = 0; *map; switch_connector++, map++) {
@@ -467,6 +474,36 @@ bool GCodeMachineControl::Impl::Init() {
       ++error_count;
     }
   }
+  for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
+    int map_index = i - 1;
+    std::string line;
+    line = StringPrintf("Aux %d: ", i);
+    switch (cfg_.aux_map_[map_index]) {
+    case AUX_NOT_MAPPED:  line += "not mapped"; break;
+    case AUX_MIST:        line += "mist"; break;
+    case AUX_FLOOD:       line += "flood"; break;
+    case AUX_VACUUM:      line += "vacuum"; break;
+    case AUX_SPINDLE_ON:  line += "spindle-on"; break;
+    case AUX_SPINDLE_DIR: line += "spindle-dir"; break;
+    case AUX_COOLER:      line += "cooler"; break;
+    case AUX_CASE_LIGHTS: line += "case-lights"; break;
+    case AUX_FAN:         line += "fan"; break;
+    default:              line += "UNKNOWN"; break;
+    }
+    Log_debug("%s", line.c_str());
+  }
+  for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
+    int map_index = i - 1;
+    std::string line;
+    line = StringPrintf("PWM %d: ", i);
+    switch (cfg_.pwm_map_[map_index]) {
+    case PWM_NOT_MAPPED:  line += "not mapped"; break;
+    case PWM_FAN:         line += "fan"; break;
+    case PWM_SPINDLE:     line += "spindle-pwn"; break;
+    default:              line += "UNKNOWN"; break;
+    }
+    Log_debug("%s", line.c_str());
+  }
   if (error_count)
     return false;
 
@@ -521,15 +558,9 @@ void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o) {
 void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   if (speed < 0.0 || speed > 255.0) return;
   float duty_cycle = speed / 255.0;
-  // The fan can be controlled by a GPIO or PWM (TIMER) signal
-  if (duty_cycle == 0.0) {
-    clr_gpio(FAN_GPIO);
-    pwm_timer_start(FAN_GPIO, 0);
-  } else {
-    set_gpio(FAN_GPIO);
-    pwm_timer_set_duty(FAN_GPIO, duty_cycle);
-    pwm_timer_start(FAN_GPIO, 1);
-  }
+  // The fan can be mapped to an aux and/or pwm signal
+  set_mapped_aux(AUX_FAN, duty_cycle != 0.0);
+  set_mapped_pwm(PWM_FAN, duty_cycle);
 }
 
 void GCodeMachineControl::Impl::wait_for_start() {
@@ -602,17 +633,25 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       remaining = after_pair;
     }
     if (spindle_rpm_) {
-      aux_bits_ |= AUX_BIT_SPINDLE_ON;
-      if (code == 3) aux_bits_ &= ~AUX_BIT_SPINDLE_DIR;
-      else aux_bits_ |= AUX_BIT_SPINDLE_DIR;
+      set_mapped_aux(AUX_SPINDLE_DIR, code == 4);
+      // TODO: calculate the duty_cycle (0-255) for the spindle pwm based on
+      // the rpm range established by the config then:
+      // set_mapped_pwm(PWM_SPINDLE, duty_cycle);
+      set_mapped_aux(AUX_SPINDLE_ON, 1);
     }
     break;
-  case 5: aux_bits_ &= ~(AUX_BIT_SPINDLE_ON | AUX_BIT_SPINDLE_DIR); break;
-  case 7: aux_bits_ |= AUX_BIT_MIST; break;
-  case 8: aux_bits_ |= AUX_BIT_FLOOD; break;
-  case 9: aux_bits_ &= ~(AUX_BIT_MIST | AUX_BIT_FLOOD); break;
-  case 10: aux_bits_ |= AUX_BIT_VACUUM; break;
-  case 11: aux_bits_ &= ~AUX_BIT_VACUUM; break;
+  case 5:
+    set_mapped_aux(AUX_SPINDLE_ON, 0);
+    set_mapped_aux(AUX_SPINDLE_DIR, 0);
+    break;
+  case 7: set_mapped_aux(AUX_MIST, 1); break;
+  case 8: set_mapped_aux(AUX_FLOOD, 1); break;
+  case 9:
+    set_mapped_aux(AUX_MIST, 0);
+    set_mapped_aux(AUX_FLOOD, 0);
+    break;
+  case 10: set_mapped_aux(AUX_VACUUM, 1); break;
+  case 11: set_mapped_aux(AUX_VACUUM, 0); break;
   case 42:
   case 62: case 63: case 64: case 65:
     for (;;) {
@@ -625,22 +664,22 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
     }
     if (code == 62 || code == 64) aux_bit = 1;
     else if (code == 63 || code == 65) aux_bit = 0;
-    if (pin >= 0 && pin <= MAX_AUX_PIN) {
+    if (pin > 0 && pin <= BEAGLEG_NUM_AUX) {
       if (aux_bit >= 0 && aux_bit <= 1) {
-        if (aux_bit) aux_bits_ |= 1 << pin;
-        else aux_bits_ &= ~(1 << pin);
+        if (aux_bit) aux_bits_ |= (1 << (pin - 1));
+        else aux_bits_ &= ~(1 << (pin - 1));
         if (code == 64 || code == 65) {
           // update the AUX pin now
           if (aux_bit) set_gpio(get_aux_bit_gpio_descriptor(pin));
           else clr_gpio(get_aux_bit_gpio_descriptor(pin));
         }
       } else if (code == 42 && msg_stream_) {  // Just read operation.
-        mprintf("%d\n", (aux_bits_ >> pin) & 1);
+        mprintf("%d\n", (aux_bits_ >> (pin - 1)) & 1);
       }
     }
     break;
-  case 245: aux_bits_ |= AUX_BIT_COOLER; break;
-  case 246: aux_bits_ &= ~AUX_BIT_COOLER; break;
+  case 245: set_mapped_aux(AUX_COOLER, 1); break;
+  case 246: set_mapped_aux(AUX_COOLER, 0); break;
   case 355:
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
@@ -649,18 +688,42 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       else break;
       remaining = after_pair;
     }
-    if (aux_bit >= 0 && aux_bit <= 1) {
-      if (aux_bit) aux_bits_ |= AUX_BIT_CASE_LIGHT;
-      else aux_bits_ &= ~AUX_BIT_CASE_LIGHT;
-    }
-    if (get_aux_bit_gpio_descriptor(AUX_7_GPIO)) {
-      mprintf("Case lights %s\n", (aux_bits_ & AUX_BIT_CASE_LIGHT) ? "on" : "off");
+    if (aux_bit >= 0 && aux_bit <= 1)
+      set_mapped_aux(AUX_CASE_LIGHTS, aux_bit);
+    pin = cfg_.aux_map_[AUX_CASE_LIGHTS];
+    if (get_aux_bit_gpio_descriptor(pin)) {
+      mprintf("Case lights %s\n", (aux_bits_ & (1 << (pin - 1))) ? "on" : "off");
     } else {
       mprintf("No case lights\n");
     }
     break;
   }
   return remaining;
+}
+
+void GCodeMachineControl::Impl::set_mapped_aux(enum AuxMap map, int level) {
+  for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
+    int map_index = i - 1;
+    if (cfg_.aux_map_[map_index] == map) {
+      if (level) aux_bits_ |= (1 << map_index);
+      else aux_bits_ &= ~(1 << map_index);
+    }
+  }
+}
+
+void GCodeMachineControl::Impl::set_mapped_pwm(enum PwmMap map, float duty_cycle) {
+  for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
+    int map_index = i - 1;
+    if (cfg_.pwm_map_[map_index] == map) {
+      uint32_t fan_pwm = get_pwm_gpio_descriptor(i);
+      if (duty_cycle == 0.0) {
+        pwm_timer_start(fan_pwm, 0);
+      } else {
+        pwm_timer_set_duty(fan_pwm, duty_cycle);
+        pwm_timer_start(fan_pwm, 1);
+      }
+    }
+  }
 }
 
 void GCodeMachineControl::Impl::get_current_position() {
@@ -1159,6 +1222,7 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
 void GCodeMachineControl::Impl::dwell(float value) {
   bring_path_to_halt();
   motor_ops_->WaitQueueEmpty();
+  update_aux_gpios(aux_bits_);
   usleep((int) (value * 1000));
 }
 
@@ -1208,6 +1272,8 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
   if (target_speed > max_axis_speed_[axis]) {
     target_speed = max_axis_speed_[axis];
   }
+
+  move_command.aux_bits = aux_bits_;
 
   move_command.v0 = 0;
   move_command.v1 = target_speed;

@@ -208,13 +208,6 @@
 
 
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
-// Aux 1 = Mist control on/off (M7: on; M9: off)
-// Aux 2 = Flood control on/off (M8: on; M9: off)
-// Aux 3 = Vacuum control on/off (M10: on; M11: off)
-// Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
-// Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
-// Aux 6 = Cooler control on/off (M245: on; M246: off)
-// Aux 7 = Case lights control on/off (M355 S1: on; M355 S0: off)
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED
 #endif
@@ -296,11 +289,6 @@
 #endif
 #ifndef END_6_GPIO
 #define END_6_GPIO         GPIO_NOT_MAPPED
-#endif
-
-// Friendly names for the GPIO signals
-#ifndef FAN_GPIO
-#define FAN_GPIO           GPIO_NOT_MAPPED
 #endif
 
 #endif // __MOTOR_INTERFACE_CONSTANTS_H

@@ -48,14 +48,14 @@
 					0x020 0x27	/* P8.19 EHRPWM2A	START input	(Mode7: gpio0_22 - gpio22) */
 					0x08c 0x27	/* P8.18 GPIO2_1	PAUSE input	(Mode7: gpio2_1  - gpio65) */
 
-					//0x090 0x07	/* P8.7  TIMER4		OUT0 output	(Mode7: gpio2_2 - gpio66) */
-					//0x094 0x07	/* P8.8  TIMER7		OUT1 output	(Mode7: gpio2_3 - gpio67) */
-					//0x09c 0x07	/* P8.9  TIMER5		OUT2 output	(Mode7: gpio2_5 - gpio69) */
+					0x090 0x07	/* P8.7  TIMER4		OUT0 output	(Mode7: gpio2_2 - gpio66) */
+					0x094 0x07	/* P8.8  TIMER7		OUT1 output	(Mode7: gpio2_3 - gpio67) */
+					0x09c 0x07	/* P8.9  TIMER5		OUT2 output	(Mode7: gpio2_5 - gpio69) */
 					//0x098 0x07	/* P8.10 TIMER6		OUT3 output	(Mode7: gpio2_4 - gpio68) */
 
-					0x090 0x02	/* P8.7  TIMER4		OUT0 output	(Mode2: timer4) */
-					0x094 0x02	/* P8.8  TIMER7		OUT1 output	(Mode2: timer7) */
-					0x09c 0x02	/* P8.9  TIMER5		OUT2 output	(Mode7: timer5) */
+					//0x090 0x02	/* P8.7  TIMER4		OUT0 output	(Mode2: timer4) */
+					//0x094 0x02	/* P8.8  TIMER7		OUT1 output	(Mode2: timer7) */
+					//0x09c 0x02	/* P8.9  TIMER5		OUT2 output	(Mode7: timer5) */
 					0x098 0x02	/* P8.10 TIMER6		OUT3 output	(Mode7: timer6) */
 
 					0x048 0x07	/* P9.14 EHRPWM1A	OUT4 output	(Mode7: gpio1_18 - gpio50) */

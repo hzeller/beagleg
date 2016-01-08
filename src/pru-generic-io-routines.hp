@@ -54,20 +54,6 @@ EnableMotors:
 	RET
 
 ;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..15
-;;; The aux bits are mapped as:
-;;;   Aux 1 = Mist control on/off (M7: on; M9: off)
-;;;   Aux 2 = Flood control on/off (M8: on; M9: off)
-;;;   Aux 3 = Vacuum control on/off (M10: on; M11: off)
-;;;   Aux 4 = Spindle control on/off (M3/M4: on; M5: off)
-;;;   Aux 5 = Spindle direction (M3: clockwise; M4: counterclockwise)
-;;;   Aux 6 = Cooler control on/off (M245: on; M246: off)
-;;;   Aux 7 = Case lights control on/off (M355 S1: on; M355 S0: off)
-;;; The aux bits can also be controlled using M42/M62/M63/M64/M65
-;;;   M42 Pnn Sxx - Set AUX Pin nn to value xx
-;;;   M62 Pnn     - Set AUX Pin nn to 1
-;;;   M63 Pnn     - Set AUX Pin nn to 0
-;;;   M64 Pnn     - Set AUX Pin nn to 1
-;;;   M65 Pnn     - Set AUX Pin nn to 0
 SetAuxBits:
 	SetGPIO r3, 0, AUX_1_GPIO
 	SetGPIO r3, 1, AUX_2_GPIO

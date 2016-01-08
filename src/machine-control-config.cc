@@ -53,7 +53,9 @@ public:
     current_section_ = section_name;
     if (section_name == "general"
         || section_name == "motor-mapping"
-        || section_name == "switch-mapping")
+        || section_name == "switch-mapping"
+        || section_name == "aux-mapping"
+        || section_name == "pwm-mapping")
       return true;
 
     // See if this is a valid axis section.
@@ -93,6 +95,24 @@ public:
       for (int i = 1; i <= BEAGLEG_NUM_SWITCHES; ++i) {
         if (name == StringPrintf("switch_%d", i)) {
           return SetSwitchOptions(line_no, i, value);
+        }
+      }
+      return false;
+    }
+
+    if (current_section_ == "aux-mapping") {
+      for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
+        if (name == StringPrintf("aux_%d", i)) {
+          return SetAuxMapping(line_no, i, value);
+        }
+      }
+      return false;
+    }
+
+    if (current_section_ == "pwm-mapping") {
+      for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
+        if (name == StringPrintf("pwm_%d", i)) {
+          return SetPwmMapping(line_no, i, value);
         }
       }
       return false;
@@ -288,6 +308,54 @@ private:
       }
       else if (option == "active:high") {
         config_->trigger_level_[switch_number - 1] = true;
+      } else {
+        return false;
+      }
+    }
+
+    return true;  // All went fine.
+  }
+
+  bool SetAuxMapping(int line_no, int aux_number, const std::string &value) {
+    int map_index = aux_number - 1;
+    std::vector<StringPiece> options = SplitString(value, " \t,");
+    for (size_t i = 0; i < options.size(); ++i) {
+      const std::string option = ToLower(options[i]);
+      if (option.empty()) continue;
+      if (option == "mist") {
+        config_->aux_map_[map_index] = AUX_MIST;
+      } else if (option == "flood") {
+        config_->aux_map_[map_index] = AUX_FLOOD;
+      } else if (option == "vacuum") {
+        config_->aux_map_[map_index] = AUX_VACUUM;
+      } else if (option == "spindle-on") {
+        config_->aux_map_[map_index] = AUX_SPINDLE_ON;
+      } else if (option == "spindle-dir") {
+        config_->aux_map_[map_index] = AUX_SPINDLE_DIR;
+      } else if (option == "cooler") {
+        config_->aux_map_[map_index] = AUX_COOLER;
+      } else if (option == "case-lights") {
+        config_->aux_map_[map_index] = AUX_CASE_LIGHTS;
+      } else if (option == "fan") {
+        config_->aux_map_[map_index] = AUX_FAN;
+      } else {
+        return false;
+      }
+    }
+
+    return true;  // All went fine.
+  }
+
+  bool SetPwmMapping(int line_no, int pwm_number, const std::string &value) {
+    int map_index = pwm_number - 1;
+    std::vector<StringPiece> options = SplitString(value, " \t,");
+    for (size_t i = 0; i < options.size(); ++i) {
+      const std::string option = ToLower(options[i]);
+      if (option.empty()) continue;
+      if (option == "fan") {
+        config_->pwm_map_[map_index] = PWM_FAN;
+      } else if (option == "spindle-pwm") {
+        config_->pwm_map_[map_index] = PWM_SPINDLE;
       } else {
         return false;
       }
