@@ -57,6 +57,7 @@
 #define AUX_BIT_SPINDLE_ON  (1 << 3)  // M3/M4: on; M5: off
 #define AUX_BIT_SPINDLE_DIR (1 << 4)  // M3: clockwise; M4: counterclockwise
 #define AUX_BIT_COOLER      (1 << 5)  // M245: on ; M246: off
+#define AUX_BIT_CASE_LIGHT  (1 << 6)  // M355 S1: on; M355 S0: off
 #define MAX_AUX_PIN         15
 
 #define NUM_ENDSTOPS        6
@@ -560,7 +561,8 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 7: case 8: case 9: case 10: case 11: // aux pin mist/flood/vacuum control
   case 42:                                  // aux pin state query
   case 62: case 63: case 64: case 65:       // aux pin set
-  case 245: case 246:  // aux pin cooler control
+  case 245: case 246:                       // aux pin cooler control
+  case 355:                                 // aux pin case lights control
     remaining = aux_bit_commands(letter, value, remaining);
     break;
   case 80: set_gpio(MACHINE_PWR_GPIO); break;
@@ -591,8 +593,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
   const char* after_pair;
 
   switch (code) {
-  case 3:
-  case 4:
+  case 3: case 4:
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
@@ -613,10 +614,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
   case 10: aux_bits_ |= AUX_BIT_VACUUM; break;
   case 11: aux_bits_ &= ~AUX_BIT_VACUUM; break;
   case 42:
-  case 62:
-  case 63:
-  case 64:
-  case 65:
+  case 62: case 63: case 64: case 65:
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
@@ -643,6 +641,24 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
     break;
   case 245: aux_bits_ |= AUX_BIT_COOLER; break;
   case 246: aux_bits_ &= ~AUX_BIT_COOLER; break;
+  case 355:
+    for (;;) {
+      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      if (after_pair == NULL) break;
+      if (letter == 'S') aux_bit = round2int(value);
+      else break;
+      remaining = after_pair;
+    }
+    if (aux_bit >= 0 && aux_bit <= 1) {
+      if (aux_bit) aux_bits_ |= AUX_BIT_CASE_LIGHT;
+      else aux_bits_ &= ~AUX_BIT_CASE_LIGHT;
+    }
+    if (get_aux_bit_gpio_descriptor(AUX_7_GPIO)) {
+      mprintf("Case lights %s\n", (aux_bits_ & AUX_BIT_CASE_LIGHT) ? "on" : "off");
+    } else {
+      mprintf("No case lights\n");
+    }
+    break;
   }
   return remaining;
 }

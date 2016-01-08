@@ -112,6 +112,7 @@ M115             | Get firmware version.
 M119             | Get endstop status.
 M245             | Start cooler; happens synchronously with next move.
 M246             | Stop cooler; happens synchronously with next move.
+M355             | Turn case lights on/off; happens synchronously with next move.
 M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 
 ### Feedrate in Euclidian space
