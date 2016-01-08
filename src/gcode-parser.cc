@@ -603,6 +603,10 @@ const char *GCodeParser::Impl::handle_M111(const char *line) {
 
 // Note: changes here should be documented in G-code.md as well.
 void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
+  if (debug_level_ & DEBUG_PARSER) {
+    Log_debug("GCodeParser| %s", line);
+  }
+
   ++line_number_;
   err_msg_ = err_stream;  // remember as 'instance' variable.
   char letter;
@@ -755,9 +759,6 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
       break;
 
-    if (debug_level_ & DEBUG_PARSER) {
-      Log_debug("GCodeParser: %s", buffer);
-    }
     ParseLine(buffer, err_stream);
   }
   disarm_signal_handler();
