@@ -49,6 +49,8 @@
   "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 // aux_bits
+// TODO(hzeller): the actual bit->function should be configured in the
+// config file.
 #define AUX_BIT_MIST        (1 << 0)  // M7: on; M9: off
 #define AUX_BIT_FLOOD       (1 << 1)  // M8: on; M9: off
 #define AUX_BIT_VACUUM      (1 << 2)  // M10: on; M11: off
@@ -554,11 +556,11 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   const int code = (int)value;
   switch (code) {
   case 0: set_gpio(ESTOP_SW_GPIO); break;
-  case 3 ... 5:      // aux pin spindle control
-  case 7 ... 11:     // aux pin mist/flood/vacuum control
-  case 42:           // aux pin state query
-  case 62 ... 65:    // aux pin set
-  case 245 ... 246:  // aux pin cooler control
+  case 3: case 4: case 5:                   // aux pin spindle control
+  case 7: case 8: case 9: case 10: case 11: // aux pin mist/flood/vacuum control
+  case 42:                                  // aux pin state query
+  case 62: case 63: case 64: case 65:       // aux pin set
+  case 245: case 246:  // aux pin cooler control
     remaining = aux_bit_commands(letter, value, remaining);
     break;
   case 80: set_gpio(MACHINE_PWR_GPIO); break;

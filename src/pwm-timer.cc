@@ -160,7 +160,7 @@ void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle) {
 
 static void pwm_timer_calc_resolution(struct pwm_timer_data *timer, int pwm_freq) {
   float pwm_period = 1.0 / pwm_freq;
-  unsigned long long resolution = 0;
+  uint64_t resolution = 0;
   int ratio;
   char pre;
   char ptv;

@@ -32,9 +32,9 @@ GMOCK_SOURCE=/usr/src/gmock
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
 # environment variable.
-BEAGLEG_OPT_FLAGS?=-O3
+BEAGLEG_OPT_CFLAGS?=-O3
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_FLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS)
 
 # We export the following variables so that the googletest library will get
 # the same variables when compiling.
