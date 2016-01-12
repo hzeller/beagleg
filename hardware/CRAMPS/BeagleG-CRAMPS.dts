@@ -15,7 +15,7 @@
 /plugin/;
 
 /{
-    compatible = "ti,beaglebone", "ti,beaglebone-black";
+    compatible = "ti,beaglebone", "ti,beaglebone-black", "ti,beaglebone-green";
     part-number = "BeagleG-CRAMPS";  /* BeagleG/CRAMPS 'cape' */
     version = "00A0";
 
