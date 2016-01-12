@@ -82,24 +82,19 @@ public:
     }
 
     if (current_section_ == "motor-mapping") {
-      if (name == "motor_1") return SetMotorAxis(line_no, 1, value);
-      if (name == "motor_2") return SetMotorAxis(line_no, 2, value);
-      if (name == "motor_3") return SetMotorAxis(line_no, 3, value);
-      if (name == "motor_4") return SetMotorAxis(line_no, 4, value);
-      if (name == "motor_5") return SetMotorAxis(line_no, 5, value);
-      if (name == "motor_6") return SetMotorAxis(line_no, 6, value);
-      if (name == "motor_7") return SetMotorAxis(line_no, 7, value);
-      if (name == "motor_8") return SetMotorAxis(line_no, 8, value);
+      for (int i = 1; i <= BEAGLEG_NUM_MOTORS; ++i) {
+        if (name == StringPrintf("motor_%d", i))
+          return SetMotorAxis(line_no, i, value);
+      }
       return false;
     }
 
     if (current_section_ == "switch-mapping") {
-      if (name == "switch_1") return SetSwitchOptions(line_no, 1, value);
-      if (name == "switch_2") return SetSwitchOptions(line_no, 2, value);
-      if (name == "switch_3") return SetSwitchOptions(line_no, 3, value);
-      if (name == "switch_4") return SetSwitchOptions(line_no, 4, value);
-      if (name == "switch_5") return SetSwitchOptions(line_no, 5, value);
-      if (name == "switch_6") return SetSwitchOptions(line_no, 6, value);
+      for (int i = 1; i <= BEAGLEG_NUM_SWITCHES; ++i) {
+        if (name == StringPrintf("switch_%d", i)) {
+          return SetSwitchOptions(line_no, i, value);
+        }
+      }
       return false;
     }
 
@@ -237,10 +232,10 @@ private:
         if (axis.empty()) return false;
         const char axis_letter = axis[0];
         if (gcodep_letter2axis(axis_letter) == GCODE_NUM_AXES) {
-          Log_error("Invalid axis letter '%c'", axis_letter); 
+          Log_error("Invalid axis letter '%c'", axis_letter);
           return false; // invalid axis.
         }
-      
+
         // Now, we copy it to the somehwat old command-line friendly
         // configuration which encodes that as a string. We do that now for
         // compatibility, but later we should decommission this.
@@ -257,7 +252,7 @@ private:
                                                  ? tolower(axis_letter)
                                                  : toupper(axis_letter));
       }
-      // TODO: maybe option 'mirror' 
+      // TODO: maybe option 'mirror'
       else {
         Log_error("Line %d: Unknown motor option '%s'", line_no, option.c_str());
         return false;
