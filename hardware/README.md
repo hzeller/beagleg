@@ -82,10 +82,10 @@ these exact names:
      cp template-pru-io-routines.hp MyCapeName/pru-io-routines.hp
      ```
 
-You can enable compilation for your new cape by setting the variable `HARDWARE_TARGET` in
-the toplevel Makefile to your cape name:
+You can enable compilation for your new cape by setting the variable `BEAGLEG_HARDWARE_TARGET`
+in the toplevel Makefile to your cape name:
 
-     HARDWARE_TARGET=MyCapeName
+     BEAGLEG_HARDWARE_TARGET=MyCapeName
 
 Please check out the existing subdirectories to get an idea. If you added a new board,
 consider sending a patch.

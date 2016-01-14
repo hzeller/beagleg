@@ -100,7 +100,7 @@
 
 // The following file is included from the hardware directory
 // of the cape we are compiling for.
-// If this include fails, check the HARDWARE_TARGET in the
+// If this include fails, check the BEAGLEG_HARDWARE_TARGET in the
 // Makefile: it must match a subdirectory in hardware/
 // (because of a broken implementation of the include directive in
 // the pasm, this needs to be in angle brackets).
