@@ -42,7 +42,12 @@ if [ $? -ne 0 ] ; then
 fi
 
 PINS=/sys/kernel/debug/pinctrl/44e10800.pinmux/pins
-SLOTS=/sys/devices/bone_capemgr.*/slots
+if [ -e /sys/devices/platform/bone_capemgr/slots ] ; then
+	SLOTS=/sys/devices/platform/bone_capemgr/slots
+else
+	# 3.x way of doing things.
+	SLOTS=/sys/devices/bone_capemgr.*/slots
+fi
 
 # Some dance around minimal tools available on the system. We get the offsets
 # and add 44e10800 to it, so that we can grep these in the $PINS

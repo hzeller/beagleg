@@ -51,7 +51,11 @@ fi
 # Let's put it there.
 cp $DTBO_FILE /lib/firmware
 
-MAGIC_ENABLE=cape_enable=capemgr.enable_partno=
+if uname -r | grep -q "^4" ; then
+	MAGIC_ENABLE=cape_enable=bone_capemgr.enable_partno=
+else
+	MAGIC_ENABLE=cape_enable=capemgr.enable_partno=
+fi
 
 # First: set up UENV_FILE.
 echo "* Setting up $UENV_FILE"
