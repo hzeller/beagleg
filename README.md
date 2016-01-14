@@ -184,7 +184,7 @@ To avoid re-inventing the testing-framework wheel, we use the
 are typically already packages available:
 
 ```bash
- sudo aptitude install libgtest-dev google-mock
+ sudo apt-get install libgtest-dev google-mock
  make test
  # Or, for more thorough memory-leak or initialization issue check:
  make valgrind-test
