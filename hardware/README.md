@@ -28,7 +28,7 @@ file that you need to install for your hardware (or just use the one that comes 
 We can enable your cape, you can use the
 [start-devicetree-overlay.sh](./start-devicetree-overlay.sh) script in this directory:
 
-    sudo ./start-devicetree-overlay.sh BUMPS/BeagleG.dts
+    sudo ./start-devicetree-overlay.sh BUMPS/BeagleG-BUMPS.dts
 
 (pass the DTS file of the board you are using as parameter)
 
@@ -36,22 +36,24 @@ This initializes the pinmux now, but we have to do this every time after boot. A
 we'd like to have the cape installed as early as possible in the boot process
 to properly set all the output values to safe values.
 
-There is a script for that
+There is a script for that.
 
-    sudo ./install-devicetree-overlay.sh BUMPS/BeagleG.dts
+First make sure that you have the `bb-customizations`
+package installed:
 
-In general, what this script is doing is to add the overlay name
+    sudo apt-get install bb-customizations
 
-    optargs=capemgr.enable_partno=BeagleG
+.. Now run this script
 
-to the `/boot/uboot/uEnv.txt` file to let the kernel know to enable that cape.
+    sudo ./install-devicetree-overlay.sh BUMPS/BeagleG-BUMPS.dts
+
+In general, what this script is doing is to add the overlay name to the `cape_enable`
+lines in `/boot/uEnv.txt` file to let the kernel know to enable that cape at boot time.
 
 The kernel looks for the firmware in /lib/firmware - since at boot time the
 root-fs is not mounted yet, just the init-rd ramdisk, we need to make sure
-to have it in the uInitrd filesystem. The script copies it there.
-
-The script assumes a certain way the boot happens, so it might depend on your distribution
-if it actually works; you might want to inspect it first to what it does.
+to have it in the initial ram-filesystem. The script issues an update-initramfs
+that does that (with help from scripts from the bb-customizations package).
 
 ## Adding support for new hardware
 
@@ -91,3 +93,4 @@ consider sending a patch.
 [BeagleBone-Black]: http://beagleboard.org/BLACK
 [BUMPS]: http://github.com/hzeller/bumps
 [CRAMPS]: http://reprap.org/wiki/CRAMPS
+

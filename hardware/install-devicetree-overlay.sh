@@ -11,6 +11,7 @@
 set -e
 
 DT_VERSION=00A0
+UENV_FILE=/boot/uEnv.txt
 
 usage() {
     echo "Usage: $0 <dts-file>"
@@ -46,49 +47,28 @@ if [ $? -ne 0 ] ; then
     echo "Failed to produce $DTBO_FILE"
 fi
 
-# Make this an absolute filename
-DTBO_FILE=$(readlink -f $DTBO_FILE)
+# The initramfs script will pick up dtbos from /lib/firmware.
+# Let's put it there.
+cp $DTBO_FILE /lib/firmware
 
-BOOT_PARAM="capemgr.enable_partno=$CAPE_NAME"
-BOOT_DIR=/boot/uboot
-UENV_FILE=$BOOT_DIR/uEnv.txt
-INITRD_FILE=$BOOT_DIR/uInitrd
-
-if [ $# -ne 1 ] ; then
-    echo "usage: $0 <path-to-dtbo-file>"
-    exit 1
-fi
+MAGIC_ENABLE=cape_enable=capemgr.enable_partno=
 
 # First: set up UENV_FILE.
 echo "* Setting up $UENV_FILE"
 # Note, this only works properly if optargs is not set yet.
-if grep $BOOT_PARAM $UENV_FILE > /dev/null ; then
+if grep "^${MAGIC_ENABLE}.*${CAPE_NAME}" $UENV_FILE > /dev/null ; then
     echo "  * Already configured in $UENV_FILE"
 else
-    echo "  * Adding $BOOT_PARAM to $UENV_FILE"
-    echo "optargs=$BOOT_PARAM" >> $UENV_FILE
+    if grep "^$MAGIC_ENABLE" $UENV_FILE > /dev/null ; then
+        echo "  * Adding $CAPE_NAME to cape-enable line in $UENV_FILE"
+	sed -i "s/^${MAGIC_ENABLE}.*/\0,${CAPE_NAME}/g" $UENV_FILE
+    else
+        echo "  * Adding cape-enable line to $UENV_FILE"
+	echo "${MAGIC_ENABLE}${CAPE_NAME}" >> $UENV_FILE
+    fi
 fi
 
-echo "* Storing the $DTBO_FILE in $INITRD_FILE"
-TEMP_BASE=/tmp/new-boot.$$
-
-# Unpack uInitrd, copy dtbo file into it.
-echo "* Unpacking initrd and adding $DTBO_FILE to its lib/firmware"
-mkdir -p ${TEMP_BASE}/tree
-cd ${TEMP_BASE}/tree
-dd if=${INITRD_FILE} skip=1 bs=64 | gzip -d | cpio -id
-mkdir -p lib/firmware
-cp $DTBO_FILE lib/firmware
-
-# Re-pack
-echo "* Repacking initrd"
-find . | cpio -o -H newc | gzip -9 > ${TEMP_BASE}/initrd.mod.gz
-mkimage -A arm -O linux -T ramdisk -C none -a 0 -e 0 -n initramfs -d ${TEMP_BASE}/initrd.mod.gz ${TEMP_BASE}/uInitrd.new
-
-echo "* Replace $INITRD_FILE with new file"
-cp ${INITRD_FILE} ${INITRD_FILE}.orig
-cp ${TEMP_BASE}/uInitrd.new ${INITRD_FILE}.new
-mv ${INITRD_FILE}.new ${INITRD_FILE}
+update-initramfs -tu -k `uname -r`
 
 sync
 

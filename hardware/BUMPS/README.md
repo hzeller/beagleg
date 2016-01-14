@@ -5,9 +5,6 @@ The BUMPS cape was designed together with BeagleG.
 
 ![Bumps board][BUMPS-img]
 
-TODO: The dts file should probably just be named BUMPS.dts instead of BeagleG.dts. Also, ideally
-this should actually live with the hardware.
-
 ## Pinout
 
 These are the GPIO bits associated with the motor outputs on the BUMPS board.
