@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 
 #include "pwm-timer.h"
+#include "logging.h"
 
 // Memory space mapped to the Clock Module registers
 #define CM_BASE                 0x44e00000
@@ -209,14 +210,13 @@ static void pwm_timers_ena_clk(volatile uint32_t *cm, uint32_t reg, int timer) {
 
   val = cm[reg/4];
   if (val & IDLEST_MASK) {
-    fprintf(stderr, "Enabling TIMER%d clock", timer);
+    Log_debug("Enabling TIMER%d clock", timer);
     val |= MODULEMODE_ENABLE;
     cm[reg/4] = val;
     do {
       fprintf(stderr, ".");
       val = cm[reg/4];
     } while (val & IDLEST_MASK);
-    fprintf(stderr, "\n");
   }
 }
 

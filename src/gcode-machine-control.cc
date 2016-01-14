@@ -322,10 +322,9 @@ bool GCodeMachineControl::Impl::Init() {
       continue;
     const enum GCodeParserAxis axis = gcodep_letter2axis(*axis_map);
     if (axis == GCODE_NUM_AXES) {
-      fprintf(stderr,
-              "Illegal axis->connector mapping character '%c' in '%s' "
-              "(Only valid axis letter or '_' to skip a connector).\n",
-              toupper(*axis_map), cfg_.axis_mapping.c_str());
+      Log_error("Illegal axis->connector mapping character '%c' in '%s' "
+                "(Only valid axis letter or '_' to skip a connector).\n",
+                toupper(*axis_map), cfg_.axis_mapping.c_str());
       return false;
     }
     driver_flip_[pos] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
@@ -368,8 +367,7 @@ bool GCodeMachineControl::Impl::Init() {
         continue;
       const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
       if (axis == GCODE_NUM_AXES) {
-        fprintf(stderr,
-                "Illegal axis->min_endswitch mapping character '%c' in '%s' "
+        Log_error("Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
                 toupper(*map), cfg_.min_endswitch.c_str());
         ++error_count;
@@ -388,8 +386,7 @@ bool GCodeMachineControl::Impl::Init() {
         continue;
       const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
       if (axis == GCODE_NUM_AXES) {
-        fprintf(stderr,
-                "Illegal axis->min_endswitch mapping character '%c' in '%s' "
+        Log_error("Illegal axis->min_endswitch mapping character '%c' in '%s' "
                 "(Only valid axis letter or '_' to skip a connector).\n",
                 toupper(*map), cfg_.min_endswitch.c_str());
         ++error_count;
@@ -397,10 +394,9 @@ bool GCodeMachineControl::Impl::Init() {
       }
       const char for_homing = (toupper(*map) == *map) ? 1 : 0;
       if (cfg_.move_range_mm[axis] <= 0) {
-        fprintf(stderr,
-                "Error: Endstop for axis %c defined at max-endswitch which "
-                "implies that we need to know that position; yet "
-                "no --range value was given for that axis\n", *map);
+        Log_error("Error: Endstop for axis %c defined at max-endswitch which "
+                  "implies that we need to know that position; yet "
+                  "no --range value was given for that axis\n", *map);
         ++error_count;
         continue;
       }

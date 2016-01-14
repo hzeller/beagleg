@@ -170,7 +170,6 @@ static void ena_gpio_clk(volatile uint32_t *cm, uint32_t reg, int bank) {
       fprintf(stderr, ".");
       val = cm[reg/4];
     } while (val & IDLEST_MASK);
-    fprintf(stderr, "\n");
   }
 }
 
