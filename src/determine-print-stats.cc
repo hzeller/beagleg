@@ -27,6 +27,7 @@
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
 #include "motor-operations.h"
+#include "hardware-mapping.h"
 
 namespace {
 // An event receiver for GCodeParser events that are intercepted, stats
@@ -115,12 +116,15 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
                            struct BeagleGPrintStats *result) {
   bzero(result, sizeof(*result));
 
+  HardwareMapping hardware;  // We never initialize, just sim mode.
+
   // Motor control that just determines the time spent turning the motor.
   // We do that by intercepting the motor operations by replacing the
   // implementation with our own.
   StatsMotorOperations stats_motor_ops(result);
   GCodeMachineControl *machine_control
-    = GCodeMachineControl::Create(config, &stats_motor_ops, NULL);
+    = GCodeMachineControl::Create(config, &stats_motor_ops,
+                                  &hardware, NULL);
   if (!machine_control)
     return false;
 

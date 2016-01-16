@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Cannot read config file '%s'\n", config_file);
     return 1;
   }
-  if (!config.InitializeFromFile(&config_parser)) {
+  if (!config.ConfigureFromFile(&config_parser)) {
     fprintf(stderr, "Exiting. Parse error in configuration file '%s'\n", config_file);
     return 1;
   }

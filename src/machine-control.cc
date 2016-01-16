@@ -38,6 +38,7 @@
 #include "config-parser.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser.h"
+#include "hardware-mapping.h"
 #include "logging.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
@@ -369,10 +370,17 @@ int main(int argc, char *argv[]) {
     Log_error("Exiting. Cannot read config file '%s'", config_file);
     return 1;
   }
-  if (!config.InitializeFromFile(&config_parser)) {
+  if (!config.ConfigureFromFile(&config_parser)) {
     Log_error("Exiting. Parse error in configuration file '%s'", config_file);
     return 1;
   }
+
+  HardwareMapping hardware_mapping;
+  if (!hardware_mapping.ConfigureFromFile(&config_parser)) {
+    Log_error("Exiting. Couldn't initialize hardware mapping (%s)", config_file);
+    return 1;
+  }
+
   // ... other configurations that read from that file.
 
   if (as_daemon && daemon(0, 0) != 0) {
@@ -410,11 +418,9 @@ int main(int argc, char *argv[]) {
       motion_backend = new DummyMotionQueue();
     }
   } else {
-    if (geteuid() != 0) {
-      Log_error("Exiting. Need to run as root to access GPIO pins "
-                "(use the dryrun option -n to not write to GPIO).");
-      Log_error("If you start as root, privileges will be dropped to '%s' "
-                "after opening GPIO", privs);
+    if (!hardware_mapping.InitializeHardware()) {
+      Log_error("Exiting. (Just testing ? "
+                "Use the dryrun option -n to not write to GPIO).");
       return 1;
     }
     motion_backend = new PRUMotionQueue();
@@ -433,7 +439,9 @@ int main(int argc, char *argv[]) {
   MotionQueueMotorOperations motor_operations(motion_backend);
 
   GCodeMachineControl *machine_control
-    = GCodeMachineControl::Create(config, &motor_operations, stderr);
+    = GCodeMachineControl::Create(config, &motor_operations,
+                                  &hardware_mapping,
+                                  stderr);
   if (machine_control == NULL) {
     Log_error("Exiting. Cannot initialize machine control.");
     return 1;

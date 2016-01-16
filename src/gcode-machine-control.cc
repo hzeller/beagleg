@@ -37,6 +37,7 @@
 #include "container.h"
 #include "gcode-parser.h"
 #include "generic-gpio.h"
+#include "hardware-mapping.h"
 #include "logging.h"
 #include "motor-operations.h"
 #include "pwm-timer.h"
@@ -86,6 +87,7 @@ public:
   // Create Impl. It is not fully initialized yet, call Init()
   Impl(const MachineControlConfig &config,
        MotorOperations *motor_ops,
+       HardwareMapping *hardware_mapping,
        FILE *msg_stream);
 
   // Initialize. Only if this succeeds, we have a properly initialized
@@ -131,7 +133,6 @@ private:
   void get_endstop_status();
   void get_current_position();
   void set_mapped_aux(enum AuxMap map, int level);
-  void set_mapped_pwm(enum PwmMap map, float duty_cycle);
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -166,6 +167,7 @@ private:
 private:
   const struct MachineControlConfig cfg_;
   MotorOperations *const motor_ops_;
+  HardwareMapping *const hardware_mapping_;
   FILE *msg_stream_;
 
   // Derived configuration
@@ -234,16 +236,6 @@ static uint32_t get_aux_bit_gpio_descriptor(int pin) {
   }
 }
 
-static uint32_t get_pwm_gpio_descriptor(int pwm_num) {
-  switch (pwm_num) {
-  case 1:  return PWM_1_GPIO;
-  case 2:  return PWM_2_GPIO;
-  case 3:  return PWM_3_GPIO;
-  case 4:  return PWM_4_GPIO;
-  default: return GPIO_NOT_MAPPED;
-  }
-}
-
 static void update_aux_gpios(unsigned short aux_bits) {
   for (int pin = 1; pin <= BEAGLEG_NUM_AUX; ++pin) {
     if (aux_bits & (1 << (pin - 1)))
@@ -257,9 +249,11 @@ static inline int round2int(float x) { return (int) roundf(x); }
 
 GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
                                 MotorOperations *motor_ops,
+                                HardwareMapping *hardware_mapping,
                                 FILE *msg_stream)
   : cfg_(config),
-    motor_ops_(motor_ops), msg_stream_(msg_stream),
+    motor_ops_(motor_ops), hardware_mapping_(hardware_mapping),
+    msg_stream_(msg_stream),
     g0_feedrate_mm_per_sec_(-1),
     highest_accel_(-1),
     current_feedrate_mm_per_sec_(-1),
@@ -488,18 +482,6 @@ bool GCodeMachineControl::Impl::Init() {
     }
     Log_debug("%s", line.c_str());
   }
-  for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
-    int map_index = i - 1;
-    std::string line;
-    line = StringPrintf("PWM %d: ", i);
-    switch (cfg_.pwm_map_[map_index]) {
-    case PWM_NOT_MAPPED:  line += "not mapped"; break;
-    case PWM_FAN:         line += "fan"; break;
-    case PWM_SPINDLE:     line += "spindle-pwn"; break;
-    default:              line += "UNKNOWN"; break;
-    }
-    Log_debug("%s", line.c_str());
-  }
   if (error_count)
     return false;
 
@@ -556,7 +538,7 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   float duty_cycle = speed / 255.0;
   // The fan can be mapped to an aux and/or pwm signal
   set_mapped_aux(AUX_FAN, duty_cycle != 0.0);
-  set_mapped_pwm(PWM_FAN, duty_cycle);
+  hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_FAN, duty_cycle);
 }
 
 void GCodeMachineControl::Impl::wait_for_start() {
@@ -703,21 +685,6 @@ void GCodeMachineControl::Impl::set_mapped_aux(enum AuxMap map, int level) {
     if (cfg_.aux_map_[map_index] == map) {
       if (level) aux_bits_ |= (1 << map_index);
       else aux_bits_ &= ~(1 << map_index);
-    }
-  }
-}
-
-void GCodeMachineControl::Impl::set_mapped_pwm(enum PwmMap map, float duty_cycle) {
-  for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
-    int map_index = i - 1;
-    if (cfg_.pwm_map_[map_index] == map) {
-      uint32_t fan_pwm = get_pwm_gpio_descriptor(i);
-      if (duty_cycle == 0.0) {
-        pwm_timer_start(fan_pwm, 0);
-      } else {
-        pwm_timer_set_duty(fan_pwm, duty_cycle);
-        pwm_timer_start(fan_pwm, 1);
-      }
     }
   }
 }
@@ -1374,8 +1341,9 @@ GCodeMachineControl::~GCodeMachineControl() {
 
 GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &config,
                                                  MotorOperations *motor_ops,
+                                                 HardwareMapping *hardware_mapping,
                                                  FILE *msg_stream) {
-  Impl *result = new Impl(config, motor_ops, msg_stream);
+  Impl *result = new Impl(config, motor_ops, hardware_mapping, msg_stream);
   if (!result->Init()) {
     delete result;
     return NULL;

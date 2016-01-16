@@ -54,8 +54,7 @@ public:
     if (section_name == "general"
         || section_name == "motor-mapping"
         || section_name == "switch-mapping"
-        || section_name == "aux-mapping"
-        || section_name == "pwm-mapping")
+        || section_name == "aux-mapping")
       return true;
 
     // See if this is a valid axis section.
@@ -104,15 +103,6 @@ public:
       for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
         if (name == StringPrintf("aux_%d", i)) {
           return SetAuxMapping(line_no, i, value);
-        }
-      }
-      return false;
-    }
-
-    if (current_section_ == "pwm-mapping") {
-      for (int i = 1; i <= BEAGLEG_NUM_PWM; ++i) {
-        if (name == StringPrintf("pwm_%d", i)) {
-          return SetPwmMapping(line_no, i, value);
         }
       }
       return false;
@@ -346,31 +336,13 @@ private:
     return true;  // All went fine.
   }
 
-  bool SetPwmMapping(int line_no, int pwm_number, const std::string &value) {
-    int map_index = pwm_number - 1;
-    std::vector<StringPiece> options = SplitString(value, " \t,");
-    for (size_t i = 0; i < options.size(); ++i) {
-      const std::string option = ToLower(options[i]);
-      if (option.empty()) continue;
-      if (option == "fan") {
-        config_->pwm_map_[map_index] = PWM_FAN;
-      } else if (option == "spindle-pwm") {
-        config_->pwm_map_[map_index] = PWM_SPINDLE;
-      } else {
-        return false;
-      }
-    }
-
-    return true;  // All went fine.
-  }
-
   MachineControlConfig *const config_;
   enum GCodeParserAxis current_axis_;
   std::string current_section_;
 };
 }
 
-bool MachineControlConfig::InitializeFromFile(ConfigParser *parser) {
+bool MachineControlConfig::ConfigureFromFile(ConfigParser *parser) {
   MachineControlConfigReader reader(this);
   return parser->EmitConfigValues(&reader);
 }

@@ -25,6 +25,7 @@
 #include <string>
 
 class MotorOperations;
+class HardwareMapping;
 class ConfigParser;
 typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
 
@@ -41,16 +42,9 @@ enum AuxMap {
   AUX_FAN,
 };
 
-enum PwmMap {
-  PWM_NOT_MAPPED,
-  PWM_FAN,
-  PWM_SPINDLE,
-};
-
 enum {
   BEAGLEG_NUM_SWITCHES = 6,  // Number of supported input switches.
   BEAGLEG_NUM_AUX = 16,      // Number of supported aux outputs.
-  BEAGLEG_NUM_PWM = 4,       // Number of supported PWM outputs.
 };
 
 // Compact representation of an enstop configuration.
@@ -67,7 +61,7 @@ struct MachineControlConfig {
   MachineControlConfig();
 
   // Read values from configuration file.
-  bool InitializeFromFile(ConfigParser *parser);
+  bool ConfigureFromFile(ConfigParser *parser);
 
   // Arrays with values for each axis
   FloatAxisConfig steps_per_mm;   // Steps per mm for each logical axis.
@@ -101,7 +95,6 @@ struct MachineControlConfig {
   FixedArray<bool, BEAGLEG_NUM_SWITCHES> trigger_level_;
 
   FixedArray<int, BEAGLEG_NUM_AUX> aux_map_;
-  FixedArray<int, BEAGLEG_NUM_PWM> pwm_map_;
 
   // Position in these strings is the connector position of input switches.
   // Lower case: just regular stopswitch, Upper case: used for homing.
@@ -127,6 +120,7 @@ class GCodeMachineControl {
   // Returns NULL on failure.
   static GCodeMachineControl *Create(const MachineControlConfig &config,
                                      MotorOperations *motor_backend,
+                                     HardwareMapping *hardware_mapping,
                                      FILE *msg_stream);
 
   ~GCodeMachineControl();

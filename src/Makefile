@@ -34,7 +34,7 @@ GMOCK_SOURCE=/usr/src/gmock
 # environment variable.
 BEAGLEG_OPT_CFLAGS?=-O3
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS)
+CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"'
 
 # We export the following variables so that the googletest library will get
 # the same variables when compiling.
@@ -51,7 +51,7 @@ PRU_BIN=motor-interface-pru_bin.h
 
 GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o \
-	      string-util.o machine-control-config.o
+	      string-util.o machine-control-config.o hardware-mapping.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
 TEST_FRAMEORK_OBJECTS=gtest-all.o gmock-all.o

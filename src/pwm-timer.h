@@ -23,7 +23,7 @@
 #include "motor-interface-constants.h"
 
 // Start/stop the PWM timer
-void pwm_timer_start(uint32_t gpio_def, char start);
+void pwm_timer_start(uint32_t gpio_def, bool start);
 
 // Set the PWM timer duty cycle
 void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle);

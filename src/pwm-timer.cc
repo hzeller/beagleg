@@ -113,7 +113,7 @@ static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
   return timer;
 }
 
-void pwm_timer_start(uint32_t gpio_def, char start) {
+void pwm_timer_start(uint32_t gpio_def, bool start) {
   struct pwm_timer_data *timer = pwm_timer_get_data(gpio_def);
   if (!timer) return;
 
