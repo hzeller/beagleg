@@ -35,7 +35,7 @@ TEST(MachineControlConfig, GeneralMapping) {
                "synchronous = false\n"   // 'NO'.
                );
   MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(&p));
 
   EXPECT_EQ("ABC", config.home_order);
   EXPECT_FALSE(config.require_homing);
@@ -57,7 +57,7 @@ TEST(MachineControlConfig, AxisMapping) {
                );
 
   MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(&p));
 
   EXPECT_FLOAT_EQ(200.0f / (2 * 60.0f), config.steps_per_mm[AXIS_X]);
   EXPECT_FLOAT_EQ(42.0f, config.max_feedrate[AXIS_X]);
@@ -78,7 +78,7 @@ TEST(MachineControlConfig, MotorMapping) {
                // No mapping for motor 3
                "motor_4 = axis:z");
   MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(&p));
 
   EXPECT_EQ("Xy_Z", config.axis_mapping);
 }
@@ -90,7 +90,7 @@ TEST(MachineControlConfig, SwitchMapping) {
                "switch_4 = active:low min_y max_y\n"  // switch connected in series.
                );
   MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(&p));
 
   EXPECT_EQ(3, config.min_endstop_[AXIS_X].endstop_switch);
   EXPECT_TRUE(config.trigger_level_[3 - 1]);
@@ -98,56 +98,6 @@ TEST(MachineControlConfig, SwitchMapping) {
   EXPECT_EQ(4, config.min_endstop_[AXIS_Y].endstop_switch);
   EXPECT_EQ(4, config.max_endstop_[AXIS_Y].endstop_switch);
   EXPECT_FALSE(config.trigger_level_[4 - 1]);
-}
-
-TEST(MachineControlConfig, AuxMapping) {
-  ConfigParser p;
-  p.SetContent("[ aux-mapping ]\n"
-               "aux_1 = spindle-on\n"
-               "aux_2 = spindle-dir\n"
-               "aux_3 = vacuum\n"
-               "aux_4 = mist\n"
-               "aux_5 = flood\n"
-               "aux_10 = cooler\n"
-               "aux_11 = case-lights\n"
-               "aux_15 = fan\n"
-               "aux_16 = fan\n"
-               );
-  MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
-
-  EXPECT_EQ(AUX_SPINDLE_ON,  config.aux_map_[0]);
-  EXPECT_EQ(AUX_SPINDLE_DIR, config.aux_map_[1]);
-  EXPECT_EQ(AUX_VACUUM,      config.aux_map_[2]);
-  EXPECT_EQ(AUX_MIST,        config.aux_map_[3]);
-  EXPECT_EQ(AUX_FLOOD,       config.aux_map_[4]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[5]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[6]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[7]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[8]);
-  EXPECT_EQ(AUX_COOLER,      config.aux_map_[9]);
-  EXPECT_EQ(AUX_CASE_LIGHTS, config.aux_map_[10]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[11]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[12]);
-  EXPECT_EQ(AUX_NOT_MAPPED,  config.aux_map_[13]);
-  EXPECT_EQ(AUX_FAN,         config.aux_map_[14]);
-  EXPECT_EQ(AUX_FAN,         config.aux_map_[15]);
-}
-
-TEST(MachineControlConfig, PwmMapping) {
-  ConfigParser p;
-  p.SetContent("[ pwm-mapping ]\n"
-               "pwm_1 = spindle-pwm\n"
-               "pwm_3 = fan\n"
-               "pwm_4 = fan\n"
-               );
-  MachineControlConfig config;
-  EXPECT_TRUE(config.InitializeFromFile(&p));
-
-  EXPECT_EQ(PWM_SPINDLE,    config.pwm_map_[0]);
-  EXPECT_EQ(PWM_NOT_MAPPED, config.pwm_map_[1]);
-  EXPECT_EQ(PWM_FAN,        config.pwm_map_[2]);
-  EXPECT_EQ(PWM_FAN,        config.pwm_map_[3]);
 }
 
 int main(int argc, char *argv[]) {

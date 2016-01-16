@@ -14,9 +14,10 @@
 
 #include <gtest/gtest.h>
 
-#include "motor-operations.h"
 #include "gcode-parser.h"
+#include "hardware-mapping.h"
 #include "logging.h"
+#include "motor-operations.h"
 
 #define END_SENTINEL 0x42
 
@@ -93,7 +94,8 @@ class Harness {
   Harness(const LinearSegmentSteps *expected)
     : expect_motor_ops(expected) {
     init_test_config(&config);
-    machine_control = GCodeMachineControl::Create(config, &expect_motor_ops, NULL);
+    machine_control = GCodeMachineControl::Create(config, &expect_motor_ops,
+                                                  &hardware_, NULL);
   }
 
   ~Harness() {
@@ -106,6 +108,7 @@ class Harness {
 
   struct MachineControlConfig config;
   MockMotorOps expect_motor_ops;
+  HardwareMapping hardware_;
   GCodeMachineControl *machine_control;
 };
 
