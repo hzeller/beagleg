@@ -66,22 +66,29 @@ bool HardwareMapping::InitializeHardware() {
   return true;
 }
 
-void HardwareMapping::SetBooleanOutput(LogicOutput type, bool value) {
+void HardwareMapping::UpdateAuxFlags(LogicOutput type, bool is_on, AuxFlags *flags) {
+  Log_debug("Set aux for %d = %s", type, is_on ? "on" : "off");
+  if (is_on) {
+    *flags |= output_to_aux_bits_[type];
+  } else {
+    *flags &= ~output_to_aux_bits_[type];
+  }
+}
+
+void HardwareMapping::SetAuxOutput(AuxFlags flags) {
   if (!is_initialized_) return;
-  const uint32_t gpio = output_to_bool_gpio_[type];
-  if (gpio == GPIO_NOT_MAPPED) return;
-  Log_debug("Set output for %d", type);
-  // TODO: implement me.
+  for (int i = 0; i < NUM_BOOL_OUTPUTS; ++i) {
+    if (flags & (1 << i)) {
+      set_gpio(get_aux_bit_gpio_descriptor(i + 1));
+    } else {
+      clr_gpio(get_aux_bit_gpio_descriptor(i + 1));
+    }
+  }
 }
 
 void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
   if (!is_initialized_) return;
   const uint32_t gpio = output_to_pwm_gpio_[type];
-  if (gpio == GPIO_NOT_MAPPED) {
-    SetBooleanOutput(type, value > 0.0);  // Fallback in case this is just bool.
-    return;
-  }
-
   if (value <= 0.0) {
     pwm_timer_start(gpio, false);
   } else {
@@ -90,12 +97,14 @@ void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
   }
 }
 
-HardwareMapping::AxisTrigger HardwareMapping::EndstopTrigger(LogicAxis axis) {
+HardwareMapping::AxisTrigger HardwareMapping::AvailableTrigger(LogicAxis axis) {
+  if (!is_initialized_) return TRIGGER_NONE;
   return TRIGGER_NONE;   // TODO: implement me.
 }
 
 bool HardwareMapping::TestEndstop(LogicAxis axis, AxisTrigger expected_trigger) {
-  return true;  // TODO: implement me.
+  if (!is_initialized_) return false;
+  return false;  // TODO: implement me.
 }
 
 bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
@@ -103,7 +112,7 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
 #define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)
   MAP_VAL(n == "mist",        OUT_MIST);
   MAP_VAL(n == "flood",       OUT_FLOOD);
-  MAP_VAL(n == "vacuum",      OUT_VACCUM);
+  MAP_VAL(n == "vacuum",      OUT_VACUUM);
   MAP_VAL(n == "spindle" || n == "spindle-on", OUT_SPINDLE);
   MAP_VAL(n == "spindle-dir", OUT_SPINDLE_DIRECTION);
   MAP_VAL(n == "cooler",      OUT_COOLER);
@@ -113,38 +122,6 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
   MAP_VAL(n == "heatedbed",   OUT_FAN);
 #undef MAP_VAL
   return false;
-}
-
-static uint32_t get_aux_bit_gpio_descriptor(int pin) {
-  switch (pin) {
-  case 1:  return AUX_1_GPIO;
-  case 2:  return AUX_2_GPIO;
-  case 3:  return AUX_3_GPIO;
-  case 4:  return AUX_4_GPIO;
-  case 5:  return AUX_5_GPIO;
-  case 6:  return AUX_6_GPIO;
-  case 7:  return AUX_7_GPIO;
-  case 8:  return AUX_8_GPIO;
-  case 9:  return AUX_9_GPIO;
-  case 10: return AUX_10_GPIO;
-  case 11: return AUX_11_GPIO;
-  case 12: return AUX_12_GPIO;
-  case 13: return AUX_13_GPIO;
-  case 14: return AUX_14_GPIO;
-  case 15: return AUX_15_GPIO;
-  case 16: return AUX_16_GPIO;
-  default: return GPIO_NOT_MAPPED;
-  }
-}
-
-static uint32_t get_pwm_gpio_descriptor(int pwm_num) {
-  switch (pwm_num) {
-  case 1:  return PWM_1_GPIO;
-  case 2:  return PWM_2_GPIO;
-  case 3:  return PWM_3_GPIO;
-  case 4:  return PWM_4_GPIO;
-  default: return GPIO_NOT_MAPPED;
-  }
 }
 
 class HardwareMapping::ConfigReader : public ConfigParser::EventReceiver {
@@ -188,35 +165,23 @@ private:
     const uint32_t gpio_descriptor = get_aux_bit_gpio_descriptor(aux_number);
     LogicOutput output;
     if (NameToOutput(value, &output)) {
-      if (config_->output_to_bool_gpio_[output] != GPIO_NOT_MAPPED ||
-          config_->output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED) {
-        // TODO: do we want to allow 1:n mapping, same output, multiple pins ?
-        ReportError(line_no,
-                    StringPrintf("Attempt to map '%s' which is already "
-                                 "mapped to different pin.", value.c_str()));
-        return false;
-      }
-
       if (gpio_descriptor == GPIO_NOT_MAPPED) {
         Log_info("Mapping '%s' to aux %d which has no hardware connector for %s"
                  "; output will be ignored for this cape.",
                  value.c_str(), aux_number, CAPE_NAME);
-        // continue, this is not fatal.
+        return true;  // This is not fatal, but no need to prepare these bits.
       } else {
         Log_debug("PWM %d -> %s", aux_number, value.c_str());
       }
 
-      config_->output_to_bool_gpio_[output] = gpio_descriptor;
-      switch (output) {
-      case OUT_HOTEND:   // Fish out bad ideas
-      case OUT_HEATEDBED:
-        ReportError(line_no, "It is a dangours idea to connect hotends "
+      if (output == OUT_HOTEND || output == OUT_HEATEDBED) {
+        ReportError(line_no, "It is a dangerous to connect hotends "
                     "or heated beds to a boolean output. Use a PWM output!");
         return false;
-
-      default:
-        return true;
       }
+
+      config_->output_to_aux_bits_[output] |= 1 << (aux_number-1);
+      return true;
     } else {
       ReportError(line_no, StringPrintf("Unrecognized AUX output type: %s",
                                         value.c_str()));
@@ -228,8 +193,7 @@ private:
     const uint32_t gpio_descriptor = get_pwm_gpio_descriptor(aux_number);
     LogicOutput output;
     if (NameToOutput(value, &output)) {
-      if (config_->output_to_bool_gpio_[output] != GPIO_NOT_MAPPED ||
-          config_->output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED) {
+      if (config_->output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED) {
         // TODO: do we want to allow 1:n mapping, same output, multiple pins ?
         ReportError(line_no,
                     StringPrintf("Attempt to map '%s' which is already "
@@ -266,4 +230,38 @@ bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
     return true;
   }
   return false;
+}
+
+HardwareMapping::GPIODefinition
+HardwareMapping::get_aux_bit_gpio_descriptor(int aux_num) {
+  switch (aux_num) {
+  case 1:  return AUX_1_GPIO;
+  case 2:  return AUX_2_GPIO;
+  case 3:  return AUX_3_GPIO;
+  case 4:  return AUX_4_GPIO;
+  case 5:  return AUX_5_GPIO;
+  case 6:  return AUX_6_GPIO;
+  case 7:  return AUX_7_GPIO;
+  case 8:  return AUX_8_GPIO;
+  case 9:  return AUX_9_GPIO;
+  case 10: return AUX_10_GPIO;
+  case 11: return AUX_11_GPIO;
+  case 12: return AUX_12_GPIO;
+  case 13: return AUX_13_GPIO;
+  case 14: return AUX_14_GPIO;
+  case 15: return AUX_15_GPIO;
+  case 16: return AUX_16_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
+}
+
+HardwareMapping::GPIODefinition
+HardwareMapping::get_pwm_gpio_descriptor(int pwm_num) {
+  switch (pwm_num) {
+  case 1:  return PWM_1_GPIO;
+  case 2:  return PWM_2_GPIO;
+  case 3:  return PWM_3_GPIO;
+  case 4:  return PWM_4_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
 }

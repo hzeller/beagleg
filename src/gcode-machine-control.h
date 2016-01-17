@@ -44,7 +44,6 @@ enum AuxMap {
 
 enum {
   BEAGLEG_NUM_SWITCHES = 6,  // Number of supported input switches.
-  BEAGLEG_NUM_AUX = 16,      // Number of supported aux outputs.
 };
 
 // Compact representation of an enstop configuration.
@@ -93,14 +92,6 @@ struct MachineControlConfig {
   FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
   FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
   FixedArray<bool, BEAGLEG_NUM_SWITCHES> trigger_level_;
-
-  FixedArray<int, BEAGLEG_NUM_AUX> aux_map_;
-
-  // Position in these strings is the connector position of input switches.
-  // Lower case: just regular stopswitch, Upper case: used for homing.
-  //std::string min_endswitch;       // Letter: affected axis.
-  //std::string max_endswitch;       // Letter: affected axis.
-  //std::string endswitch_polarity;  // Letter: trigger logic level.
 
   std::string home_order;        // Order in which axes are homed.
 

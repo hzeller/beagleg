@@ -132,7 +132,6 @@ private:
   void bring_path_to_halt();
   void get_endstop_status();
   void get_current_position();
-  void set_mapped_aux(enum AuxMap map, int level);
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -148,6 +147,7 @@ private:
                       int dir, int trigger_value,
                       uint32_t gpio_def);
   void home_axis(enum GCodeParserAxis axis);
+  void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
 
   // Print to msg_stream.
   void mprintf(const char *format, ...);
@@ -192,7 +192,7 @@ private:
   AxesRegister coordinate_display_origin_; // parser tells us
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
-  unsigned short aux_bits_;              // Set via M42.
+  HardwareMapping::AuxFlags aux_bits_;   // Set via M42 or various other settings.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
@@ -211,37 +211,6 @@ static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
   case 5:  return END_5_GPIO;
   case 6:  return END_6_GPIO;
   default: return GPIO_NOT_MAPPED;
-  }
-}
-
-static uint32_t get_aux_bit_gpio_descriptor(int pin) {
-  switch (pin) {
-  case 1:  return AUX_1_GPIO;
-  case 2:  return AUX_2_GPIO;
-  case 3:  return AUX_3_GPIO;
-  case 4:  return AUX_4_GPIO;
-  case 5:  return AUX_5_GPIO;
-  case 6:  return AUX_6_GPIO;
-  case 7:  return AUX_7_GPIO;
-  case 8:  return AUX_8_GPIO;
-  case 9:  return AUX_9_GPIO;
-  case 10:  return AUX_10_GPIO;
-  case 11: return AUX_11_GPIO;
-  case 12: return AUX_12_GPIO;
-  case 13: return AUX_13_GPIO;
-  case 14: return AUX_14_GPIO;
-  case 15: return AUX_15_GPIO;
-  case 16: return AUX_16_GPIO;
-  default: return GPIO_NOT_MAPPED;
-  }
-}
-
-static void update_aux_gpios(unsigned short aux_bits) {
-  for (int pin = 1; pin <= BEAGLEG_NUM_AUX; ++pin) {
-    if (aux_bits & (1 << (pin - 1)))
-      set_gpio(get_aux_bit_gpio_descriptor(pin));
-    else
-      clr_gpio(get_aux_bit_gpio_descriptor(pin));
   }
 }
 
@@ -464,24 +433,7 @@ bool GCodeMachineControl::Impl::Init() {
       ++error_count;
     }
   }
-  for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
-    int map_index = i - 1;
-    std::string line;
-    line = StringPrintf("Aux %d: ", i);
-    switch (cfg_.aux_map_[map_index]) {
-    case AUX_NOT_MAPPED:  line += "not mapped"; break;
-    case AUX_MIST:        line += "mist"; break;
-    case AUX_FLOOD:       line += "flood"; break;
-    case AUX_VACUUM:      line += "vacuum"; break;
-    case AUX_SPINDLE_ON:  line += "spindle-on"; break;
-    case AUX_SPINDLE_DIR: line += "spindle-dir"; break;
-    case AUX_COOLER:      line += "cooler"; break;
-    case AUX_CASE_LIGHTS: line += "case-lights"; break;
-    case AUX_FAN:         line += "fan"; break;
-    default:              line += "UNKNOWN"; break;
-    }
-    Log_debug("%s", line.c_str());
-  }
+
   if (error_count)
     return false;
 
@@ -537,7 +489,7 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   if (speed < 0.0 || speed > 255.0) return;
   float duty_cycle = speed / 255.0;
   // The fan can be mapped to an aux and/or pwm signal
-  set_mapped_aux(AUX_FAN, duty_cycle != 0.0);
+  set_output_flags(HardwareMapping::OUT_FAN, duty_cycle > 0.0);
   hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_FAN, duty_cycle);
 }
 
@@ -596,12 +548,10 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
 
 const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value,
                                                         const char *remaining) {
-  const int code = (int)value;
-  int pin = -1;
-  int aux_bit = -1;
+  const int m_code = (int)value;
   const char* after_pair;
 
-  switch (code) {
+  switch (m_code) {
   case 3: case 4:
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
@@ -611,82 +561,81 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       remaining = after_pair;
     }
     if (spindle_rpm_) {
-      set_mapped_aux(AUX_SPINDLE_DIR, code == 4);
+      set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, m_code == 4);
       // TODO: calculate the duty_cycle (0-255) for the spindle pwm based on
       // the rpm range established by the config then:
       // set_mapped_pwm(PWM_SPINDLE, duty_cycle);
-      set_mapped_aux(AUX_SPINDLE_ON, 1);
+      set_output_flags(HardwareMapping::OUT_SPINDLE, true);
     }
     break;
   case 5:
-    set_mapped_aux(AUX_SPINDLE_ON, 0);
-    set_mapped_aux(AUX_SPINDLE_DIR, 0);
+    set_output_flags(HardwareMapping::OUT_SPINDLE, false);
+    set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, false);
     break;
-  case 7: set_mapped_aux(AUX_MIST, 1); break;
-  case 8: set_mapped_aux(AUX_FLOOD, 1); break;
+  case 7: set_output_flags(HardwareMapping::OUT_MIST, true); break;
+  case 8: set_output_flags(HardwareMapping::OUT_FLOOD, true); break;
   case 9:
-    set_mapped_aux(AUX_MIST, 0);
-    set_mapped_aux(AUX_FLOOD, 0);
+    set_output_flags(HardwareMapping::OUT_MIST, false);
+    set_output_flags(HardwareMapping::OUT_FLOOD, false);
     break;
-  case 10: set_mapped_aux(AUX_VACUUM, 1); break;
-  case 11: set_mapped_aux(AUX_VACUUM, 0); break;
+  case 10: set_output_flags(HardwareMapping::OUT_VACUUM, true); break;
+  case 11: set_output_flags(HardwareMapping::OUT_VACUUM, false); break;
   case 42:
-  case 62: case 63: case 64: case 65:
+  case 62: case 63: case 64: case 65: {
+    int bit_value = -1;
+    int pin = -1;
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
       if (letter == 'P') pin = round2int(value);
-      else if (letter == 'S' && code == 42) aux_bit = round2int(value);
+      else if (letter == 'S' && m_code == 42) bit_value = round2int(value);
       else break;
       remaining = after_pair;
     }
-    if (code == 62 || code == 64) aux_bit = 1;
-    else if (code == 63 || code == 65) aux_bit = 0;
-    if (pin > 0 && pin <= BEAGLEG_NUM_AUX) {
-      if (aux_bit >= 0 && aux_bit <= 1) {
-        if (aux_bit) aux_bits_ |= (1 << (pin - 1));
-        else aux_bits_ &= ~(1 << (pin - 1));
-        if (code == 64 || code == 65) {
-          // update the AUX pin now
-          if (aux_bit) set_gpio(get_aux_bit_gpio_descriptor(pin));
-          else clr_gpio(get_aux_bit_gpio_descriptor(pin));
+
+    if (m_code == 62 || m_code == 64)
+      bit_value = 1;
+    else if (m_code == 63 || m_code == 65)
+      bit_value = 0;
+
+    if (pin > 0 && pin <= HardwareMapping::NUM_BOOL_OUTPUTS) {
+      if (bit_value >= 0 && bit_value <= 1) {
+        if (bit_value)
+          aux_bits_ |= (1 << (pin - 1));
+        else
+          aux_bits_ &= ~(1 << (pin - 1));
+
+        if (m_code == 64 || m_code == 65) {    // update the AUX pin immediately
+          hardware_mapping_->SetAuxOutput(aux_bits_);
         }
-      } else if (code == 42 && msg_stream_) {  // Just read operation.
+      }
+      else if (m_code == 42 && msg_stream_) {  // Just read operation.
         mprintf("%d\n", (aux_bits_ >> (pin - 1)) & 1);
       }
     }
+  }
     break;
-  case 245: set_mapped_aux(AUX_COOLER, 1); break;
-  case 246: set_mapped_aux(AUX_COOLER, 0); break;
-  case 355:
+  case 245: set_output_flags(HardwareMapping::OUT_COOLER, true); break;
+  case 246: set_output_flags(HardwareMapping::OUT_COOLER, false); break;
+  case 355: {
+    int on_value = 0;
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
-      if (letter == 'S') aux_bit = round2int(value);
+      if (letter == 'S') on_value = round2int(value);
       else break;
       remaining = after_pair;
     }
-    if (aux_bit >= 0 && aux_bit <= 1)
-      set_mapped_aux(AUX_CASE_LIGHTS, aux_bit);
-    pin = cfg_.aux_map_[AUX_CASE_LIGHTS];
-    if (get_aux_bit_gpio_descriptor(pin)) {
-      mprintf("Case lights %s\n", (aux_bits_ & (1 << (pin - 1))) ? "on" : "off");
-    } else {
-      mprintf("No case lights\n");
-    }
+    set_output_flags(HardwareMapping::OUT_CASE_LIGHTS, on_value > 0);
+  }
     break;
   }
   return remaining;
 }
 
-void GCodeMachineControl::Impl::set_mapped_aux(enum AuxMap map, int level) {
-  for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
-    int map_index = i - 1;
-    if (cfg_.aux_map_[map_index] == map) {
-      if (level) aux_bits_ |= (1 << map_index);
-      else aux_bits_ &= ~(1 << map_index);
-    }
-  }
+void GCodeMachineControl::Impl::set_output_flags(HardwareMapping::LogicOutput out,
+                                                 bool is_on) {
+  hardware_mapping_->UpdateAuxFlags(out, is_on, &aux_bits_);
 }
 
 void GCodeMachineControl::Impl::get_current_position() {
@@ -1185,7 +1134,7 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
 void GCodeMachineControl::Impl::dwell(float value) {
   bring_path_to_halt();
   motor_ops_->WaitQueueEmpty();
-  update_aux_gpios(aux_bits_);
+  // update_aux_gpios(aux_bits_); // Needed ? bring_path_to_halt() already sets bits.
   usleep((int) (value * 1000));
 }
 

@@ -99,15 +99,6 @@ public:
       return false;
     }
 
-    if (current_section_ == "aux-mapping") {
-      for (int i = 1; i <= BEAGLEG_NUM_AUX; ++i) {
-        if (name == StringPrintf("aux_%d", i)) {
-          return SetAuxMapping(line_no, i, value);
-        }
-      }
-      return false;
-    }
-
     if (current_axis_ != GCODE_NUM_AXES) {
       ACCEPT_EXPR("steps-per-mm",     &config_->steps_per_mm[current_axis_]);
       ACCEPT_EXPR("steps-per-degree", &config_->steps_per_mm[current_axis_]);
@@ -298,36 +289,6 @@ private:
       }
       else if (option == "active:high") {
         config_->trigger_level_[switch_number - 1] = true;
-      } else {
-        return false;
-      }
-    }
-
-    return true;  // All went fine.
-  }
-
-  bool SetAuxMapping(int line_no, int aux_number, const std::string &value) {
-    int map_index = aux_number - 1;
-    std::vector<StringPiece> options = SplitString(value, " \t,");
-    for (size_t i = 0; i < options.size(); ++i) {
-      const std::string option = ToLower(options[i]);
-      if (option.empty()) continue;
-      if (option == "mist") {
-        config_->aux_map_[map_index] = AUX_MIST;
-      } else if (option == "flood") {
-        config_->aux_map_[map_index] = AUX_FLOOD;
-      } else if (option == "vacuum") {
-        config_->aux_map_[map_index] = AUX_VACUUM;
-      } else if (option == "spindle-on") {
-        config_->aux_map_[map_index] = AUX_SPINDLE_ON;
-      } else if (option == "spindle-dir") {
-        config_->aux_map_[map_index] = AUX_SPINDLE_DIR;
-      } else if (option == "cooler") {
-        config_->aux_map_[map_index] = AUX_COOLER;
-      } else if (option == "case-lights") {
-        config_->aux_map_[map_index] = AUX_CASE_LIGHTS;
-      } else if (option == "fan") {
-        config_->aux_map_[map_index] = AUX_FAN;
       } else {
         return false;
       }
