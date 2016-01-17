@@ -53,8 +53,7 @@ public:
     current_section_ = section_name;
     if (section_name == "general"
         || section_name == "motor-mapping"
-        || section_name == "switch-mapping"
-        || section_name == "aux-mapping")
+        || section_name == "switch-mapping")
       return true;
 
     // See if this is a valid axis section.
