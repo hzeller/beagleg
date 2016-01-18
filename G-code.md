@@ -90,29 +90,29 @@ the `unprocessed()` callback (see API below):
 Command          | Description
 -----------------|----------------------------------------
 M0               | Unconditional stop, sets Software E-Stop (only on capes that have ESTOP_SW_GPIO)
-M3 Sxx           | Spindle On Clockwise at speed Sxx; happens synchronously with next move.
-M4 Sxx           | Spindle On Counterclockwise at speed Sxx; happens synchronously with next move.
-M5               | Spindle Off; happens synchronously with next move.
-M7               | Turn mist on; happens synchronously with next move.
-M8               | Turn flood on; happens synchronously with next move.
-M9               | Turn all coolant off; happens synchronously with next move.
-M10              | Turn on vacuum; happens synchronously with next move.
-M11              | Turn off vacuum; happens synchronously with next move.
+M3 Sxx           | Spindle On Clockwise at speed Sxx
+M4 Sxx           | Spindle On Counterclockwise at speed Sxx
+M5               | Spindle Off
+M7               | Turn mist on
+M8               | Turn flood on
+M9               | Turn all coolant off
+M10              | Turn on vacuum
+M11              | Turn off vacuum
 M42 Pnn          | Get state of AUX Pin nn.
-M42 Pnn Sxx      | Set AUX Pin nn to value xx; happens synchronously with next move.
-M62 Pnn          | Set AUX Pin nn to 1; happens synchronously with next move.
-M63 Pnn          | Set AUX Pin nn to 0; happens synchronously with next move.
-M64 Pnn          | Set AUX Pin nn to 1; updates immediately, should only be used when not moving.
-M65 Pnn          | Set AUX Pin nn to 0; updates immediately, should only be used when not moving.
+M42 Pnn Sxx      | Set AUX Pin nn to value xx
+M62 Pnn          | Set AUX Pin nn to 1
+M63 Pnn          | Set AUX Pin nn to 0
+M64 Pnn          | Set AUX Pin nn to 1; updates immediately, independent of buffered moves.
+M65 Pnn          | Set AUX Pin nn to 0; updates immediately, independent of buffered moves.
 M80              | ATX Power On (only on capes that have MACHINE_PWR_GPIO)
 M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
 M119             | Get endstop status.
-M245             | Start cooler; happens synchronously with next move.
-M246             | Stop cooler; happens synchronously with next move.
-M355             | Turn case lights on/off; happens synchronously with next move.
+M245             | Start cooler
+M246             | Stop cooler
+M355             | Turn case lights on/off
 M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
 
 ### Feedrate in Euclidian space

@@ -170,7 +170,6 @@ int MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
   if (defining_axis_steps == 0) {
     // No move, but we still have to set the bits.
     struct MotionSegment empty_element = {0};
-    Log_debug("Push aux bits 0x%04x", param.aux_bits);
     empty_element.aux = param.aux_bits;
     empty_element.state = STATE_FILLED;
     backend_->Enqueue(&empty_element);
