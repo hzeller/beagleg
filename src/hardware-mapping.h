@@ -110,7 +110,7 @@ public:
 
   /*
    * various configuration options. Direct setters for programmatic
-   * access, configuration file option for standard BeagleG config.
+   * access. Configuration file option for standard BeagleG config.
    */
 
   // Pick the relevant mapping parameter from the configuration file.
@@ -139,8 +139,7 @@ public:
   int GetFirstFreeMotor();
 
   /*
-   * If used not on a simulated machine, InitializeHardware() is needed
-   * after the configuration is finished
+   * If not used as a simulated machine, InitializeHardware() is needed.
    */
 
   // Initialize the hardware (needs to be configured first).
@@ -169,6 +168,8 @@ public:
   // Given the logic axis and number of steps, assign these steps to the mapped
   // motors in the LinearSegmentSteps
   void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
+
+  // -- Switch access
 
   // Returns which endstop trigger are available. Possible values are
   // TRIGGER_NONE, if there are no end-stops configured, TRIGGER_MIN/MAX
