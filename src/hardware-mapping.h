@@ -106,6 +106,7 @@ public:
   };
 
   HardwareMapping();
+  ~HardwareMapping();
 
   // -- various configuration options. Direct setters for programmatic
   //    access, configuration file option for standard BeagleG config.
@@ -195,6 +196,8 @@ private:
 
   // Get GPIO definition for pwm number. Value range from 1..NUM_PWM_OUTPUTS
   static GPIODefinition get_pwm_gpio_descriptor(int pwm_number);
+
+  void ResetHardware();  // Initialize to a safe state.
 
   // Mapping of logical outputs to hardware outputs.
   FixedArray<AuxBitmap, NUM_OUTPUTS> output_to_aux_bits_;

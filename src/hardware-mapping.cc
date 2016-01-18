@@ -32,6 +32,10 @@
 HardwareMapping::HardwareMapping() : is_initialized_(false) {
 }
 
+HardwareMapping::~HardwareMapping() {
+  ResetHardware();
+}
+
 bool HardwareMapping::AddMotorMapping(LogicAxis axis, int motor,
                                       bool mirrored) {
   if (motor == 0) return true;  // allowed null-mapping
@@ -120,7 +124,16 @@ bool HardwareMapping::InitializeHardware() {
   pwm_timer_set_freq(PWM_4_GPIO, 0);
 
   is_initialized_ = true;
+  ResetHardware();
+
   return true;
+}
+
+void HardwareMapping::ResetHardware() {
+  SetAuxOutput(0);
+  for (int i = 0; i < NUM_PWM_OUTPUTS; ++i) {
+    pwm_timer_start(get_pwm_gpio_descriptor(i+1), false);
+  }
 }
 
 void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on, AuxBitmap *flags) {
