@@ -193,6 +193,7 @@ private:
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
   HardwareMapping::AuxFlags aux_bits_;   // Set via M42 or various other settings.
+  HardwareMapping::AuxFlags last_aux_bits_;  // last enqueued aux bits.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
@@ -833,6 +834,13 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
                                                    struct AxisTarget *target_pos,
                                                    const struct AxisTarget *upcoming) {
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
+    if (last_aux_bits_ != target_pos->aux_bits) {
+      // Special treatment: bits changed since last time, let's push them through.
+      struct LinearSegmentSteps bit_set_command = {0};
+      bit_set_command.aux_bits = target_pos->aux_bits;
+      motor_ops_->Enqueue(bit_set_command, msg_stream_);
+      last_aux_bits_ = target_pos->aux_bits;
+    }
     return;
   }
   struct LinearSegmentSteps accel_command = {0};
@@ -956,6 +964,8 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
   if (has_accel) motor_ops_->Enqueue(accel_command, msg_stream_);
   if (has_move) motor_ops_->Enqueue(move_command, msg_stream_);
   if (has_decel) motor_ops_->Enqueue(decel_command, msg_stream_);
+
+  last_aux_bits_ = target_pos->aux_bits;
 }
 
 // If we have enough data in the queue, issue motor move.
@@ -1134,7 +1144,6 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
 void GCodeMachineControl::Impl::dwell(float value) {
   bring_path_to_halt();
   motor_ops_->WaitQueueEmpty();
-  // update_aux_gpios(aux_bits_); // Needed ? bring_path_to_halt() already sets bits.
   usleep((int) (value * 1000));
 }
 

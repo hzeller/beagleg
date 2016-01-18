@@ -165,12 +165,16 @@ static int get_defining_axis_steps(const LinearSegmentSteps &param) {
 int MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
                                         FILE *err_stream) {
   const int defining_axis_steps = get_defining_axis_steps(param);
-  if (defining_axis_steps == 0) {
-    Log_debug("Zero steps. Ignoring command.");
-    return 1;
-  }
 
-  if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
+  if (defining_axis_steps == 0) {
+    // No move, but we still have to set the bits.
+    struct MotionSegment empty_element = {0};
+    Log_debug("Push aux bits 0x%04x", param.aux_bits);
+    empty_element.aux = param.aux_bits;
+    empty_element.state = STATE_FILLED;
+    backend_->Enqueue(&empty_element);
+  }
+  else if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
     // We have more steps that we can enqueue in one chunk, so let's cut
     // it in pieces.
     const double a = (sqd(param.v1) - sqd(param.v0))/(2.0*defining_axis_steps);
