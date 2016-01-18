@@ -342,6 +342,10 @@ bool GCodeMachineControl::Impl::Init() {
   Log_debug("-- Config --\n");
   for (int ii = 0; ii < GCODE_NUM_AXES; ++ii) {
     const GCodeParserAxis axis = (GCodeParserAxis) ii;
+    if (cfg_.steps_per_mm[axis] > 0 && !hardware_mapping_->HasMotorFor(axis)) {
+      const int new_motor = hardware_mapping_->GetFirstFreeMotor();
+      hardware_mapping_->AddMotorMapping(axis, new_motor, false);
+    }
     if (!hardware_mapping_->HasMotorFor(axis))
       continue;
     const bool is_error = (cfg_.steps_per_mm[axis] <= 0

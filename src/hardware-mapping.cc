@@ -29,31 +29,15 @@
 #include "motor-operations.h"  // LinearSegmentSteps
 #include "string-util.h"
 
-HardwareMapping::HardwareMapping() : is_initialized_(false) {
+HardwareMapping::HardwareMapping() : is_hardware_initialized_(false) {
 }
 
 HardwareMapping::~HardwareMapping() {
-  if (is_initialized_) {
+  if (is_hardware_initialized_) {
     ResetHardware();
     unmap_gpio();
     pwm_timers_unmap();
   }
-}
-
-bool HardwareMapping::AddMotorMapping(LogicAxis axis, int motor,
-                                      bool mirrored) {
-  if (motor == 0) return true;  // allowed null-mapping
-  if (motor < 1 || motor > NUM_MOTORS) {
-    Log_error("Motor %d out of range [%d..%d]", motor, 1, NUM_MOTORS);
-    return false;
-  }
-  if (driver_flip_[motor-1] != 0) {
-    Log_error("Motor %d mapped more than once.", motor);
-    return false;
-  }
-  axis_to_driver_[axis] |= 1 << (motor-1);
-  driver_flip_[motor-1] = mirrored ? -1 : 1;
-  return true;
 }
 
 bool HardwareMapping::AddAuxMapping(LogicOutput output, int aux) {
@@ -95,8 +79,31 @@ bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
   return true;
 }
 
+bool HardwareMapping::AddMotorMapping(LogicAxis axis, int motor,
+                                      bool mirrored) {
+  if (motor == 0) return true;  // allowed null-mapping
+  if (motor < 1 || motor > NUM_MOTORS) {
+    Log_error("Motor %d out of range [%d..%d]", motor, 1, NUM_MOTORS);
+    return false;
+  }
+  if (driver_flip_[motor-1] != 0) {
+    Log_error("Motor %d mapped more than once.", motor);
+    return false;
+  }
+  axis_to_driver_[axis] |= 1 << (motor-1);
+  driver_flip_[motor-1] = mirrored ? -1 : 1;
+  return true;
+}
+
+int HardwareMapping::GetFirstFreeMotor() {
+  for (int motor = 0; motor < NUM_MOTORS; ++motor) {
+    if (driver_flip_[motor] == 0)
+      return motor + 1;
+  }
+  return 0;
+}
+
 bool HardwareMapping::InitializeHardware() {
-  assert(is_configured_);  // Call sequence error. Needs to be configured first.
   if (geteuid() != 0) {
     Log_error("Need to run as root to access GPIO pins.");
     return false;
@@ -127,14 +134,14 @@ bool HardwareMapping::InitializeHardware() {
   pwm_timer_set_freq(PWM_3_GPIO, 0);
   pwm_timer_set_freq(PWM_4_GPIO, 0);
 
-  is_initialized_ = true;
+  is_hardware_initialized_ = true;
   ResetHardware();
 
   return true;
 }
 
 void HardwareMapping::ResetHardware() {
-  if (!is_initialized_) return;
+  if (!is_hardware_initialized_) return;
   SetAuxOutput(0);
   for (int i = 0; i < NUM_PWM_OUTPUTS; ++i) {
     pwm_timer_start(get_pwm_gpio_descriptor(i+1), false);
@@ -150,7 +157,7 @@ void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on, AuxBitmap *f
 }
 
 void HardwareMapping::SetAuxOutput(AuxBitmap flags) {
-  if (!is_initialized_) return;
+  if (!is_hardware_initialized_) return;
   for (int i = 0; i < NUM_BOOL_OUTPUTS; ++i) {
     if (flags & (1 << i)) {
       set_gpio(get_aux_bit_gpio_descriptor(i + 1));
@@ -161,7 +168,7 @@ void HardwareMapping::SetAuxOutput(AuxBitmap flags) {
 }
 
 void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
-  if (!is_initialized_) return;
+  if (!is_hardware_initialized_) return;
   const uint32_t gpio = output_to_pwm_gpio_[type];
   if (value <= 0.0) {
     pwm_timer_start(gpio, false);
@@ -195,12 +202,12 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
 }
 
 HardwareMapping::AxisTrigger HardwareMapping::AvailableTrigger(LogicAxis axis) {
-  if (!is_initialized_) return TRIGGER_NONE;
+  if (!is_hardware_initialized_) return TRIGGER_NONE;
   return TRIGGER_NONE;   // TODO: implement me.
 }
 
 bool HardwareMapping::TestEndstop(LogicAxis axis, AxisTrigger expected_trigger) {
-  if (!is_initialized_) return false;
+  if (!is_hardware_initialized_) return false;
   return false;  // TODO: implement me.
 }
 
@@ -321,7 +328,6 @@ private:
 bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
   HardwareMapping::ConfigReader reader(this);
   if (parser->EmitConfigValues(&reader)) {
-    is_configured_ = true;
     return true;
   }
   return false;

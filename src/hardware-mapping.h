@@ -108,8 +108,10 @@ public:
   HardwareMapping();
   ~HardwareMapping();
 
-  // -- various configuration options. Direct setters for programmatic
-  //    access, configuration file option for standard BeagleG config.
+  /*
+   * various configuration options. Direct setters for programmatic
+   * access, configuration file option for standard BeagleG config.
+   */
 
   // Pick the relevant mapping parameter from the configuration file.
   bool ConfigureFromFile(ConfigParser *parser);
@@ -128,7 +130,18 @@ public:
   // A value of 0 for 'motor' is accepted but does not connect it to anything.
   bool AddMotorMapping(LogicAxis axis, int motor, bool mirrored);
 
-  // -- If used not on a simulated machine, InitializeHardware() is needed.
+  // Determine if we have a motor configured for given axis.
+  bool HasMotorFor(LogicAxis axis) { return axis_to_driver_[axis] != 0; }
+
+  // Return first motor free to map. Returns value in the range
+  // [1..NUM_MOTORS] if there is a free motor, 0 otherwise.
+  // Useful for auto-configuration.
+  int GetFirstFreeMotor();
+
+  /*
+   * If used not on a simulated machine, InitializeHardware() is needed
+   * after the configuration is finished
+   */
 
   // Initialize the hardware (needs to be configured first).
   // If this function is never called, all outputs are simulated.
@@ -152,9 +165,6 @@ public:
   void SetPWMOutput(LogicOutput type, float value);
 
   // -- Motor outputs
-
-  // Determine if we have a motor configured for given axis.
-  bool HasMotorFor(LogicAxis axis) { return axis_to_driver_[axis] != 0; }
 
   // Given the logic axis and number of steps, assign these steps to the mapped
   // motors in the LinearSegmentSteps
@@ -210,8 +220,7 @@ private:
   FixedArray<MotorBitmap, GCODE_NUM_AXES> axis_to_driver_;
   FixedArray<int, NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
 
-  bool is_configured_;
-  bool is_initialized_;
+  bool is_hardware_initialized_;
 };
 
 #endif  // BEAGLEG_HARDWARE_MAPPING_

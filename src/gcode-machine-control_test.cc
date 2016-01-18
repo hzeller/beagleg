@@ -32,11 +32,6 @@ static void init_test_config(struct MachineControlConfig *c,
     c->max_feedrate[i] = 10000;
   c->threshold_angle = 0;
   c->require_homing = false;
-
-  // We expect axis outputs X, Y, Z arrive at motor 0, 1, 2
-  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_X, 1, false));
-  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_Y, 2, false));
-  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_Z, 3, false));
 }
 
 namespace {
