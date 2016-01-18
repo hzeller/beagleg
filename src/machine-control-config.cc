@@ -1,4 +1,4 @@
-/* -*- mode: c++ c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -40,6 +40,7 @@ MachineControlConfig::MachineControlConfig() {
   require_homing = true;
   home_order = kHomeOrder;
   threshold_angle = -1;
+  auto_motor_disable_seconds = -1;
 }
 
 namespace {
@@ -78,6 +79,8 @@ public:
       ACCEPT_VALUE("require-homing", Bool,   &config_->require_homing);
       ACCEPT_VALUE("range-check",    Bool,   &config_->range_check);
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
+      ACCEPT_VALUE("auto-motor-disable-seconds",
+                   Int,   &config_->auto_motor_disable_seconds);
       return false;
     }
 
@@ -130,6 +133,12 @@ private:
   bool ParseString(const std::string &value, std::string *result) {
     *result = value;
     return true;
+  }
+
+  bool ParseInt(const std::string &value, int *result) {
+    char *end;
+    *result = strtol(value.c_str(), &end, 10);
+    return *end == '\0';
   }
 
   bool ParseBool(const std::string &value, bool *result) {

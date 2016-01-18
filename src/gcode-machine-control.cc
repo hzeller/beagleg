@@ -1,4 +1,4 @@
-/* -*- mode: c++ c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2013, 2014 Henner Zeller <h.zeller@acm.org>
  *
  * This file is part of BeagleG. http://github.com/hzeller/beagleg
@@ -33,6 +33,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "container.h"
 #include "gcode-parser.h"
@@ -109,7 +110,7 @@ public:
   virtual void inform_origin_offset(const AxesRegister &origin);
 
   virtual void gcode_command_done(char letter, float val);
-  virtual void input_idle();
+  virtual void input_idle(bool is_first);
   virtual void wait_for_start();
   virtual void go_home(AxisBitmap_t axis_bitmap);
   virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
@@ -195,6 +196,7 @@ private:
   HardwareMapping::AuxFlags aux_bits_;   // Set via M42 or various other settings.
   HardwareMapping::AuxFlags last_aux_bits_;  // last enqueued aux bits.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
+  time_t next_auto_disable_motor_;
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
@@ -1147,8 +1149,15 @@ void GCodeMachineControl::Impl::dwell(float value) {
   usleep((int) (value * 1000));
 }
 
-void GCodeMachineControl::Impl::input_idle() {
+void GCodeMachineControl::Impl::input_idle(bool is_first) {
   bring_path_to_halt();
+  if (cfg_.auto_motor_disable_seconds > 0) {
+    if (is_first) {
+      next_auto_disable_motor_ = time(NULL) + cfg_.auto_motor_disable_seconds;
+    } else if (time(NULL) >= next_auto_disable_motor_) {
+      motors_enable(false);
+    }
+  }
 }
 
 void GCodeMachineControl::Impl::set_speed_factor(float value) {

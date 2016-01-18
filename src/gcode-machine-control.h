@@ -95,6 +95,7 @@ struct MachineControlConfig {
 
   std::string home_order;        // Order in which axes are homed.
 
+  int auto_motor_disable_seconds; // disable motors automatically after these seconds.
   bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
   bool require_homing;          // Require homing before any moves.
   bool range_check;             // Do machine limit checks. Default 1.

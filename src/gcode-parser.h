@@ -92,7 +92,9 @@ public:
     // If the input has been idle and we haven't gotten any new line for more
     // than 50ms, this function is called (repeately, until there is input again).
     // Use this to do whatever other maintenance might be needed.
-    virtual void input_idle();
+    // The first call to input_idle() after data has been processed
+    // will have "is_first" set.
+    virtual void input_idle(bool is_first);
 
     // G24: Start/resume
     // If machine has a START_GPIO this callback will wait until it is low

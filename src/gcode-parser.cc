@@ -151,7 +151,7 @@ const char *GCodeParser::EventReceiver::unprocessed(char letter, float value,
             letter, (int) value, remaining);
   return NULL;
 }
-void GCodeParser::EventReceiver::input_idle() {
+void GCodeParser::EventReceiver::input_idle(bool is_first) {
   Log_debug("GCodeParser: input idle\n");
 }
 
@@ -731,6 +731,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
     return 1;
   }
 
+  bool is_processing = true;
   fd_set read_fds;
   struct timeval wait_time;
   int select_ret;
@@ -751,9 +752,12 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
       break;
 
     if (select_ret == 0) {  // Timeout. Regularly call.
-      callbacks->input_idle();
+      callbacks->input_idle(is_processing);
+      is_processing = false;
       continue;
     }
+
+    is_processing = true;
 
     // Filedescriptor readable. Now wait for a line to finish.
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)

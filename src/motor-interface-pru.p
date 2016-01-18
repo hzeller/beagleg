@@ -258,7 +258,6 @@ FINISH:
 	HALT
 
 ;;; This include file needs to provide the subroutines
-;;;    EnableMotors
 ;;;    SetAuxBits
 ;;;    SetDirections
 ;;;    SetSteps

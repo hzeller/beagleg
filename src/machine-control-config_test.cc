@@ -33,6 +33,7 @@ TEST(MachineControlConfig, GeneralMapping) {
                "require-homing = 0\n"    // three ways ..
                "range-check = no\n"      // .. to say ...
                "synchronous = false\n"   // 'NO'.
+               "auto-motor-disable-seconds = 188 \n"
                );
   MachineControlConfig config;
   EXPECT_TRUE(config.ConfigureFromFile(&p));
@@ -41,6 +42,7 @@ TEST(MachineControlConfig, GeneralMapping) {
   EXPECT_FALSE(config.require_homing);
   EXPECT_FALSE(config.range_check);
   EXPECT_FALSE(config.synchronous);
+  EXPECT_EQ(188, config.auto_motor_disable_seconds);
 }
 
 TEST(MachineControlConfig, AxisMapping) {
