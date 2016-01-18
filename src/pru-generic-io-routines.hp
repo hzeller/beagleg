@@ -46,13 +46,6 @@ update_gpio:
 no_map:
 .endm
 
-;;; Set motor enable to on (polarity depending on MOTOR_ENABLE_IS_ACTIVE_HIGH)
-;;; Uses r3..r6
-EnableMotors:
-	MOV r3, MOTOR_ENABLE_IS_ACTIVE_HIGH
-	SetGPIO r3, 0, MOTOR_ENABLE_GPIO
-	RET
-
 ;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..15
 SetAuxBits:
 	SetGPIO r3, 0, AUX_1_GPIO

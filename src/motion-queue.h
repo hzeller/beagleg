@@ -108,6 +108,8 @@ public:
 
 private:
   int Init();
+
+  bool last_motor_enable_;
 };
 
 

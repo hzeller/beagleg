@@ -133,8 +133,10 @@ void PRUMotionQueue::WaitQueueEmpty() {
 }
 
 void PRUMotionQueue::MotorEnable(bool on) {
+  if (on == last_motor_enable_) return;
   if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
   else set_gpio(MOTOR_ENABLE_GPIO);
+  last_motor_enable_ = on;
 }
 
 void PRUMotionQueue::Shutdown(bool flush_queue) {
@@ -152,7 +154,7 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   pwm_timers_unmap();
 }
 
-PRUMotionQueue::PRUMotionQueue() {
+PRUMotionQueue::PRUMotionQueue() : last_motor_enable_(false) {
   const int init_result = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.

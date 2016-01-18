@@ -475,7 +475,7 @@ void GCodeMachineControl::Impl::wait_temperature() {
 void GCodeMachineControl::Impl::motors_enable(bool b) {
   bring_path_to_halt();
   motor_ops_->MotorEnable(b);
-  if (homing_state_ == HOMING_STATE_HOMED) {
+  if (!b && homing_state_ == HOMING_STATE_HOMED) {
     homing_state_ = HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED;
   }
 }

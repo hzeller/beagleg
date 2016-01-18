@@ -186,9 +186,6 @@ QUEUE_READ:
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 
-	;; Enable the stepper motors.
-	CALL EnableMotors
-
 	;; Set direction bits
 	MOV r3, queue_header.direction_bits
 	CALL SetDirections

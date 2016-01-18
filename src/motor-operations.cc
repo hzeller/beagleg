@@ -149,6 +149,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
 
   new_element.aux = param.aux_bits;
   new_element.state = STATE_FILLED;
+  backend_->MotorEnable(true);
   backend_->Enqueue(&new_element);
 }
 
