@@ -33,7 +33,11 @@ HardwareMapping::HardwareMapping() : is_initialized_(false) {
 }
 
 HardwareMapping::~HardwareMapping() {
-  ResetHardware();
+  if (is_initialized_) {
+    ResetHardware();
+    unmap_gpio();
+    pwm_timers_unmap();
+  }
 }
 
 bool HardwareMapping::AddMotorMapping(LogicAxis axis, int motor,
@@ -130,6 +134,7 @@ bool HardwareMapping::InitializeHardware() {
 }
 
 void HardwareMapping::ResetHardware() {
+  if (!is_initialized_) return;
   SetAuxOutput(0);
   for (int i = 0; i < NUM_PWM_OUTPUTS; ++i) {
     pwm_timer_start(get_pwm_gpio_descriptor(i+1), false);
