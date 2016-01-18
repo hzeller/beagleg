@@ -52,8 +52,7 @@ public:
 
   virtual bool SeenSection(int line_no, const std::string &section_name) {
     current_section_ = section_name;
-    if (section_name == "general"
-        || section_name == "switch-mapping")
+    if (section_name == "general")
       return true;
 
     // See if this is a valid axis section.
@@ -80,15 +79,6 @@ public:
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
       ACCEPT_VALUE("auto-motor-disable-seconds",
                    Int,   &config_->auto_motor_disable_seconds);
-      return false;
-    }
-
-    if (current_section_ == "switch-mapping") {
-      for (int i = 1; i <= BEAGLEG_NUM_SWITCHES; ++i) {
-        if (name == StringPrintf("switch_%d", i)) {
-          return SetSwitchOptions(line_no, i, value);
-        }
-      }
       return false;
     }
 
@@ -195,65 +185,26 @@ private:
 
   bool SetHomePos(int line_no, enum GCodeParserAxis axis,
                   const std::string &value) {
+    if (config_->homing_trigger[axis] != HardwareMapping::TRIGGER_NONE) {
+      ReportError(line_no, StringPrintf("home-pos[%c] already configured before ",
+                                        gcodep_axis2letter(axis)));
+      return false;
+    }
     const std::string choice = ToLower(value);
     if (choice == "min") {
-      if (config_->max_endstop_[axis].homing_use) {
-        ReportError(line_no,
-                    StringPrintf("home-pos[%c] Prior max configured as endstop.",
-                                 gcodep_axis2letter(axis)));
-        return false;
-      }
-      config_->min_endstop_[axis].homing_use = true;
-      return true;
-    } else if (choice == "max") {
-      if (config_->min_endstop_[axis].homing_use) {
-        ReportError(line_no,
-                    StringPrintf("home-pos[%c] Prior min configured as endstop.",
-                                 gcodep_axis2letter(axis)));
-        return false;
-      }
-      config_->max_endstop_[axis].homing_use = true;
+      config_->homing_trigger[axis] = HardwareMapping::TRIGGER_MIN;
+    }
+    else if (choice == "max") {
+      config_->homing_trigger[axis] = HardwareMapping::TRIGGER_MAX;
       return true;
     }
-    ReportError(line_no,
-                StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
-                             gcodep_axis2letter(axis), value.c_str()));
-    return false;
-  }
-
-  bool SetSwitchOptions(int line_no, int switch_number,
-                        const std::string &value) {
-    std::vector<StringPiece> options = SplitString(value, " \t,");
-    for (size_t i = 0; i < options.size(); ++i) {
-      const std::string option = ToLower(options[i]);
-      if (option.empty()) continue;
-      if (option.length() == 5) {
-        const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
-        if (axis == GCODE_NUM_AXES) {
-          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. Last character not a valid axis (got %s).", line_no, option.c_str());
-          return false;
-        }
-
-        if (HasPrefix(option, "min_")) {
-          config_->min_endstop_[axis].endstop_switch = switch_number;
-        } else if (HasPrefix(option, "max_")) {
-          config_->max_endstop_[axis].endstop_switch = switch_number;
-        } else {
-          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. Got %s", line_no, option.c_str());
-          return false;
-        }
-      }
-      else if (option == "active:low") {
-        config_->trigger_level_[switch_number - 1] = false;
-      }
-      else if (option == "active:high") {
-        config_->trigger_level_[switch_number - 1] = true;
-      } else {
-        return false;
-      }
+    else {
+      ReportError(line_no,
+                  StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
+                               gcodep_axis2letter(axis), value.c_str()));
+      return false;
     }
-
-    return true;  // All went fine.
+    return true;
   }
 
   MachineControlConfig *const config_;

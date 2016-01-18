@@ -406,8 +406,7 @@ int main(int argc, char *argv[]) {
   if (dry_run) {
     // For dry-run, we never see switches, so disable them.
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      config.min_endstop_[i].endstop_switch = 0;
-      config.max_endstop_[i].endstop_switch = 0;
+      config.homing_trigger[i] = HardwareMapping::TRIGGER_NONE;
     }
     config.require_homing = false;
 

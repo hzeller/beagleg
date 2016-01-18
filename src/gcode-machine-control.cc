@@ -95,9 +95,6 @@ public:
 
   ~Impl() {}
 
-  uint32_t GetHomeEndstop(enum GCodeParserAxis axis,
-                          int *dir, bool *trigger_value) const;
-
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
 
@@ -143,8 +140,7 @@ private:
                           const struct AxisTarget *upcoming);
   int move_to_endstop(enum GCodeParserAxis axis,
                       float feedrate, int backoff,
-                      int dir, int trigger_value,
-                      uint32_t gpio_def);
+                      HardwareMapping::AxisTrigger trigger);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
 
@@ -181,18 +177,6 @@ private:
 
   enum HomingState homing_state_;
 };
-
-static uint32_t get_endstop_gpio_descriptor(struct EndstopConfig config) {
-  switch (config.endstop_switch) {
-  case 1:  return END_1_GPIO;
-  case 2:  return END_2_GPIO;
-  case 3:  return END_3_GPIO;
-  case 4:  return END_4_GPIO;
-  case 5:  return END_5_GPIO;
-  case 6:  return END_6_GPIO;
-  default: return GPIO_NOT_MAPPED;
-  }
-}
 
 static inline int round2int(float x) { return (int) roundf(x); }
 
@@ -324,17 +308,19 @@ bool GCodeMachineControl::Impl::Init() {
 #endif
 
   // Check if things are plausible: we only allow one home endstop per axis.
-  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
-    if (cfg_.min_endstop_[axis].endstop_switch
-        && cfg_.max_endstop_[axis].endstop_switch) {
-      if (cfg_.min_endstop_[axis].homing_use
-          && cfg_.max_endstop_[axis].homing_use) {
-        Log_error("Error: There can only be one home-origin for axis %c, "
-                "but both min/max are set for homing (Uppercase letter)\n",
-                gcodep_axis2letter((GCodeParserAxis)axis));
-        ++error_count;
-        continue;
-      }
+  for (int a = 0; a < GCODE_NUM_AXES; ++a) {
+    GCodeParserAxis axis = (GCodeParserAxis) a;
+    const HardwareMapping::AxisTrigger homing_trigger = cfg_.homing_trigger[axis];
+    if (homing_trigger == HardwareMapping::TRIGGER_ANY) {
+      Log_error("Error: There can only be one home-origin for axis %c, "
+                "but both min/max are set for homing.\n",
+                gcodep_axis2letter(axis));
+      ++error_count;
+    }
+    if ((hardware_mapping_->AvailableAxisSwitch(axis) & homing_trigger) == 0) {
+      Log_error("Error: There is no switch associated in [switch-mapping] "
+                "for the home origin of axis %c", gcodep_axis2letter(axis));
+      ++error_count;
     }
   }
 
@@ -364,20 +350,13 @@ bool GCodeMachineControl::Impl::Init() {
     } else {
       line += "[ unknown range ] ";
     }
-    int endstop = cfg_.min_endstop_[axis].endstop_switch;
-    const char *trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
-    if (endstop) {
-      line += StringPrintf("min-switch %d (%s-trigger)%s; ",
-                           endstop, trg,
-                           cfg_.min_endstop_[axis].homing_use ? " [HOME]" : "       ");
+    if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MIN) != 0) {
+      line += StringPrintf("HOME@min; ");
     }
-    endstop = cfg_.max_endstop_[axis].endstop_switch;
-    trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
-    if (endstop) {
-      line += StringPrintf("max-switch %d (%s-trigger)%s;",
-                           endstop, trg,
-                           cfg_.max_endstop_[axis].homing_use ? " [HOME]" : "");
+    else if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MAX) != 0) {
+      line += StringPrintf("HOME@max; ");
     }
+
     if (!cfg_.range_check)
       line += "Limit checks disabled!";
     Log_debug("%s", line.c_str());
@@ -399,14 +378,14 @@ bool GCodeMachineControl::Impl::Init() {
   struct AxisTarget *init_axis = planning_buffer_.append();
   bzero(init_axis, sizeof(*init_axis));
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
-    int dir;
-    bool dummy;
-    if (GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy)) {
-      const float home_pos = (dir < 0) ? 0 : cfg_.move_range_mm[axis];
-      init_axis->position_steps[axis]
-        = round2int(home_pos * cfg_.steps_per_mm[axis]);
-    } else {
+    HardwareMapping::AxisTrigger trigger = cfg_.homing_trigger[axis];
+    if (trigger == 0) {
       init_axis->position_steps[axis] = 0;
+    }
+    else {
+      const float home_pos = trigger == HardwareMapping::TRIGGER_MIN
+        ? 0 : cfg_.move_range_mm[axis];
+      init_axis->position_steps[axis] = round2int(home_pos * cfg_.steps_per_mm[axis]);
     }
   }
 
@@ -625,27 +604,26 @@ void GCodeMachineControl::Impl::get_current_position() {
 }
 
 void GCodeMachineControl::Impl::get_endstop_status() {
-  bool any_enstops_found = false;
+  bool any_endstops_found = false;
   for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
-    GCodeParserAxis axis = (GCodeParserAxis) ai;
-    struct EndstopConfig config = cfg_.min_endstop_[axis];
-    if (config.endstop_switch) {
-      int value = get_gpio(get_endstop_gpio_descriptor(config));
+    const  GCodeParserAxis axis = (GCodeParserAxis) ai;
+    HardwareMapping::AxisTrigger triggers = cfg_.homing_trigger[axis];
+    if ((triggers & HardwareMapping::TRIGGER_MIN) != 0) {
       mprintf("%c_min:%s ",
               tolower(gcodep_axis2letter(axis)),
-              value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-      any_enstops_found = true;
+              hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MIN)
+              ? "TRIGGERED" : "open");
+      any_endstops_found = true;
     }
-    config = cfg_.max_endstop_[axis];
-    if (config.endstop_switch) {
-      int value = get_gpio(get_endstop_gpio_descriptor(config));
+    if ((triggers & HardwareMapping::TRIGGER_MAX) != 0) {
       mprintf("%c_max:%s ",
               tolower(gcodep_axis2letter(axis)),
-              value == cfg_.trigger_level_[config.endstop_switch-1] ? "TRIGGERED" : "open");
-      any_enstops_found = true;
+              hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MAX)
+              ? "TRIGGERED" : "open");
+      any_endstops_found = true;
     }
   }
-  if (any_enstops_found) {
+  if (any_endstops_found) {
     mprintf("\n");
   } else {
     mprintf("// This machine has no endstops configured.\n");
@@ -1120,29 +1098,10 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
   prog_speed_factor_ = value;
 }
 
-// Get the endstop for the axis.
-uint32_t GCodeMachineControl::Impl::GetHomeEndstop(enum GCodeParserAxis axis,
-                                                   int *dir, bool *trigger_value) const {
-  *dir = 1;
-  struct EndstopConfig config = cfg_.max_endstop_[axis];
-  if (cfg_.min_endstop_[axis].endstop_switch
-      && cfg_.min_endstop_[axis].homing_use) {
-    *dir = -1;
-    config = cfg_.min_endstop_[axis];
-  }
-  if (!config.homing_use)
-    return 0;
-  if (config.endstop_switch == 0)
-    return 0;
-  *trigger_value = cfg_.trigger_level_[config.endstop_switch-1];
-  return get_endstop_gpio_descriptor(config);
-}
-
 // Moves to endstop and returns how many steps it moved in the process.
 int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
                                                float feedrate, int backoff,
-                                               int dir, int trigger_value,
-                                               uint32_t gpio_def) {
+                                               HardwareMapping::AxisTrigger trigger) {
   int total_movement = 0;
   struct LinearSegmentSteps move_command = {0};
   const float steps_per_mm = cfg_.steps_per_mm[axis];
@@ -1156,10 +1115,11 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
   move_command.v0 = 0;
   move_command.v1 = target_speed;
 
+  const int dir = trigger == HardwareMapping::TRIGGER_MIN ? -1 : 1;
   // move axis until endstop is hit
   int segment_move_steps = 0.5 * steps_per_mm * dir;
   assign_steps_to_motors(&move_command, axis, segment_move_steps);
-  while (get_gpio(gpio_def) != trigger_value) {
+  while (!hardware_mapping_->TestAxisSwitch(axis, trigger)) {
     motor_ops_->Enqueue(move_command, msg_stream_);
     motor_ops_->WaitQueueEmpty();
     total_movement += segment_move_steps;
@@ -1171,7 +1131,7 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
     // move axis off endstop
     segment_move_steps = 0.1 * steps_per_mm * -dir;
     assign_steps_to_motors(&move_command, axis, segment_move_steps);
-    while (get_gpio(gpio_def) == trigger_value) {
+    while (hardware_mapping_->TestAxisSwitch(axis, trigger)) {
       motor_ops_->Enqueue(move_command, msg_stream_);
       motor_ops_->WaitQueueEmpty();
       total_movement += segment_move_steps;
@@ -1182,15 +1142,14 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
 }
 
 void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
+  const HardwareMapping::AxisTrigger trigger = cfg_.homing_trigger[axis];
+  if (trigger == HardwareMapping::TRIGGER_NONE)
+    return;   // no homing defined
   struct AxisTarget *last = planning_buffer_.back();
-  float home_pos = 0; // assume HOME_POS_ORIGIN
-  int dir;
-  bool trigger_value;
-  uint32_t gpio_def = GetHomeEndstop(axis, &dir, &trigger_value);
-  if (!gpio_def)
-    return;
-  move_to_endstop(axis, 15, 1, dir, trigger_value, gpio_def);
-  home_pos = (dir < 0) ? 0 : cfg_.move_range_mm[axis];
+  move_to_endstop(axis, 15, 1, trigger);
+
+  const float home_pos = trigger == HardwareMapping::TRIGGER_MIN ?
+    0 : cfg_.move_range_mm[axis];
   last->position_steps[axis] = round2int(home_pos * cfg_.steps_per_mm[axis]);
 }
 
@@ -1214,23 +1173,20 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
 
   bring_path_to_halt();
 
-  int dir = 1;
-
   // -- somewhat hackish
 
   // We try to find the axis that is _not_ used for homing.
   // this is not yet 100% the way it should be. We should actually
   // define the probe-'endstops' somewhat differently.
   // For now, we just do the simple thing
-  struct EndstopConfig config = cfg_.max_endstop_[axis];
-  if (cfg_.min_endstop_[axis].endstop_switch
-      && !cfg_.min_endstop_[axis].homing_use) {
-    dir = -1;
-    config = cfg_.min_endstop_[axis];
+  HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
+  HardwareMapping::AxisTrigger probe_trigger;
+  if (home_trigger == HardwareMapping::TRIGGER_MIN) {
+    probe_trigger = HardwareMapping::TRIGGER_MAX;
+  } else {
+    probe_trigger = HardwareMapping::TRIGGER_MIN;
   }
-  uint32_t gpio_def = get_endstop_gpio_descriptor(config);
-  if (!gpio_def || config.homing_use) {
-    // We are only looking for probes that are _not_ used for homing.
+  if ((hardware_mapping_->AvailableAxisSwitch(axis) & probe_trigger) == 0) {
     mprintf("// BeagleG: No probe - axis %c does not have a travel endstop\n",
             gcodep_axis2letter(axis));
     return false;
@@ -1240,9 +1196,7 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   if (feedrate <= 0) feedrate = 20;
   // TODO: if the probe fails to trigger, there is no mechanism to stop
   // it right now...
-  const bool trigger_level = cfg_.trigger_level_[config.endstop_switch-1];
-  int total_steps = move_to_endstop(axis, feedrate, 0, dir,
-                                    trigger_level, gpio_def);
+  int total_steps = move_to_endstop(axis, feedrate, 0, probe_trigger);
   last->position_steps[axis] += total_steps;
   *probe_result = 1.0f * last->position_steps[axis] / cfg_.steps_per_mm[axis];
   return true;
@@ -1268,12 +1222,10 @@ GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &con
 
 void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   home_pos->zero();
-  int dir;
-  bool dummy;
   for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
-    if (!impl_->GetHomeEndstop((GCodeParserAxis)axis, &dir, &dummy))
-      continue;
-    (*home_pos)[axis] = (dir < 0) ? 0 : impl_->config().move_range_mm[axis];
+    HardwareMapping::AxisTrigger trigger = impl_->config().homing_trigger[axis];
+    (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
+      ? impl_->config().move_range_mm[axis] : 0;
   }
 }
 

@@ -201,14 +201,31 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
   }
 }
 
-HardwareMapping::AxisTrigger HardwareMapping::AvailableTrigger(LogicAxis axis) {
+HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis) {
   if (!is_hardware_initialized_) return TRIGGER_NONE;
-  return TRIGGER_NONE;   // TODO: implement me.
+  int result = 0;
+  if (axis_to_min_endstop_[axis] != GPIO_NOT_MAPPED) result |= TRIGGER_MIN;
+  if (axis_to_max_endstop_[axis] != GPIO_NOT_MAPPED) result |= TRIGGER_MAX;
+  return (AxisTrigger) result;  // Safe to cast: all within range.
 }
 
-bool HardwareMapping::TestEndstop(LogicAxis axis, AxisTrigger expected_trigger) {
+bool HardwareMapping::TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger) {
   if (!is_hardware_initialized_) return false;
-  return false;  // TODO: implement me.
+  bool result = false;
+  GPIODefinition gpio_def;
+  if (requested_trigger & TRIGGER_MIN) {
+    const int switch_number = axis_to_min_endstop_[axis];
+    gpio_def = get_endstop_gpio_descriptor(switch_number);
+    if (gpio_def)
+      result |= get_gpio(gpio_def) == trigger_level_[switch_number-1];
+  }
+  if (requested_trigger & TRIGGER_MIN) {
+    const int switch_number = axis_to_max_endstop_[axis];
+    gpio_def = get_endstop_gpio_descriptor(switch_number);
+    if (gpio_def)
+      result |= get_gpio(gpio_def) == trigger_level_[switch_number-1];
+  }
+  return result;
 }
 
 class HardwareMapping::ConfigReader : public ConfigParser::EventReceiver {
@@ -246,6 +263,15 @@ public:
       for (int i = 1; i <= NUM_MOTORS; ++i) {
         if (name == StringPrintf("motor_%d", i))
           return SetMotorAxis(line_no, i, value);
+      }
+      return false;
+    }
+
+    if (current_section_ == "switch-mapping") {
+      for (int i = 1; i <= NUM_SWITCHES; ++i) {
+        if (name == StringPrintf("switch_%d", i)) {
+          return SetSwitchOptions(line_no, i, value);
+        }
       }
       return false;
     }
@@ -320,6 +346,54 @@ private:
     return true;
   }
 
+  bool SetSwitchOptions(int line_no, int switch_number,
+                        const std::string &value) {
+    std::vector<StringPiece> options = SplitString(value, " \t,");
+    for (size_t i = 0; i < options.size(); ++i) {
+      const std::string option = ToLower(options[i]);
+      if (option.empty()) continue;
+      if (option.length() == 5) {
+        const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
+        if (axis == GCODE_NUM_AXES) {
+          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. "
+                    "Last character not a valid axis (got %s).",
+                    line_no, option.c_str());
+          return false;
+        }
+
+        if (get_endstop_gpio_descriptor(switch_number) == GPIO_NOT_MAPPED) {
+          Log_info("Switch %d has no hardware connector for %s",
+                   switch_number, CAPE_NAME);
+          // It is somewhat dangerous to assume that an endswitch is working
+          // when it fact it is not. Bail out.
+          return false;
+        }
+        if (HasPrefix(option, "min_")) {
+          config_->axis_to_min_endstop_[axis] = switch_number;
+        } else if (HasPrefix(option, "max_")) {
+          config_->axis_to_max_endstop_[axis] = switch_number;
+        } else {
+          Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. "
+                    "Got %s", line_no, option.c_str());
+          return false;
+        }
+      }
+      else if (option == "active:low") {
+        config_->trigger_level_[switch_number - 1] = false;
+      }
+      else if (option == "active:high") {
+        config_->trigger_level_[switch_number - 1] = true;
+      }
+      else {
+        Log_error("Line %d: Invalid option '%s' for switch %d.", line_no,
+                  option.c_str(), switch_number);
+        return false;
+      }
+    }
+
+    return true;  // All went fine.
+  }
+
   HardwareMapping *const config_;
 
   std::string current_section_;
@@ -363,6 +437,19 @@ HardwareMapping::get_pwm_gpio_descriptor(int pwm_num) {
   case 2:  return PWM_2_GPIO;
   case 3:  return PWM_3_GPIO;
   case 4:  return PWM_4_GPIO;
+  default: return GPIO_NOT_MAPPED;
+  }
+}
+
+HardwareMapping::GPIODefinition
+HardwareMapping::get_endstop_gpio_descriptor(int switch_num) {
+  switch (switch_num) {
+  case 1:  return END_1_GPIO;
+  case 2:  return END_2_GPIO;
+  case 3:  return END_3_GPIO;
+  case 4:  return END_4_GPIO;
+  case 5:  return END_5_GPIO;
+  case 6:  return END_6_GPIO;
   default: return GPIO_NOT_MAPPED;
   }
 }

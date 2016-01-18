@@ -21,36 +21,13 @@
 
 #include "gcode-parser.h"
 #include "container.h"
+#include "hardware-mapping.h"
 
 #include <string>
 
 class MotorOperations;
-class HardwareMapping;
 class ConfigParser;
 typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
-
-// (TODO: the enums need to go somewhere else)
-enum AuxMap {
-  AUX_NOT_MAPPED,
-  AUX_MIST,
-  AUX_FLOOD,
-  AUX_VACUUM,
-  AUX_SPINDLE_ON,
-  AUX_SPINDLE_DIR,
-  AUX_COOLER,
-  AUX_CASE_LIGHTS,
-  AUX_FAN,
-};
-
-enum {
-  BEAGLEG_NUM_SWITCHES = 6,  // Number of supported input switches.
-};
-
-// Compact representation of an enstop configuration.
-struct EndstopConfig {
-  bool homing_use : 1;      // 0: no 1: yes.
-  unsigned char endstop_switch : 6;  // 0: no mapping; or (1..NUM_ENDSTOPS+1)
-};
 
 /* Configuration constants for the controller.
  * Parameters in the arrays are always indexed by logical axes, e.g. AXIS_X.
@@ -72,12 +49,9 @@ struct MachineControlConfig {
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
   float threshold_angle;      // Threshold angle to ignore speed changes
 
-  // Mapping of Axis to which endstop it affects.
-  FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
-  FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;
-  FixedArray<bool, BEAGLEG_NUM_SWITCHES> trigger_level_;
-
   std::string home_order;        // Order in which axes are homed.
+
+  FixedArray<HardwareMapping::AxisTrigger, GCODE_NUM_AXES> homing_trigger;
 
   int auto_motor_disable_seconds; // disable motors automatically after these seconds.
   bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.

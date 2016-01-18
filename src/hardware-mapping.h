@@ -70,7 +70,7 @@ public:
   // Some anonymous sets of constexpr, here represented as enum as we don't
   // have constexpr in this version of c++ yet.
   enum {
-    NUM_SWITCHES      =  8,
+    NUM_SWITCHES      =  6,
     NUM_BOOL_OUTPUTS  = 16,
     NUM_PWM_OUTPUTS   =  4,
     NUM_MOTORS        =  8,
@@ -175,14 +175,14 @@ public:
   // TRIGGER_NONE, if there are no end-stops configured, TRIGGER_MIN/MAX
   // if either min or max are available as endstop trigger or TRIGGER_ANY,
   // if both ends are triggering.
-  AxisTrigger AvailableTrigger(LogicAxis axis);
+  AxisTrigger AvailableAxisSwitch(LogicAxis axis);
 
   // Returns true if endstop for given axis has been reached.
   // "expected_trigger" can be any of MIN/MAX to test for that
   // particular end-trigger or ANY if we don't care which end is affected.
-  // If an expected trigger is asked that is not returned in AvailableTrigger(),
+  // If an requested trigger is asked that is not returned in AvailableAxisSwitch(),
   // this will always return false.
-  bool TestEndstop(LogicAxis axis, AxisTrigger expected_trigger);
+  bool TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger);
 
   // other switches: emergency off etc.
   // inputs: analog inputs needed.
@@ -202,11 +202,10 @@ private:
   static bool NameToOutput(StringPiece str, LogicOutput *result);
   static const char *OutputToName(LogicOutput output);
 
-  // return GPIO definition for aux number. Values range from 1..NUM_BOOL_OUTPUTS
+  // Return GPIO definition for various types of out/input. Count starts with 1.
   static GPIODefinition get_aux_bit_gpio_descriptor(int aux_number);
-
-  // Get GPIO definition for pwm number. Value range from 1..NUM_PWM_OUTPUTS
   static GPIODefinition get_pwm_gpio_descriptor(int pwm_number);
+  static GPIODefinition get_endstop_gpio_descriptor(int switch_num);
 
   void ResetHardware();  // Initialize to a safe state.
 
@@ -220,6 +219,10 @@ private:
   // Bitmap of drivers output should go.
   FixedArray<MotorBitmap, GCODE_NUM_AXES> axis_to_driver_;
   FixedArray<int, NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
+
+  FixedArray<int, GCODE_NUM_AXES> axis_to_min_endstop_;
+  FixedArray<int, GCODE_NUM_AXES> axis_to_max_endstop_;
+  FixedArray<bool, NUM_SWITCHES> trigger_level_;
 
   bool is_hardware_initialized_;
 };
