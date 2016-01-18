@@ -22,16 +22,21 @@
 #define END_SENTINEL 0x42
 
 // Set up config that they are the same for all the tests.
-static void init_test_config(struct MachineControlConfig *c) {
+static void init_test_config(struct MachineControlConfig *c,
+                             HardwareMapping *hmap) {
   for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->steps_per_mm[i] = 100;  // step/mm
   for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->acceleration[i] = 1000;  // mm/s^2
   for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->max_feedrate[i] = 10000;
-  c->axis_mapping   = "XYZEABCU";
   c->threshold_angle = 0;
   c->require_homing = false;
+
+  // We expect axis outputs X, Y, Z arrive at motor 0, 1, 2
+  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_X, 1, false));
+  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_Y, 2, false));
+  EXPECT_TRUE(hmap->AddMotorMapping(AXIS_Z, 3, false));
 }
 
 namespace {
@@ -91,10 +96,10 @@ class Harness {
  public:
   // Initialize harness with the expected sequence of motor movements
   // and return the callback struct to receive simulated gcode calls.
-  Harness(const LinearSegmentSteps *expected)
-    : expect_motor_ops(expected) {
-    init_test_config(&config);
-    machine_control = GCodeMachineControl::Create(config, &expect_motor_ops,
+  Harness(const LinearSegmentSteps *expected) : expect_motor_ops_(expected) {
+    struct MachineControlConfig config;
+    init_test_config(&config, &hardware_);
+    machine_control = GCodeMachineControl::Create(config, &expect_motor_ops_,
                                                   &hardware_, NULL);
   }
 
@@ -106,8 +111,7 @@ class Harness {
     return machine_control->ParseEventReceiver();
   }
 
-  struct MachineControlConfig config;
-  MockMotorOps expect_motor_ops;
+  MockMotorOps expect_motor_ops_;
   HardwareMapping hardware_;
   GCodeMachineControl *machine_control;
 };

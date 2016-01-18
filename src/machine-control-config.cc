@@ -53,7 +53,6 @@ public:
   virtual bool SeenSection(int line_no, const std::string &section_name) {
     current_section_ = section_name;
     if (section_name == "general"
-        || section_name == "motor-mapping"
         || section_name == "switch-mapping")
       return true;
 
@@ -81,14 +80,6 @@ public:
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
       ACCEPT_VALUE("auto-motor-disable-seconds",
                    Int,   &config_->auto_motor_disable_seconds);
-      return false;
-    }
-
-    if (current_section_ == "motor-mapping") {
-      for (int i = 1; i <= BEAGLEG_NUM_MOTORS; ++i) {
-        if (name == StringPrintf("motor_%d", i))
-          return SetMotorAxis(line_no, i, value);
-      }
       return false;
     }
 
@@ -158,6 +149,10 @@ private:
     double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
     if (end == NULL || *end == '\0') {
       *result = eval;
+      if (*result < 0) {
+        Log_error("Expected positive value.");
+        return false;
+      }
       return true;
     }
     return false;
@@ -224,50 +219,6 @@ private:
                 StringPrintf("home-pos[%c]: valid values are 'min' or 'max', but got '%s'",
                              gcodep_axis2letter(axis), value.c_str()));
     return false;
-  }
-
-  bool SetMotorAxis(int line_no, int motor_number, const std::string &in_val) {
-    std::vector<StringPiece> options = SplitString(in_val, " \t,");
-    for (size_t i = 0; i < options.size(); ++i) {
-      const std::string option = ToLower(options[i]);
-      if (HasPrefix(option, "axis:")) {
-        std::string axis = option.substr(strlen("axis:"));
-        if (axis.empty()) return false;
-        bool is_negative = false;
-        if (axis[0] == '-') {
-          is_negative = true;
-          axis = axis.substr(1);
-        }
-        if (axis.empty()) return false;
-        const char axis_letter = axis[0];
-        if (gcodep_letter2axis(axis_letter) == GCODE_NUM_AXES) {
-          Log_error("Invalid axis letter '%c'", axis_letter);
-          return false; // invalid axis.
-        }
-
-        // Now, we copy it to the somehwat old command-line friendly
-        // configuration which encodes that as a string. We do that now for
-        // compatibility, but later we should decommission this.
-        if (config_->axis_mapping.length() < (size_t)motor_number) {
-          config_->axis_mapping.resize(motor_number, '_');
-        }
-        if (config_->axis_mapping[motor_number-1] != '_') {
-          Log_error("Line %d: Attempt to use motor twice: Motor %d already "
-                    "mapped to axis %c", line_no, motor_number,
-                    config_->axis_mapping[motor_number-1]);
-          return false;
-        }
-        config_->axis_mapping[motor_number-1] = (is_negative
-                                                 ? tolower(axis_letter)
-                                                 : toupper(axis_letter));
-      }
-      // TODO: maybe option 'mirror'
-      else {
-        Log_error("Line %d: Unknown motor option '%s'", line_no, option.c_str());
-        return false;
-      }
-    }
-    return true;
   }
 
   bool SetSwitchOptions(int line_no, int switch_number,

@@ -72,6 +72,7 @@ TEST(MachineControlConfig, AxisMapping) {
   EXPECT_FALSE(config.max_endstop_[AXIS_Y].homing_use);
 }
 
+#if 0
 TEST(MachineControlConfig, MotorMapping) {
   ConfigParser p;
   p.SetContent("[ motor-mapping ]\n"
@@ -84,6 +85,7 @@ TEST(MachineControlConfig, MotorMapping) {
 
   EXPECT_EQ("Xy_Z", config.axis_mapping);
 }
+#endif
 
 TEST(MachineControlConfig, SwitchMapping) {
   ConfigParser p;

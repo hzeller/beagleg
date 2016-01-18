@@ -70,8 +70,6 @@ struct AxisTarget {
   unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
 };
 
-typedef uint8_t DriverBitmap;
-
 // The three levels of homing confidence. If we ever switch off
 // power to the motors after homing, we can't be sure.
 enum HomingState {
@@ -153,18 +151,6 @@ private:
   // Print to msg_stream.
   void mprintf(const char *format, ...);
 
-  std::string print_driver_bitmap(DriverBitmap map) {
-    std::string result;
-    for (int m = 0; m < BEAGLEG_NUM_MOTORS; ++m) {
-      if (map & (1 << m)) {
-        if (!result.empty()) result.append(", ");
-        result.append(StringPrintf("%d", m + 1));
-      }
-    }
-    if (result.empty()) result.append("<none>");
-    return result;
-  }
-
 private:
   const struct MachineControlConfig cfg_;
   MotorOperations *const motor_ops_;
@@ -180,21 +166,12 @@ private:
   AxesRegister max_axis_accel_;   // acceleration hz/s
   float highest_accel_;           // hightest accel of all axes.
 
-  // "axis_to_driver": Which axis is mapped to which physical output drivers.
-  // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
-  // or a set of multiple drivers (mirroring).
-  // Bitmap of drivers output should go.
-  FixedArray<DriverBitmap, GCODE_NUM_AXES> axis_to_driver_;
-
-  FixedArray<int, GCODE_NUM_AXES> axis_flip_;  // 1 or -1 for dir flip of axis
-  FixedArray<int, BEAGLEG_NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
-
   // Current machine configuration
   AxesRegister coordinate_display_origin_; // parser tells us
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
-  HardwareMapping::AuxFlags aux_bits_;   // Set via M42 or various other settings.
-  HardwareMapping::AuxFlags last_aux_bits_;  // last enqueued aux bits.
+  HardwareMapping::AuxBitmap aux_bits_;   // Set via M42 or various other settings.
+  HardwareMapping::AuxBitmap last_aux_bits_;  // last enqueued aux bits.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
   time_t next_auto_disable_motor_;
 
@@ -239,7 +216,11 @@ bool GCodeMachineControl::Impl::Init() {
   // Always keep the steps_per_mm positive, but extract direction for
   // final assignment to motor.
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    axis_flip_[i] = cfg_.steps_per_mm[i] < 0 ? -1 : 1;
+    if (cfg_.steps_per_mm[i] < 0) {
+      Log_error("Negative number of steps per unit for Axis %c",
+                gcodep_axis2letter((GCodeParserAxis)i));
+      return false;
+    }
     // Permissible hard override. We want to keep cfg_ const for most of the
     // places, so writing here in Init() is permissible.
     const_cast<MachineControlConfig&>(cfg_).steps_per_mm[i]
@@ -271,37 +252,6 @@ bool GCodeMachineControl::Impl::Init() {
       lowest_accel = accel;
   }
   prog_speed_factor_ = 1.0f;
-
-  // Mapping axes to physical motors. We might have a larger set of logical
-  // axes of which we map a subset to actual motors.
-  // (TODO(hzeller): this used to be a c-string, now is a std::string. The
-  // processing still looks very c-like here :) ).
-  const char *axis_map = cfg_.axis_mapping.c_str();
-  int map_count = 0;
-  for (int pos = 0; *axis_map; pos++, axis_map++) {
-    if (pos >= BEAGLEG_NUM_MOTORS) {
-      Log_error("Error: Axis mapping string has more elements than "
-              "available %d connectors (remaining=\"..%s\").\n", pos, axis_map);
-      return false;
-    }
-    if (*axis_map == '_')
-      continue;
-    const enum GCodeParserAxis axis = gcodep_letter2axis(*axis_map);
-    if (axis == GCODE_NUM_AXES) {
-      Log_error("Illegal axis->connector mapping character '%c' in '%s' "
-                "(Only valid axis letter or '_' to skip a connector).\n",
-                toupper(*axis_map), cfg_.axis_mapping.c_str());
-      return false;
-    }
-    driver_flip_[pos] = (tolower(*axis_map) == *axis_map) ? -1 : 1;
-    axis_to_driver_[axis] |= (1 << pos);
-    ++map_count;
-  }
-
-  if (map_count == 0) {
-    Log_error("There is no output motor mapped, which makes things pretty boring. [ Motor-Mapping ] section missing in config file ?");
-    return false;
-  }
 
 #if CONFIG_FILE_TRANSITION
   // Extract enstop polarity
@@ -390,39 +340,39 @@ bool GCodeMachineControl::Impl::Init() {
 
   // Now let's see what motors are mapped to any useful output.
   Log_debug("-- Config --\n");
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (axis_to_driver_[i] == 0)
+  for (int ii = 0; ii < GCODE_NUM_AXES; ++ii) {
+    const GCodeParserAxis axis = (GCodeParserAxis) ii;
+    if (!hardware_mapping_->HasMotorFor(axis))
       continue;
-    const bool is_error = (cfg_.steps_per_mm[i] <= 0
-                           || cfg_.max_feedrate[i] <= 0);
+    const bool is_error = (cfg_.steps_per_mm[axis] <= 0
+                           || cfg_.max_feedrate[axis] <= 0);
     // Some generic useful output
     std::string line;
-    const char *unit = is_rotational_axis(i) ? "° " : "mm";
-    line = StringPrintf("%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s%s ",
-                        gcodep_axis2letter((GCodeParserAxis)i),
-                        print_driver_bitmap(axis_to_driver_[i]).c_str(),
-                        cfg_.max_feedrate[i], unit,
-                        cfg_.acceleration[i], unit,
-                        cfg_.steps_per_mm[i], unit,
-                        axis_flip_[i] < 0 ? " (reversed)" : "");
-    if (cfg_.move_range_mm[i] > 0) {
-      line += StringPrintf("[ range %5.1f%s ] ", cfg_.move_range_mm[i], unit);
+    const char *unit = is_rotational_axis(axis) ? "° " : "mm";
+    line = StringPrintf("%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s ",
+                        gcodep_axis2letter(axis),
+                        hardware_mapping_->DebugMotorString(axis).c_str(),
+                        cfg_.max_feedrate[axis], unit,
+                        cfg_.acceleration[axis], unit,
+                        cfg_.steps_per_mm[axis], unit);
+    if (cfg_.move_range_mm[axis] > 0) {
+      line += StringPrintf("[ range %5.1f%s ] ", cfg_.move_range_mm[axis], unit);
     } else {
       line += "[ unknown range ] ";
     }
-    int endstop = cfg_.min_endstop_[i].endstop_switch;
+    int endstop = cfg_.min_endstop_[axis].endstop_switch;
     const char *trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
     if (endstop) {
       line += StringPrintf("min-switch %d (%s-trigger)%s; ",
                            endstop, trg,
-                           cfg_.min_endstop_[i].homing_use ? " [HOME]" : "       ");
+                           cfg_.min_endstop_[axis].homing_use ? " [HOME]" : "       ");
     }
-    endstop = cfg_.max_endstop_[i].endstop_switch;
+    endstop = cfg_.max_endstop_[axis].endstop_switch;
     trg = cfg_.trigger_level_[endstop-1] ? "hi" : "lo";
     if (endstop) {
       line += StringPrintf("max-switch %d (%s-trigger)%s;",
                            endstop, trg,
-                           cfg_.max_endstop_[i].homing_use ? " [HOME]" : "");
+                           cfg_.max_endstop_[axis].homing_use ? " [HOME]" : "");
     }
     if (!cfg_.range_check)
       line += "Limit checks disabled!";
@@ -431,8 +381,8 @@ bool GCodeMachineControl::Impl::Init() {
     if (is_error) {
       Log_error("ERROR: Motor %s configured for axis '%c', but invalid "
                 "feedrate or steps/%s.",
-                print_driver_bitmap(axis_to_driver_[i]).c_str(),
-                gcodep_axis2letter((GCodeParserAxis)i), unit);
+                hardware_mapping_->DebugMotorString(axis).c_str(),
+                gcodep_axis2letter(axis), unit);
       ++error_count;
     }
   }
@@ -638,7 +588,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
 
 void GCodeMachineControl::Impl::set_output_flags(HardwareMapping::LogicOutput out,
                                                  bool is_on) {
-  hardware_mapping_->UpdateAuxFlags(out, is_on, &aux_bits_);
+  hardware_mapping_->UpdateAuxBitmap(out, is_on, &aux_bits_);
 }
 
 void GCodeMachineControl::Impl::get_current_position() {
@@ -802,13 +752,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
 void GCodeMachineControl::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
                                                        enum GCodeParserAxis axis,
                                                        int steps) {
-  const DriverBitmap motormap_for_axis = axis_to_driver_[axis];
-  for (int motor = 0; motor < BEAGLEG_NUM_MOTORS; ++motor) {
-    if (motormap_for_axis & (1 << motor)) {
-      command->steps[motor] =
-        axis_flip_[axis] * driver_flip_[motor] * steps;
-    }
-  }
+  hardware_mapping_->AssignMotorSteps(axis, steps, command);
 }
 
 // Returns true, if all results in zero movement

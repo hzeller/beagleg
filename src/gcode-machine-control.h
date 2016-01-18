@@ -72,22 +72,6 @@ struct MachineControlConfig {
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
   float threshold_angle;      // Threshold angle to ignore speed changes
 
-  // The follwing parameter determines which logical axis ends up
-  // on which physical plug location.
-  //
-  // The 'axis_mapping' determines how to map a logical axis (e.g. 'X') to
-  // a connector position. The string position represents the
-  // position on the board (sequence of connectors), while the character at
-  // that position describes the logical axis. Typicaly, this is just
-  // "XZYEABC"; for reasons such as using a double-connector, one might
-  // have a different mapping, e.g. "XZE_Y". Underscores represent axis that
-  // are not mapped.
-  std::string axis_mapping;     // Mapping of axis-name (character in string)
-                                // to physical location (position in string).
-                                // Assumed "XYZEABC" if empty.
-                                // Axis name '_' for skipped placeholder.
-                                // Not mentioned axes are not handled.
-
   // Mapping of Axis to which endstop it affects.
   FixedArray<EndstopConfig, GCODE_NUM_AXES> min_endstop_;
   FixedArray<EndstopConfig, GCODE_NUM_AXES> max_endstop_;

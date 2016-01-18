@@ -413,7 +413,7 @@ int main(int argc, char *argv[]) {
 
     // The backend
     if (simulation_output) {
-      motion_backend = new SimFirmwareQueue(stdout, config.axis_mapping.length());
+      motion_backend = new SimFirmwareQueue(stdout, 3); // TODO: derive from cfg
     } else {
       motion_backend = new DummyMotionQueue();
     }

@@ -26,33 +26,45 @@
 #include "string-util.h"
 
 class ConfigParser;
+class LinearSegmentSteps;
 
-// The hardware mapping class maps symbolic names of functionality,
+// The hardware connected to the BeagleBone typically has a number of universal
+// motor, PWM and Aux outputs and inputs. The user wants to tie a universal
+// connector to a particular logic function.
+//
+// Let's say the board has a set of numbered outputs for motors (motor 1..8),
+// some for PWM etc. This class allows to tie them to logical functions within
+// BeagleG (motor 1 shall be the Z axis), configurable by the user.
+//
+// This class maps symbolic names of functionality,
 // e.g. 'Motor for Axis X' or 'Output for Mist' or 'PWM for heater' to
 // an actual hardware output (or none).
 //
-// The mapping happens in two levels:
+// Internall, the mapping happens in two levels:
 //
-// 1) On the low level, there is the hardware
-//    that provides a number of outputs for motors, aux-pins or PWM-controlled
+// 1) On the low level, there is the cape that provides a number of outputs
+//    for motors, aux-pins or PWM-controlled
 //    pins as well as input switches. They are tied to a particular GPIO pin on
 //    the processor. This might map MOTOR_2_STEP_GPIO to PIN_P9_19 on a
 //    Beaglebone Black for instance. On the cape provided by the user, there
 //    might be a screw terminal 'Motor 2 step'. So this level provides numbered
 //    connectors Motor 1..8, switch 1..8 or PWM 1..4 and maps it to even lower
-//    level GPIOs. These mappings are provided in form of #defines in the
-//    hardware/<CAPENAME>/beagleg-pin-mapping.h and used in this class and in
-//    PRU.
+//    level GPIOs. These low-level mappings are provided in form of #defines in
+//    the hardware/<CAPENAME>/beagleg-pin-mapping.h and used in this class and
+//    in the PRU.
 //
 // 2) The next level maps logic names to the numbered connectors. For instance
 //    Axis A might map to 'motor 2', 'min-x-home' to 'switch 4',
 //    'Spindle speed' to PWM 3 or 'cooling fan' to Aux 1. This mapping is chosen
 //    by the user of the CAPE by filling the [motor-mapping], [switch-mapping],
-//    [aux-mapping] or [pwm-mapping].
+//    [aux-mapping] or [pwm-mapping] sections of the configuration file.
 //
 // This class uses the pin mappings provided in the cape specific include file
 // and the logic mappings provided by the user in the configuration file to
 // present logic accesses to these values.
+//
+// An object of this class can be used to just simulate hardare access if
+// InitializeHardware() is not called.
 class HardwareMapping {
 public:
   // Some anonymous sets of constexpr, here represented as enum as we don't
@@ -64,17 +76,9 @@ public:
     NUM_MOTORS        =  8,
   };
 
-  HardwareMapping();
-
-  // Pick the relevant mapping parameter from the configuration file.
-  bool ConfigureFromFile(ConfigParser *parser);
-
-  // Initialize the hardware (needs to be configured first).
-  // If this function is never called, all outputs are simulated.
-  bool InitializeHardware();
-
   // A register containing all the necessary bits.
-  typedef uint16_t AuxFlags;
+  typedef uint16_t AuxBitmap;
+  typedef uint8_t  MotorBitmap;
 
   typedef GCodeParserAxis LogicAxis;  // This is provided by the gcode parser.
 
@@ -101,19 +105,59 @@ public:
     NUM_OUTPUTS   // last.
   };
 
+  HardwareMapping();
+
+  // -- various configuration options. Direct setters for programmatic
+  //    access, configuration file option for standard BeagleG config.
+
+  // Pick the relevant mapping parameter from the configuration file.
+  bool ConfigureFromFile(ConfigParser *parser);
+
+  // Connect logic output to aux pin in the range [1..NUM_BOOL_OUTPUTS]
+  // A value of 0 for 'aux' is accepted, but does not connect it to anything.
+  bool AddAuxMapping(LogicOutput output, int aux);
+
+  // Connect logic output to pwm pin in the range [1..NUM_PWM_OUTPUTS]
+  // A value of 0 for 'pwm' is accpeted, but does not connect it to anything.
+  bool AddPWMMapping(LogicOutput output, int pwm);
+
+  // Add a motor mapping: connect the logic axis to given motor.
+  // Motor is in the range [1..NUM_MOTORS]. If 'mirrored' is true,
+  // motor turns the opposite direction.
+  // A value of 0 for 'motor' is accepted but does not connect it to anything.
+  bool AddMotorMapping(LogicAxis axis, int motor, bool mirrored);
+
+  // -- If used not on a simulated machine, InitializeHardware() is needed.
+
+  // Initialize the hardware (needs to be configured first).
+  // If this function is never called, all outputs are simulated.
+  bool InitializeHardware();
+
+
+  // -- Boolean and PWM outputs.
+
   // Set logic output value to on/off for the particular logic output
-  // in the given flag-set. Only updates the flags, does not set the
-  // output.
-  void UpdateAuxFlags(LogicOutput type, bool value, AuxFlags *flags);
+  // in the given flag-set. Only updates the given bitfield,
+  // does not set the output (can be done with SetAuxOutput()).
+  void UpdateAuxBitmap(LogicOutput type, bool value, AuxBitmap *flags);
 
   // Set the output according to the flags immediately (unbuffered).
   // There are some cases in which this is necessary, but usually
   // the values are set synchronously with the motor movements to avoid timing
   // problems due to the buffer.
-  void SetAuxOutput(AuxFlags flags);
+  void SetAuxOutput(AuxBitmap flags);
 
   // Set PWM value for given output immediately.
   void SetPWMOutput(LogicOutput type, float value);
+
+  // -- Motor outputs
+
+  // Determine if we have a motor configured for given axis.
+  bool HasMotorFor(LogicAxis axis) { return axis_to_driver_[axis] != 0; }
+
+  // Given the logic axis and number of steps, assign these steps to the mapped
+  // motors in the LinearSegmentSteps
+  void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
 
   // Returns which endstop trigger are available. Possible values are
   // TRIGGER_NONE, if there are no end-stops configured, TRIGGER_MIN/MAX
@@ -131,6 +175,10 @@ public:
   // other switches: emergency off etc.
   // inputs: analog inputs needed.
 
+  // Return a string with a comma separated list of motors attached to given
+  // logic axis.
+  std::string DebugMotorString(LogicAxis axis);
+
 private:
   class ConfigReader;
 
@@ -140,6 +188,7 @@ private:
 
   // Converts the human readable name of an output to the enumeration if possible.
   static bool NameToOutput(StringPiece str, LogicOutput *result);
+  static const char *OutputToName(LogicOutput output);
 
   // return GPIO definition for aux number. Values range from 1..NUM_BOOL_OUTPUTS
   static GPIODefinition get_aux_bit_gpio_descriptor(int aux_number);
@@ -147,8 +196,16 @@ private:
   // Get GPIO definition for pwm number. Value range from 1..NUM_PWM_OUTPUTS
   static GPIODefinition get_pwm_gpio_descriptor(int pwm_number);
 
-  FixedArray<AuxFlags, NUM_OUTPUTS> output_to_aux_bits_;
+  // Mapping of logical outputs to hardware outputs.
+  FixedArray<AuxBitmap, NUM_OUTPUTS> output_to_aux_bits_;
   FixedArray<GPIODefinition, NUM_OUTPUTS> output_to_pwm_gpio_;
+
+    // "axis_to_driver": Which axis is mapped to which physical output drivers.
+  // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
+  // or a set of multiple drivers (mirroring).
+  // Bitmap of drivers output should go.
+  FixedArray<MotorBitmap, GCODE_NUM_AXES> axis_to_driver_;
+  FixedArray<int, NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
 
   bool is_configured_;
   bool is_initialized_;
