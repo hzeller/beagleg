@@ -103,7 +103,12 @@ int main(int argc, char *argv[]) {
   }
 
   config.speed_factor = factor;
+
+  // This is not connected to any machine. Don't assume homing.
   config.require_homing = false;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    config.homing_trigger[i] = HardwareMapping::TRIGGER_NONE;
+  }
 
   int longest_filename = strlen("#[filename]"); // table header
   for (int i = optind; i < argc; ++i) {
