@@ -137,6 +137,20 @@ bool HardwareMapping::InitializeHardware() {
   is_hardware_initialized_ = true;
   ResetHardware();
 
+  // Do some sanity check. If logical min/max are re-using switch channels,
+  // then we can have the electrical situation that both look triggered at
+  // startup, which is of course an impossible mechanical state.
+  // Since we don't know in which direction to move out of the way, we have to
+  // bail for safety.
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    const GCodeParserAxis axis = (GCodeParserAxis) i;
+    if (TestAxisSwitch(axis, TRIGGER_MIN) && TestAxisSwitch(axis, TRIGGER_MAX)) {
+      Log_error("Error: Both min and max switch for axis %c are triggered at "
+                "the same time. No way to safely proceed. Bailing out",
+                gcodep_axis2letter(axis));
+      return false;
+    }
+  }
   return true;
 }
 
@@ -216,14 +230,14 @@ bool HardwareMapping::TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigg
   if (requested_trigger & TRIGGER_MIN) {
     const int switch_number = axis_to_min_endstop_[axis];
     gpio_def = get_endstop_gpio_descriptor(switch_number);
-    if (gpio_def)
-      result |= get_gpio(gpio_def) == trigger_level_[switch_number-1];
+    if (gpio_def != GPIO_NOT_MAPPED)
+      result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
   }
-  if (requested_trigger & TRIGGER_MIN) {
+  if (requested_trigger & TRIGGER_MAX) {
     const int switch_number = axis_to_max_endstop_[axis];
     gpio_def = get_endstop_gpio_descriptor(switch_number);
-    if (gpio_def)
-      result |= get_gpio(gpio_def) == trigger_level_[switch_number-1];
+    if (gpio_def != GPIO_NOT_MAPPED)
+      result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
   }
   return result;
 }
