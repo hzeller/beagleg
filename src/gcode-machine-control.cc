@@ -237,75 +237,7 @@ bool GCodeMachineControl::Impl::Init() {
   }
   prog_speed_factor_ = 1.0f;
 
-#if CONFIG_FILE_TRANSITION
-  // Extract enstop polarity
-  bool endstop_trigger[BEAGLEG_NUM_SWITCHES] = {0};
-  if (!cfg_.endswitch_polarity.empty()) {
-    const char *map = cfg_.endswitch_polarity.c_str();
-    for (int switch_connector = 0; *map; switch_connector++, map++) {
-      if (*map == '_' || *map == '0' || *map == '-' || *map == 'L') {
-        endstop_trigger[switch_connector] = false;
-      } else if (*map == '1' || *map == '+' || *map == 'H') {
-        endstop_trigger[switch_connector] = true;
-      } else {
-        Log_error("Illegal endswitch polarity character '%c' in '%s'.\n",
-                  *map, cfg_.endswitch_polarity.c_str());
-        return false;
-      }
-    }
-  }
-#endif
-
   int error_count = 0;
-
-#if CONFIG_FILE_TRANSITION
-  // Now map the endstops. String position is position on the switch connector
-  if (!cfg_.min_endswitch.empty()) {
-    const char *map = cfg_.min_endswitch.c_str();
-    for (int switch_connector = 0; *map; switch_connector++, map++) {
-      if (*map == '_')
-        continue;
-      const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
-      if (axis == GCODE_NUM_AXES) {
-        Log_error("Illegal axis->min_endswitch mapping character '%c' in '%s' "
-                "(Only valid axis letter or '_' to skip a connector).\n",
-                toupper(*map), cfg_.min_endswitch.c_str());
-        ++error_count;
-        continue;
-      }
-      min_endstop_[axis].endstop_switch = switch_connector + 1;
-      min_endstop_[axis].homing_use = (toupper(*map) == *map);
-      min_endstop_[axis].trigger_value = endstop_trigger[switch_connector];
-    }
-  }
-
-  if (!cfg_.max_endswitch.empty()) {
-    const char *map = cfg_.max_endswitch.c_str();
-    for (int switch_connector = 0; *map; switch_connector++, map++) {
-      if (*map == '_')
-        continue;
-      const enum GCodeParserAxis axis = gcodep_letter2axis(*map);
-      if (axis == GCODE_NUM_AXES) {
-        Log_error("Illegal axis->min_endswitch mapping character '%c' in '%s' "
-                "(Only valid axis letter or '_' to skip a connector).\n",
-                toupper(*map), cfg_.min_endswitch.c_str());
-        ++error_count;
-        continue;
-      }
-      const char for_homing = (toupper(*map) == *map) ? 1 : 0;
-      if (cfg_.move_range_mm[axis] <= 0) {
-        Log_error("Error: Endstop for axis %c defined at max-endswitch which "
-                  "implies that we need to know that position; yet "
-                  "no --range value was given for that axis\n", *map);
-        ++error_count;
-        continue;
-      }
-      max_endstop_[axis].endstop_switch = switch_connector + 1;
-      max_endstop_[axis].homing_use = for_homing;
-      max_endstop_[axis].trigger_value = endstop_trigger[switch_connector];
-    }
-  }
-#endif
 
   // Check if things are plausible: we only allow one home endstop per axis.
   for (int a = 0; a < GCODE_NUM_AXES; ++a) {
@@ -333,7 +265,13 @@ bool GCodeMachineControl::Impl::Init() {
   for (int ii = 0; ii < GCODE_NUM_AXES; ++ii) {
     const GCodeParserAxis axis = (GCodeParserAxis) ii;
     if (cfg_.steps_per_mm[axis] > 0 && !hardware_mapping_->HasMotorFor(axis)) {
+      // User didn't give a motor mapping for this one. Auto map it.
       const int new_motor = hardware_mapping_->GetFirstFreeMotor();
+      if (new_motor == 0) {
+        Log_error("Not enough motor connectors: no free motor for axis %c",
+                  gcodep_axis2letter(axis));
+        ++error_count;
+      }
       hardware_mapping_->AddMotorMapping(axis, new_motor, false);
     }
     if (!hardware_mapping_->HasMotorFor(axis))
@@ -355,14 +293,15 @@ bool GCodeMachineControl::Impl::Init() {
       line += "[ unknown range ] ";
     }
     if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MIN) != 0) {
-      line += StringPrintf("HOME@min; ");
+      line += StringPrintf("|<-HOME@min; ");
     }
     else if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MAX) != 0) {
-      line += StringPrintf("HOME@max; ");
+      line += StringPrintf("HOME@max->|; ");
     }
 
     if (!cfg_.range_check)
       line += "Limit checks disabled!";
+
     Log_debug("%s", line.c_str());
 
     if (is_error) {

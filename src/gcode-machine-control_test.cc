@@ -24,12 +24,11 @@
 // Set up config that they are the same for all the tests.
 static void init_test_config(struct MachineControlConfig *c,
                              HardwareMapping *hmap) {
-  for (int i = 0; i < GCODE_NUM_AXES; ++i)
+  for (int i = 0; i <= AXIS_Z; ++i) {
     c->steps_per_mm[i] = 100;  // step/mm
-  for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->acceleration[i] = 1000;  // mm/s^2
-  for (int i = 0; i < GCODE_NUM_AXES; ++i)
     c->max_feedrate[i] = 10000;
+  }
   c->threshold_angle = 0;
   c->require_homing = false;
 }
@@ -96,6 +95,7 @@ class Harness {
     init_test_config(&config, &hardware_);
     machine_control = GCodeMachineControl::Create(config, &expect_motor_ops_,
                                                   &hardware_, NULL);
+    assert(machine_control != NULL);
   }
 
   ~Harness() {
@@ -163,7 +163,7 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
 }
 
 int main(int argc, char *argv[]) {
-  Log_init("/dev/null");
+  Log_init("/dev/stderr");
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
