@@ -377,8 +377,9 @@ private:
         }
 
         if (get_endstop_gpio_descriptor(switch_number) == GPIO_NOT_MAPPED) {
-          Log_info("Switch %d has no hardware connector for %s",
-                   switch_number, CAPE_NAME);
+          Log_error("Switch %d has no hardware connector on %s cape. "
+                    "Possibly dangerous to ignore, bailing out.",
+                    switch_number, CAPE_NAME);
           // It is somewhat dangerous to assume that an endswitch is working
           // when it fact it is not. Bail out.
           return false;
