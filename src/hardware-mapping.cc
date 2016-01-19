@@ -496,7 +496,7 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
   MAP_VAL(n == "flood",       OUT_FLOOD);
   MAP_VAL(n == "vacuum",      OUT_VACUUM);
   MAP_VAL(n == "spindle" || n == "spindle-on", OUT_SPINDLE);
-  MAP_VAL(n == "spindle-speed", OUT_SPINDLE_SPEED);
+  MAP_VAL(n == "spindle-speed" || n == "spindle-pwm", OUT_SPINDLE_SPEED);
   MAP_VAL(n == "spindle-dir", OUT_SPINDLE_DIRECTION);
   MAP_VAL(n == "cooler",      OUT_COOLER);
   MAP_VAL(n == "case-lights", OUT_CASE_LIGHTS);
