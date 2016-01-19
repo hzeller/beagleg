@@ -109,6 +109,7 @@ M81              | ATX Power Off (only on capes that have MACHINE_PWR_GPIO)
 M105             | Get current extruder temperature.
 M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
+M117             | Display message.
 M119             | Get endstop status.
 M245             | Start cooler
 M246             | Stop cooler
