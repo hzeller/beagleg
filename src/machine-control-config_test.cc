@@ -65,14 +65,12 @@ TEST(MachineControlConfig, AxisMapping) {
   EXPECT_FLOAT_EQ(42.0f, config.max_feedrate[AXIS_X]);
   EXPECT_FLOAT_EQ(4242.0f, config.acceleration[AXIS_X]);
   EXPECT_FLOAT_EQ(987.0f, config.move_range_mm[AXIS_X]);
-  EXPECT_FALSE(config.min_endstop_[AXIS_X].homing_use);
-  EXPECT_TRUE(config.max_endstop_[AXIS_X].homing_use);
-
-  EXPECT_TRUE(config.min_endstop_[AXIS_Y].homing_use);
-  EXPECT_FALSE(config.max_endstop_[AXIS_Y].homing_use);
+  EXPECT_EQ(HardwareMapping::TRIGGER_MAX, config.homing_trigger[AXIS_X]);
+  EXPECT_EQ(HardwareMapping::TRIGGER_MIN, config.homing_trigger[AXIS_Y]);
 }
 
 #if 0
+// TODO: needs to move to hardware mapping test
 TEST(MachineControlConfig, MotorMapping) {
   ConfigParser p;
   p.SetContent("[ motor-mapping ]\n"
@@ -87,6 +85,8 @@ TEST(MachineControlConfig, MotorMapping) {
 }
 #endif
 
+#if 0
+// TODO: needs to move to hardware mapping test
 TEST(MachineControlConfig, SwitchMapping) {
   ConfigParser p;
   p.SetContent("[ switch-mapping ]\n"
@@ -103,6 +103,7 @@ TEST(MachineControlConfig, SwitchMapping) {
   EXPECT_EQ(4, config.max_endstop_[AXIS_Y].endstop_switch);
   EXPECT_FALSE(config.trigger_level_[4 - 1]);
 }
+#endif
 
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);

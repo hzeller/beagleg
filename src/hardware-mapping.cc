@@ -204,8 +204,8 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
 HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis) {
   if (!is_hardware_initialized_) return TRIGGER_NONE;
   int result = 0;
-  if (axis_to_min_endstop_[axis] != GPIO_NOT_MAPPED) result |= TRIGGER_MIN;
-  if (axis_to_max_endstop_[axis] != GPIO_NOT_MAPPED) result |= TRIGGER_MAX;
+  if (axis_to_min_endstop_[axis] != 0) result |= TRIGGER_MIN;
+  if (axis_to_max_endstop_[axis] != 0) result |= TRIGGER_MAX;
   return (AxisTrigger) result;  // Safe to cast: all within range.
 }
 
@@ -236,6 +236,7 @@ public:
     current_section_ = section_name;
     return (section_name == "aux-mapping" ||
             section_name == "pwm-mapping" ||
+            section_name == "switch-mapping" ||
             section_name == "motor-mapping");
   }
 

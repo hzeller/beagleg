@@ -311,11 +311,15 @@ bool GCodeMachineControl::Impl::Init() {
   for (int a = 0; a < GCODE_NUM_AXES; ++a) {
     GCodeParserAxis axis = (GCodeParserAxis) a;
     const HardwareMapping::AxisTrigger homing_trigger = cfg_.homing_trigger[axis];
+    if (homing_trigger == HardwareMapping::TRIGGER_NONE) {
+      continue;
+    }
     if (homing_trigger == HardwareMapping::TRIGGER_ANY) {
       Log_error("Error: There can only be one home-origin for axis %c, "
                 "but both min/max are set for homing.\n",
                 gcodep_axis2letter(axis));
       ++error_count;
+      continue;
     }
     if ((hardware_mapping_->AvailableAxisSwitch(axis) & homing_trigger) == 0) {
       Log_error("Error: There is no switch associated in [switch-mapping] "
