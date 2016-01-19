@@ -611,17 +611,21 @@ void GCodeMachineControl::Impl::get_endstop_status() {
   bool any_endstops_found = false;
   for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
     const  GCodeParserAxis axis = (GCodeParserAxis) ai;
-    HardwareMapping::AxisTrigger triggers = cfg_.homing_trigger[axis];
+    HardwareMapping::AxisTrigger triggers = hardware_mapping_->AvailableAxisSwitch(axis);
     if ((triggers & HardwareMapping::TRIGGER_MIN) != 0) {
-      mprintf("%c_min:%s ",
+      mprintf("%c_min:%s:%s ",
               tolower(gcodep_axis2letter(axis)),
+              cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MIN
+              ? "home" : "limit"
               hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MIN)
               ? "TRIGGERED" : "open");
       any_endstops_found = true;
     }
     if ((triggers & HardwareMapping::TRIGGER_MAX) != 0) {
-      mprintf("%c_max:%s ",
+      mprintf("%c_max:%s:%s ",
               tolower(gcodep_axis2letter(axis)),
+              cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MAX
+              ? "home" : "limit"
               hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MAX)
               ? "TRIGGERED" : "open");
       any_endstops_found = true;
