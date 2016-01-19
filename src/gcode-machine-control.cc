@@ -616,7 +616,7 @@ void GCodeMachineControl::Impl::get_endstop_status() {
       mprintf("%c_min:%s:%s ",
               tolower(gcodep_axis2letter(axis)),
               cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MIN
-              ? "home" : "limit"
+              ? "home" : "limit",
               hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MIN)
               ? "TRIGGERED" : "open");
       any_endstops_found = true;
@@ -625,7 +625,7 @@ void GCodeMachineControl::Impl::get_endstop_status() {
       mprintf("%c_max:%s:%s ",
               tolower(gcodep_axis2letter(axis)),
               cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MAX
-              ? "home" : "limit"
+              ? "home" : "limit",
               hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MAX)
               ? "TRIGGERED" : "open");
       any_endstops_found = true;
