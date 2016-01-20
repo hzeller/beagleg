@@ -502,8 +502,8 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
   MAP_VAL(n == "cooler",      OUT_COOLER);
   MAP_VAL(n == "case-lights", OUT_CASE_LIGHTS);
   MAP_VAL(n == "fan",         OUT_FAN);
-  MAP_VAL(n == "hotend",      OUT_FAN);
-  MAP_VAL(n == "heatedbed",   OUT_FAN);
+  MAP_VAL(n == "hotend",      OUT_HOTEND);
+  MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
 #undef MAP_VAL
   return false;
 }
