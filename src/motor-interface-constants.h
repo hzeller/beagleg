@@ -134,9 +134,6 @@
 #ifndef MOTOR_8_STEP_GPIO
 #define MOTOR_8_STEP_GPIO  GPIO_NOT_MAPPED
 #endif
-#ifndef MOTOR_9_STEP_GPIO
-#define MOTOR_9_STEP_GPIO  GPIO_NOT_MAPPED
-#endif
 
 // OUTPUTs - There are up to 9 motors, each requires a direction signal
 // Ony the PRU code toggles these GPIOs
@@ -163,9 +160,6 @@
 #endif
 #ifndef MOTOR_8_DIR_GPIO
 #define MOTOR_8_DIR_GPIO   GPIO_NOT_MAPPED
-#endif
-#ifndef MOTOR_9_DIR_GPIO
-#define MOTOR_9_DIR_GPIO   GPIO_NOT_MAPPED
 #endif
 
 // OUtPUT - Enables the drivers, can be active-low (default) or high

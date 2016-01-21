@@ -29,7 +29,6 @@
 #define MOTOR_6_STEP_GPIO  PIN_P9_24  // E2_STEP
 #define MOTOR_7_STEP_GPIO  PIN_P9_42  // STEP_U (external)
 #define MOTOR_8_STEP_GPIO  PIN_P9_31  // STEP_V (external)
-#define MOTOR_9_STEP_GPIO  PIN_P9_29  // STEP_W (external)
 
 #define MOTOR_1_DIR_GPIO   PIN_P8_12  // X_DIR
 #define MOTOR_2_DIR_GPIO   PIN_P8_14  // Y_DIR
@@ -39,13 +38,14 @@
 #define MOTOR_6_DIR_GPIO   PIN_P9_26  // E2_DIR
 #define MOTOR_7_DIR_GPIO   PIN_P8_16  // DIR_U (external)
 #define MOTOR_8_DIR_GPIO   PIN_P9_28  // DIR_V (external)
-#define MOTOR_9_DIR_GPIO   PIN_P9_30  // DIR_W (external)
 
 #define MOTOR_ENABLE_GPIO  PIN_P9_14  // AXIS_ENAn
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0  // 1 if EN, 0 if ~EN
 
 #define AUX_1_GPIO         PIN_P9_41  // FET5
 #define AUX_2_GPIO         PIN_P9_22  // FET6
+#define AUX_3_GPIO         PIN_P9_29  // STEP_W (external)
+#define AUX_4_GPIO         PIN_P9_30  // DIR_W (external)
 #define AUX_14_GPIO        PIN_P8_26  // ESTOP_SW
 #define AUX_15_GPIO        PIN_P9_23  // MACHINE_PWR
 #define AUX_16_GPIO        PIN_P9_25  // LED

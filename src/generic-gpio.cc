@@ -106,7 +106,6 @@ static void cfg_gpio_outputs() {
   set_gpio_output_mask(output_mask, MOTOR_6_STEP_GPIO);
   set_gpio_output_mask(output_mask, MOTOR_7_STEP_GPIO);
   set_gpio_output_mask(output_mask, MOTOR_8_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_9_STEP_GPIO);
 
   // Motor Direction signals
   set_gpio_output_mask(output_mask, MOTOR_1_DIR_GPIO);
@@ -117,7 +116,6 @@ static void cfg_gpio_outputs() {
   set_gpio_output_mask(output_mask, MOTOR_6_DIR_GPIO);
   set_gpio_output_mask(output_mask, MOTOR_7_DIR_GPIO);
   set_gpio_output_mask(output_mask, MOTOR_8_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_9_DIR_GPIO);
 
   // Motor Enable signal and other outputs
   set_gpio_output_mask(output_mask, MOTOR_ENABLE_GPIO);
