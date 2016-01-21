@@ -176,11 +176,6 @@
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0
 #endif
 
-// OUTPUT - Turns the ATX power on/off (M80: on; M81: off)
-#ifndef MACHINE_PWR_GPIO
-#define MACHINE_PWR_GPIO   GPIO_NOT_MAPPED
-#endif
-
 // OUTPUT - Generates a software E-Stop (M0; cleared with M999)
 #ifndef ESTOP_SW_GPIO
 #define ESTOP_SW_GPIO      GPIO_NOT_MAPPED

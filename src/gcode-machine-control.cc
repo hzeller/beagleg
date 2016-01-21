@@ -412,8 +412,11 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 355:                                 // aux pin case lights control
     remaining = aux_bit_commands(letter, value, remaining);
     break;
-  case 80: set_gpio(MACHINE_PWR_GPIO); break;
-  case 81: clr_gpio(MACHINE_PWR_GPIO); break;
+  case 80:
+  case 81:
+    set_output_flags(HardwareMapping::OUT_ATX_POWER, code == 80);
+    hardware_mapping_->SetAuxOutput(aux_bits_);
+    break;
   case 105: mprintf("T-300\n"); break;  // no temp yet.
   case 114: get_current_position(); break;
   case 115: mprintf("%s\n", VERSION_STRING); break;

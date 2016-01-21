@@ -44,11 +44,11 @@
 #define MOTOR_ENABLE_GPIO  PIN_P9_14  // AXIS_ENAn
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0  // 1 if EN, 0 if ~EN
 
-#define MACHINE_PWR_GPIO   PIN_P9_23  // MACHINE_PWR
 #define ESTOP_SW_GPIO      PIN_P8_26  // ESTOP_SW (output)
 
 #define AUX_1_GPIO         PIN_P9_41  // FET5
 #define AUX_2_GPIO         PIN_P9_22  // FET6
+#define AUX_15_GPIO        PIN_P9_23  // MACHINE_PWR
 #define AUX_16_GPIO        PIN_P9_25  // LED
 
 #define PWM_1_GPIO         PIN_P8_11  // FET1

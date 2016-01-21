@@ -102,6 +102,7 @@ public:
     OUT_HOTEND,
     OUT_HEATEDBED,
     OUT_LED,
+    OUT_ATX_POWER,
 
     NUM_OUTPUTS   // last.
   };
