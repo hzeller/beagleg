@@ -541,15 +541,15 @@ HardwareMapping::get_pwm_gpio_descriptor(int pwm_num) {
 HardwareMapping::GPIODefinition
 HardwareMapping::get_endstop_gpio_descriptor(int switch_num) {
   switch (switch_num) {
-  case 1:  return END_1_GPIO;
-  case 2:  return END_2_GPIO;
-  case 3:  return END_3_GPIO;
-  case 4:  return END_4_GPIO;
-  case 5:  return END_5_GPIO;
-  case 6:  return END_6_GPIO;
-  case 7:  return END_7_GPIO;
-  case 8:  return END_8_GPIO;
-  case 9:  return END_9_GPIO;
+  case 1:  return IN_1_GPIO;
+  case 2:  return IN_2_GPIO;
+  case 3:  return IN_3_GPIO;
+  case 4:  return IN_4_GPIO;
+  case 5:  return IN_5_GPIO;
+  case 6:  return IN_6_GPIO;
+  case 7:  return IN_7_GPIO;
+  case 8:  return IN_8_GPIO;
+  case 9:  return IN_9_GPIO;
   default: return GPIO_NOT_MAPPED;
   }
 }

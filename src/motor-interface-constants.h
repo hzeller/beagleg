@@ -256,32 +256,32 @@
 #endif
 
 // INPUTs - Endstops
-#ifndef END_1_GPIO
-#define END_1_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_1_GPIO
+#define IN_1_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_2_GPIO
-#define END_2_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_2_GPIO
+#define IN_2_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_3_GPIO
-#define END_3_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_3_GPIO
+#define IN_3_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_4_GPIO
-#define END_4_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_4_GPIO
+#define IN_4_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_5_GPIO
-#define END_5_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_5_GPIO
+#define IN_5_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_6_GPIO
-#define END_6_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_6_GPIO
+#define IN_6_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_7_GPIO
-#define END_7_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_7_GPIO
+#define IN_7_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_8_GPIO
-#define END_8_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_8_GPIO
+#define IN_8_GPIO         GPIO_NOT_MAPPED
 #endif
-#ifndef END_9_GPIO
-#define END_9_GPIO         GPIO_NOT_MAPPED
+#ifndef IN_9_GPIO
+#define IN_9_GPIO         GPIO_NOT_MAPPED
 #endif
 
 #endif // __MOTOR_INTERFACE_CONSTANTS_H

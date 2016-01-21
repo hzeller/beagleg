@@ -50,6 +50,6 @@
 #define PWM_3_GPIO         PIN_P8_7   // PWM_3 "PWM, Open Collector"
 #define PWM_4_GPIO         PIN_P8_8   // PWM_4 "PWM, Open Collector"
 
-#define END_1_GPIO         PIN_P8_13  // END_X
-#define END_2_GPIO         PIN_P8_14  // END_Y
-#define END_3_GPIO         PIN_P8_17  // END_Z
+#define IN_1_GPIO         PIN_P8_13  // END_X
+#define IN_2_GPIO         PIN_P8_14  // END_Y
+#define IN_3_GPIO         PIN_P8_17  // END_Z
