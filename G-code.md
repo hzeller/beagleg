@@ -66,7 +66,7 @@ G92.3            | -                    | Restore G92 offset
 Command          | Callback              | Description
 -----------------|-----------------------|-----------------------------
 M2               | `gcode_finished()`    | Program end. Resets back to defaults.
-M24              | `wait_for_start()`    | Start/resume a program (only on capes that have START_GPIO).
+M24              | `wait_for_start()`    | Start/resume a program. Waits for the start input if available.
 M17              | `motors_enable()`     | Switch on motors.
 M18              | `motors_enable()`     | Switch off motors.
 M30              | `gcode_finished()`    | Program end. Resets back to defaults.

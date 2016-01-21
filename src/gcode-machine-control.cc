@@ -375,13 +375,11 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
 
 void GCodeMachineControl::Impl::wait_for_start() {
   int flash_usec = 100 * 1000;
-  int value = get_gpio(START_GPIO);
-  while (value == 1) {
+  while (!hardware_mapping_->TestStartSwitch()) {
     set_gpio(LED_GPIO);
     usleep(flash_usec);
     clr_gpio(LED_GPIO);
     usleep(flash_usec);
-    value = get_gpio(START_GPIO);
   }
 }
 

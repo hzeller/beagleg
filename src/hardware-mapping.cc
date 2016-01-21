@@ -32,6 +32,7 @@
 HardwareMapping::HardwareMapping() : is_hardware_initialized_(false) {
   estop_input_ = 0;
   pause_input_ = 0;
+  start_input_ = 0;
 }
 
 HardwareMapping::~HardwareMapping() {
@@ -264,6 +265,15 @@ bool HardwareMapping::TestPauseSwitch() {
   return result;
 }
 
+bool HardwareMapping::TestStartSwitch() {
+  if (!is_hardware_initialized_) return true;
+  const int switch_number = start_input_;
+  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
+  if (gpio_def != GPIO_NOT_MAPPED)
+    return (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
+  return true;
+}
+
 class HardwareMapping::ConfigReader : public ConfigParser::EventReceiver {
 public:
   ConfigReader(HardwareMapping *config) : config_(config){}
@@ -395,6 +405,9 @@ private:
       else if (option == "pause") {
         config_->pause_input_ = switch_number;
       }
+      else if (option == "start") {
+        config_->start_input_ = switch_number;
+      }
       else if (option.length() == 5) {
         const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
         if (axis == GCODE_NUM_AXES) {
@@ -496,6 +509,7 @@ HardwareMapping::get_endstop_gpio_descriptor(int switch_num) {
   case 6:  return END_6_GPIO;
   case 7:  return END_7_GPIO;
   case 8:  return END_8_GPIO;
+  case 9:  return END_9_GPIO;
   default: return GPIO_NOT_MAPPED;
   }
 }

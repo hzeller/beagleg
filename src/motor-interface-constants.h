@@ -191,11 +191,6 @@
 #define LED_GPIO           GPIO_NOT_MAPPED
 #endif
 
-// INPUT - Starts motion generation after input is low (M24)
-#ifndef START_GPIO
-#define START_GPIO         GPIO_NOT_MAPPED
-#endif
-
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED
@@ -284,6 +279,9 @@
 #endif
 #ifndef END_8_GPIO
 #define END_8_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_9_GPIO
+#define END_9_GPIO         GPIO_NOT_MAPPED
 #endif
 
 #endif // __MOTOR_INTERFACE_CONSTANTS_H

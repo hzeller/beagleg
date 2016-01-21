@@ -96,9 +96,7 @@ public:
     // will have "is_first" set.
     virtual void input_idle(bool is_first) {}
 
-    // G24: Start/resume
-    // If machine has a START_GPIO this callback will wait until it is low
-    // before continuing to parse commands.
+    // G24: Start/resume. Waits for the start input if available.
     virtual void wait_for_start() {}
 
     // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X

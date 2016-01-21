@@ -70,7 +70,7 @@ public:
   // Some anonymous sets of constexpr, here represented as enum as we don't
   // have constexpr in this version of c++ yet.
   enum {
-    NUM_SWITCHES      =  8,
+    NUM_SWITCHES      =  9,
     NUM_BOOL_OUTPUTS  = 16,
     NUM_PWM_OUTPUTS   =  4,
     NUM_MOTORS        =  8,
@@ -190,6 +190,9 @@ public:
   // Returns true if the pause input is active.
   bool TestPauseSwitch();
 
+  // Returns true if the start input is active (or it's not available)
+  bool TestStartSwitch();
+
   // other input switches.
   // inputs: analog inputs needed.
 
@@ -231,6 +234,7 @@ private:
   FixedArray<bool, NUM_SWITCHES> trigger_level_;
   int estop_input_;
   int pause_input_;
+  int start_input_;
 
   bool is_hardware_initialized_;
 };
