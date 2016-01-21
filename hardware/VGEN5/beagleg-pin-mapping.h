@@ -58,12 +58,12 @@
 #define PWM_3_GPIO         AUX_3_GPIO // OUT2 - TIMER PWM
 #define PWM_4_GPIO         AUX_4_GPIO // OUT3 - TIMER PWM
 
-#define IN_1_GPIO         PIN_P8_15  // IN0 - X home (min)
-#define IN_2_GPIO         PIN_P8_16  // IN1 - Y home (max)
-#define IN_3_GPIO         PIN_P8_11  // IN2 - Z home (max)
-#define IN_4_GPIO         PIN_P8_12  // IN3 - Z suface (min)
-#define IN_5_GPIO         PIN_P8_13  // IN4 - LIM4
-#define IN_6_GPIO         PIN_P8_14  // IN5 - LIM5
-#define IN_7_GPIO         PIN_P8_17  // ESTOP
-#define IN_8_GPIO         PIN_P8_18  // PAUSE
-#define IN_9_GPIO         PIN_P8_19  // START
+#define IN_1_GPIO          PIN_P8_15  // IN0 - X home (min)
+#define IN_2_GPIO          PIN_P8_16  // IN1 - Y home (max)
+#define IN_3_GPIO          PIN_P8_11  // IN2 - Z home (max)
+#define IN_4_GPIO          PIN_P8_12  // IN3 - Z suface (min)
+#define IN_5_GPIO          PIN_P8_13  // IN4 - LIM4
+#define IN_6_GPIO          PIN_P8_14  // IN5 - LIM5
+#define IN_7_GPIO          PIN_P8_17  // ESTOP
+#define IN_8_GPIO          PIN_P8_18  // PAUSE
+#define IN_9_GPIO          PIN_P8_19  // START
