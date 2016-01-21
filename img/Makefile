@@ -1,7 +1,7 @@
-all : machine-control.svg print-stats.svg
-
-machine-control.svg:
-print-stats.svg:
+all : machine-control.png print-stats.png
 
  %.svg : %.dot
 	dot -Tsvg $^ > $@
+
+ %.png : %.dot
+	dot -Tpng $^ > $@

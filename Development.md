@@ -43,9 +43,9 @@ Movement commands are pipelined and queued as they need to be buffered
 to do path and accleration planning. This also prevents machine stalls while
 waiting on GCode input.
 
-This is a rough overview of the components:
+This is a overview of the pipeline components:
 
-![Processing](./img/machine-control.svg)
+![Processing](./img/machine-control.png)
 
 ### APIs
 The functionality is implemented in a stack of independently usable APIs.
@@ -107,5 +107,5 @@ second.
 It only takes a couple of seconds to simulate and pre-calculate the wall-time
 of many-hour long jobs. This might be useful to display to the user.
 
-![gcode-prin-stats](./img/print-stats.svg)
+![gcode-prin-stats](./img/print-stats.png)
 
