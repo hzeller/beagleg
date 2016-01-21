@@ -464,6 +464,46 @@ bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
   return false;
 }
 
+const char *HardwareMapping::OutputToName(LogicOutput output) {
+  switch (output) {
+  case OUT_MIST:        return "mist";
+  case OUT_FLOOD:       return "flood";
+  case OUT_VACUUM:      return "vacuum";
+  case OUT_SPINDLE:     return "spindle";
+  case OUT_SPINDLE_SPEED:  return "spindle-speed";
+  case OUT_SPINDLE_DIRECTION: return "spindle-dir";
+  case OUT_COOLER:      return "cooler";
+  case OUT_CASE_LIGHTS: return "case-lights";
+  case OUT_FAN:         return "fan";
+  case OUT_HOTEND:      return "hotend";
+  case OUT_HEATEDBED:   return "heatedbed";
+
+  case NUM_OUTPUTS: return "<invalid>";
+    // no default case to have the compiler warn about new things.
+  }
+  return "<invalid>";
+}
+
+bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
+  const std::string n = ToLower(str);
+#define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)
+  MAP_VAL(n == "mist",        OUT_MIST);
+  MAP_VAL(n == "flood",       OUT_FLOOD);
+  MAP_VAL(n == "vacuum",      OUT_VACUUM);
+  MAP_VAL(n == "spindle" || n == "spindle-on", OUT_SPINDLE);
+  MAP_VAL(n == "spindle-speed" || n == "spindle-pwm", OUT_SPINDLE_SPEED);
+  MAP_VAL(n == "spindle-dir", OUT_SPINDLE_DIRECTION);
+  MAP_VAL(n == "cooler",      OUT_COOLER);
+  MAP_VAL(n == "case-lights", OUT_CASE_LIGHTS);
+  MAP_VAL(n == "fan",         OUT_FAN);
+  MAP_VAL(n == "hotend",      OUT_HOTEND);
+  MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
+#undef MAP_VAL
+  return false;
+}
+
+// Mapping of numbered IO pins to GPIO definition. The *_GPIO macros
+// are defined in the cape specific header files.
 HardwareMapping::GPIODefinition
 HardwareMapping::get_aux_bit_gpio_descriptor(int aux_num) {
   switch (aux_num) {
@@ -512,42 +552,4 @@ HardwareMapping::get_endstop_gpio_descriptor(int switch_num) {
   case 9:  return END_9_GPIO;
   default: return GPIO_NOT_MAPPED;
   }
-}
-
-const char *HardwareMapping::OutputToName(LogicOutput output) {
-  switch (output) {
-  case OUT_MIST:        return "mist";
-  case OUT_FLOOD:       return "flood";
-  case OUT_VACUUM:      return "vacuum";
-  case OUT_SPINDLE:     return "spindle";
-  case OUT_SPINDLE_SPEED:  return "spindle-speed";
-  case OUT_SPINDLE_DIRECTION: return "spindle-dir";
-  case OUT_COOLER:      return "cooler";
-  case OUT_CASE_LIGHTS: return "case-lights";
-  case OUT_FAN:         return "fan";
-  case OUT_HOTEND:      return "hotend";
-  case OUT_HEATEDBED:   return "heatedbed";
-
-  case NUM_OUTPUTS: return "<invalid>";
-    // no default case to have the compiler warn about new things.
-  }
-  return "<invalid>";
-}
-
-bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
-  const std::string n = ToLower(str);
-#define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)
-  MAP_VAL(n == "mist",        OUT_MIST);
-  MAP_VAL(n == "flood",       OUT_FLOOD);
-  MAP_VAL(n == "vacuum",      OUT_VACUUM);
-  MAP_VAL(n == "spindle" || n == "spindle-on", OUT_SPINDLE);
-  MAP_VAL(n == "spindle-speed" || n == "spindle-pwm", OUT_SPINDLE_SPEED);
-  MAP_VAL(n == "spindle-dir", OUT_SPINDLE_DIRECTION);
-  MAP_VAL(n == "cooler",      OUT_COOLER);
-  MAP_VAL(n == "case-lights", OUT_CASE_LIGHTS);
-  MAP_VAL(n == "fan",         OUT_FAN);
-  MAP_VAL(n == "hotend",      OUT_HOTEND);
-  MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
-#undef MAP_VAL
-  return false;
 }
