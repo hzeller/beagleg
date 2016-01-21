@@ -487,6 +487,7 @@ const char *HardwareMapping::OutputToName(LogicOutput output) {
   case OUT_HEATEDBED:   return "heatedbed";
   case OUT_LED:         return "led";
   case OUT_ATX_POWER:   return "atx-power";
+  case OUT_ESTOP:       return "estop";
 
   case NUM_OUTPUTS: return "<invalid>";
     // no default case to have the compiler warn about new things.
@@ -510,6 +511,7 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
   MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
   MAP_VAL(n == "led",         OUT_LED);
   MAP_VAL(n == "atx-power",   OUT_ATX_POWER);
+  MAP_VAL(n == "estop",       OUT_ESTOP);
 #undef MAP_VAL
   return false;
 }

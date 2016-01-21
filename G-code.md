@@ -89,7 +89,7 @@ the `unprocessed()` callback (see API below):
 
 Command          | Description
 -----------------|----------------------------------------
-M0               | Unconditional stop, sets Software E-Stop (only on capes that have ESTOP_SW_GPIO)
+M0               | Unconditional stop, sets Software E-Stop.
 M3 Sxx           | Spindle On Clockwise at speed Sxx
 M4 Sxx           | Spindle On Counterclockwise at speed Sxx
 M5               | Spindle Off
@@ -116,7 +116,7 @@ M121             | Disable pause switch detection.
 M245             | Start cooler
 M246             | Stop cooler
 M355             | Turn case lights on/off
-M999             | Clear Software E-Stop (only on capes that have ESTOP_SW_GPIO)
+M999             | Clear Software E-Stop.
 
 ### Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are

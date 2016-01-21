@@ -403,7 +403,11 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
 
   const int code = (int)value;
   switch (code) {
-  case 0: set_gpio(ESTOP_SW_GPIO); break;
+  case 0:
+  case 999:
+    set_output_flags(HardwareMapping::OUT_ESTOP, code == 0);
+    hardware_mapping_->SetAuxOutput(aux_bits_);
+    break;
   case 3: case 4: case 5:                   // aux pin spindle control
   case 7: case 8: case 9: case 10: case 11: // aux pin mist/flood/vacuum control
   case 42:                                  // aux pin state query
@@ -427,7 +431,6 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 119: get_endstop_status(); break;
   case 120: pause_enabled_ = true; break;
   case 121: pause_enabled_ = false; break;
-  case 999: clr_gpio(ESTOP_SW_GPIO); break;
   default:
     mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
             letter, code, remaining);

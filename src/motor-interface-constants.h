@@ -176,11 +176,6 @@
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0
 #endif
 
-// OUTPUT - Generates a software E-Stop (M0; cleared with M999)
-#ifndef ESTOP_SW_GPIO
-#define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
-#endif
-
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED
