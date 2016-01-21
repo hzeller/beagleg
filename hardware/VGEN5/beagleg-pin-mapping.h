@@ -35,23 +35,21 @@
 #define MOTOR_ENABLE_GPIO  PIN_P9_16  // ENA (output)
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 1  // 1 if EN, 0 if ~EN
 
-#define LED_GPIO           PIN_P8_26  // LED
-
 #define AUX_1_GPIO         PIN_P8_7   // OUT0 - GPIO
 #define AUX_2_GPIO         PIN_P8_8   // OUT1 - GPIO
 #define AUX_3_GPIO         PIN_P8_9   // OUT2 - GPIO
 #define AUX_4_GPIO         PIN_P8_10  // OUT3 - GPIO
 #define AUX_5_GPIO         PIN_P9_14  // OUT4 - GPIO
-#define AUX_6_GPIO         LED_GPIO   // OUT5 - GPIO
-#define AUX_7_GPIO         PIN_P9_17  // not routed (SPI0_CS0)
-#define AUX_8_GPIO         PIN_P9_18  // not routed (SPI0_D1)
-#define AUX_9_GPIO         PIN_P9_21  // not routed (SPI0_D0)
-#define AUX_10_GPIO        PIN_P9_22  // not routed (SPI0_SCLK)
-#define AUX_11_GPIO        PIN_P9_24  // not routed (UART1_TXD)
-#define AUX_12_GPIO        PIN_P9_26  // not routed (UART1_RXD)
-#define AUX_13_GPIO        PIN_P9_28  // not routed (SPI1_CS0)
-#define AUX_14_GPIO        PIN_P9_29  // not routed (SPI1_DO)
-#define AUX_15_GPIO        PIN_P9_31  // not routed (SPI1_SCLK)
+#define AUX_6_GPIO         PIN_P9_17  // not routed (SPI0_CS0)
+#define AUX_7_GPIO         PIN_P9_18  // not routed (SPI0_D1)
+#define AUX_8_GPIO         PIN_P9_21  // not routed (SPI0_D0)
+#define AUX_9_GPIO         PIN_P9_22  // not routed (SPI0_SCLK)
+#define AUX_10_GPIO        PIN_P9_24  // not routed (UART1_TXD)
+#define AUX_11_GPIO        PIN_P9_26  // not routed (UART1_RXD)
+#define AUX_12_GPIO        PIN_P9_28  // not routed (SPI1_CS0)
+#define AUX_13_GPIO        PIN_P9_29  // not routed (SPI1_DO)
+#define AUX_14_GPIO        PIN_P9_31  // not routed (SPI1_SCLK)
+#define AUX_16_GPIO        PIN_P8_26  // LED
 
 #define PWM_1_GPIO         AUX_1_GPIO // OUT0 - TIMER PWM
 #define PWM_2_GPIO         AUX_2_GPIO // OUT1 - TIMER PWM

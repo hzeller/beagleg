@@ -101,6 +101,7 @@ public:
     OUT_FAN,
     OUT_HOTEND,
     OUT_HEATEDBED,
+    OUT_LED,
 
     NUM_OUTPUTS   // last.
   };

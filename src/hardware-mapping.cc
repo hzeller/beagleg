@@ -339,6 +339,14 @@ private:
                     "or heated beds to a boolean output. Use a PWM output!");
         return false;
       }
+      if (aux_number == 16 && output != OUT_LED) {
+        ReportError(line_no, "Aux 16 can only be mapped to an led!");
+        return false;
+      }
+      if (output == OUT_LED && aux_number != 16) {
+        ReportError(line_no, "An led can only be mapped to Aux 16!");
+        return false;
+      }
       Log_debug("Aux %d -> %s", aux_number, value.c_str());
       return config_->AddAuxMapping(output, aux_number);
     } else {
@@ -477,6 +485,7 @@ const char *HardwareMapping::OutputToName(LogicOutput output) {
   case OUT_FAN:         return "fan";
   case OUT_HOTEND:      return "hotend";
   case OUT_HEATEDBED:   return "heatedbed";
+  case OUT_LED:         return "led";
 
   case NUM_OUTPUTS: return "<invalid>";
     // no default case to have the compiler warn about new things.
@@ -498,6 +507,7 @@ bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
   MAP_VAL(n == "fan",         OUT_FAN);
   MAP_VAL(n == "hotend",      OUT_HOTEND);
   MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
+  MAP_VAL(n == "led",         OUT_LED);
 #undef MAP_VAL
   return false;
 }

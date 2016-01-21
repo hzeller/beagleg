@@ -186,11 +186,6 @@
 #define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
 #endif
 
-// OUTPUT - General purpose LED (toggles with M24 until start button is pressed)
-#ifndef LED_GPIO
-#define LED_GPIO           GPIO_NOT_MAPPED
-#endif
-
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
 #ifndef AUX_1_GPIO
 #define AUX_1_GPIO         GPIO_NOT_MAPPED

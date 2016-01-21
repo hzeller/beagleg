@@ -123,7 +123,6 @@ static void cfg_gpio_outputs() {
   set_gpio_output_mask(output_mask, MOTOR_ENABLE_GPIO);
   set_gpio_output_mask(output_mask, MACHINE_PWR_GPIO);
   set_gpio_output_mask(output_mask, ESTOP_SW_GPIO);
-  set_gpio_output_mask(output_mask, LED_GPIO);
 
   // Aux and PWM signals
   set_gpio_output_mask(output_mask, AUX_1_GPIO);

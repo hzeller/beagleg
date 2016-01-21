@@ -149,7 +149,6 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();
   MotorEnable(false);
-  clr_gpio(LED_GPIO);  // turn off the status LED
 }
 
 PRUMotionQueue::PRUMotionQueue() : last_motor_enable_(false) {
@@ -160,8 +159,6 @@ PRUMotionQueue::PRUMotionQueue() : last_motor_enable_(false) {
 }
 
 int PRUMotionQueue::Init() {
-  clr_gpio(LED_GPIO);  // turn off the status LED
-
   MotorEnable(false);  // motors off initially.
 
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
