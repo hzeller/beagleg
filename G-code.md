@@ -111,6 +111,8 @@ M114             | Get current position; coordinate units in mm.
 M115             | Get firmware version.
 M117             | Display message.
 M119             | Get endstop status.
+M120             | Enable pause switch detection.
+M121             | Disable pause switch detection.
 M245             | Start cooler
 M246             | Stop cooler
 M355             | Turn case lights on/off

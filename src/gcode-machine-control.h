@@ -59,6 +59,7 @@ struct MachineControlConfig {
   bool range_check;             // Do machine limit checks. Default 1.
   bool debug_print;             // Print step-tuples to output_fd if 1.
   bool synchronous;             // Don't queue, wait for command to finish if 1.
+  bool enable_pause;            // Enable pause switch detection. Default 0.
 };
 
 // A class that controls a machine via gcode.

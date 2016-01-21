@@ -38,6 +38,7 @@ MachineControlConfig::MachineControlConfig() {
   synchronous = false;
   range_check = true;
   require_homing = true;
+  enable_pause = false;
   home_order = kHomeOrder;
   threshold_angle = -1;
   auto_motor_disable_seconds = -1;
@@ -77,6 +78,7 @@ public:
       ACCEPT_VALUE("require-homing", Bool,   &config_->require_homing);
       ACCEPT_VALUE("range-check",    Bool,   &config_->range_check);
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
+      ACCEPT_VALUE("enable-pause",   Bool,   &config_->enable_pause);
       ACCEPT_VALUE("auto-motor-disable-seconds",
                    Int,   &config_->auto_motor_disable_seconds);
       return false;

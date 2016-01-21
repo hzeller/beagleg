@@ -171,6 +171,7 @@ private:
   HardwareMapping::AuxBitmap last_aux_bits_;  // last enqueued aux bits.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
   time_t next_auto_disable_motor_;
+  bool pause_enabled_;                  // Enabled via M120, disabled via M121
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
@@ -194,6 +195,7 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
     prog_speed_factor_(1),
     aux_bits_(0), spindle_rpm_(0),
     homing_state_(HOMING_STATE_NEVER_HOMED) {
+    pause_enabled_ = cfg_.enable_pause;
 }
 
 // The actual initialization. Can fail, hence we make it a separate method.
@@ -418,6 +420,8 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     remaining = NULL;  // consume the full line.
     break;
   case 119: get_endstop_status(); break;
+  case 120: pause_enabled_ = true; break;
+  case 121: pause_enabled_ = false; break;
   case 999: clr_gpio(ESTOP_SW_GPIO); break;
   default:
     mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
@@ -1028,7 +1032,7 @@ void GCodeMachineControl::Impl::dwell(float value) {
   motor_ops_->WaitQueueEmpty();
   usleep((int) (value * 1000));
 
-  if (check_for_pause()) {
+  if (pause_enabled_ && check_for_pause()) {
     Log_debug("Pause input detected, waiting for Start");
     wait_for_start();
   }
