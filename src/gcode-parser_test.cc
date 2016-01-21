@@ -80,6 +80,8 @@ public:
   virtual void set_speed_factor(float factor) {}
   virtual void set_fanspeed(float value) {}
   virtual void set_temperature(float degrees_c) {}
+  virtual void wait_temperature() {}
+  virtual void dwell(float ms) {}
 
 public:
   // public counters.

@@ -70,8 +70,8 @@ public:
   class EventReceiver {
   public:
     virtual ~EventReceiver() {}
-    virtual void gcode_start();    // Start program. Use for initialization.
-    virtual void gcode_finished(); // End of program or stream.
+    virtual void gcode_start() {}    // Start program. Use for initialization.
+    virtual void gcode_finished() {} // End of program or stream.
 
     // The parser handles relative positions and coordinate systems internally,
     // so the machine does not have to worry about that.
@@ -81,44 +81,44 @@ public:
     // machine cube.
     // If needed after the callback returns, the receiver needs to make a copy
     // of the register.
-    virtual void inform_origin_offset(const AxesRegister& offset);
+    virtual void inform_origin_offset(const AxesRegister& offset) {}
 
     // "gcode_command_done" is always executed when a command is completed,
     // which is after internally executed ones (such as G21) or commands that
     // have triggered a callback. Mostly FYI, you can use this for logging or
     // might use this to send "ok\n" depending on the client implementation.
-    virtual void gcode_command_done(char letter, float val);
+    virtual void gcode_command_done(char letter, float val) {}
 
     // If the input has been idle and we haven't gotten any new line for more
     // than 50ms, this function is called (repeately, until there is input again).
     // Use this to do whatever other maintenance might be needed.
     // The first call to input_idle() after data has been processed
     // will have "is_first" set.
-    virtual void input_idle(bool is_first);
+    virtual void input_idle(bool is_first) {}
 
     // G24: Start/resume
     // If machine has a START_GPIO this callback will wait until it is low
     // before continuing to parse commands.
-    virtual void wait_for_start();
+    virtual void wait_for_start() {}
 
     // G28: Home all the axis whose bit is set. e.g. (1<<AXIS_X) for X
     // After that, the parser assume to be at the machine_origin as set in
     // the GCodeParserConfig for the given axes.
-    virtual void go_home(AxisBitmap_t axis_bitmap);
+    virtual void go_home(AxisBitmap_t axis_bitmap) = 0;
 
     // G30: Probe Z axis to travel_endstop. Returns 'true' if the receiver
     // successfully probed the position and returned it in "probed_position".
     // The value represents the actual position reached within the machine
     // cube for the queried axis (in mm).
     virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
-                            float *probed_position);
+                            float *probed_position) { return false; }
 
-    virtual void set_speed_factor(float factor);   // M220 feedrate factor 0..1
-    virtual void set_fanspeed(float value);        // M106, M107: speed 0...255
-    virtual void set_temperature(float degrees_c); // M104, M109: Set temp. in Celsius
-    virtual void wait_temperature();       // M109, M116: Wait for temp. reached.
-    virtual void dwell(float time_ms);     // G4: dwell for milliseconds.
-    virtual void motors_enable(bool enable);   // M17, M84, M18: Switch on/off motors
+    virtual void set_speed_factor(float factor) = 0;// M220 feedrate factor 0..1
+    virtual void set_fanspeed(float value) = 0;    // M106, M107: speed 0...255
+    virtual void set_temperature(float degrees_c)=0; // M104, M109: Set temp. in Celsius
+    virtual void wait_temperature() = 0;    // M109, M116: Wait for temp. reached.
+    virtual void dwell(float time_ms) = 0;     // G4: dwell for milliseconds.
+    virtual void motors_enable(bool enable) = 0;   // M17, M84, M18: Switch on/off motors
 
     // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates.
     // First parameter is feedrate in mm/sec if provided, or -1 otherwise.
@@ -128,9 +128,9 @@ public:
     // Returns 1, if the move was successful or 0 if the machine could not move
     // the machine (e.g. because it was beyond limits or other condition).
     virtual bool coordinated_move(float feed_mm_p_sec,
-                                  const AxesRegister &absolute_pos);  // G1
+                                  const AxesRegister &absolute_pos) = 0;  // G1
     virtual bool rapid_move(float feed_mm_p_sec,
-                            const AxesRegister &absolute_pos);        // G0
+                            const AxesRegister &absolute_pos) = 0;        // G0
 
     // Hand out G-code command that could not be interpreted.
     // Parameters: letter + value of the command that was not understood,
@@ -141,7 +141,7 @@ public:
     // Implementors might want to use GCodeParser::ParsePair() if they need
     // to read G-code words from the remaining line.
     virtual const char *unprocessed(char letter, float value,
-                                    const char *rest_of_line);
+                                    const char *rest_of_line) = 0;
   };
 
   // Configuration for the parser.
