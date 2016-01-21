@@ -35,10 +35,8 @@
 #define MOTOR_ENABLE_GPIO  PIN_P9_16  // ENA (output)
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 1  // 1 if EN, 0 if ~EN
 
-#define ESTOP_HW_GPIO      PIN_P8_17  // ESTOP (input)
 #define LED_GPIO           PIN_P8_26  // LED
 #define START_GPIO         PIN_P8_19  // START (input)
-#define PAUSE_GPIO         PIN_P8_18  // PAUSE (input)
 
 #define AUX_1_GPIO         PIN_P8_7   // OUT0 - GPIO
 #define AUX_2_GPIO         PIN_P8_8   // OUT1 - GPIO
@@ -67,3 +65,5 @@
 #define END_4_GPIO         PIN_P8_12  // IN3 - Z suface (min)
 #define END_5_GPIO         PIN_P8_13  // IN4 - LIM4
 #define END_6_GPIO         PIN_P8_14  // IN5 - LIM5
+#define END_7_GPIO         PIN_P8_17  // ESTOP
+#define END_8_GPIO         PIN_P8_18  // PAUSE

@@ -121,6 +121,7 @@ public:
   virtual const char *unprocessed(char letter, float value, const char *);
 
 private:
+  bool check_for_pause();
   void issue_motor_move_if_possible();
   void machine_move(float feedrate, const AxesRegister &axes);
   bool test_homing_status_ok();
@@ -382,6 +383,10 @@ void GCodeMachineControl::Impl::wait_for_start() {
     usleep(flash_usec);
     value = get_gpio(START_GPIO);
   }
+}
+
+bool GCodeMachineControl::Impl::check_for_pause() {
+  return hardware_mapping_->TestPauseSwitch();
 }
 
 const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
@@ -1020,6 +1025,11 @@ void GCodeMachineControl::Impl::dwell(float value) {
   bring_path_to_halt();
   motor_ops_->WaitQueueEmpty();
   usleep((int) (value * 1000));
+
+  if (check_for_pause()) {
+    Log_debug("Pause input detected, waiting for Start");
+    wait_for_start();
+  }
 }
 
 void GCodeMachineControl::Impl::input_idle(bool is_first) {

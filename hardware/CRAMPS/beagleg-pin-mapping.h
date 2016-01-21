@@ -45,7 +45,6 @@
 #define MOTOR_ENABLE_IS_ACTIVE_HIGH 0  // 1 if EN, 0 if ~EN
 
 #define MACHINE_PWR_GPIO   PIN_P9_23  // MACHINE_PWR
-#define ESTOP_HW_GPIO      PIN_P8_17  // ESTOP (input)
 #define ESTOP_SW_GPIO      PIN_P8_26  // ESTOP_SW (output)
 #define LED_GPIO           PIN_P9_25  // LED
 
@@ -63,3 +62,4 @@
 #define END_4_GPIO         PIN_P8_7   // X-MAX
 #define END_5_GPIO         PIN_P8_9   // Y-MAX
 #define END_6_GPIO         PIN_P9_11  // Z-MAX
+#define END_7_GPIO         PIN_P8_17  // ESTOP

@@ -70,7 +70,7 @@ public:
   // Some anonymous sets of constexpr, here represented as enum as we don't
   // have constexpr in this version of c++ yet.
   enum {
-    NUM_SWITCHES      =  6,
+    NUM_SWITCHES      =  8,
     NUM_BOOL_OUTPUTS  = 16,
     NUM_PWM_OUTPUTS   =  4,
     NUM_MOTORS        =  8,
@@ -184,7 +184,13 @@ public:
   // this will always return false.
   bool TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger);
 
-  // other switches: emergency off etc.
+  // Returns true if the E-Stop input is active.
+  bool TestEStopSwitch();
+
+  // Returns true if the pause input is active.
+  bool TestPauseSwitch();
+
+  // other input switches.
   // inputs: analog inputs needed.
 
   // Return a string with a comma separated list of motors attached to given
@@ -223,6 +229,8 @@ private:
   FixedArray<int, GCODE_NUM_AXES> axis_to_min_endstop_;
   FixedArray<int, GCODE_NUM_AXES> axis_to_max_endstop_;
   FixedArray<bool, NUM_SWITCHES> trigger_level_;
+  int estop_input_;
+  int pause_input_;
 
   bool is_hardware_initialized_;
 };

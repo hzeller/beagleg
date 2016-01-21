@@ -30,6 +30,8 @@
 #include "string-util.h"
 
 HardwareMapping::HardwareMapping() : is_hardware_initialized_(false) {
+  estop_input_ = 0;
+  pause_input_ = 0;
 }
 
 HardwareMapping::~HardwareMapping() {
@@ -242,6 +244,26 @@ bool HardwareMapping::TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigg
   return result;
 }
 
+bool HardwareMapping::TestEStopSwitch() {
+  if (!is_hardware_initialized_) return false;
+  bool result = false;
+  const int switch_number = estop_input_;
+  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
+  if (gpio_def != GPIO_NOT_MAPPED)
+    result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
+  return result;
+}
+
+bool HardwareMapping::TestPauseSwitch() {
+  if (!is_hardware_initialized_) return false;
+  bool result = false;
+  const int switch_number = pause_input_;
+  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
+  if (gpio_def != GPIO_NOT_MAPPED)
+    result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
+  return result;
+}
+
 class HardwareMapping::ConfigReader : public ConfigParser::EventReceiver {
 public:
   ConfigReader(HardwareMapping *config) : config_(config){}
@@ -367,7 +389,13 @@ private:
     for (size_t i = 0; i < options.size(); ++i) {
       const std::string option = ToLower(options[i]);
       if (option.empty()) continue;
-      if (option.length() == 5) {
+      if (option == "e-stop") {
+        config_->estop_input_ = switch_number;
+      }
+      else if (option == "pause") {
+        config_->pause_input_ = switch_number;
+      }
+      else if (option.length() == 5) {
         const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
         if (axis == GCODE_NUM_AXES) {
           Log_error("Line %d: Expect min_<axis> or max_<axis>, e.g. min_x. "
@@ -466,6 +494,8 @@ HardwareMapping::get_endstop_gpio_descriptor(int switch_num) {
   case 4:  return END_4_GPIO;
   case 5:  return END_5_GPIO;
   case 6:  return END_6_GPIO;
+  case 7:  return END_7_GPIO;
+  case 8:  return END_8_GPIO;
   default: return GPIO_NOT_MAPPED;
   }
 }

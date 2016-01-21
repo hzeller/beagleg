@@ -181,11 +181,6 @@
 #define MACHINE_PWR_GPIO   GPIO_NOT_MAPPED
 #endif
 
-// INPUT - Allows detecting a hardware E-Stop
-#ifndef ESTOP_HW_GPIO
-#define ESTOP_HW_GPIO      GPIO_NOT_MAPPED
-#endif
-
 // OUTPUT - Generates a software E-Stop (M0; cleared with M999)
 #ifndef ESTOP_SW_GPIO
 #define ESTOP_SW_GPIO      GPIO_NOT_MAPPED
@@ -200,12 +195,6 @@
 #ifndef START_GPIO
 #define START_GPIO         GPIO_NOT_MAPPED
 #endif
-
-// INPUT - Pauses motion generation when input is low
-#ifndef PAUSE_GPIO
-#define PAUSE_GPIO         GPIO_NOT_MAPPED
-#endif
-
 
 // OUTPUTs - Auxillary outputs; updated by PRU with each queue segment
 #ifndef AUX_1_GPIO
@@ -289,6 +278,12 @@
 #endif
 #ifndef END_6_GPIO
 #define END_6_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_7_GPIO
+#define END_7_GPIO         GPIO_NOT_MAPPED
+#endif
+#ifndef END_8_GPIO
+#define END_8_GPIO         GPIO_NOT_MAPPED
 #endif
 
 #endif // __MOTOR_INTERFACE_CONSTANTS_H
