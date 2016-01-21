@@ -48,7 +48,7 @@
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
 
 #define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
-  "FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
+  "CAPE:" CAPE_NAME " FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 // The target position vector is essentially a position in the
 // GCODE_NUM_AXES-dimensional space.
