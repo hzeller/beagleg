@@ -90,20 +90,20 @@ public:
   };
 
   enum LogicOutput {
-    OUT_MIST,
-    OUT_FLOOD,
-    OUT_VACUUM,
-    OUT_SPINDLE,
+    OUT_MIST,              // M7 = on; M9 = off
+    OUT_FLOOD,             // M8 = on; M9 = off
+    OUT_VACUUM,            // M10 = on; M11 = off
+    OUT_SPINDLE,           // M3/M4 = on; M5 = off
     OUT_SPINDLE_SPEED,
-    OUT_SPINDLE_DIRECTION,
-    OUT_COOLER,
-    OUT_CASE_LIGHTS,
-    OUT_FAN,
+    OUT_SPINDLE_DIRECTION, // M4 = on; M3/M5 = off
+    OUT_COOLER,            // M245 = on; M246 = off
+    OUT_CASE_LIGHTS,       // M355 S1 = on; M355 S0 = off
+    OUT_FAN,               // M106 Sn (set pwm or on if n > 0); M107 = off
     OUT_HOTEND,
     OUT_HEATEDBED,
-    OUT_LED,
-    OUT_ATX_POWER,
-    OUT_ESTOP,
+    OUT_LED,               // toggles on/off with M42 while waiting for start switch
+    OUT_ATX_POWER,         // M80 = on; M81 = off
+    OUT_ESTOP,             // M0 = on; M999 = off
 
     NUM_OUTPUTS   // last.
   };
