@@ -165,6 +165,8 @@ If you want to use the nicely seprated sub-APIs of BeagleG programmatically
 or want to get involved in the development, check
 the [Development](./Development.md) page.
 
+<a href="Development.md"><img src="./img/machine-control.png" width="128"/></a>
+
 ## License
 BeagleG is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
