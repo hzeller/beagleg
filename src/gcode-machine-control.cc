@@ -447,10 +447,14 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       // TODO: calculate the duty_cycle (0-255) for the spindle pwm based on
       // the rpm range established by the config then:
       // set_mapped_pwm(PWM_SPINDLE, duty_cycle);
+      const float max_rpm = 3000.0;  // TODO: configure.
+      hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED,
+                                      std::min(spindle_rpm_ / max_rpm, 1.0f));
       set_output_flags(HardwareMapping::OUT_SPINDLE, true);
     }
     break;
   case 5:
+    hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED, 0.0);
     set_output_flags(HardwareMapping::OUT_SPINDLE, false);
     set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, false);
     break;
