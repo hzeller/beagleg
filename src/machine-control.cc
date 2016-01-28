@@ -42,6 +42,7 @@
 #include "logging.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
+#include "spindle-control.h"
 #include "sim-firmware.h"
 #include "string-util.h"
 
@@ -378,6 +379,16 @@ int main(int argc, char *argv[]) {
   HardwareMapping hardware_mapping;
   if (!hardware_mapping.ConfigureFromFile(&config_parser)) {
     Log_error("Exiting. Couldn't initialize hardware mapping (%s)", config_file);
+    return 1;
+  }
+
+  Spindle spindle;
+  if (!spindle.ConfigureFromFile(&config_parser)) {
+    Log_error("Exiting. Parse error in configuration file '%s'", config_file);
+    return 1;
+  }
+  if (!spindle.Init(&hardware_mapping)) {
+    Log_error("Exiting. Unable to initialize spindle");
     return 1;
   }
 
