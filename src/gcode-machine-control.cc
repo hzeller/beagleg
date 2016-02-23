@@ -39,6 +39,7 @@
 #include "gcode-parser.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"
+#include "spindle-control.h"
 #include "logging.h"
 #include "motor-operations.h"
 #include "pwm-timer.h"
@@ -87,6 +88,7 @@ public:
   Impl(const MachineControlConfig &config,
        MotorOperations *motor_ops,
        HardwareMapping *hardware_mapping,
+       Spindle *spindle,
        FILE *msg_stream);
 
   // Initialize. Only if this succeeds, we have a properly initialized
@@ -152,6 +154,7 @@ private:
   const struct MachineControlConfig cfg_;
   MotorOperations *const motor_ops_;
   HardwareMapping *const hardware_mapping_;
+  Spindle *const spindle_;
   FILE *msg_stream_;
 
   // Derived configuration
@@ -168,7 +171,6 @@ private:
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
   HardwareMapping::AuxBitmap last_aux_bits_;  // last enqueued aux bits.
-  unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
   time_t next_auto_disable_motor_;
   bool pause_enabled_;                  // Enabled via M120, disabled via M121
 
@@ -184,15 +186,17 @@ static inline int round2int(float x) { return (int) roundf(x); }
 GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
                                 MotorOperations *motor_ops,
                                 HardwareMapping *hardware_mapping,
+                                Spindle *spindle,
                                 FILE *msg_stream)
   : cfg_(config),
-    motor_ops_(motor_ops), hardware_mapping_(hardware_mapping),
+    motor_ops_(motor_ops),
+    hardware_mapping_(hardware_mapping),
+    spindle_(spindle),
     msg_stream_(msg_stream),
     g0_feedrate_mm_per_sec_(-1),
     highest_accel_(-1),
     current_feedrate_mm_per_sec_(-1),
     prog_speed_factor_(1),
-    spindle_rpm_(0),
     homing_state_(HOMING_STATE_NEVER_HOMED) {
     pause_enabled_ = cfg_.enable_pause;
 }
@@ -443,31 +447,21 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
                                                         const char *remaining) {
   const int m_code = (int)value;
   const char* after_pair;
+  int spindle_rpm = -1;
 
   switch (m_code) {
   case 3: case 4:
     for (;;) {
       after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
-      else if (letter == 'S') spindle_rpm_ = round2int(value);
+      else if (letter == 'S') spindle_rpm = round2int(value);
       else break;
       remaining = after_pair;
     }
-    if (spindle_rpm_) {
-      set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, m_code == 4);
-      // TODO: calculate the duty_cycle (0-255) for the spindle pwm based on
-      // the rpm range established by the config then:
-      // set_mapped_pwm(PWM_SPINDLE, duty_cycle);
-      const float max_rpm = 3000.0;  // TODO: configure.
-      hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED,
-                                      std::min(spindle_rpm_ / max_rpm, 1.0f));
-      set_output_flags(HardwareMapping::OUT_SPINDLE, true);
-    }
+    if (spindle_rpm >= 0) spindle_->On(m_code == 4, spindle_rpm);
     break;
   case 5:
-    hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED, 0.0);
-    set_output_flags(HardwareMapping::OUT_SPINDLE, false);
-    set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, false);
+    spindle_->Off();
     break;
   case 7: set_output_flags(HardwareMapping::OUT_MIST, true); break;
   case 8: set_output_flags(HardwareMapping::OUT_FLOOD, true); break;
@@ -1178,8 +1172,9 @@ GCodeMachineControl::~GCodeMachineControl() {
 GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &config,
                                                  MotorOperations *motor_ops,
                                                  HardwareMapping *hardware_mapping,
+                                                 Spindle *spindle,
                                                  FILE *msg_stream) {
-  Impl *result = new Impl(config, motor_ops, hardware_mapping, msg_stream);
+  Impl *result = new Impl(config, motor_ops, hardware_mapping, spindle, msg_stream);
   if (!result->Init()) {
     delete result;
     return NULL;

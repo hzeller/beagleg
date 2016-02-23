@@ -450,7 +450,7 @@ int main(int argc, char *argv[]) {
 
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &motor_operations,
-                                  &hardware_mapping,
+                                  &hardware_mapping, &spindle,
                                   stderr);
   if (machine_control == NULL) {
     Log_error("Exiting. Cannot initialize machine control.");

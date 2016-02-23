@@ -27,6 +27,7 @@
 
 class MotorOperations;
 class ConfigParser;
+class Spindle;
 typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
 
 /* Configuration constants for the controller.
@@ -72,6 +73,7 @@ class GCodeMachineControl {
   static GCodeMachineControl *Create(const MachineControlConfig &config,
                                      MotorOperations *motor_backend,
                                      HardwareMapping *hardware_mapping,
+                                     Spindle *spindle,
                                      FILE *msg_stream);
 
   ~GCodeMachineControl();
