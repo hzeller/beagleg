@@ -167,7 +167,6 @@ private:
   AxesRegister coordinate_display_origin_; // parser tells us
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
-  HardwareMapping::AuxBitmap aux_bits_;   // Set via M42 or various other settings.
   HardwareMapping::AuxBitmap last_aux_bits_;  // last enqueued aux bits.
   unsigned int spindle_rpm_;             // Set via Sxxx of M3/M4 and remembered
   time_t next_auto_disable_motor_;
@@ -193,7 +192,7 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
     highest_accel_(-1),
     current_feedrate_mm_per_sec_(-1),
     prog_speed_factor_(1),
-    aux_bits_(0), spindle_rpm_(0),
+    spindle_rpm_(0),
     homing_state_(HOMING_STATE_NEVER_HOMED) {
     pause_enabled_ = cfg_.enable_pause;
 }
@@ -379,10 +378,10 @@ void GCodeMachineControl::Impl::wait_for_start() {
   int flash_usec = 100 * 1000;
   while (!hardware_mapping_->TestStartSwitch()) {
     set_output_flags(HardwareMapping::OUT_LED, true);
-    hardware_mapping_->SetAuxOutput(aux_bits_);
+    hardware_mapping_->SetAuxOutputs();
     usleep(flash_usec);
     set_output_flags(HardwareMapping::OUT_LED, false);
-    hardware_mapping_->SetAuxOutput(aux_bits_);
+    hardware_mapping_->SetAuxOutputs();
     usleep(flash_usec);
   }
 }
@@ -406,7 +405,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 0:
   case 999:
     set_output_flags(HardwareMapping::OUT_ESTOP, code == 0);
-    hardware_mapping_->SetAuxOutput(aux_bits_);
+    hardware_mapping_->SetAuxOutputs();
     break;
   case 3: case 4: case 5:                   // aux pin spindle control
   case 7: case 8: case 9: case 10: case 11: // aux pin mist/flood/vacuum control
@@ -419,7 +418,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 80:
   case 81:
     set_output_flags(HardwareMapping::OUT_ATX_POWER, code == 80);
-    hardware_mapping_->SetAuxOutput(aux_bits_);
+    hardware_mapping_->SetAuxOutputs();
     break;
   case 105: mprintf("T-300\n"); break;  // no temp yet.
   case 114: get_current_position(); break;
@@ -498,17 +497,14 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
 
     if (pin > 0 && pin <= HardwareMapping::NUM_BOOL_OUTPUTS) {
       if (bit_value >= 0 && bit_value <= 1) {
-        if (bit_value)
-          aux_bits_ |= (1 << (pin - 1));
-        else
-          aux_bits_ &= ~(1 << (pin - 1));
+        hardware_mapping_->UpdateAuxBits(pin, bit_value == 1);
 
         if (m_code == 64 || m_code == 65) {    // update the AUX pin immediately
-          hardware_mapping_->SetAuxOutput(aux_bits_);
+          hardware_mapping_->SetAuxOutputs();
         }
       }
       else if (m_code == 42 && msg_stream_) {  // Just read operation.
-        mprintf("%d\n", (aux_bits_ >> (pin - 1)) & 1);
+        mprintf("%d\n", hardware_mapping_->GetAuxBit(pin));
       }
     }
   }
@@ -533,7 +529,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
 
 void GCodeMachineControl::Impl::set_output_flags(HardwareMapping::LogicOutput out,
                                                  bool is_on) {
-  hardware_mapping_->UpdateAuxBitmap(out, is_on, &aux_bits_);
+  hardware_mapping_->UpdateAuxBitmap(out, is_on);
 }
 
 void GCodeMachineControl::Impl::get_current_position() {
@@ -895,7 +891,7 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
       defining_axis = (enum GCodeParserAxis) i;
     }
   }
-  new_pos->aux_bits = aux_bits_;
+  new_pos->aux_bits = hardware_mapping_->GetAuxBits();
   new_pos->defining_axis = defining_axis;
   new_pos->angle = previous->angle + 180.0f; // default angle to force a speed change
 
@@ -950,7 +946,7 @@ void GCodeMachineControl::Impl::bring_path_to_halt() {
   }
   new_pos->defining_axis = AXIS_X;
   new_pos->speed = 0;
-  new_pos->aux_bits = aux_bits_;
+  new_pos->aux_bits = hardware_mapping_->GetAuxBits();
   new_pos->angle = 0;
   issue_motor_move_if_possible();
 }
@@ -1081,7 +1077,7 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
     target_speed = max_axis_speed_[axis];
   }
 
-  move_command.aux_bits = aux_bits_;
+  move_command.aux_bits = hardware_mapping_->GetAuxBits();
 
   move_command.v0 = 0;
   move_command.v1 = target_speed;

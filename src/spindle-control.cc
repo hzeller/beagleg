@@ -119,10 +119,8 @@ public:
   virtual void On(bool ccw, int rpm) = 0;
   virtual void Off() = 0;
 
-  // FIXME: GCodeMachineControl::Impl::set_output_flags
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on) {
-    HardwareMapping::AuxBitmap aux_bits_;
-    hardware_mapping_->UpdateAuxBitmap(out, is_on, &aux_bits_);
+    hardware_mapping_->UpdateAuxBitmap(out, is_on);
   }
 
 protected:

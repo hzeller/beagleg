@@ -152,16 +152,27 @@ public:
 
   // -- Boolean and PWM outputs.
 
-  // Set logic output value to on/off for the particular logic output
-  // in the given flag-set. Only updates the given bitfield,
-  // does not set the output (can be done with SetAuxOutput()).
-  void UpdateAuxBitmap(LogicOutput type, bool value, AuxBitmap *flags);
+  // Get the logic state of all the aux_bits_.
+  AuxBitmap GetAuxBits();
 
-  // Set the output according to the flags immediately (unbuffered).
+  // Get the logic state of a given pin.
+  int GetAuxBit(int pin);
+
+  // Set logic output value to on/off for a given pin.
+  // Only updates the aux_bits_ does not set the output (can be done
+  // with SetAuxOutput()).
+  void UpdateAuxBits(int pin, bool is_on);
+
+  // Set logic output value to on/off for the particular logic output.
+  // Only updates the aux_bits_ does not set the output (can be done
+  // with SetAuxOutput()).
+  void UpdateAuxBitmap(LogicOutput type, bool value);
+
+  // Set the output according to the aux_bits_ immediately (unbuffered).
   // There are some cases in which this is necessary, but usually
   // the values are set synchronously with the motor movements to avoid timing
   // problems due to the buffer.
-  void SetAuxOutput(AuxBitmap flags);
+  void SetAuxOutputs();
 
   // Set PWM value for given output immediately.
   void SetPWMOutput(LogicOutput type, float value);
@@ -238,6 +249,8 @@ private:
   int estop_input_;
   int pause_input_;
   int start_input_;
+
+  AuxBitmap aux_bits_;       // Set via M42 or various other settings.
 
   bool is_hardware_initialized_;
 };

@@ -29,10 +29,9 @@
 #include "motor-operations.h"  // LinearSegmentSteps
 #include "string-util.h"
 
-HardwareMapping::HardwareMapping() : is_hardware_initialized_(false) {
-  estop_input_ = 0;
-  pause_input_ = 0;
-  start_input_ = 0;
+HardwareMapping::HardwareMapping()
+  : estop_input_(0), pause_input_(0), start_input_(0), aux_bits_(0),
+    is_hardware_initialized_(false) {
 }
 
 HardwareMapping::~HardwareMapping() {
@@ -159,28 +158,36 @@ bool HardwareMapping::InitializeHardware() {
 
 void HardwareMapping::ResetHardware() {
   if (!is_hardware_initialized_) return;
-  SetAuxOutput(0);
+  aux_bits_ = 0;
+  SetAuxOutputs();
   for (int i = 0; i < NUM_PWM_OUTPUTS; ++i) {
     pwm_timer_start(get_pwm_gpio_descriptor(i+1), false);
   }
 }
 
-void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on, AuxBitmap *flags) {
-  if (is_on) {
-    *flags |= output_to_aux_bits_[type];
-  } else {
-    *flags &= ~output_to_aux_bits_[type];
-  }
+HardwareMapping::AuxBitmap HardwareMapping::GetAuxBits() {
+  return aux_bits_;
 }
 
-void HardwareMapping::SetAuxOutput(AuxBitmap flags) {
+int HardwareMapping::GetAuxBit(int pin) {
+  return (aux_bits_ >> (pin - 1)) & 1;
+}
+
+void HardwareMapping::UpdateAuxBits(int pin, bool is_on) {
+  if (is_on) aux_bits_ |= (1 << (pin - 1));
+  else       aux_bits_ &= ~(1 << (pin - 1));
+}
+
+void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on) {
+  if (is_on) aux_bits_ |= output_to_aux_bits_[type];
+  else       aux_bits_ &= ~output_to_aux_bits_[type];
+}
+
+void HardwareMapping::SetAuxOutputs() {
   if (!is_hardware_initialized_) return;
   for (int i = 0; i < NUM_BOOL_OUTPUTS; ++i) {
-    if (flags & (1 << i)) {
-      set_gpio(get_aux_bit_gpio_descriptor(i + 1));
-    } else {
-      clr_gpio(get_aux_bit_gpio_descriptor(i + 1));
-    }
+    if (aux_bits_ & (1 << i)) set_gpio(get_aux_bit_gpio_descriptor(i + 1));
+    else                      clr_gpio(get_aux_bit_gpio_descriptor(i + 1));
   }
 }
 
