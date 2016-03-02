@@ -102,7 +102,7 @@ public:
 
   // -- GCodeParser::Events interface implementation --
   virtual void gcode_start() {}    // Start program. Use for initialization.
-  virtual void gcode_finished();   // End of program or stream.
+  virtual void gcode_finished(bool end_of_stream);  // End of program or stream.
 
   virtual void inform_origin_offset(const AxesRegister &origin);
 
@@ -586,8 +586,10 @@ void GCodeMachineControl::Impl::get_endstop_status() {
   }
 }
 
-void GCodeMachineControl::Impl::gcode_finished() {
+void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
   bring_path_to_halt();
+  if (end_of_stream && cfg_.auto_motor_disable_seconds > 0)
+    motors_enable(false);
 }
 
 static float euclid_distance(float x, float y, float z) {

@@ -71,7 +71,7 @@ public:
   public:
     virtual ~EventReceiver() {}
     virtual void gcode_start() {}    // Start program. Use for initialization.
-    virtual void gcode_finished() {} // End of program or stream.
+    virtual void gcode_finished(bool end_of_stream=false) {} // End of program or stream.
 
     // The parser handles relative positions and coordinate systems internally,
     // so the machine does not have to worry about that.

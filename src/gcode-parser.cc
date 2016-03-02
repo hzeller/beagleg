@@ -702,9 +702,8 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
   }
   fclose(gcode_stream);
 
-  if (program_in_progress_) {
-    callbacks->gcode_finished();
-  }
+  // always call gcode_finished() to disable motors at end of stream
+  callbacks->gcode_finished(true);
 
   return caught_signal ? 2 : 0;
 }
