@@ -101,7 +101,7 @@ public:
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
 
   // -- GCodeParser::Events interface implementation --
-  virtual void gcode_start() {}    // Start program. Use for initialization.
+  virtual void gcode_start();          // Start program. Use for initialization.
   virtual void gcode_finished(bool end_of_stream);  // End of program or stream.
 
   virtual void inform_origin_offset(const AxesRegister &origin);
@@ -172,6 +172,7 @@ private:
   float prog_speed_factor_;              // Speed factor set by program (M220)
   HardwareMapping::AuxBitmap last_aux_bits_;  // last enqueued aux bits.
   time_t next_auto_disable_motor_;
+  time_t next_auto_disable_fan_;
   bool pause_enabled_;                  // Enabled via M120, disabled via M121
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
@@ -199,6 +200,8 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
     prog_speed_factor_(1),
     homing_state_(HOMING_STATE_NEVER_HOMED) {
     pause_enabled_ = cfg_.enable_pause;
+    next_auto_disable_motor_ = -1;
+    next_auto_disable_fan_ = -1;
 }
 
 // The actual initialization. Can fail, hence we make it a separate method.
@@ -584,6 +587,11 @@ void GCodeMachineControl::Impl::get_endstop_status() {
   } else {
     mprintf("// This machine has no endstops configured.\n");
   }
+}
+
+void GCodeMachineControl::Impl::gcode_start() {
+  if (cfg_.auto_fan_pwm > 0)
+    set_fanspeed(cfg_.auto_fan_pwm);
 }
 
 void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
@@ -1043,9 +1051,19 @@ void GCodeMachineControl::Impl::input_idle(bool is_first) {
   if (cfg_.auto_motor_disable_seconds > 0) {
     if (is_first) {
       next_auto_disable_motor_ = time(NULL) + cfg_.auto_motor_disable_seconds;
-    } else if (time(NULL) >= next_auto_disable_motor_) {
+      next_auto_disable_fan_ = -1;
+    } else if (next_auto_disable_motor_ != -1 &&
+               time(NULL) >= next_auto_disable_motor_) {
       motors_enable(false);
+      next_auto_disable_motor_ = -1;
+      if (cfg_.auto_fan_disable_seconds > 0) {
+        next_auto_disable_fan_ = time(NULL) + cfg_.auto_fan_disable_seconds;
+      }
     }
+  }
+  if (next_auto_disable_fan_ != -1 && time(NULL) >= next_auto_disable_fan_) {
+    set_fanspeed(0);
+    next_auto_disable_fan_ = -1;
   }
 }
 

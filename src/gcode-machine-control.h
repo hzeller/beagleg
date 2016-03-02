@@ -55,6 +55,8 @@ struct MachineControlConfig {
   FixedArray<HardwareMapping::AxisTrigger, GCODE_NUM_AXES> homing_trigger;
 
   int auto_motor_disable_seconds; // disable motors automatically after these seconds.
+  int auto_fan_disable_seconds; // Disable fan automatically after these seconds.
+  int auto_fan_pwm;             // PWM value to automatically enable fan with.
   bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
   bool require_homing;          // Require homing before any moves.
   bool range_check;             // Do machine limit checks. Default 1.

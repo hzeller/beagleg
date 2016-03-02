@@ -42,6 +42,8 @@ MachineControlConfig::MachineControlConfig() {
   home_order = kHomeOrder;
   threshold_angle = -1;
   auto_motor_disable_seconds = -1;
+  auto_fan_disable_seconds = -1;
+  auto_fan_pwm = 0;
 }
 
 namespace {
@@ -81,6 +83,9 @@ public:
       ACCEPT_VALUE("enable-pause",   Bool,   &config_->enable_pause);
       ACCEPT_VALUE("auto-motor-disable-seconds",
                    Int,   &config_->auto_motor_disable_seconds);
+      ACCEPT_VALUE("auto-fan-disable-seconds",
+                   Int,  &config_->auto_fan_disable_seconds);
+      ACCEPT_VALUE("auto-fan-pwm",   Int,    &config_->auto_fan_pwm);
       return false;
     }
 
