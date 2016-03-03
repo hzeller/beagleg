@@ -596,6 +596,7 @@ void GCodeMachineControl::Impl::gcode_start() {
 
 void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
   bring_path_to_halt();
+  spindle_->Off();
   if (end_of_stream && cfg_.auto_motor_disable_seconds > 0)
     motors_enable(false);
 }
