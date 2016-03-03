@@ -89,29 +89,6 @@ public:
   }
 
 private:
-  bool ParseString(const std::string &value, std::string *result) {
-    *result = value;
-    return true;
-  }
-
-  bool ParseInt(const std::string &value, int *result) {
-    char *end;
-    *result = strtol(value.c_str(), &end, 10);
-    return *end == '\0';
-  }
-
-  bool ParseBool(const std::string &value, bool *result) {
-    if (value == "1" || value == "yes" || value == "true") {
-      *result = true;
-      return true;
-    }
-    if (value == "0" || value == "no" || value == "false") {
-      *result = false;
-      return true;
-    }
-    return false;
-  }
-
   Spindle *const config_;
 
   std::string current_section_;

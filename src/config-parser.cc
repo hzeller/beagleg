@@ -29,6 +29,83 @@
 #include "logging.h"
 #include "string-util.h"
 
+bool ConfigParser::EventReceiver::ParseString(const std::string &value,
+                                              std::string *result) {
+  *result = value;
+  return true;
+}
+
+bool ConfigParser::EventReceiver::ParseInt(const std::string &value,
+                                           int *result) {
+  char *end;
+  *result = strtol(value.c_str(), &end, 10);
+  return *end == '\0';
+}
+
+bool ConfigParser::EventReceiver::ParseBool(const std::string &value,
+                                            bool *result) {
+  if (value == "1" || value == "yes" || value == "true") {
+    *result = true;
+    return true;
+  }
+  if (value == "0" || value == "no" || value == "false") {
+    *result = false;
+    return true;
+  }
+  return false;
+}
+
+bool ConfigParser::EventReceiver::ParseFloatExpr(const std::string &value,
+                                                 float *result) {
+  char *end;
+  double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
+  if (end == NULL || *end == '\0') {
+    *result = eval;
+    if (*result < 0) {
+      Log_error("Expected positive value.");
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+double ConfigParser::EventReceiver::ParseDoubleExpression(const char *input,
+                                                          double fallback,
+                                                          char **end) {
+  const char *full_expr = input;
+  double value = strtod(input, end);
+  if (*end == input) return fallback;
+  for (;;) {
+    while (isspace(**end)) ++*end;
+    const char op = **end;
+    if (op != '/' && op != '*') {
+      return value;  // done. Not an operation.
+    }
+    ++*end;
+    while (isspace(**end)) ++*end;
+    input = *end;
+    double operand;
+    if (*input == '(') {
+      operand = ParseDoubleExpression(input+1, 1.0, end);
+      if (**end != ')') {
+        fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
+        return fallback;
+      } else {
+        ++*end;
+      }
+    } else {
+      operand = strtod(input, end);
+    }
+    if (*end == input) return fallback;
+    if (op == '/')
+      value /= operand;
+    else if (op == '*')
+      value *= operand;
+  }
+  return value;
+}
+
 void ConfigParser::EventReceiver::ReportError(int line_no,
                                               const std::string &msg) {
   std::cerr << line_no << ":" << msg << std::endl;

@@ -42,6 +42,17 @@ public:
                                const std::string &value) = 0;
 
     virtual void ReportError(int line_no, const std::string &msg);
+
+  protected:
+    // All the Accept() functions are done in the way that they always return
+    // 'true' if the expected name is not matched, otherwise they return the
+    // outcome of parsing the value. That way, they can be chained with &&
+    static bool ParseString(const std::string &value, std::string *result);
+    static bool ParseInt(const std::string &value, int *result);
+    static bool ParseBool(const std::string &value, bool *result);
+    static bool ParseFloatExpr(const std::string &value, float *result);
+
+    static double ParseDoubleExpression(const char *input, double fallback, char **end);
   };
 
   // Create a config parser.
