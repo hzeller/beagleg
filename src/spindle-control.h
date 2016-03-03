@@ -53,6 +53,7 @@ private:
   int pwr_delay_;
   int on_delay_;
   int off_delay_;
+  bool allow_ccw_;
 };
 
 #endif  // BEAGLEG_SPINDLE_CONTROL_
