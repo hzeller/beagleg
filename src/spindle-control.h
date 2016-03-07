@@ -50,9 +50,9 @@ private:
   std::string port_;
 
   int max_rpm_;
-  int pwr_delay_;
-  int on_delay_;
-  int off_delay_;
+  int pwr_delay_seconds_;
+  int on_delay_seconds_;
+  int off_delay_seconds_;
   bool allow_ccw_;
 };
 
