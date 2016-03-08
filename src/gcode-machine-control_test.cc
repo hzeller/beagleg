@@ -94,7 +94,9 @@ class Harness {
     struct MachineControlConfig config;
     init_test_config(&config, &hardware_);
     machine_control = GCodeMachineControl::Create(config, &expect_motor_ops_,
-                                                  &hardware_, NULL);
+                                                  &hardware_,
+                                                  NULL,   // spindle
+                                                  NULL);  // msg-stream
     assert(machine_control != NULL);
   }
 
