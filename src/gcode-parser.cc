@@ -91,14 +91,17 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
 class GCodeParser::Impl {
 public:
   Impl(const GCodeParser::Config &config,
-       GCodeParser::EventReceiver *parse_events);
+       GCodeParser::EventReceiver *parse_events, bool allow_m111);
 
   void ParseLine(const char *line, FILE *err_stream);
   int ParseStream(int input_fd, FILE *err_stream);
 
-  void set_debug_level(unsigned int level) { debug_level_ = level; }
-
 private:
+  enum DebugLevel {
+    DEBUG_NONE   = 0,
+    DEBUG_PARSER = (1 << 0)
+  };
+
   // Reset parser, mostly reset relative coordinate systems to whatever they
   // should be in the beginning.
   // Does _not_ reset the machine position.
@@ -222,12 +225,14 @@ private:
   enum GCodeParserAxis arc_normal_;  // normal vector of arcs.
 
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
+  bool allow_m111_;
 };
 
 AxesRegister GCodeParser::Impl::kZeroOffset;
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
-                        GCodeParser::EventReceiver *parse_events)
+                        GCodeParser::EventReceiver *parse_events,
+                        bool allow_m111)
   : callbacks(parse_events), config(parse_config),
     program_in_progress_(false),
     err_msg_(NULL), modal_g0_g1_(0),
@@ -243,7 +248,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     home_position_(config.machine_origin),
     current_origin_(&home_position_), current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
-    debug_level_(DEBUG_NONE)
+    debug_level_(DEBUG_NONE), allow_m111_(allow_m111)
 {
   assert(callbacks);  // otherwise, this is not very useful.
   reset_G92();
@@ -516,18 +521,22 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
 }
 
 const char *GCodeParser::Impl::handle_M111(const char *line) {
-  int level = -1;
-  char letter;
-  float value;
-  const char *remaining_line;
-  // Read all the 'S' parameters. Well, we expect exactly one.
-  while ((remaining_line = gparse_pair(line, &letter, &value))) {
-    if (letter != 'S')
-      break;  // possibly next command.
-    level = (int)value;
-    line = remaining_line;
+  if (allow_m111_) {
+    int level = -1;
+    char letter;
+    float value;
+    const char *remaining_line;
+    // Read all the 'S' parameters. Well, we expect exactly one.
+    while ((remaining_line = gparse_pair(line, &letter, &value))) {
+      if (letter != 'S')
+        break;  // possibly next command.
+      level = (int)value;
+      line = remaining_line;
+    }
+    if (level >= 0) debug_level_ = level;
+  } else {
+    line = NULL;  // consume the full line.
   }
-  if (level >= 0) set_debug_level((unsigned int)level);
   return line;
 }
 
@@ -708,8 +717,9 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
   return caught_signal ? 2 : 0;
 }
 
-GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events)
-  : impl_(new Impl(config, parse_events)) {
+GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events,
+                         bool allow_m111)
+  : impl_(new Impl(config, parse_events, allow_m111)) {
 }
 GCodeParser::~GCodeParser() {
   delete impl_;
@@ -724,7 +734,4 @@ const char *GCodeParser::ParsePair(const char *line,
                                    char *letter, float *value,
                                    FILE *err_stream) {
   return gcodep_parse_pair_with_linenumber(-1, line, letter, value, err_stream);
-}
-void GCodeParser::set_debug_level(unsigned int level) {
-  impl_->set_debug_level(level);
 }

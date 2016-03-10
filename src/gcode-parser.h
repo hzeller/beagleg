@@ -156,14 +156,9 @@ public:
   };
 
 public:
-  enum DebugLevel {
-    DEBUG_NONE   = 0,
-    DEBUG_PARSER = (1 << 0)
-  };
-
   // Create a parser with the given config, emitting parse events
   // to "parse_events".
-  GCodeParser(const Config &config, EventReceiver *parse_events);
+  GCodeParser(const Config &config, EventReceiver *parse_events, bool allow_m111);
   ~GCodeParser();
 
   // Main workhorse: Parse a gcode line, call callbacks if needed.
@@ -193,9 +188,6 @@ public:
   // end-of-string has been reached.
   static const char *ParsePair(const char *line, char *letter, float *value,
                                FILE *err_stream);
-
-  // Debug level: ORed bits from the DebugLevel enumeration.
-  void set_debug_level(unsigned int level);
 
 private:
   class Impl;

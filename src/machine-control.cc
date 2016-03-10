@@ -53,29 +53,35 @@ static int usage(const char *prog, const char *msg) {
   fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
           "Options:\n", prog);
   fprintf(stderr,
-          "  --config <config>     (-c): Configuration file.\n"
-          "  --port <port>         (-p): Listen on this TCP port for GCode.\n"
-          "  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).\n"
-          "  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
-          "  --daemon              (-d): Run as daemon.\n"
-          "  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
+          "  -c, --config <config-file> : Configuration file. (Required)\n"
+          "  -p, --port <port>          : Listen on this TCP port for GCode.\n"
+          "  -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).\n"
+          "  -l, --logfile <logfile>    : Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
+          "  -d, --daemon               : Run as daemon.\n"
+          "      --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
+          "      --help                 : Display this help text and exit.\n"
           "\nMostly for testing and debugging:\n"
-          "  --log-parser              : Log the parser stream (Default: off).\n"
-          "  -f <factor>               : Feedrate speed factor (Default 1.0).\n"
-          "  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
+          "  -f <factor>                : Feedrate speed factor (Default 1.0).\n"
+          "  -n                         : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
-          "  -P                        : Verbose: Show some more debug output (Default: off).\n"
-          "  -S                        : Synchronous: don't queue (Default: off).\n"
-          "  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)\n");
+          "  -P                         : Verbose: Show some more debug output (Default: off).\n"
+          "  -S                         : Synchronous: don't queue (Default: off).\n"
+          "      --loop[=count]         : Loop file number of times (no value: forever; equal sign with value important.)\n"
+          "      --allow-m111           : Allow changing the debug level with M111 (Default: off).\n"
+          // --threshold-angle specifies threshold angle used for arc segment acceleration.
+          "\nConfiguration file overrides:\n"
+          "     --homing-required       : Require homing before any moves (require-homing = yes).\n"
+          "     --homing-not-required   : Don't require homing before any moves (require-homing = no).\n"
+          "     --disable-range-check   : Disable machine limit checks. (range-check = no).\n");
   return 1;
 }
 
-static int fyi_option_gone() {
+static int fyi_option_gone(const char *prog) {
   fprintf(stderr,
           "Options for machine settings have been removed in favor of a configuration file.\n"
           "Provide it with -c <config-file>.\n"
-          "See https://github.com/hzeller/beagleg/blob/master/sample.config\n");
-  return 1;
+          "See https://github.com/hzeller/beagleg/blob/master/sample.config\n\n");
+  return usage(prog, NULL);
 }
 
 // Call with <uid>:<gid> string.
@@ -220,58 +226,51 @@ int main(int argc, char *argv[]) {
 
   // Less common options don't have a short option.
   enum LongOptionsOnly {
-    OPT_SET_STEPS_MM = 1000,
-    OPT_SET_HOME_POS,
-    OPT_SET_HOME_ORDER,
-    OPT_SET_MOTOR_MAPPING,
-    OPT_SET_MIN_ENDSWITCH,
-    OPT_SET_MAX_ENDSWITCH,
-    OPT_SET_ENDSWITCH_POLARITY,
+    OPT_HELP = 1000,
     OPT_SET_THRESHOLD_ANGLE,
     OPT_REQUIRE_HOMING,
+    OPT_DONT_REQUIRE_HOMING,
     OPT_DISABLE_RANGE_CHECK,
     OPT_LOOP,
     OPT_PRIVS,
-    OPT_LOG_PARSER,
+    OPT_ENABLE_M111,
   };
 
   static struct option long_options[] = {
+    { "help",               no_argument,       NULL, OPT_HELP },
+
+    // Required options
     { "config",             required_argument, NULL, 'c'},
+
+    // Configuration file overrides
     { "homing-required",    no_argument,       NULL, OPT_REQUIRE_HOMING },
+    { "homing-not-required",no_argument,       NULL, OPT_DONT_REQUIRE_HOMING },
     { "disable-range-check",no_argument,       NULL, OPT_DISABLE_RANGE_CHECK },
 
+    // Optional
     { "port",               required_argument, NULL, 'p'},
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
     { "logfile",            required_argument, NULL, 'l'},
     { "daemon",             no_argument,       NULL, 'd'},
     { "priv",               required_argument, NULL, OPT_PRIVS },
-    { "log-parser",         no_argument,       NULL, OPT_LOG_PARSER },
+    { "allow-m111",         no_argument,       NULL, OPT_ENABLE_M111 },
 
     // possibly deprecated soon.
-    { "home-order",         required_argument, NULL, OPT_SET_HOME_ORDER },
     { "threshold-angle",    required_argument, NULL, OPT_SET_THRESHOLD_ANGLE },
-
-    // deprecated.
-    { "max-feedrate",       required_argument, NULL, 'm'},
-    { "accel",              required_argument, NULL, 'a'},
-    { "range",              required_argument, NULL, 'r' },
-    { "steps-mm",           required_argument, NULL, OPT_SET_STEPS_MM },
-
-    { "axis-mapping",       required_argument, NULL, OPT_SET_MOTOR_MAPPING },
-    { "min-endswitch",      required_argument, NULL, OPT_SET_MIN_ENDSWITCH },
-    { "max-endswitch",      required_argument, NULL, OPT_SET_MAX_ENDSWITCH },
-    { "endswitch-polarity", required_argument, NULL, OPT_SET_ENDSWITCH_POLARITY },
 
     { 0,                    0,                 0,    0  },
   };
 
   int listen_port = -1;
   int file_loop_count = 1;
-  unsigned int debug_level = GCodeParser::DEBUG_NONE;
   char *bind_addr = NULL;
+  bool require_homing = false;
+  bool dont_require_homing = false;
+  bool disable_range_check = false;
+  bool allow_m111 = false;
   int opt;
-  while ((opt = getopt_long(argc, argv, "m:a:p:b:r:SPnNf:l:dc:",
+  while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:",
                             long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -282,14 +281,14 @@ int main(int argc, char *argv[]) {
     case OPT_SET_THRESHOLD_ANGLE:
       config.threshold_angle = (float)atof(optarg);
       break;
-    case OPT_SET_HOME_ORDER:
-      config.home_order = optarg;
-      break;
     case OPT_REQUIRE_HOMING:
-      config.require_homing = true;
+      require_homing = true;
+      break;
+    case OPT_DONT_REQUIRE_HOMING:
+      dont_require_homing = true;
       break;
     case OPT_DISABLE_RANGE_CHECK:
-      config.range_check = false;
+      disable_range_check = true;
       break;
     case 'n':
       dry_run = true;
@@ -325,24 +324,19 @@ int main(int argc, char *argv[]) {
     case OPT_PRIVS:
       privs = strdup(optarg);
       break;
-    case OPT_LOG_PARSER:
-      debug_level |= GCodeParser::DEBUG_PARSER;
+    case OPT_ENABLE_M111:
+      allow_m111 = true;
       break;
-
-      // Deprecated options.
-    case 'm':
-    case 'a':
-    case OPT_SET_STEPS_MM:
-    case OPT_SET_MOTOR_MAPPING:
-    case OPT_SET_MIN_ENDSWITCH:
-    case OPT_SET_MAX_ENDSWITCH:
-    case OPT_SET_ENDSWITCH_POLARITY:
-    case 'r':  // range.
-      return fyi_option_gone();
-
+    case OPT_HELP:
+      return usage(argv[0], NULL);
     default:
-      return usage(argv[0], "Unknown flag");
+      // Deprecated, or unknown, option
+      return fyi_option_gone(argv[0]);
     }
+  }
+
+  if (require_homing && dont_require_homing) {
+    return usage(argv[0], "Choose one: --homing-required or --homing-not-required.");
   }
 
   const bool has_filename = (optind < argc);
@@ -393,6 +387,11 @@ int main(int argc, char *argv[]) {
   }
 
   // ... other configurations that read from that file.
+
+  // Handle command line configuration overrides.
+  if (require_homing)      config.require_homing = true;
+  if (dont_require_homing) config.require_homing = false;
+  if (disable_range_check) config.range_check = false;
 
   if (as_daemon && daemon(0, 0) != 0) {
     Log_error("Can't become daemon: %s", strerror(errno));
@@ -459,8 +458,8 @@ int main(int argc, char *argv[]) {
   GCodeParser::Config parser_cfg;
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
-                                        machine_control->ParseEventReceiver());
-  parser->set_debug_level(debug_level);
+                                        machine_control->ParseEventReceiver(),
+                                        allow_m111);
 
   int ret = 0;
   if (has_filename) {

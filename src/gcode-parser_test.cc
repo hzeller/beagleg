@@ -38,7 +38,7 @@ public:
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
-    parser_ = new GCodeParser(config, this);
+    parser_ = new GCodeParser(config, this, false);
   }
   virtual ~ParseTester() { delete parser_; }
 
