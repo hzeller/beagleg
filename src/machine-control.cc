@@ -71,8 +71,8 @@ static int usage(const char *prog, const char *msg) {
           // --threshold-angle specifies threshold angle used for arc segment acceleration.
           "\nConfiguration file overrides:\n"
           "     --homing-required       : Require homing before any moves (require-homing = yes).\n"
-          "     --homing-not-required   : Don't require homing before any moves (require-homing = no).\n"
-          "     --disable-range-check   : Disable machine limit checks. (range-check = no).\n");
+          "     --nohoming-required     : (Opposite of above^): Don't require homing before any moves (require-homing = no).\n"
+          "     --norange-check         : Disable machine limit checks. (range-check = no).\n");
   return 1;
 }
 
@@ -244,8 +244,8 @@ int main(int argc, char *argv[]) {
 
     // Configuration file overrides
     { "homing-required",    no_argument,       NULL, OPT_REQUIRE_HOMING },
-    { "homing-not-required",no_argument,       NULL, OPT_DONT_REQUIRE_HOMING },
-    { "disable-range-check",no_argument,       NULL, OPT_DISABLE_RANGE_CHECK },
+    { "nohoming-required",  no_argument,       NULL, OPT_DONT_REQUIRE_HOMING },
+    { "norange-check",      no_argument,       NULL, OPT_DISABLE_RANGE_CHECK },
 
     // Optional
     { "port",               required_argument, NULL, 'p'},
@@ -336,7 +336,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (require_homing && dont_require_homing) {
-    return usage(argv[0], "Choose one: --homing-required or --homing-not-required.");
+    return usage(argv[0], "Choose one: --homing-required or --nohoming-required.");
   }
 
   const bool has_filename = (optind < argc);

@@ -60,23 +60,30 @@ This either takes a filename or a TCP port to listen on.
 ```
 Usage: ./machine-control [options] [<gcode-filename>]
 Options:
-  --config <config>     (-c): Configuration file.
-  --port <port>         (-p): Listen on this TCP port for GCode.
-  --bind-addr <bind-ip> (-b): Bind to this IP (Default: 0.0.0.0).
-  --logfile <logfile>   (-l): Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).
-  --daemon              (-d): Run as daemon.
-  --priv <uid>[:<gid>]      : After opening GPIO: drop privileges to this (default: daemon:daemon)
+  -c, --config <config-file> : Configuration file. (Required)
+  -p, --port <port>          : Listen on this TCP port for GCode.
+  -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).
+  -l, --logfile <logfile>    : Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).
+  -d, --daemon               : Run as daemon.
+      --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to this (default: daemon:daemon)
+      --help                 : Display this help text and exit.
 
 Mostly for testing and debugging:
-  -f <factor>               : Feedrate speed factor (Default 1.0).
-  -n                        : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).
-  -P                        : Verbose: Show some more debug output (Default: off).
-  -S                        : Synchronous: don't queue (Default: off).
-  --loop[=count]            : Loop file number of times (no value: forever; equal sign with value important.)
+  -f <factor>                : Feedrate speed factor (Default 1.0).
+  -n                         : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).
+  -P                         : Verbose: Show some more debug output (Default: off).
+  -S                         : Synchronous: don't queue (Default: off).
+      --loop[=count]         : Loop file number of times (no value: forever; equal sign with value important.)
+      --allow-m111           : Allow changing the debug level with M111 (Default: off).
+
+Configuration file overrides:
+     --homing-required       : Require homing before any moves (require-homing = yes).
+     --nohoming-required     : (Opposite of above^): Don't require homing before any moves (require-homing = no).
+     --norange-check         : Disable machine limit checks. (range-check = no).
 ```
 
-The axis configurations (max feedrate, acceleration, travel, motor mapping,...) is configured
-in a [configuration file like in this example](./sample.config).
+The axis configurations (max feedrate, acceleration, travel, motor mapping,...)
+is configured in a [configuration file like in this example](./sample.config).
 
 The G-Code understands logical axes X, Y, Z, E, A, B, C, U, V, and W.
 
