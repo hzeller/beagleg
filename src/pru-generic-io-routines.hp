@@ -1,0 +1,92 @@
+;; -*- asm -*-
+;;
+;; (c) 2013, 2014, 2015 Henner Zeller <h.zeller@acm.org>
+;;                      H Hartley Sweeten <hsweeten@visionengravers.com>
+;;
+;; This file is part of BeagleG. http://github.com/hzeller/beagleg
+;;
+;; BeagleG is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; BeagleG is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+
+;;;;
+;;;  Each hardware/<CAPE> subdirectory needs to include a pru-io-routines.hp
+;;;  file that contains the functions defined in this file. The simplest
+;;;  way is to just include this generic file (albeit a bit slower).
+;;;  (TODO: auto generate optimized assembler with a little program).
+;;;;
+
+;;; Set/Clr a GPIO pin based on 'bit' being set/clr in 'bits'
+;;; Uses:
+;;;   r4 : the base address of the gpio bank to set/clr the pin
+;;;   r5 : the bitmask to set/clr the gpio pin
+;;;   r6 : scratch
+.macro SetGPIO
+.mparam bits, bit, gpio_def
+	MOV r4, (gpio_def & 0xfffff000)
+	QBEQ no_map, r4.w2, GPIO_NOT_MAPPED
+	MOV r5, 1 << (gpio_def & 0x1f)
+	QBBS set_gpio, bits, bit
+	MOV r6, GPIO_CLEARDATAOUT
+	QBA update_gpio
+set_gpio:
+	MOV r6, GPIO_SETDATAOUT
+update_gpio:
+	ADD r4, r4, r6
+	SBBO r5, r4, 0, 4
+no_map:
+.endm
+
+;;; Set the aux bit signals based on the travel_params.aux (r3) bit 0..15
+SetAuxBits:
+	SetGPIO r3, 0, AUX_1_GPIO
+	SetGPIO r3, 1, AUX_2_GPIO
+	SetGPIO r3, 2, AUX_3_GPIO
+	SetGPIO r3, 3, AUX_4_GPIO
+	SetGPIO r3, 4, AUX_5_GPIO
+	SetGPIO r3, 5, AUX_6_GPIO
+	SetGPIO r3, 6, AUX_7_GPIO
+	SetGPIO r3, 7, AUX_8_GPIO
+	SetGPIO r3, 8, AUX_9_GPIO
+	SetGPIO r3, 9, AUX_10_GPIO
+	SetGPIO r3, 10, AUX_11_GPIO
+	SetGPIO r3, 11, AUX_12_GPIO
+	SetGPIO r3, 12, AUX_13_GPIO
+	SetGPIO r3, 13, AUX_14_GPIO
+	SetGPIO r3, 14, AUX_15_GPIO
+	SetGPIO r3, 15, AUX_16_GPIO
+	RET
+
+;;; Set the motor direction signals based from queue_header.direction_bits (r3)
+;;; bit 0..7
+SetDirections:
+	SetGPIO r3, 0, MOTOR_1_DIR_GPIO
+	SetGPIO r3, 1, MOTOR_2_DIR_GPIO
+	SetGPIO r3, 2, MOTOR_3_DIR_GPIO
+	SetGPIO r3, 3, MOTOR_4_DIR_GPIO
+	SetGPIO r3, 4, MOTOR_5_DIR_GPIO
+	SetGPIO r3, 5, MOTOR_6_DIR_GPIO
+	SetGPIO r3, 6, MOTOR_7_DIR_GPIO
+	SetGPIO r3, 7, MOTOR_8_DIR_GPIO
+	RET
+
+;;; Set the motor step signals based on bit 31 of the mstate of the motor
+SetSteps:
+	SetGPIO mstate.m1, 31, MOTOR_1_STEP_GPIO
+	SetGPIO mstate.m2, 31, MOTOR_2_STEP_GPIO
+	SetGPIO mstate.m3, 31, MOTOR_3_STEP_GPIO
+	SetGPIO mstate.m4, 31, MOTOR_4_STEP_GPIO
+	SetGPIO mstate.m5, 31, MOTOR_5_STEP_GPIO
+	SetGPIO mstate.m6, 31, MOTOR_6_STEP_GPIO
+	SetGPIO mstate.m7, 31, MOTOR_7_STEP_GPIO
+	SetGPIO mstate.m8, 31, MOTOR_8_STEP_GPIO
+	RET

@@ -1,0 +1,20 @@
+digraph beagleg {
+    node [fontsize=10, fontname="Helvetica"];
+    edge [fontsize=10, fontname="Helvetica"];
+
+    {
+       node [ shape=box ];
+       GCodeParser;
+       GCodeMachineControl [ label = "GCodeMachineControl\nGCode Actions\nPath planning"];
+       MotorOperations  [label = "StatsMotorOperations\lPretend to operate motors\lcalculate exact time."];
+    }      
+
+    CSVOut [ label = "CSV output\njob statistics."]
+    File -> GCodeParser [ label="G-Code"];
+
+    {
+      GCodeParser -> GCodeMachineControl [ label=" Parse Events;\l Metric coordinates.\l Logic axes (X, Y, Z..)"];
+      GCodeMachineControl -> MotorOperations [ label = " LinearSegmentSteps\l Step coordinates." ]
+      MotorOperations -> CSVOut;
+    }
+}
