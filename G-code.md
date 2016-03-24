@@ -1,7 +1,7 @@
 BealgeG G-Code interpretation
 -----------------------------
 
-##Synatx
+##Syntax
 
 G-Code is essentially a pair of 'letters' and 'numbers' that tell the machine
 what to do. It is well described somewhere else, so this is only a
