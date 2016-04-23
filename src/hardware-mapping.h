@@ -152,6 +152,9 @@ public:
 
   // -- Boolean and PWM outputs.
 
+  // Enable motors.
+  void EnableMotors(bool on);
+
   // Get the logic state of all the aux_bits_.
   AuxBitmap GetAuxBits();
 

@@ -160,9 +160,19 @@ void HardwareMapping::ResetHardware() {
   if (!is_hardware_initialized_) return;
   aux_bits_ = 0;
   SetAuxOutputs();
+  EnableMotors(false);
   for (int i = 0; i < NUM_PWM_OUTPUTS; ++i) {
     pwm_timer_start(get_pwm_gpio_descriptor(i+1), false);
   }
+}
+
+void HardwareMapping::EnableMotors(bool on) {
+  if (!is_hardware_initialized_) return;
+  // Right now, we just have this hardcoded, but if 'enable' should
+  // ever be configurable via config file and not given by the hardware
+  // mapping include, we can do that here.
+  if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
+  else set_gpio(MOTOR_ENABLE_GPIO);
 }
 
 HardwareMapping::AuxBitmap HardwareMapping::GetAuxBits() {

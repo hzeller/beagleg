@@ -432,7 +432,7 @@ int main(int argc, char *argv[]) {
                 "Use the dryrun option -n to not write to GPIO).");
       return 1;
     }
-    motion_backend = new PRUMotionQueue();
+    motion_backend = new PRUMotionQueue(&hardware_mapping);
   }
 
   // Listen port bound, GPIO initialized. Ready to drop privileges.

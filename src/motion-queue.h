@@ -97,9 +97,10 @@ public:
 // Returns 0 on success. Requires to run as root to initialize.
 // There is only one PRU, so it can only be initialzed once until shutdown() is
 // called.
+class HardwareMapping;
 class PRUMotionQueue : public MotionQueue {
 public:
-  PRUMotionQueue();
+  PRUMotionQueue(HardwareMapping *hw);
 
   void Enqueue(MotionSegment *segment);
   void WaitQueueEmpty();
@@ -109,7 +110,7 @@ public:
 private:
   int Init();
 
-  bool last_motor_enable_;
+  HardwareMapping *const hardware_mapping_;
 };
 
 

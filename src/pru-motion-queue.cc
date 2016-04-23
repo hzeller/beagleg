@@ -31,6 +31,7 @@
 #include "generic-gpio.h"
 #include "pwm-timer.h"
 #include "logging.h"
+#include "hardware-mapping.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
@@ -133,10 +134,7 @@ void PRUMotionQueue::WaitQueueEmpty() {
 }
 
 void PRUMotionQueue::MotorEnable(bool on) {
-  if (on == last_motor_enable_) return;
-  if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
-  else set_gpio(MOTOR_ENABLE_GPIO);
-  last_motor_enable_ = on;
+  hardware_mapping_->EnableMotors(on);
 }
 
 void PRUMotionQueue::Shutdown(bool flush_queue) {
@@ -151,7 +149,7 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
-PRUMotionQueue::PRUMotionQueue() : last_motor_enable_(false) {
+PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw) : hardware_mapping_(hw) {
   const int init_result = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
