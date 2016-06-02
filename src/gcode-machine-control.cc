@@ -620,16 +620,19 @@ static float steps_for_speed_change(float a, float v0, float *v1, int max_steps)
   return max_steps;
 }
 
-// Example with speed: given the axis with the highest (relative) out of bounds speed
-// what's the speed of the defining_axis? All the axes should be scaled of this maximum offset.
-// offset = limit[i] / value[i]
+// Example with speed: given i the axis with the highest (relative) out of bounds
+// speed what's the speed of the defining_axis so that every speed respects its
+// bounds? The defining axis should be rescaled with this maximum offset.
+// offset = speed_limit[i] / speed[i]
 static float clamp_to_limits(const float value,
                              const AxesRegister &max_axis_value,
                              const int *axis_steps,
                              enum GCodeParserAxis defining_axis) {
-  float max_offset = 1, offset;
+  float ratio, max_offset = 1, offset;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    offset = axis_steps[i] > 0 ? fabs(max_axis_value[i] * axis_steps[defining_axis] / (value * axis_steps[i])) : 1;
+    // Keep ratio, increase readability
+    ratio = fabs(axis_steps[i]) / axis_steps[defining_axis];
+    offset = ratio > 0 ? max_axis_value[i] / (value * ratio) : 1;
     if (offset < max_offset) max_offset = offset;
   }
   return value * max_offset;
@@ -775,11 +778,11 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
-  static float a =
-    clamp_to_limits(max_axis_accel_[defining_axis],
-                    max_axis_accel_,
-                    axis_steps,
-                    defining_axis);
+  const float a
+    = clamp_to_limits(max_axis_accel_[defining_axis],
+                      max_axis_accel_,
+                      axis_steps,
+                      defining_axis);
   const float peak_speed = get_peak_speed(abs_defining_axis_steps,
                                           last_speed, next_speed, a);
   assert(peak_speed > 0);
@@ -920,7 +923,7 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
     // the relative feedrate of the defining axis.
     // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
     // (If we don't have motion in XYZ, the feedrate should represent the mm/min of the extruder?
-    // should we allow the user to set the tool speed only with the S command?)
+    // or should we allow the user to set the tool speed only with the S command?)
     if (new_pos->delta_steps[euclidean_defining_axis] != 0) {
       // We need to calculate the feedrate in real-world coordinates as each
       // axis can have a different amount of steps/mm
@@ -944,10 +947,8 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
     } else {
       travel_speed = feedrate * cfg_.steps_per_mm[defining_axis];
     }
-    new_pos->speed = clamp_to_limits(travel_speed,
-                                     max_axis_speed_,
-                                     new_pos->delta_steps,
-                                     defining_axis);
+    new_pos->speed = clamp_to_limits(travel_speed, max_axis_speed_,
+                                     new_pos->delta_steps, defining_axis);
   } else {
     new_pos->speed = 0;
   }

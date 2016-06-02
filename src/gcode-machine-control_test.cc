@@ -27,7 +27,7 @@ static void init_test_config(struct MachineControlConfig *c,
   for (int i = 0; i <= AXIS_Z; ++i) {
     c->steps_per_mm[i] = 100;  // step/mm
     c->acceleration[i] = 1000;  // mm/s^2
-    c->max_feedrate[i] = 10000;
+    c->max_feedrate[i] = (i + 1) * 1000;
   }
   c->threshold_angle = 0;
   c->require_homing = false;
@@ -111,6 +111,29 @@ class Harness {
   HardwareMapping hardware_;
   GCodeMachineControl *machine_control;
 };
+
+// Since the speed limit of Y doubles the X speed limit, and the steps ratio is 10:12
+// we expect the speed of the defining axis (Y) to be 6/5 of the X speed limit. The same
+// concept in the same way is extended to acceleration.
+TEST(GCodeMachineControlTest, speed_clamping) {
+  // Total steps x = 200 000  total steps y = 240 000
+  static const struct LinearSegmentSteps expected[] = {
+    { /*v0*/     0.0, /*v1*/ 120000.0, 0, /*steps*/ { 60000, 72000}},  // accel
+    { /*v0*/120000.0, /*v1*/ 120000.0, 0, /*steps*/ { 80000, 96000}},  // // move
+    { /*v0*/120000.0, /*v1*/      0.0, 0, /*steps*/ { 60000, 72000}},  // decel back to 0
+    { 0.0, 0.0, END_SENTINEL},
+  };
+  Harness harness(expected);
+
+  AxesRegister coordinates;
+  coordinates[0] = 2000;
+  coordinates[1] = 2400;
+
+  // We set a huge feedrate value to see if it's correctly clamped.
+  harness.gcode_emit()->coordinated_move(1e10, coordinates);
+
+  harness.gcode_emit()->motors_enable(false);  // finish movement.
+}
 
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
