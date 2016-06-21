@@ -44,6 +44,8 @@
 // using a microcontroller or FPGA.
 // Also useful for testing.
 
+#define MOTION_SEGMENT_SIZE 54
+
 struct MotionSegment {
   // Queue header
   uint8_t state;           // see motor-interface-constants.h STATE_* constants.
@@ -70,7 +72,7 @@ struct MotionSegment {
   uint16_t jerk_stop;
   float jerk_motion;
 #endif
-} __attribute__((packed));
+} __attribute__((packed, aligned(64)));
 
 // Low level motion queue operations.
 class MotionQueue {

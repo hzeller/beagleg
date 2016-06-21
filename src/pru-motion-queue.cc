@@ -44,7 +44,7 @@
 // commands to execute, but also configuration data, such as what to do when
 // an endswitch fires.
 struct PRUCommunication {
-  volatile struct MotionSegment ring_buffer[QUEUE_LEN];
+  volatile uint8_t ring_buffer[MOTION_SEGMENT_SIZE * QUEUE_LEN];
 };
 
 // The queue is a physical singleton, so simply reflect that here.
@@ -56,8 +56,10 @@ static volatile struct PRUCommunication *map_pru_communication() {
   prussdrv_map_prumem(PRUSS0_PRU0_DATARAM, &result);
   bzero(result, sizeof(*pru_data_));
   pru_data_ = (struct PRUCommunication*) result;
+  MotionSegment *slot;
   for (int i = 0; i < QUEUE_LEN; ++i) {
-    pru_data_->ring_buffer[i].state = STATE_EMPTY;
+    slot = (MotionSegment*) &pru_data_->ring_buffer[i * MOTION_SEGMENT_SIZE];
+    slot->state = STATE_EMPTY;
   }
   queue_pos_ = 0;
   return pru_data_;
@@ -65,11 +67,15 @@ static volatile struct PRUCommunication *map_pru_communication() {
 
 static volatile struct MotionSegment *next_queue_element() {
   queue_pos_ %= QUEUE_LEN;
-  while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
+  volatile struct MotionSegment *slot
+    = (volatile struct MotionSegment*)
+      &pru_data_->ring_buffer[queue_pos_ * MOTION_SEGMENT_SIZE];
+  while (slot->state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
     prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
   }
-  return &pru_data_->ring_buffer[queue_pos_++];
+  queue_pos_++;
+  return slot;
 }
 
 #ifdef DEBUG_QUEUE
@@ -127,7 +133,10 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
 void PRUMotionQueue::WaitQueueEmpty() {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
+  volatile struct MotionSegment *slot
+    = (volatile struct MotionSegment*)
+      &pru_data_->ring_buffer[last_insert_position * MOTION_SEGMENT_SIZE];
+  while (slot->state != STATE_EMPTY) {
     prussdrv_pru_wait_event(PRU_EVTOUT_0);
     prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
   }
