@@ -55,7 +55,7 @@ GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
 	      spindle-control.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o
-TEST_FRAMEORK_OBJECTS=gtest-all.o gmock-all.o
+TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats
 UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test
@@ -78,8 +78,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-%_test: %_test.o $(OBJECTS) $(TEST_FRAMEORK_OBJECTS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEORK_OBJECTS)
+%_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -105,7 +105,7 @@ gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GMOCK_SOURCE) -c  $< -o $@
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) $(TEST_FRAMEORK_OBJECTS)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) $(TEST_FRAMEWORK_OBJECTS)
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
