@@ -135,6 +135,9 @@ TEST(GCodeMachineControlTest, speed_clamping) {
   harness.gcode_emit()->motors_enable(false);  // finish movement.
 }
 
+// TODO: Let's check that the "clamping function" is even:
+// f(-steps[]) = f(steps[]) since we expect a scalar and >0 speed.
+
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
 TEST(GCodeMachineControlTest, straight_segments_same_speed) {

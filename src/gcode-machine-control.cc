@@ -631,7 +631,7 @@ static float clamp_to_limits(const float value,
   float ratio, max_offset = 1, offset;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     // Keep ratio, increase readability
-    ratio = fabs(axis_steps[i]) / axis_steps[defining_axis];
+    ratio = fabs((float) axis_steps[i] / axis_steps[defining_axis]);
     offset = ratio > 0 ? max_axis_value[i] / (value * ratio) : 1;
     if (offset < max_offset) max_offset = offset;
   }
