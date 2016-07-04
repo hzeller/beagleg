@@ -721,6 +721,10 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
 
     ParseLine(buffer, err_stream);
   }
+  disarm_signal_handler();
+
+  if (caught_signal)
+    return 2;
 
   if (err_stream) {
     fflush(err_stream);
@@ -730,8 +734,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
   // always call gcode_finished() to disable motors at end of stream
   callbacks->gcode_finished(true);
 
-  disarm_signal_handler();
-  return caught_signal ? 2 : 0;
+  return 0;
 }
 
 GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events,
