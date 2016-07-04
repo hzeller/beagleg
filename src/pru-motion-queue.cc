@@ -23,9 +23,10 @@
 #include "motion-queue.h"
 
 #include <assert.h>
-#include <stdio.h>
+#include <errno.h>
 #include <pruss_intc_mapping.h>
 #include <prussdrv.h>
+#include <stdio.h>
 #include <strings.h>
 
 #include "generic-gpio.h"
@@ -107,6 +108,17 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e) {
 }
 #endif
 
+// Stop gap for compiler attempting to be overly clever when copying between
+// host and PRU memory.
+static void unaligned_memcpy(void *dest, const void *src, size_t size) {
+  char *d = (char*) dest;
+  const char *s = (char*) src;
+  const char *end = d + size;
+  while (d < end) {
+    *d++ = *s++;
+  }
+}
+
 void PRUMotionQueue::Enqueue(MotionSegment *element) {
   const uint8_t state_to_send = element->state;
   assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
@@ -116,7 +128,7 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
   // Need to case volatile away, otherwise c++ complains.
   MotionSegment *queue_element = (MotionSegment*) next_queue_element();
-  *queue_element = *element;
+  unaligned_memcpy(queue_element, element, sizeof(*queue_element));
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;
@@ -165,7 +177,7 @@ int PRUMotionQueue::Init() {
   /* Get the interrupt initialized */
   int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
   if (ret) {
-    Log_error("prussdrv_open() failed (%d)\n", ret);
+    Log_error("prussdrv_open() failed (%d) %s\n", ret, strerror(errno));
     return ret;
   }
   prussdrv_pruintc_init(&pruss_intc_initdata);
