@@ -170,6 +170,8 @@ static int open_server(const char *bind_addr, int port) {
   return s;
 }
 
+static void eatsignal(int sig) {}
+
 // Accept connections and receive GCode.
 // Only one connection can be active at a time.
 // Socket must already be opened by open_server(). "bind_addr" and "port"
@@ -191,11 +193,20 @@ static int run_server(int listen_socket,
   do {
     struct sockaddr_in client;
     socklen_t socklen = sizeof(client);
+    struct sigaction sa = {0};
+    sa.sa_handler = eatsignal;
+    sa.sa_flags = SA_RESETHAND | SA_NODEFER;  // oneshot, no restart
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
     int connection = accept(listen_socket, (struct sockaddr*) &client, &socklen);
     if (connection < 0) {
       Log_error("accept(): %s", strerror(errno));
-      return 1;
+      return (errno == EINTR) ? 2 : 1;
     }
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
     char ip_buffer[INET_ADDRSTRLEN];
     const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
                                      ip_buffer, sizeof(ip_buffer));
@@ -444,6 +455,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   }
+  Log_info("Running with PID %d", getpid());
 
   MotionQueueMotorOperations motor_operations(motion_backend);
 

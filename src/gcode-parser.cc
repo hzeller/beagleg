@@ -27,6 +27,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <math.h>
 #include <signal.h>
 #include <stdio.h>
@@ -641,20 +642,34 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
 // It is usually good to shut down gracefully, otherwise the PRU keeps running.
 // So we're intercepting signals and exit gcode_machine_control_from_stream()
 // cleanly.
-static volatile char caught_signal = 0;
+static volatile bool caught_signal = false;
 static void receive_signal(int signo) {
-  caught_signal = 1;
+  caught_signal = true;
   static char msg[] = "Caught signal. Shutting down ASAP.\n";
   (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
 }
 static void arm_signal_handler() {
-  caught_signal = 0;
-  signal(SIGTERM, &receive_signal);  // Regular kill
-  signal(SIGINT, &receive_signal);   // Ctrl-C
+  caught_signal = false;
+  struct sigaction sa = {0};
+  sa.sa_handler = receive_signal;
+  sa.sa_flags = SA_RESETHAND;  // oneshot, no restart
+  sigaction(SIGTERM, &sa, NULL);  // Regular kill
+  sigaction(SIGINT, &sa, NULL);   // Ctrl-C
+
+  // Other, internal problems that should never happen, but
+  // can trigger multiple times before we gain back control
+  // to shut down as cleanly as possible. These are not one-shot.
+  sa.sa_flags = 0;
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
+  sigaction(SIGFPE, &sa, NULL);
 }
 static void disarm_signal_handler() {
   signal(SIGTERM, SIG_DFL);  // Regular kill
   signal(SIGINT, SIG_DFL);   // Ctrl-C
+  signal(SIGSEGV, SIG_DFL);
+  signal(SIGBUS, SIG_DFL);
+  signal(SIGFPE, SIG_DFL);
 }
 
 // Public facade function.
@@ -687,8 +702,10 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
     // When we're already in idle mode, we're not interested in change.
     wait_time.tv_usec = 50 * 1000;
     select_ret = select(input_fd + 1, &read_fds, NULL, NULL, &wait_time);
-    if (select_ret < 0)  // Broken stream.
+    if (select_ret < 0)  { // Broken stream.
+      Log_error("select(): %s", strerror(errno));
       break;
+    }
 
     if (select_ret == 0) {  // Timeout. Regularly call.
       callbacks->input_idle(is_processing);
@@ -704,7 +721,6 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
 
     ParseLine(buffer, err_stream);
   }
-  disarm_signal_handler();
 
   if (err_stream) {
     fflush(err_stream);
@@ -714,6 +730,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
   // always call gcode_finished() to disable motors at end of stream
   callbacks->gcode_finished(true);
 
+  disarm_signal_handler();
   return caught_signal ? 2 : 0;
 }
 
