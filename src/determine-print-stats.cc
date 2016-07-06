@@ -91,7 +91,7 @@ class StatsMotorOperations : public MotorOperations {
 public:
   StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
-  virtual int Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
+  virtual void Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       int steps = abs(param.steps[i]);
@@ -102,7 +102,6 @@ public:
     // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
     print_stats_->total_time_seconds += 2 * max_steps / (param.v0 + param.v1);
     //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param.v0, param.v1, max_steps);
-    return 0;
   }
 
   virtual void MotorEnable(bool on) {}

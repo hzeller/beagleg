@@ -163,8 +163,8 @@ static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   return defining_axis_steps;
 }
 
-int MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
-                                        FILE *err_stream) {
+void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
+                                         FILE *err_stream) {
   const int defining_axis_steps = get_defining_axis_steps(param);
 
   if (defining_axis_steps == 0) {
@@ -215,7 +215,6 @@ int MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param,
   } else {
     EnqueueInternal(param, defining_axis_steps);
   }
-  return 0;
 }
 
 void MotionQueueMotorOperations::MotorEnable(bool on) {

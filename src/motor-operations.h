@@ -52,11 +52,9 @@ public:
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
   // otherwise it waits until a slot frees up.
-  // Returns 0 on success, 1 if this is a no-op with no steps to move and 2 on
-  // invalid parameters.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  virtual int Enqueue(const LinearSegmentSteps &segment, FILE *err_stream) = 0;
+  virtual void Enqueue(const LinearSegmentSteps &segment, FILE *err_stream) = 0;
 
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
@@ -71,7 +69,7 @@ public:
   // Initialize motor operations, sending planned results into the motion backend.
   MotionQueueMotorOperations(MotionQueue *backend) : backend_(backend) {}
 
-  virtual int Enqueue(const LinearSegmentSteps &segment, FILE *err_stream);
+  virtual void Enqueue(const LinearSegmentSteps &segment, FILE *err_stream);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
 
