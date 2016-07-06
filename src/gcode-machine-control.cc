@@ -924,8 +924,8 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
       const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
       travel_speed *= euclid_fraction;
 
-      // If this is a true XY vector, calculate the angle of the vector
-      if (dz == 0)
+      // If this is a truish XY vector, calculate the angle of the vector
+      if (fabsf(dz) < 0.01)
         new_pos->angle = (atan2f(dy, dx) / 3.14159265359) * 180.0f;
     }
     if (travel_speed > max_axis_speed_[defining_axis]) {

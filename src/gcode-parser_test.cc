@@ -156,6 +156,14 @@ TEST(GCodeParserTest, absolute_relative) {
   EXPECT_EQ(HOME_X + 20 + 5, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 21 + 6, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 22 + 7, counter.abs_pos[AXIS_Z]);
+
+  // Still in relative mode. So even if we set a G92, all movements
+  // still are relative
+  counter.TestParseLine("G92 X0 Y0");
+
+  counter.TestParseLine("G1 X17 Y11");
+  EXPECT_EQ(HOME_X + 20 + 5 + 17, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 21 + 6 + 11, counter.abs_pos[AXIS_Y]);
 }
 
 TEST(GCodeParserTest, set_origin_G92) {

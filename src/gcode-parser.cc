@@ -108,8 +108,8 @@ private:
   // Does _not_ reset the machine position.
   void InitProgramDefaults() {
     unit_to_mm_factor_ = 1.0f;        // G21
-    set_all_axis_to_absolute(true);  // G90
-    reset_G92();                     // No global offset.
+    set_all_axis_to_absolute(true);   // G90
+    reset_G92();                      // No global offset.
     set_current_offset(global_offset_g92_);
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
@@ -160,10 +160,9 @@ private:
 
   float abs_axis_pos(const enum GCodeParserAxis axis, const float unit_value) {
     float relative_to = ((axis_is_absolute_[axis])
-                         ? current_origin()[axis]
+                         ? current_origin()[axis]+current_global_offset()[axis]
                          : axes_pos_[axis]);
-    float offset = current_global_offset()[axis];
-    return relative_to + unit_value + offset;
+    return relative_to + unit_value;
   }
 
   const char *handle_home(const char *line);
