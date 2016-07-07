@@ -103,6 +103,7 @@ int main(int argc, char *argv[]) {
   }
 
   config.speed_factor = factor;
+  config.range_check = false;  // don't care about clipping.
 
   // This is not connected to any machine. Don't assume homing.
   config.require_homing = false;
