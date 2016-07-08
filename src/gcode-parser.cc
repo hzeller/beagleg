@@ -167,8 +167,8 @@ private:
 
   const char *handle_home(const char *line);
   const char *handle_G92(float sub_command, const char *line);
-  const char *handle_move(const char *line, int force_change);
-  const char *handle_arc(const char *line, int is_cw);
+  const char *handle_move(const char *line, bool force_change);
+  const char *handle_arc(const char *line, bool is_cw);
   const char *handle_z_probe(const char *line);
   const char *handle_M111(const char *line);
 
@@ -395,10 +395,10 @@ static float f_param_to_feedrate(const float unit_value) {
   return unit_value / 60.0f;  // feedrates are units per minute.
 }
 
-const char *GCodeParser::Impl::handle_move(const char *line, int force_change) {
+const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) {
   char axis_l;
   float value;
-  int any_change = force_change;
+  bool any_change = force_change;
   float feedrate = -1;
   const char *remaining_line;
   AxesRegister new_pos = axes_pos_;
@@ -407,14 +407,14 @@ const char *GCodeParser::Impl::handle_move(const char *line, int force_change) {
     const float unit_value = value * unit_to_mm_factor_;
     if (axis_l == 'F') {
       feedrate = f_param_to_feedrate(unit_value);
-      any_change = 1;
+      any_change = true;
     }
     else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
         break;  // Invalid axis: possibly start of new command.
       new_pos[update_axis] = abs_axis_pos(update_axis, unit_value);
-      any_change = 1;
+      any_change = true;
     }
     line = remaining_line;
   }
@@ -452,7 +452,7 @@ static void arc_callback(void *data, const AxesRegister &new_pos) {
 // F      : Optional feedrate.
 // P      : number of turns. currently ignored.
 // R      : TODO: implement. Modern systems allow that.
-const char *GCodeParser::Impl::handle_arc(const char *line, int is_cw) {
+const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   const char *remaining_line;
   AxesRegister target = axes_pos_;
   AxesRegister offset;
@@ -478,9 +478,10 @@ const char *GCodeParser::Impl::handle_arc(const char *line, int is_cw) {
   }
 
   // Should the arc parameters be sanity checked?
-  if (turns < 0 || turns > 4) {
+  if (turns != 1) {
+    // Currently, we ignore turns, so we check that it is exactly one.
     fprintf(err_msg_ ? err_msg_ : stderr,
-            "// G-Code Syntax Error: handle_arc: turns=%d (must be 1-4)\n",
+            "// G-Code Syntax Error: handle_arc: turns=%d (must be 1)\n",
             turns);
     return remaining_line;
   }
@@ -488,7 +489,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, int is_cw) {
   struct ArcCallbackData cb_arc_data;
   cb_arc_data.callbacks = callbacks;
   cb_arc_data.feedrate = feedrate;
-  arc_gen(arc_normal_, is_cw, axes_pos_, offset, target,
+  arc_gen(arc_normal_, is_cw, &axes_pos_, offset, target,
           &arc_callback, &cb_arc_data);
 
   return line;
@@ -558,10 +559,10 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
     char processed_command = 1;
     if (letter == 'G') {
       switch ((int) value) {
-      case  0: modal_g0_g1_ = 0; line = handle_move(line, 0); break;
-      case  1: modal_g0_g1_ = 1; line = handle_move(line, 0); break;
-      case  2: line = handle_arc(line, 1); break;
-      case  3: line = handle_arc(line, 0); break;
+      case  0: modal_g0_g1_ = 0; line = handle_move(line, false); break;
+      case  1: modal_g0_g1_ = 1; line = handle_move(line, false); break;
+      case  2: line = handle_arc(line, true); break;
+      case  3: line = handle_arc(line, false); break;
       case  4: line = set_param('P', &GCodeParser::EventReceiver::dwell,
                                 1.0f, line);
         break;
@@ -625,7 +626,7 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
         // Update the axis position then handle the move.
         const float unit_value = value * unit_to_mm_factor_;
         axes_pos_[axis] = abs_axis_pos(axis, unit_value);
-        line = handle_move(line, 1);
+        line = handle_move(line, true);
         // make gcode_command_done() think this was a 'G0/G1' command
         letter = 'G';
         value = modal_g0_g1_;

@@ -31,10 +31,10 @@
 // After arc_gen() returns, the values in position[] are updated
 // to the new machine position.
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
-             char is_cw,         // 1 if CW, 0 if CCW
-             AxesRegister &position,   // start position. Will be updated.
-             const AxesRegister &offset,     // Offset to center.
-             const AxesRegister &target,     // Target position.
+             bool is_cw,                   // 1 if CW, 0 if CCW
+             AxesRegister *position,       // start position. Will be updated.
+             const AxesRegister &offset,   // Offset to center.
+             const AxesRegister &target,   // Target position.
              void (*segment_output)(void *, const AxesRegister &),
              void *segment_output_user_data);
 

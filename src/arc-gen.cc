@@ -41,8 +41,8 @@
 
 // Generate an arc. Input is the
 void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
-             char is_cw,                        // 0 CCW, 1 CW
-             AxesRegister &position,   // start position. Will be updated.
+             bool is_cw,                        // 0 CCW, 1 CW
+             AxesRegister *position_out,   // start position. Will be updated.
              const AxesRegister &offset,     // Offset to center.
              const AxesRegister &target,     // Target position.
              void (*segment_output)(void *, const AxesRegister&),
@@ -57,15 +57,19 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
     return;   // Invalid axis.
   }
 
-  float radius = sqrtf(offset[plane[0]]*offset[plane[0]] +
-                       offset[plane[1]]*offset[plane[1]]);
-  float center_0 = position[plane[0]] + offset[plane[0]];
-  float center_1 = position[plane[1]] + offset[plane[1]];
-  float linear_travel = target[plane[2]] - position[plane[2]];
+  // Alias reference for readable use with [] operator
+  AxesRegister &position = *position_out;
+
+  const float radius = sqrtf(offset[plane[0]] * offset[plane[0]] +
+                             offset[plane[1]] * offset[plane[1]]);
+  const float center_0 = position[plane[0]] + offset[plane[0]];
+  const float center_1 = position[plane[1]] + offset[plane[1]];
+  const float linear_travel = target[plane[2]] - position[plane[2]];
+  const float rt_0 = target[plane[0]] - center_0;
+  const float rt_1 = target[plane[1]] - center_1;
+
   float r_0 = -offset[plane[0]]; // Radius vector from center to current location
   float r_1 = -offset[plane[1]];
-  float rt_0 = target[plane[0]] - center_0;
-  float rt_1 = target[plane[1]] - center_1;
 
 #if 0
   Log_debug("arc from %c,%c: %.3f,%.3f to %.3f,%.3f (radius:%.3f) helix %c:%.3f\n",
@@ -75,16 +79,18 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
             gcodep_axis2letter(plane[2]), linear_travel);
 #endif
 
-  // CCW angle between position and target from circle center. Only one atan2()
-  // trig computation required.
+  // CCW angle between position and target from circle center.
   float angular_travel = atan2(r_0*rt_1 - r_1*rt_0, r_0*rt_0 + r_1*rt_1);
-  if (angular_travel < 0) angular_travel += 2 * M_PI;
-  if (is_cw) angular_travel -= 2 * M_PI;
+  if (is_cw) {
+    if (angular_travel >= -1e-6) angular_travel -= 2*M_PI;
+  } else {
+    if (angular_travel <=  1e-6) angular_travel += 2*M_PI;
+  }
 
-  // Find the distance for this gcode
+  // Find the distance for this gcode in the axes we care.
   const float mm_of_travel = hypotf(angular_travel*radius, fabs(linear_travel));
 
-  // We don't care about non-XYZ moves (for example the extruder produces some of those)
+  // We don't care about non-XYZ moves (e.g. extruder)
   if (mm_of_travel < 0.00001)
     return;
 
