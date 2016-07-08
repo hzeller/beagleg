@@ -23,6 +23,17 @@
 #include <iostream>
 #include <gtest/gtest.h>
 
+// Resolution of our angle steps for tests that increase angles. 100 means
+// 1/100 of a degree resolution, so 36000 individual steps are tested.
+// If we are running on the Beaglebone (__ARMEL__ defined), use only
+// 0.1 degree resolution to limit test times; on other machines, let's
+// go into more detail.
+#ifdef __ARMEL__
+#  define TEST_FRACTION_OF_DEGREE 10
+#else
+#  define TEST_FRACTION_OF_DEGREE 500
+#endif
+
 struct TestArcAccumulator {
   TestArcAccumulator() : total_len(0) {}
   AxesRegister last;
@@ -35,15 +46,11 @@ static void TestArcCallback(void *user_data, const AxesRegister& pos) {
   acc->last = pos;
 }
 
-// Resolution of our angle steps for tests that increase angles. 100 means
-// 1/100 of a degree resolution, so 36000 individual steps are tested.
-static int kFractionOfDegree = 100;
-
 static void testHalfTurnAnyStartPosition(bool clockwise) {
   // We start anywhere and do a half turn, testing that we're generating
   // exactly an arc of the specified length.
-  for (int i = 0; i < 360 * kFractionOfDegree; ++i) {
-    const float start_angle = 2*M_PI * i / (360 * kFractionOfDegree);
+  for (int i = 0; i < 360 * TEST_FRACTION_OF_DEGREE; ++i) {
+    const float start_angle = 2*M_PI * i / (360 * TEST_FRACTION_OF_DEGREE);
     TestArcAccumulator collect;
     AxesRegister start, offset, target;
 
@@ -79,8 +86,8 @@ TEST(ArcGenerator, HalfTurnAnyStartPosition_CCW) {
 // if they have the length as expected.
 static void testArcLength(bool clockwise) {
   // Varying arc-length.
-  for (int i = 1; i < 360 * kFractionOfDegree; ++i) {
-    const float turn_angle = 2*M_PI * i / (360 * kFractionOfDegree);
+  for (int i = 1; i < 360 * TEST_FRACTION_OF_DEGREE; ++i) {
+    const float turn_angle = 2*M_PI * i / (360 * TEST_FRACTION_OF_DEGREE);
     TestArcAccumulator collect;
     AxesRegister start, offset, target;
 
