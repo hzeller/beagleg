@@ -23,16 +23,16 @@
 #include <iostream>
 #include <gtest/gtest.h>
 
-// Resolution of our angle steps for tests that increase angles. 100 means
-// 1/100 of a degree resolution, so 36000 individual steps are tested.
-// If we are running on the Beaglebone (__ARMEL__ defined), use only
-// 0.1 degree resolution to limit test times; on other machines, let's
-// go into more detail.
-#ifdef __ARMEL__
-#  define TEST_FRACTION_OF_DEGREE 10
-#else
-#  define TEST_FRACTION_OF_DEGREE 500
-#endif
+// Going around the circle for start-points with this step.
+#define TEST_ARC_STEP 2*M_PI/255
+
+// The area around zero angle, we look at with higher scrutiny as
+// this is where a circle can flip/flop between tiny and full depending
+// on some rounded bits somewhere.
+// So for this, we test a small HIRES_TEST_CIRCLE_SEGMENT around zero with
+// the same number of steps we otherwise would test a full circle.
+#define HIRES_TEST_CIRCLE_SEGMENT (2*M_PI/1e12)
+#define HIRES_TEST_ARC_STEP (TEST_ARC_STEP/1e12)
 
 struct TestArcAccumulator {
   TestArcAccumulator() : total_len(0) {}
@@ -49,8 +49,7 @@ static void TestArcCallback(void *user_data, const AxesRegister& pos) {
 static void testHalfTurnAnyStartPosition(bool clockwise) {
   // We start anywhere and do a half turn, testing that we're generating
   // exactly an arc of the specified length.
-  for (int i = 0; i < 360 * TEST_FRACTION_OF_DEGREE; ++i) {
-    const float start_angle = 2*M_PI * i / (360 * TEST_FRACTION_OF_DEGREE);
+  for (float start_angle = 0; start_angle < 2*M_PI; start_angle+=TEST_ARC_STEP) {
     TestArcAccumulator collect;
     AxesRegister start, offset, target;
 
@@ -84,10 +83,9 @@ TEST(ArcGenerator, HalfTurnAnyStartPosition_CCW) {
 
 // Starting from a position, generate arcs of varying length and determine
 // if they have the length as expected.
-static void testArcLength(bool clockwise) {
+static void testArcLength(bool clockwise, double start, double step, double end) {
   // Varying arc-length.
-  for (int i = 1; i < 360 * TEST_FRACTION_OF_DEGREE; ++i) {
-    const float turn_angle = 2*M_PI * i / (360 * TEST_FRACTION_OF_DEGREE);
+  for (double turn_angle = start; turn_angle <= end-step; turn_angle+=step) {
     TestArcAccumulator collect;
     AxesRegister start, offset, target;
 
@@ -97,24 +95,52 @@ static void testArcLength(bool clockwise) {
     offset[AXIS_X] = -1.0;
     offset[AXIS_Y] = 0;
 
-    target[AXIS_X] = cosf(turn_angle);
-    target[AXIS_Y] = sinf(turn_angle);
+    target[AXIS_X] = cos(turn_angle);
+    target[AXIS_Y] = sin(turn_angle);
 
     collect.last = start;
     arc_gen(AXIS_Z, clockwise, &start, offset, target,
             &TestArcCallback, &collect);
 
-    float expected_len = clockwise ? 2*M_PI-turn_angle : turn_angle;
+    const float expected_len = clockwise ? 2*M_PI-turn_angle : turn_angle;
     EXPECT_NEAR(collect.total_len, expected_len, 0.003);
   }
 }
 
-TEST(ArcGenerator, ArcLength_CW) {
-  testArcLength(true);
+TEST(ArcGenerator, ArcLength_CW_360) {
+  testArcLength(true, TEST_ARC_STEP, TEST_ARC_STEP, 2*M_PI);
 }
 
-TEST(ArcGenerator, ArcLength_CCW) {
-  testArcLength(false);
+TEST(ArcGenerator, ArcLength_CW_HiRes_StartCircle) {
+  testArcLength(true,
+                2*M_PI - HIRES_TEST_CIRCLE_SEGMENT,
+                HIRES_TEST_ARC_STEP,
+                2*M_PI);
+}
+
+TEST(ArcGenerator, ArcLength_CW_HiRes_FullCircle) {
+  testArcLength(true,
+                HIRES_TEST_ARC_STEP,
+                HIRES_TEST_ARC_STEP,
+                HIRES_TEST_CIRCLE_SEGMENT);
+}
+
+TEST(ArcGenerator, ArcLength_CCW_360) {
+  testArcLength(false, TEST_ARC_STEP, TEST_ARC_STEP, 2*M_PI);
+}
+
+TEST(ArcGenerator, ArcLength_CCW_HiRes_StartCircle) {
+  testArcLength(false,
+                HIRES_TEST_ARC_STEP,
+                HIRES_TEST_ARC_STEP,
+                HIRES_TEST_CIRCLE_SEGMENT);
+}
+
+TEST(ArcGenerator, ArcLength_CCW_HiRes_FullCircle) {
+  testArcLength(false,
+                2*M_PI - HIRES_TEST_CIRCLE_SEGMENT,
+                HIRES_TEST_ARC_STEP,
+                2*M_PI);
 }
 
 // Test special case: if start/end position are the same, then we expect

@@ -82,9 +82,9 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
   // CCW angle between position and target from circle center.
   float angular_travel = atan2(r_0*rt_1 - r_1*rt_0, r_0*rt_0 + r_1*rt_1);
   if (is_cw) {
-    if (angular_travel >= -1e-6) angular_travel -= 2*M_PI;
+    if (angular_travel >= 0) angular_travel -= 2*M_PI;
   } else {
-    if (angular_travel <=  1e-6) angular_travel += 2*M_PI;
+    if (angular_travel <= 0) angular_travel += 2*M_PI;
   }
 
   // Find the distance for this gcode in the axes we care.
