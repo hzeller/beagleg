@@ -261,6 +261,28 @@ static const char *skip_white(const char *line) {
   return line;
 }
 
+static float ParseGcodeNumber(const char *line, const char **endptr) {
+  // We need to copy the number into a temporary buffer as strtof() does
+  // not accept an end-limiter.
+  char buffer[40];
+  const char *src = line;
+  char *dst = buffer;
+  const char *end = buffer + sizeof(buffer) - 1;
+  const char *extra_allowed = "+-.";
+  while (*src && (isdigit(*src) || index(extra_allowed, *src)) && dst < end) {
+    *dst++ = *src++;
+  }
+  *dst = '\0';
+  char *parsed_end;
+  const float result = strtof(buffer, &parsed_end);
+  if (parsed_end == dst) {
+    *endptr = src;
+  } else {
+    *endptr = line;
+  }
+  return result;
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
@@ -295,20 +317,12 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
   while (*line && isspace(*line))
     line++;
 
-  // Parsing with strtof() can be problematic if the line does
-  // not contain spaces, and strof() sees the sequence 0X... as it treats that
-  // as hex value. E.g. G0X1. Unlikely, but let's do a nasty workaround:
-  char *repair_x = (*(line+1) == 'x' || *(line+1) == 'X') ? (char*)line+1 : NULL;
-  if (repair_x) *repair_x = '\0';  // pretend that is the end of number.
-
-  char *endptr;
-  *value = strtof(line, &endptr);
-
-  if (repair_x) *repair_x = 'X';  // Put the 'X' back.
+  const char *endptr;
+  *value = ParseGcodeNumber(line, &endptr);
 
   if (line == endptr) {
     fprintf(err_stream ? err_stream : stderr, "// Line %d G-Code Syntax Error:"
-            " Letter '%c' is not followed by a number `%s`.\n",
+            " Letter '%c' is not followed by a number but '%s'.\n",
             line_num, *letter, line);
     return NULL;
   }
@@ -681,7 +695,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
 
   FILE *gcode_stream = fdopen(input_fd, "r");
   if (gcode_stream == NULL) {
-    perror("Opening gcode stream");
+    Log_error("While opening stream from fd %d: %s", input_fd, strerror(errno));
     return 1;
   }
 

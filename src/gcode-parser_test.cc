@@ -44,7 +44,7 @@ public:
 
   // Main function to test.
   void TestParseLine(const char *block) {
-    parser_->ParseLine(block, NULL);
+    parser_->ParseLine(block, stderr);
   }
 
   virtual void gcode_start()     { Count(CALL_gcode_start); }
@@ -132,6 +132,66 @@ TEST(GCodeParserTest, simple_move) {
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 10,  counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z - 20,  counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, ParsingCompactNumbers) {
+  // Coordinates are valid without spaces in-between
+  ParseTester counter;
+
+  counter.TestParseLine("G1Y0010Z0011X0012");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  EXPECT_EQ(HOME_X + 12, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 10, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 11, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, ParsingComments) {
+  ParseTester counter;
+
+  counter.TestParseLine("G1 X10 (This is some comment) Y11 Z12 ; end of line");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 11, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 12, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, VariousNumbersOfLeadingZero) {
+  ParseTester counter;
+
+  counter.TestParseLine("G1X.1Y0.2Z00000.4");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  EXPECT_NEAR(HOME_X + 0.1, counter.abs_pos[AXIS_X], 1e-4);
+  EXPECT_NEAR(HOME_Y + 0.2, counter.abs_pos[AXIS_Y], 1e-4);
+  EXPECT_NEAR(HOME_Z + 0.4, counter.abs_pos[AXIS_Z], 1e-4);
+}
+
+TEST(GCodeParserTest, SquishedTogetherNumbers) {
+  ParseTester counter;
+
+  // Provoke a situation in which we have 0x<something> to
+  // test for accidental hex parsing.
+  counter.TestParseLine("G1Y0X17Z23");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  EXPECT_EQ(HOME_X + 17, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 0, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 23, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, InvalidNumbers) {
+  {
+    ParseTester counter;
+    counter.TestParseLine("G1X--17");
+    EXPECT_EQ(0, counter.call_count[CALL_coordinated_move]);
+  }
+  {
+    ParseTester counter;
+    counter.TestParseLine("G1X..1");
+    EXPECT_EQ(0, counter.call_count[CALL_coordinated_move]);
+  }
 }
 
 TEST(GCodeParserTest, absolute_relative) {
