@@ -168,6 +168,17 @@ TEST(GCodeParserTest, VariousNumbersOfLeadingZero) {
   EXPECT_NEAR(HOME_Z + 0.4, counter.abs_pos[AXIS_Z], 1e-4);
 }
 
+TEST(GCodeParserTest, SpacesAroundNumbers) {
+  ParseTester counter;
+
+  counter.TestParseLine("G\t1 X 2 \tY\t4 Z \t5");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  EXPECT_EQ(HOME_X + 2, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 4, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 5, counter.abs_pos[AXIS_Z]);
+}
+
 TEST(GCodeParserTest, SquishedTogetherNumbers) {
   ParseTester counter;
 
