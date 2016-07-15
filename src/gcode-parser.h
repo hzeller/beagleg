@@ -71,7 +71,7 @@ public:
   public:
     virtual ~EventReceiver() {}
     virtual void gcode_start() {}    // Start program. Use for initialization.
-    virtual void gcode_finished(bool end_of_stream=false) {} // End of program or stream.
+    virtual void gcode_finished(bool end_of_stream) {} // End of program or stream.
 
     // The parser handles relative positions and coordinate systems internally,
     // so the machine does not have to worry about that.
@@ -123,8 +123,8 @@ public:
     //   (typically, the user would need to remember the positive values).
     // The second parameter is an array of absolute coordinates (already
     // preprocessed to be in millimeter), indexed by GCodeParserAxis.
-    // Returns 1, if the move was successful or 0 if the machine could not move
-    // the machine (e.g. because it was beyond limits or other condition).
+    // Returns true if the move was successful or false if the machine could
+    // not move (e.g. because it was beyond limits or other condition).
     virtual bool coordinated_move(float feed_mm_p_sec,
                                   const AxesRegister &absolute_pos) = 0;  // G1
     virtual bool rapid_move(float feed_mm_p_sec,

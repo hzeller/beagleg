@@ -147,7 +147,7 @@ private:
   }
 
   void finish_program_and_reset() {
-    callbacks->gcode_finished();
+    callbacks->gcode_finished(false);
 
     InitProgramDefaults();
     program_in_progress_ = false;
@@ -658,9 +658,11 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
 // cleanly.
 static volatile bool caught_signal = false;
 static void receive_signal(int signo) {
-  caught_signal = true;
   static char msg[] = "Caught signal. Shutting down ASAP.\n";
-  (void)write(STDERR_FILENO, msg, sizeof(msg)); // void, but gcc still warns :/
+  if (!caught_signal) {
+    write(STDERR_FILENO, msg, sizeof(msg));
+  }
+  caught_signal = true;
 }
 static void arm_signal_handler() {
   caught_signal = false;
