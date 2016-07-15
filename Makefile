@@ -23,7 +23,7 @@ export BEAGLEG_HARDWARE_TARGET?=BUMPS
 export ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 
 all:
-	$(MAKE) -e -C src ../machine-control ../gcode-print-stats
+	$(MAKE) -e -C src all
 
 clean test valgrind-test:
 	$(MAKE) -C src $@
