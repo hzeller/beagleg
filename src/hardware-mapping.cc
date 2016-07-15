@@ -236,7 +236,10 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
 }
 
 HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis) {
-  if (!is_hardware_initialized_) return TRIGGER_NONE;
+  if (!is_hardware_initialized_) {
+    // Pretend we have all the switches.
+    return (AxisTrigger) (TRIGGER_MIN|TRIGGER_MAX);
+  }
   int result = 0;
   if (axis_to_min_endstop_[axis] != 0) result |= TRIGGER_MIN;
   if (axis_to_max_endstop_[axis] != 0) result |= TRIGGER_MAX;

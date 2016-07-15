@@ -149,6 +149,8 @@ public:
   // If this function is never called, all outputs are simulated.
   bool InitializeHardware();
 
+  // This returns if we are in hardware simulation mode.
+  bool IsHardwareSimulated() { return !is_hardware_initialized_; }
 
   // -- Boolean and PWM outputs.
 

@@ -142,7 +142,7 @@ private:
                           struct AxisTarget *target_pos,
                           const struct AxisTarget *upcoming);
   int move_to_endstop(enum GCodeParserAxis axis,
-                      float feedrate, int backoff,
+                      float feedrate, bool backoff,
                       HardwareMapping::AxisTrigger trigger);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
@@ -993,16 +993,18 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &a
     if (axes[i] > max_limit) {
       // Machine cube must be within machine limits if defined.
       if (coordinate_display_origin_[i] != 0) {
-        mprintf("// ERROR outside machine limit: Axis %c > max allowed %+.1fmm "
+        // We have a different origin, so display coordinate relative to that.
+        mprintf("// ERROR outside machine limit: Axis %c %.1fmm > max allowed %+.1fmm "
                 "in current coordinate system (=%.1fmm machine absolute). "
                 "Ignoring move!\n",
                 gcodep_axis2letter((GCodeParserAxis)i),
+                axes[i] - coordinate_display_origin_[i],
                 max_limit - coordinate_display_origin_[i], max_limit);
       } else {
         // No relative G92 or similar set. Display in simpler form.
-        mprintf("// ERROR outside machine limit: Axis %c > %.1fmm. "
+        mprintf("// ERROR outside machine limit: Axis %c = %.1f > %.1fmm. "
                 "Ignoring move!\n", gcodep_axis2letter((GCodeParserAxis)i),
-                max_limit);
+                axes[i], max_limit);
       }
       return false;
     }
@@ -1082,8 +1084,12 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
 
 // Moves to endstop and returns how many steps it moved in the process.
 int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
-                                               float feedrate, int backoff,
+                                               float feedrate, bool backoff,
                                                HardwareMapping::AxisTrigger trigger) {
+  if (hardware_mapping_->IsHardwareSimulated()) {
+    return 0;  // There are no switches to trigger, so pretend we stopped.
+  }
+
   int total_movement = 0;
   struct LinearSegmentSteps move_command = {0};
   const float steps_per_mm = cfg_.steps_per_mm[axis];
@@ -1126,13 +1132,30 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
 void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   const HardwareMapping::AxisTrigger trigger = cfg_.homing_trigger[axis];
   if (trigger == HardwareMapping::TRIGGER_NONE)
-    return;   // no homing defined
-  struct AxisTarget *last = planning_buffer_.back();
-  move_to_endstop(axis, 15, 1, trigger);
-
+    return;   // no homing defined. Should we warn ?
   const float home_pos = trigger == HardwareMapping::TRIGGER_MIN ?
     0 : cfg_.move_range_mm[axis];
-  last->position_steps[axis] = round2int(home_pos * cfg_.steps_per_mm[axis]);
+  const int home_pos_in_steps = round2int(home_pos * cfg_.steps_per_mm[axis]);
+
+  const int kHomingSpeed = 15; // mm/sec  (make configurable ?)
+  struct AxisTarget *last = planning_buffer_.back();
+  if (!hardware_mapping_->IsHardwareSimulated()) {
+    // Regular homing. Move to endstop until we hit the trigger.
+    move_to_endstop(axis, kHomingSpeed, true, trigger);
+  } else {
+    // Now we need to pretend to have homed all the way in our simulated
+    // machine. Issue a one-step motor request to origin.
+    struct LinearSegmentSteps move_command = {0};
+    move_command.v0 = move_command.v1 = kHomingSpeed;
+    int segment_move_steps = -(last->position_steps[axis] - home_pos_in_steps);
+    assign_steps_to_motors(&move_command, axis, segment_move_steps);
+    motor_ops_->Enqueue(move_command, msg_stream_);
+  }
+
+  // Last position for planning purposes and current position are
+  // now both at home pos.
+  last->position_steps[axis] = home_pos_in_steps;
+  planning_buffer_[0]->position_steps[axis] = home_pos_in_steps;
 }
 
 void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
