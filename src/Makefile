@@ -96,6 +96,10 @@ $(PRU_BIN) : motor-interface-constants.h \
 $(PASM):
 	make -C $(AM335_BASE)
 
+# Useful to convert gcode2ps output.
+%.png : %.ps
+	gs -q -r144 -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$@ $<
+
 # Explicit dependencies
 pru-motion-queue.o : $(PRU_BIN)
 
