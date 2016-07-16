@@ -182,7 +182,15 @@ public:
     fprintf(file_, "stroke %% Finished Machine Pathstroke\n");
   }
 
-  void SetPass(int p) { pass_ = p; }
+  void SetPass(int p) {
+    pass_ = p;
+    if (pass_ == 2) {
+      min_color_range_ = min_v_ + 0.1 * (max_v_ - min_v_);
+      max_color_range_ = max_v_ - 0.1 * (max_v_ - min_v_);
+      fprintf(stderr, "Speed: [%.2f..%.2f]; Coloring span [%.2f..%.2f]\n",
+              min_v_, max_v_, min_color_range_, max_color_range_);
+    }
+  }
 
   void RememberMinMax(float v) {
     if (v > max_v_) max_v_ = v;
@@ -239,12 +247,11 @@ public:
         float v = param.v0 + i * (param.v1 - param.v0)/segments;
         v /= config_.steps_per_mm[dominant_axis];
         int col_idx;
-        float min_cutoff = min_v_ + 0.1 * (max_v_ - min_v_);
-        float max_cutoff = max_v_ - 0.1 * (max_v_ - min_v_);
-        if (v < min_cutoff) col_idx = 0;
-        else if (v > max_cutoff) col_idx = 255;
+        if (v < min_color_range_) col_idx = 0;
+        else if (v > max_color_range_) col_idx = 255;
         else {
-          col_idx = roundf(255.0 * (v - min_cutoff) / (max_cutoff-min_cutoff));
+          col_idx = roundf(255.0 * (v - min_color_range_)
+                           / (max_color_range_-min_color_range_));
         }
         assert(col_idx >= 0 && col_idx < 256);
         if (col_idx != last_color_index_) {
@@ -273,6 +280,7 @@ private:
   const bool show_speeds_;
   unsigned segment_count_;
   float min_v_, max_v_;
+  float min_color_range_, max_color_range_;
   int pass_;
   float color_segment_length_;
   int last_color_index_;
