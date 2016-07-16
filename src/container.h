@@ -86,6 +86,11 @@ public:
     read_pos_ = (read_pos_ + 1) % CAPACITY;
   }
 
+  void pop_back() {
+    assert(size() > 0);
+    write_pos_ = (write_pos_ + CAPACITY - 1) % CAPACITY;
+  }
+
 private:
   unsigned write_pos_;
   unsigned read_pos_;

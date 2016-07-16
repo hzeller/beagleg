@@ -897,6 +897,13 @@ void GCodeMachineControl::Impl::machine_move(float feedrate,
       defining_axis = (enum GCodeParserAxis) i;
     }
   }
+
+  if (max_steps == 0) {
+    // Nothing to do, ignore this move.
+    planning_buffer_.pop_back();
+    return;
+  }
+
   new_pos->aux_bits = hardware_mapping_->GetAuxBits();
   new_pos->defining_axis = defining_axis;
   new_pos->angle = previous->angle + 180.0f; // default angle to force a speed change
