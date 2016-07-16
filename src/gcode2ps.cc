@@ -131,7 +131,7 @@ public:
   }
 
   void PrintPostscriptBoundingBox() {
-    fprintf(file_, "%%!PS-Adobe-3.0\n"
+    fprintf(file_, "%%!PS-Adobe-3.0 EPSF-3.0\n"
             "%%%%BoundingBox: %d %d %d %d\n",
             ToPoint(min_[AXIS_X] - 10), ToPoint(min_[AXIS_Y] - 10),
             ToPoint(max_[AXIS_X] + 20), ToPoint(max_[AXIS_Y] + 20));
@@ -233,9 +233,11 @@ public:
           dominant_axis = i;
       }
 #if 0
-      fprintf(file_, "%% dx: %f dy: %f %s\n", dx_mm, dy_mm,
+      fprintf(file_, "%% dx: %f dy: %f %s (speed: %.1f->%.1f)\n", dx_mm, dy_mm,
               param.v0 == param.v1 ? "; steady move" :
-              ((param.v0 < param.v1) ? "; accel" : "; decel"));
+              ((param.v0 < param.v1) ? "; accel" : "; decel"),
+              param.v0/config_.steps_per_mm[dominant_axis],
+              param.v1/config_.steps_per_mm[dominant_axis]);
 #endif
       const float segment_len = hypotf(dx_mm, dy_mm);
       int segments = 1;
@@ -260,7 +262,11 @@ public:
         }
         fprintf(file_, "%f %f rlineto ",
                 dx_mm/segments, dy_mm/segments);
-        fprintf(file_, "currentpoint stroke moveto\n");
+        fprintf(file_, "currentpoint stroke moveto");
+#if 1
+        fprintf(file_, " %% %.1f mm/s", v);
+#endif
+        fprintf(file_, "\n");
       }
     } else {
       fprintf(file_, "%f %f rlineto\n", dx_mm, dy_mm);
