@@ -223,21 +223,34 @@ public:
   }
   
   virtual void Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
+    int dominant_axis = 0;
+    for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
+      if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
+        dominant_axis = i;
+    }
+    if (config_.steps_per_mm[dominant_axis] == 0 ||
+        param.steps[dominant_axis] == 0) {
+      return;  // Nothing really to do.
+    }
+
     switch (pass_) {
     case 1: {
-      int dominant_axis = 0;
-      for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
-        if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
-          dominant_axis = i;
-      }
-      if (config_.steps_per_mm[dominant_axis] == 0)
-        return;
-      RememberMinMax(param.v0 / config_.steps_per_mm[dominant_axis]);
-      RememberMinMax(param.v1 / config_.steps_per_mm[dominant_axis]);
+      const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
+      const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
+      const float segment_len = hypotf(dx_mm, dy_mm);
+      // The step speed is given by the dominant axis; however the actual
+      // segment speed depends on the actual travel in euclidian space.
+      const float segment_speed_factor = segment_len /
+        (abs(param.steps[dominant_axis]) / config_.steps_per_mm[dominant_axis]);
+
+      RememberMinMax(segment_speed_factor *
+                     (param.v0 / config_.steps_per_mm[dominant_axis]));
+      RememberMinMax(segment_speed_factor *
+                     (param.v1 / config_.steps_per_mm[dominant_axis]));
     }
       break;
     case 2:
-      PrintSegment(param);
+      PrintSegment(param, dominant_axis);
       break;
     }
   }
@@ -247,24 +260,21 @@ public:
     color_segment_length_ = length;
   }
 
-  virtual void PrintSegment(const LinearSegmentSteps &param) {
+  virtual void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
     const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
 
     if (show_speeds_) {
-      int dominant_axis = 0;
-      for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
-        if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
-          dominant_axis = i;
-      }
-#if 0
       fprintf(file_, "%% dx: %f dy: %f %s (speed: %.1f->%.1f)\n", dx_mm, dy_mm,
               param.v0 == param.v1 ? "; steady move" :
               ((param.v0 < param.v1) ? "; accel" : "; decel"),
               param.v0/config_.steps_per_mm[dominant_axis],
               param.v1/config_.steps_per_mm[dominant_axis]);
-#endif
       const float segment_len = hypotf(dx_mm, dy_mm);
+      // The step speed is given by the dominant axis; however the actual
+      // physical speed depends on the actual travel in euclidian space.
+      const float segment_speed_factor = segment_len /
+        (abs(param.steps[dominant_axis]) / config_.steps_per_mm[dominant_axis]);
       int segments = 1;
       if (param.v0 != param.v1) {
         segments = segment_len / color_segment_length_;
@@ -273,6 +283,7 @@ public:
       for (int i = 0; i < segments; ++i) {
         float v = param.v0 + i * (param.v1 - param.v0)/segments;
         v /= config_.steps_per_mm[dominant_axis];
+        v *= segment_speed_factor;
         int col_idx;
         if (v < min_color_range_) col_idx = 0;
         else if (v > max_color_range_) col_idx = 255;
@@ -288,12 +299,10 @@ public:
         fprintf(file_, "%f %f rlineto ",
                 dx_mm/segments, dy_mm/segments);
         fprintf(file_, "currentpoint stroke moveto");
-#if 1
         fprintf(file_, " %% %.1f mm/s [%s]", v,
                 param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
         if (i == 0)
           fprintf(file_, " (%d,%d)", param.steps[AXIS_X], param.steps[AXIS_Y]);
-#endif
         fprintf(file_, "\n");
       }
     } else {
