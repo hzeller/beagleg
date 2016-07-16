@@ -289,8 +289,10 @@ public:
                 dx_mm/segments, dy_mm/segments);
         fprintf(file_, "currentpoint stroke moveto");
 #if 1
-        fprintf(file_, " %% %.1f mm/s (%d,%d)", v,
-                param.steps[AXIS_X], param.steps[AXIS_Y]);
+        fprintf(file_, " %% %.1f mm/s [%s]", v,
+                param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
+        if (i == 0)
+          fprintf(file_, " (%d,%d)", param.steps[AXIS_X], param.steps[AXIS_Y]);
 #endif
         fprintf(file_, "\n");
       }
