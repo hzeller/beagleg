@@ -763,9 +763,10 @@ void GCodeMachineControl::Impl::move_machine_steps(const struct AxisTarget *last
   // We need to arrive at a speed that the upcoming move does not have
   // to decelerate further (after all, it has a fixed feed-rate it should not
   // go over).
+  float angle_change = fabsf(last_pos->angle) - fabsf(target_pos->angle);
   float next_speed = determine_joining_speed(target_pos, upcoming,
                                              cfg_.threshold_angle,
-                                             fabsf(last_pos->angle - target_pos->angle));
+                                             fabsf(angle_change));
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
