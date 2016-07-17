@@ -117,48 +117,76 @@ public:
     }
   }
 
+  void GetDimensions(float *x, float *y, float *width, float *height) {
+    *x = min_[AXIS_X];
+    *y = min_[AXIS_X];
+    *width = max_[AXIS_X]-min_[AXIS_X];
+    *height = max_[AXIS_Y]-min_[AXIS_Y];
+  }
+
   float GetDiagonalLength() {
     return hypotf(max_[AXIS_X] - min_[AXIS_X], max_[AXIS_Y] - min_[AXIS_Y]);
   }
 
-  void PrintShowRange() {
+  void PrintShowRange(float margin) {
     fprintf(file_, "\n%% -- Print Dimensions\n");
     fprintf(file_, "0 0 0.8 setrgbcolor 0.5 setlinewidth\n");
     fprintf(file_, "/Helvetica findfont 5 scalefont setfont\n");
     fprintf(file_, "%f %f moveto "
-            "%f %f lineto stroke %% X-dimension\n",
-            min_[AXIS_X], max_[AXIS_Y] + 5, max_[AXIS_X], max_[AXIS_Y] + 5);
+            "%f %f lineto stroke %% width\n",
+            min_[AXIS_X], max_[AXIS_Y] + margin,
+            max_[AXIS_X], max_[AXIS_Y] + margin);
+    fprintf(file_, "gsave 0.5 setgray 0.1 setlinewidth [1] 0 setdash\n");
+    fprintf(file_, "%f %f moveto %f %f lineto stroke\n",
+            min_[AXIS_X], min_[AXIS_Y],
+            min_[AXIS_X], max_[AXIS_Y]);
+    fprintf(file_, "%f %f moveto %f %f lineto stroke\n",
+            max_[AXIS_X], min_[AXIS_Y],
+            max_[AXIS_X], max_[AXIS_Y]);
+    fprintf(file_, "%f %f moveto %f %f lineto stroke\n",
+            min_[AXIS_X], min_[AXIS_Y],
+            max_[AXIS_X], min_[AXIS_Y]);
+    fprintf(file_, "%f %f moveto %f %f lineto stroke\n",
+            min_[AXIS_X], max_[AXIS_Y],
+            max_[AXIS_X], max_[AXIS_Y]);
+    fprintf(file_, "stroke grestore\n");
     if (prefer_inch_display_) {
       fprintf(file_, "%f %f moveto "
               "(Width: %.2f\") dup stringwidth pop neg 0 rmoveto show\n",
-              max_[AXIS_X], max_[AXIS_Y] + 10, (max_[AXIS_X]-min_[AXIS_X])/25.4);
+              max_[AXIS_X], max_[AXIS_Y] + margin + 5,
+              (max_[AXIS_X]-min_[AXIS_X])/25.4);
     } else {
       fprintf(file_, "%f %f moveto "
               "(Width: %.2fmm) dup stringwidth pop neg 0 rmoveto show\n",
-              max_[AXIS_X], max_[AXIS_Y] + 10, max_[AXIS_X]-min_[AXIS_X]);
+              max_[AXIS_X], max_[AXIS_Y] + margin + 5,
+              max_[AXIS_X]-min_[AXIS_X]);
     }
     fprintf(file_, "%f %f moveto "
-            "%f %f lineto stroke %% Y-dimension\n",
-            max_[AXIS_X] + 5, min_[AXIS_Y], max_[AXIS_X] + 5, max_[AXIS_Y]);
+            "%f %f lineto stroke %% height\n",
+            max_[AXIS_X] + margin, min_[AXIS_Y],
+            max_[AXIS_X] + margin, max_[AXIS_Y]);
     if (prefer_inch_display_) {
       fprintf(file_, "gsave %f %f translate -90 rotate "
               "0 0 moveto (Height: %.2f\") show grestore\n",
-              max_[AXIS_X]+8, max_[AXIS_Y], (max_[AXIS_Y]-min_[AXIS_Y])/25.4);
+              max_[AXIS_X] + margin + 3, max_[AXIS_Y],
+              (max_[AXIS_Y]-min_[AXIS_Y])/25.4);
     } else {
       fprintf(file_, "gsave %f %f translate -90 rotate "
               "0 0 moveto (Height: %.2fmm) show grestore\n",
-              max_[AXIS_X]+8, max_[AXIS_Y], max_[AXIS_Y]-min_[AXIS_Y]);
+              max_[AXIS_X] + margin + 3, max_[AXIS_Y],
+              max_[AXIS_Y]-min_[AXIS_Y]);
     }
     fprintf(file_, "0 1 1 setrgbcolor 0.4 setlinewidth\n");
     fprintf(file_, "0 0 0.5 0 360 arc closepath "
             "gsave 0 setgray fill grestore stroke %% This is the home pos.\n");
   }
 
-  void PrintPostscriptBoundingBox() {
+  void PrintPostscriptBoundingBox(float margin_x, float margin_y) {
     fprintf(file_, "%%!PS-Adobe-3.0 EPSF-3.0\n"
             "%%%%BoundingBox: %d %d %d %d\n",
             ToPoint(min_[AXIS_X] - 10), ToPoint(min_[AXIS_Y] - 10),
-            ToPoint(max_[AXIS_X] + 20), ToPoint(max_[AXIS_Y] + 20));
+            ToPoint(max_[AXIS_X] + 10 + margin_x),
+            ToPoint(max_[AXIS_Y] + 10 + margin_y));
   }
 
 private:
@@ -317,6 +345,42 @@ public:
   virtual void MotorEnable(bool on) {}
   virtual void WaitQueueEmpty() {}
 
+  void PrintColorLegend(float x, float y, float width) {
+    const float barheight = std::min(8.0, 0.05 * width);
+    const float fontsize = barheight / 2;
+    fprintf(file_, "gsave /Helvetica findfont %f scalefont setfont\n",
+            fontsize);
+    fprintf(file_, "0 setgray 0 setlinewidth\n");
+    fprintf(file_, "%f %f moveto (mm/s) show\n", x+width + fontsize, y);
+    fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+            "(<=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+            x, y, barheight, min_color_range_);
+
+    const int kLegendPartitions = 6;
+    for (int i = 1; i < kLegendPartitions; ++i) {
+      float val = i * (max_color_range_-min_color_range_)/kLegendPartitions;
+      float pos = i * width/kLegendPartitions;
+      fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+              "(%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+              x + pos, y, barheight, min_color_range_ + val);
+    }
+    fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+            "(>=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+            x+width, y, barheight, max_color_range_);
+
+    const float step = width/256;
+    fprintf(file_, "%f setlinewidth %f %f moveto\n", barheight, x, y);
+    for (int i = 0; i < 256; ++i) {
+      // little overlap of 0.1, seems that the postscript interpreter otherwise
+      // might leave little gaps.
+      fprintf(file_, "%s setrgbcolor %f 0.1 add 0 rlineto currentpoint stroke moveto -0.1 0 rmoveto\n",
+              viridis_colors[i], step);
+    }
+    fprintf(file_, "grestore\n");
+    //min_color_range_ = min_v_ + 0.1 * (max_v_ - min_v_);
+    //max_color_range_ = max_v_ - 0.1 * (max_v_ - min_v_);
+  }
+
 private:
   FILE *const file_;
   const MachineControlConfig &config_;
@@ -406,6 +470,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  const float printMargin = 2 + tool_diameter_mm/2;
+
   Log_init("/dev/null");
 
   // TODO(hzeller): only parse the file once, so that we can read from stdin.
@@ -416,9 +482,13 @@ int main(int argc, char *argv[]) {
   GCodeParser gcode_viz_parser(GCodeParser::Config(), &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true);
 
-  gcode_printer.PrintPostscriptBoundingBox();
+  gcode_printer.PrintPostscriptBoundingBox(printMargin,
+                                           printMargin + (show_speeds ? 20 : 5));
 
   fprintf(output_file, "72 25.4 div dup scale  %% Numbers mean millimeter\n");
+  if (show_dimensions) {
+    gcode_printer.PrintShowRange(printMargin);
+  }
 
   if (config_file) {
     struct MachineControlConfig machine_config;
@@ -482,6 +552,12 @@ int main(int argc, char *argv[]) {
       motor_printer.SetColorSegmentLength(gcode_printer.GetDiagonalLength()/100);
       motor_printer.SetPass(2);
       ParseFile(&parser, filename, false);
+
+      if (show_speeds) {
+        float x, y, w, h;
+        gcode_printer.GetDimensions(&x, &y, &w, &h);
+        motor_printer.PrintColorLegend(x, y + h + 20, w);
+      }
     }
     delete machine_control;
   }
@@ -489,10 +565,6 @@ int main(int argc, char *argv[]) {
   // We print the gcode on top of the colored machine visualization.
   gcode_printer.SetPass(2);
   ParseFile(&gcode_viz_parser, filename, false);
-
-  if (show_dimensions) {
-    gcode_printer.PrintShowRange();
-  }
 
   fprintf(output_file, "\nshowpage\n");
 
