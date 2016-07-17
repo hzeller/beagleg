@@ -45,7 +45,7 @@ public:
     EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
   }
 
-  virtual void Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
+  virtual void Enqueue(const LinearSegmentSteps &param) {
     const int number = (int)(current_ - expect_);
     EXPECT_NE(END_SENTINEL, current_->aux_bits);
     ExpectEq(current_, param, number);

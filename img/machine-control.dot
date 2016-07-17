@@ -1,58 +1,69 @@
 digraph beagleg {
-    node [fontsize=10, fontname="Helvetica"];
-    edge [fontsize=10, fontname="Helvetica"];
+	node [fontsize=10, fontname="Helvetica"];
+	edge [fontsize=10, fontname="Helvetica"];
 
-    {
-       node [ shape=oval ];
-       TCP [label = "TCP socket"];
-    }
+	{
+		node [ shape=oval ];
+		TCP [label = "TCP socket"];
+	}
 
-    {
-       node [ shape=box ];
-       GCodeParser;
-       GCodeMachineControl [ label = "GCodeMachineControl\nGCode Actions\nPath planning"];
-       HardwareMapping;
-       MotorOperations  [label = "MotorOperations\nConvert segments\ninto firmware commands"];
-       DummyMotionQueue [label = "DummyMotionQueue\nfor dryrun.", style=dotted];
-       PRUMotionQueue;
-       SimFirmwareQueue [label = "SimFirmwareQueue\nSimulating PRU", style=dotted];
-       PRU [ label = "PRU firmware\n(motor-interface-pru.p)" ];
-    }      
+	// All the processing nodes, displayed as boxes.
+	{
+		node [ shape=box ];
+		GCodeParser;
+		GCodeMachineControl [ label = "GCodeMachineControl\nGCode Actions"];
+		HardwareMapping;
+		Planner;
+		MotorOperations  [label = "MotorOperations\nConvert segments\ninto firmware commands"];
+		DummyMotionQueue [label = "DummyMotionQueue\nfor dryrun.", style=dotted];
+		PRUMotionQueue;
+		SimFirmwareQueue [label = "SimFirmwareQueue\nSimulating PRU", style=dotted];
+		GCode2PS [ style=dotted];
+		PRU [ label = "PRU firmware\n(motor-interface-pru.p)" ];
+	}
 
-    {
-      CapeConfig [ label = "Cape config in\nhardware/"];
-      UserMapConfig [ label = "User config file:\nMapping sections"];
-      UserAxisConfig [ label = "User config file:\nAxis sections"];
-      GNUPlotOutput [ style = dotted ];
-      PinToggeling [ label = "Pin Toggling,\nPWM control." ];
-    }
+	// Inputs, and configuration files
+	{
+		node [ shape=oval ];
+		GCodeFile [label = "GCode File"];
+		CapeConfig [ label = "Cape config in\nhardware/"];
+		UserMapConfig [ label = "User config file:\nMapping sections"];
+		UserAxisConfig [ label = "User config file:\nAxis sections"];
+		GNUPlotOutput [ style = dotted ];
+		PinToggeling [ label = "Pin Toggling,\nPWM control." ];
+	}
 
-    File -> GCodeParser [ label="G-Code", style=dotted];
-    TCP -> GCodeParser  [ label="G-Code"];
+	GCodeFile -> GCodeParser [ label="G-Code", style=dotted];
+	TCP -> GCodeParser  [ label="G-Code"];
 
-    {
-      GCodeParser -> GCodeMachineControl [ label=" Parse Events;\l Metric coordinates.\l Logic axes (X, Y, Z..)"];
-      GCodeMachineControl -> MotorOperations [ label = " LinearSegmentSteps\l Step coordinates.\l Logic axes assigned to motors 1, 2, 3..." ]
-      MotorOperations -> PRUMotionQueue [ label = " MotionSegment\lPrepared for PRU"]
-      MotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
-      MotorOperations -> DummyMotionQueue;
+	{
+		GCodeParser -> GCodeMachineControl [ label=" Parse Events;\l Metric coordinates.\l Logic axes (X, Y, Z..)"]
+		GCodeMachineControl -> Planner [ label=" Absolute target position sequence\l with desired speed." ];
 
-      PRUMotionQueue -> PRU [ label = "Host -> PRU\lringbuffer"];
-    }
+		Planner -> MotorOperations [ label = " Delta LinearSegmentSteps\l Step coordinates.\l Logic axes assigned to motors 1, 2, 3..." ]
+		// Various MotorOperations backends
+		MotorOperations -> PRUMotionQueue [ label = " MotionSegment\lPrepared for PRU"]
+		MotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
+		MotorOperations -> DummyMotionQueue;
+		MotorOperations -> GCode2PS;
 
-    {
-      rank = same;
-      GCodeMachineControl -> HardwareMapping [ label="Request Output\nPWM, Spindle, Fan...", rank=0];
-      HardwareMapping -> GCodeMachineControl [ label = "Axis -> motor mapping."];
-      HardwareMapping -> GCodeMachineControl [ label = "Switch status." ];
-    }
+		PRUMotionQueue -> PRU [ label = "Host -> PRU\lringbuffer"];
+	}
 
-    { 
-      rank = same; 
-      UserAxisConfig -> GCodeMachineControl;
-    }
+	{
+		rank = same;
+		GCodeMachineControl -> HardwareMapping [ label="Request Output\nPWM, Spindle, Fan...", rank=0];
+		HardwareMapping -> GCodeMachineControl [ label = "Switch status." ];
+	}
 
-    CapeConfig -> HardwareMapping;
-    UserMapConfig -> HardwareMapping;
-    HardwareMapping -> PinToggeling;
+	HardwareMapping -> Planner [ label = "Axis -> motor mapping."];
+
+	{
+		rank = same;
+		UserAxisConfig -> GCodeMachineControl;
+	}
+
+	CapeConfig -> HardwareMapping;
+	UserMapConfig -> HardwareMapping;
+	HardwareMapping -> PinToggeling;
 }

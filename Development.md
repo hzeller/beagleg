@@ -49,47 +49,62 @@ This is a overview of the pipeline components:
 
 ### APIs
 The functionality is implemented in a stack of independently usable APIs.
+Each part of the stack has some well-defined task, and possibly delegates
+action levels down.
 
    - [gcode-parser.h](./src/gcode-parser.h) : C++-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
       care of many internals, e.g. interpreting slightly different dialects and
       automatically translates everything into metric, absolute coordinates for
-      ease of downstream receivers. This API in itself is independent of the
-      rest, so it might be useful in other contexts as well.
+      ease of downstream receivers.
+      This API in itself is independent of the rest, so it might be useful
+      in other contexts as well.
 
    - [gcode-machine-control.h](./src/gcode-machine-control.h) : highlevel
-      C++-API to control a machine via G-Code: it receives G-Code events, does
-      motion planning, axis mapping, speed/accleration segment joining and emits
-      the resuling motor commands to MotorOperations.
+      C++-API to control a machine via G-Code: it receives G-Code events
+      and provides the services actually needed to control a machine - from
+      dealing with homing, showing the current position or issue machine
+      moves. The machine moves are delegated to the planner for further
+      processing.
       Depends on the gcode-parser APIs as input and motor-operations as output.
       Provides the functionality provided by the `machine-control` binary.
       If you want, you can use this API to programmatically control your machine
       without the detour through GCode.
 
+   - [planner.h](./src/planner.h) : From a sequence of requested target
+      positions with a desired speed of segments, plans actually pysically
+      possible moves with speed/accleration segment joining, maps the
+      axis moves to step count for motors and emits the resuling number
+      of steps with start- and end-speed to MotorOperations.
+
    - [motor-operations.h](./src/motor-operations.h) : Low-level motor motion
       C++-API.
-      Receives travel speeds and speed transitions from gcode machine control
-      planner. This is a good place to implement stepmotor driver backends.
-      The implementation here prepares parameters for the discrete
-      approximation in the PRU motion-queue backend.
-      The `gcode-print-stats` binary has a different implementation that uses it to
-      determine print-time calculations, simulating how long motor movements
-      would take.
+      Receives travel speeds and speed transitions from the planner.
+      This is a good place to implement stepmotor driver backends.
+      There are various implementations here for visualization, and one
+      (`MotionQueueMotorOperations`) that is preparing the output for the
+      next lower hardware level: the `MotionQueue`. For that, it prepares
+      parameters for the discrete approximation in the PRU motion-queue backend.
 
    - [motion-queue.h](./src/motion-queue.h) : Even lower level interface: queue
       between motor-operations and hardware creating motion profiles in realtime.
       The implementation is done in the BeagleBone-PRU, but is separated out
       enough that it is not dependent on it: The required operations could be
       implemented in microcontrollers or FPGAs (32 bit operations help...).
-      There is a simulation implementation (sim-firmware.cc) that illustrates
+      There is a simulation implementation (`sim-firmware.cc`) that illustrates
       what to do with the parameters. The simulation just outputs the would-be
-      result as CSV file (good for debugging).
+      result as CSV file (good for debugging and visualization with gnuplot).
 
    - [determine-print-stats.h](./src/determine-print-stats.h): Highlevel API
       facade to determine some basic stats about a G-Code file; it processes
       the entire file and determines estimated print time, filament used etc.
       Since this takes the actual travel planning into account, the values are
-      a correct prediction of the actual print or CNC time.
+      a correct prediction of the actual print or CNC time. Implements
+      a `GCodeParser::EventReceiver` and a `MotorOperations` interface to get
+      all the necessary information to calculate the needed time.
+
+   - gcode2ps is a utility that outputs gcode and resulting motor-movements
+     as PostScript image to help visualize in development.
 
 The interfaces are C++ objects.
 
@@ -107,5 +122,4 @@ second.
 It only takes a couple of seconds to simulate and pre-calculate the wall-time
 of many-hour long jobs. This might be useful to display to the user.
 
-![gcode-prin-stats](./img/print-stats.png)
-
+![gcode-print-stats](./img/print-stats.png)

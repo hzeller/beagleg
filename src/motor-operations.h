@@ -54,7 +54,7 @@ public:
   // otherwise it waits until a slot frees up.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  virtual void Enqueue(const LinearSegmentSteps &segment, FILE *err_stream) = 0;
+  virtual void Enqueue(const LinearSegmentSteps &segment) = 0;
 
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
@@ -69,7 +69,7 @@ public:
   // Initialize motor operations, sending planned results into the motion backend.
   MotionQueueMotorOperations(MotionQueue *backend) : backend_(backend) {}
 
-  virtual void Enqueue(const LinearSegmentSteps &segment, FILE *err_stream);
+  virtual void Enqueue(const LinearSegmentSteps &segment);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
 

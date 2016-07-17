@@ -58,7 +58,7 @@ public:
   // We have multiple passes to determine ranges first.
   // Pass 1 - preparation, pass 2 - writing.
   void SetPass(int p) { pass_ = p; }
-  
+
   virtual void set_speed_factor(float f) {}
   virtual void set_temperature(float f) {}
   virtual void set_fanspeed(float speed) {}
@@ -110,7 +110,7 @@ public:
       fprintf(file_, "0.1 setlinewidth 0 0 0 setrgbcolor\n0 0 moveto\n");
     }
   }
-  
+
   virtual void gcode_finished(bool end_of_stream) {
     if (pass_ == 2 && end_of_stream) {
       fprintf(file_, "stroke\n");
@@ -174,7 +174,7 @@ private:
   static int ToPoint(float mm) {
     return roundf(mm / 25.4 * 72);
   }
-  
+
   AxesRegister min_;
   AxesRegister max_;
   FILE *const file_;
@@ -221,8 +221,8 @@ public:
     if (v > max_v_) max_v_ = v;
     if (v < min_v_) min_v_ = v;
   }
-  
-  virtual void Enqueue(const LinearSegmentSteps &param, FILE *err_stream) {
+
+  virtual void Enqueue(const LinearSegmentSteps &param) {
     int dominant_axis = 0;
     for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
       if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
@@ -316,7 +316,7 @@ public:
 
   virtual void MotorEnable(bool on) {}
   virtual void WaitQueueEmpty() {}
-  
+
 private:
   FILE *const file_;
   const MachineControlConfig &config_;
@@ -368,7 +368,7 @@ int main(int argc, char *argv[]) {
   float threshold_angle = 0;
   bool show_speeds = false;
   bool range_check = false;
-  
+
   int opt;
   while ((opt = getopt(argc, argv, "o:c:T:Dt:sr")) != -1) {
     switch (opt) {
@@ -405,7 +405,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Could not create output file.\n");
     return 1;
   }
-  
+
   Log_init("/dev/null");
 
   // TODO(hzeller): only parse the file once, so that we can read from stdin.
@@ -417,9 +417,9 @@ int main(int argc, char *argv[]) {
   ParseFile(&gcode_viz_parser, filename, true);
 
   gcode_printer.PrintPostscriptBoundingBox();
-  
+
   fprintf(output_file, "72 25.4 div dup scale  %% Numbers mean millimeter\n");
-  
+
   if (config_file) {
     struct MachineControlConfig machine_config;
     ConfigParser config_parser;
