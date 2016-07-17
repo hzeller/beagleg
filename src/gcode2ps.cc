@@ -100,7 +100,6 @@ public:
   }
 
   virtual const char *unprocessed(char letter, float value, const char *remain) {
-    if (pass_ == 1) fprintf(stderr, "Ignoring unknown %c%f", letter, value);
     return NULL;
   }
 
@@ -350,8 +349,8 @@ public:
     const float fontsize = barheight / 2;
     fprintf(file_, "gsave /Helvetica findfont %f scalefont setfont\n",
             fontsize);
-    fprintf(file_, "0 setgray 0 setlinewidth\n");
-    fprintf(file_, "%f %f moveto (mm/s) show\n", x+width + fontsize, y);
+    fprintf(file_, "0 setgray 0.1 setlinewidth\n");
+    fprintf(file_, "%f %f moveto (mm/s) show\n", x+width + 1, y-fontsize/2);
     fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
             "(<=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
             x, y, barheight, min_color_range_);
