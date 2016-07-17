@@ -17,8 +17,9 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Hacky thing to visualize the machine path. Right now merely a development
-// aid, but might in the future be a toplevel program we can provide as tool
+// Visualize the machine path. NOT pretty, just a quick hack.
+// Right now merely a development aid, but might in the future be a
+// toplevel program we can provide as tool
 
 /*
   TODO
@@ -45,6 +46,7 @@
 
 namespace {
 extern const char *viridis_colors[];
+extern const char *measureLinePS;
 }
 
 // Simple gcode visualizer
@@ -129,8 +131,12 @@ public:
 
   void PrintShowRange(float margin) {
     fprintf(file_, "\n%% -- Print Dimensions\n");
-    fprintf(file_, "0 0 0.8 setrgbcolor 0.5 setlinewidth\n");
-    fprintf(file_, "/Helvetica findfont 5 scalefont setfont\n");
+    fprintf(file_, "%s", measureLinePS);
+    fprintf(file_, "0 0 0.8 setrgbcolor 0.2 setlinewidth\n");
+    // Font-size dependent on overall drawing size.
+    fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
+            std::max(1.0f, 0.015f * GetDiagonalLength()));
+    fprintf(file_, "%% Dotted box around item\n");
     fprintf(file_, "%f %f moveto "
             "%f %f lineto stroke %% width\n",
             min_[AXIS_X], max_[AXIS_Y] + margin,
@@ -149,32 +155,23 @@ public:
             min_[AXIS_X], max_[AXIS_Y],
             max_[AXIS_X], max_[AXIS_Y]);
     fprintf(file_, "stroke grestore\n");
-    if (prefer_inch_display_) {
-      fprintf(file_, "%f %f moveto "
-              "(Width: %.2f\") dup stringwidth pop neg 0 rmoveto show\n",
-              max_[AXIS_X], max_[AXIS_Y] + margin + 5,
-              (max_[AXIS_X]-min_[AXIS_X])/25.4);
-    } else {
-      fprintf(file_, "%f %f moveto "
-              "(Width: %.2fmm) dup stringwidth pop neg 0 rmoveto show\n",
-              max_[AXIS_X], max_[AXIS_Y] + margin + 5,
-              max_[AXIS_X]-min_[AXIS_X]);
-    }
-    fprintf(file_, "%f %f moveto "
-            "%f %f lineto stroke %% height\n",
-            max_[AXIS_X] + margin, min_[AXIS_Y],
-            max_[AXIS_X] + margin, max_[AXIS_Y]);
-    if (prefer_inch_display_) {
-      fprintf(file_, "gsave %f %f translate -90 rotate "
-              "0 0 moveto (Height: %.2f\") show grestore\n",
-              max_[AXIS_X] + margin + 3, max_[AXIS_Y],
-              (max_[AXIS_Y]-min_[AXIS_Y])/25.4);
-    } else {
-      fprintf(file_, "gsave %f %f translate -90 rotate "
-              "0 0 moveto (Height: %.2fmm) show grestore\n",
-              max_[AXIS_X] + margin + 3, max_[AXIS_Y],
-              max_[AXIS_Y]-min_[AXIS_Y]);
-    }
+    const float df = prefer_inch_display_ ? 25.4f : 1.0f;  // display factor
+    const int resolution = prefer_inch_display_ ? 3 : 2;
+    const char *measure_unit = prefer_inch_display_ ? "\"" : "mm";
+    fprintf(file_, "%f %f moveto (%.*f) (%.*f%s) (%.*f) %f MeasureLine\n",
+            min_[AXIS_X], max_[AXIS_Y] + margin,
+            resolution, min_[AXIS_X]/df,
+            resolution, (max_[AXIS_X]-min_[AXIS_X])/df, measure_unit,
+            resolution, max_[AXIS_X]/df,
+            (max_[AXIS_X]-min_[AXIS_X]));
+
+    fprintf(file_, "gsave %f %f translate -90 rotate 0 0 moveto (%.*f) (%.*f%s) (%.*f) %f MeasureLine grestore\n",
+            max_[AXIS_X] + margin, max_[AXIS_Y],
+            resolution, max_[AXIS_Y]/df,
+            resolution, (max_[AXIS_Y]-min_[AXIS_Y])/df, measure_unit,
+            resolution, min_[AXIS_Y]/df,
+            (max_[AXIS_Y]-min_[AXIS_Y]));
+
     fprintf(file_, "0 1 1 setrgbcolor 0.4 setlinewidth\n");
     fprintf(file_, "0 0 0.5 0 360 arc closepath "
             "gsave 0 setgray fill grestore stroke %% This is the home pos.\n");
@@ -347,6 +344,7 @@ public:
   void PrintColorLegend(float x, float y, float width) {
     const float barheight = std::min(8.0, 0.05 * width);
     const float fontsize = barheight / 2;
+    fprintf(file_, "%% Color range visualization\n");
     fprintf(file_, "gsave /Helvetica findfont %f scalefont setfont\n",
             fontsize);
     fprintf(file_, "0 setgray 0.1 setlinewidth\n");
@@ -376,8 +374,6 @@ public:
               viridis_colors[i], step);
     }
     fprintf(file_, "grestore\n");
-    //min_color_range_ = min_v_ + 0.1 * (max_v_ - min_v_);
-    //max_color_range_ = max_v_ - 0.1 * (max_v_ - min_v_);
   }
 
 private:
@@ -832,4 +828,24 @@ const char *viridis_colors[] = {
   "0.983868 0.904867 0.136897",
   "0.993248 0.906157 0.143936"
 };
+
+const char *measureLinePS =
+  "/MeasureLine {\n"
+  "    /width exch def\n"
+  "    /rtext exch def\n"
+  "    /ctext exch def\n"
+  "    /ltext exch def\n"
+  "    currentpoint\n"
+  "    0 -2 rmoveto\n"
+  "    0 4 rlineto\n"
+  "    0 1 rmoveto ltext show\n"
+  "    moveto width 0 rlineto\n"
+  "    currentpoint\n"
+  "    0 -2 rmoveto\n"
+  "    0 4 rlineto\n"
+  "    0 1 rmoveto rtext dup stringwidth pop neg 0 rmoveto show\n"
+  "    exch width 2 div sub exch 1 add moveto\n"
+  "    ctext dup stringwidth pop 2 div neg 0 rmoveto show\n"
+  "    stroke\n"
+  "} def\n";
 }
