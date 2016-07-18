@@ -171,9 +171,11 @@ public:
             resolution, (max_[AXIS_Y]-min_[AXIS_Y])/df, measure_unit,
             resolution, min_[AXIS_Y]/df,
             (max_[AXIS_Y]-min_[AXIS_Y]));
+  }
 
+  void ShowHomePos() {
     fprintf(file_, "0 1 1 setrgbcolor 0.4 setlinewidth\n");
-    fprintf(file_, "0 0 0.5 0 360 arc closepath "
+    fprintf(file_, "0 0 moveto 0 0 0.5 0 360 arc closepath "
             "gsave 0 setgray fill grestore stroke %% This is the home pos.\n");
   }
 
@@ -478,7 +480,7 @@ int main(int argc, char *argv[]) {
   ParseFile(&gcode_viz_parser, filename, true);
 
   gcode_printer.PrintPostscriptBoundingBox(printMargin,
-                                           printMargin + (show_speeds ? 20 : 5));
+                                           printMargin + (show_speeds ? 15 : 0));
 
   fprintf(output_file, "72 25.4 div dup scale  %% Numbers mean millimeter\n");
   if (show_dimensions) {
@@ -551,12 +553,13 @@ int main(int argc, char *argv[]) {
       if (show_speeds) {
         float x, y, w, h;
         gcode_printer.GetDimensions(&x, &y, &w, &h);
-        motor_printer.PrintColorLegend(x, y + h + 20, w);
+        motor_printer.PrintColorLegend(x, y + h + 15, w);
       }
     }
     delete machine_control;
   }
 
+  gcode_printer.ShowHomePos();  // On top of machine path to be visible.
   // We print the gcode on top of the colored machine visualization.
   gcode_printer.SetPass(2);
   ParseFile(&gcode_viz_parser, filename, false);
