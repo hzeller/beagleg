@@ -425,12 +425,6 @@ int main(int argc, char *argv[]) {
   // just ignore them on dummy.
   MotionQueue *motion_backend;
   if (dry_run) {
-    // For dry-run, we never see switches, so disable them.
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      config.homing_trigger[i] = HardwareMapping::TRIGGER_NONE;
-    }
-    config.require_homing = false;
-
     // The backend
     if (simulation_output) {
       motion_backend = new SimFirmwareQueue(stdout, 3); // TODO: derive from cfg
