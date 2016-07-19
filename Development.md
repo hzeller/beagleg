@@ -4,6 +4,10 @@ Development
 If you want to get involved in the development and contribute, this page
 is for you.
 
+### Mailing List
+Please subscribe to the
+[mailing list](https://groups.google.com/forum/#!forum/beagleg-dev)
+
 ### Compilation
 Due to the speed of the compiler on the BeagleBone, you might want to do
 development on other machines for faster turn-around times (unless you really
@@ -35,6 +39,22 @@ for which there are typically already packages available:
  # Or, for more thorough memory-leak or initialization issue check:
  make valgrind-test
  ```
+
+### gcode2ps
+Manual inspection is also useful. A little tool to visually inspect the planner
+output is `src/gcode2ps`. It is a tool that reads gcode and outputs the raw
+gcode path and the machine path that it generates as a printable PostScript file.
+With the `-s` option, it is possible to visualize the speed, so you can see
+where the tool-path is accelerated and decelerated. For easier
+handling (or sending examples to the mailing list), you might want to convert
+the result into a PNG image:
+
+```bash
+$ src/gcode2ps -o /tmp/hello.ps -c machine.config -s somegcode.gcode
+$ make -C src /tmp/hello.png   # create a PNG image out of it if needed.
+```
+
+<img src="./img/sample-gcode2ps.png" width="200"/></a>
 
 ### Overview: processing pipeline
 The processing is event driven: The incoming GCode gets fed through the
@@ -123,3 +143,5 @@ It only takes a couple of seconds to simulate and pre-calculate the wall-time
 of many-hour long jobs. This might be useful to display to the user.
 
 ![gcode-print-stats](./img/print-stats.png)
+
+[ccache]: https://ccache.samba.org/
