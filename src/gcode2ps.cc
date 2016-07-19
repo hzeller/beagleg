@@ -120,7 +120,7 @@ public:
 
   void GetDimensions(float *x, float *y, float *width, float *height) {
     *x = min_[AXIS_X];
-    *y = min_[AXIS_X];
+    *y = min_[AXIS_Y];
     *width = max_[AXIS_X]-min_[AXIS_X];
     *height = max_[AXIS_Y]-min_[AXIS_Y];
   }
@@ -297,6 +297,8 @@ public:
               param.v0/config_.steps_per_mm[dominant_axis],
               param.v1/config_.steps_per_mm[dominant_axis]);
       const float segment_len = hypotf(dx_mm, dy_mm);
+      if (segment_len == 0)
+        return;  // If not in x/y plane.
       // The step speed is given by the dominant axis; however the actual
       // physical speed depends on the actual travel in euclidian space.
       const float segment_speed_factor = segment_len /
@@ -344,6 +346,8 @@ public:
   virtual void WaitQueueEmpty() {}
 
   void PrintColorLegend(float x, float y, float width) {
+    if (min_color_range_ == max_color_range_)
+      return;
     const float barheight = std::min(8.0, 0.05 * width);
     const float fontsize = barheight / 2;
     fprintf(file_, "%% Color range visualization\n");
