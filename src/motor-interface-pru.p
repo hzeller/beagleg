@@ -28,6 +28,7 @@
 #define CONST_PRUDRAM	   C24
 
 #define QUEUE_ELEMENT_SIZE (SIZE(QueueHeader) + SIZE(TravelParameters))
+#define STATUS_VALUE (QUEUE_LEN * QUEUE_ELEMENT_SIZE)
 
 #define PARAM_START r7
 #define PARAM_END  r19
@@ -167,13 +168,26 @@ calc_decel:
 DONE_CALCULATE_DELAY:
 .endm
 
+;;; This macro decrease the counter that holds the overall number of loops left
+;;; to be performed and then it push it in the PRU DRAM status register.
+.macro UpdateQueueStatus
+	;; Decrease the step counter
+	SUB r28, r28, 1 ; status_loops--
+	;; Push in DRAM
+	MOV r0, STATUS_VALUE
+	SBCO r28, CONST_PRUDRAM, r0, 4
+.endm
+
 INIT:
 	;; Clear STANDBY_INIT in SYSCFG register.
 	LBCO r0, C4, 4, 4
 	CLR r0, r0, 4
 	SBCO r0, C4, 4, 4
 
-	MOV r2, 0		; Queue address in PRU memory
+	MOV r2, 0   ; Queue address in PRU memory
+	MOV r28, 0  ; Status register in PRU memory,
+	            ; r28.b3 for current queue position,
+	            ; bottom three for the remaining steps of the current slot.
 QUEUE_READ:
 	;;
 	;; Read next element from ring-buffer
@@ -202,14 +216,30 @@ QUEUE_READ:
 	ZERO &mstate, SIZE(mstate)	; clear the motor states
 	ZERO &r3, 4			; initialize delay calculation state register.
 
+	;; STATUS REGISTER
+	;; ! We are assuming that writing the 4 bytes status register is atomic
+	;; and we guarantee that the bottom three bytes are all zero so we just need
+	;; to sum up the 3 loop counters. The upper bound of this sum will always be
+	;; less than 2^18. At each loop executed this counter is decreased of one unit.
+	ADD r28, r28, travel_params.loops_accel
+	ADD r28, r28, travel_params.loops_travel
+	ADD r28, r28, travel_params.loops_decel
+	;; Add one more because the first delay is pre-calculated
+	ADD r28, r28, 1
+
+	;; We store a 32-bit word at the end of the queue chunk of memory
+	MOV r0, STATUS_VALUE
+	SBCO r28, CONST_PRUDRAM, r0, 4
+
 	;; Registers
 	;; r0, r1 free for calculation
 	;; r2 = queue pos
 	;; r3 = state for CalculateDelay
-	;; scratch:      r4..r6
-	;; parameter:    r7..r19
-	;; motor-state: r20..r27
-	;; call/ret:    r30
+	;; scratch:           r4..r6
+	;; parameter:         r7..r19
+	;; motor-state:       r20..r27
+	;; status-variable:   r28
+	;; call/ret:          r30
 STEP_GEN:
 	;;
 	;; Generate motion profile configured by TravelParameters
@@ -230,6 +260,7 @@ STEP_GEN:
 	CALL SetSteps
 
 	CalculateDelay r1, travel_params, r3, r5, r6
+	UpdateQueueStatus
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
 STEP_DELAY:				; Create time delay between steps.
 	SUB r1, r1, 1                   ; two cycles per loop.
@@ -245,9 +276,11 @@ DONE_STEP_GEN:
 
 	;; Next position in ring buffer
 	ADD r2, r2, QUEUE_ELEMENT_SIZE
+	ADD r28.b3, r28.b3, 1                  ; add + 1 to the MSB byte
 	MOV r1, QUEUE_LEN * QUEUE_ELEMENT_SIZE ; end-of-queue
 	QBLT QUEUE_READ, r1, r2
 	ZERO &r2, 4
+	ZERO &r28, 4
 	JMP QUEUE_READ
 
 FINISH:
