@@ -343,7 +343,7 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
                              abs_defining_axis_steps) / abs_defining_axis_steps
     : 0;
 
-  assert(accel_fraction + decel_fraction <= 1.0 + 1e-4);
+  assert(accel_fraction + decel_fraction <= 1.0 + 1e-3);
 
 #if 1
   // fudging: if we have tiny acceleration segments, don't do these at all
