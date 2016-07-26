@@ -14,20 +14,9 @@
 #include "motor-operations.h"
 #include "gcode-machine-control.h"
 
-// We have a bug in which we generate extremely short segments that
-// are very fast.
-// TODO: This test should work with this set to 0 (and then
-// the ifdef's removed).
-#define EXPECT_SHORT_SEGMENT_GLITCH 1
+#define VERBOSE_ENQUEUE 1
 
-// Using different steps/mm speeds results in problems right now.
-// TODO: This should work being set to 1
 #define USE_DIFFERENT_STEP_SPEEDS 0
-
-// How much we allow adjacent segments to differ in euclidian speed.
-// This means essentially, we allow 8% joining-speed mismatch.
-// TODO: this is too high! This should probably be more in the 0.001 range.
-#define SPEED_COMPARISON_EQUAL_FUDGE_FRACTION 0.08
 
 // Set up config that they are the same for all the tests.
 static void InitTestConfig(struct MachineControlConfig *c) {
@@ -53,34 +42,20 @@ public:
 
   virtual void Enqueue(const LinearSegmentSteps &segment_in) {
     LinearSegmentSteps segment = segment_in;
-    // Let's convert the velocities into Euclidian space again.
-    const float hypotenuse = FixEuclidSpeed(&segment);
-#if 1
-    // Somewhat verbose, but useful :). All these values are calculated
-    // back into actual distances and speeds from steps.
-    fprintf(stderr, "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
-            "len: %5.1f ; v: %7.1f -> %7.1f\n",
-            segment.steps[AXIS_X] / config_.steps_per_mm[AXIS_X],
-            segment.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-            segment.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
-            hypotenuse,
-            segment.v0, segment.v1);
-#endif
 
-    // We recognize what we call 'glitch' at segments that are very
-    // short (a few steps), and have some very high speeds
-    if (abs(segment.steps[AXIS_X]) < 2 &&
-        abs(segment.steps[AXIS_Y]) < 2 &&
-        abs(segment.steps[AXIS_Z]) < 2) {
-      fprintf(stderr, "^^^^^^^^ steps:(%d, %d, %d): GLITCH!\n",
-              segment.steps[AXIS_X], segment.steps[AXIS_Y],
-              segment.steps[AXIS_Z]);
-#if EXPECT_SHORT_SEGMENT_GLITCH
-      // When we expect it, we ignore it by not adding to collected segments.
-      return;
-#endif
-    }
+#if VERBOSE_ENQUEUE
+    // Real world coordinates so that the euclid_len is correct for
+    // USE_DIFFERENT_STEP_SPEEDS
+    const float dx = segment.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
+    const float dy = segment.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
+    const float dz = segment.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
+    const float euclid_len = sqrtf(dx*dx + dy*dy + dz*dz);
 
+    // Somewhat verbose, but useful :).
+    fprintf(stderr, "  Receiving: (%6.1f, %6.1f, %6.1f); "
+            "euclid len: %5.1f ; v: %7.1f -> %7.1f\n",
+            dx, dy, dz, euclid_len, segment.v0, segment.v1);
+#endif
     collected_.push_back(segment);
   }
 
@@ -90,35 +65,6 @@ public:
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }
 
 private:
-  // Convert speeds in segments back to speed in euklidian space to have
-  // something useful to relate to.
-  // Out of convenience, return back the length of the segment in euclid space
-  float FixEuclidSpeed(LinearSegmentSteps *seg) {
-    // Real world coordinates
-    const float dx = seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
-    const float dy = seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
-    const float dz = seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
-    const float hypotenuse = sqrtf(dx*dx + dy*dy + dz*dz);
-    int defining_axis = AXIS_X;
-    for (int i = AXIS_Y; i < AXIS_Z; ++i) {
-      if (abs(seg->steps[i]) > abs(seg->steps[defining_axis]))
-        defining_axis = i;
-    }
-
-    // The hypotenuse is faster than each of the sides, so its speed is
-    // proportionally larger.
-    const float defining_side_len
-      = fabsf(seg->steps[defining_axis] / config_.steps_per_mm[defining_axis]);
-    const float correction = hypotenuse / defining_side_len;
-
-    // Go from steps/sec back to to mm/sec and apply correction to be back in
-    // euclid space.
-    seg->v0 = (seg->v0 / config_.steps_per_mm[defining_axis]) * correction;
-    seg->v1 = (seg->v1 / config_.steps_per_mm[defining_axis]) * correction;
-
-    return hypotenuse;
-  }
-
   const MachineControlConfig &config_;
   // We keep this public for easier testing
   std::vector<LinearSegmentSteps> collected_;
@@ -171,14 +117,10 @@ static void VerifyCommonExpectations(
   EXPECT_EQ(0, segments[0].v0);
   EXPECT_EQ(0, segments[segments.size()-1].v1);
 
-  // The joining speeds between segments match.
+  // The joining speeds between segments should match.
   for (size_t i = 0; i < segments.size()-1; ++i) {
-    // Let's determine the speed in euclidian space.
-#if 1
-    EXPECT_NEAR(segments[i].v1, segments[i+1].v0,
-                segments[i].v1 * SPEED_COMPARISON_EQUAL_FUDGE_FRACTION)
+    EXPECT_EQ(segments[i].v1, segments[i+1].v0)
       << "Joining speed between " << i << " and " << (i+1);
-#endif
   }
 }
 
@@ -213,10 +155,14 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
 
 static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
                                                    float start_angle,
-                                                   float delta_angle) {
-  const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
-  fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f)\n",
-          threshold_angle, start_angle, delta_angle);
+                                                   float delta_angle,
+                                                   float feedrate,
+                                                   float len_factor) {
+  fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f) @ %.1f %s\n",
+          threshold_angle, start_angle, delta_angle, feedrate,
+          (len_factor < 1) ? "shorter exit move" :
+          (len_factor > 1) ? "longer exit move" :
+          "equal length moves");
   PlannerHarness plantest(threshold_angle);
   const float kSegmentLen = 100;
 
@@ -224,20 +170,23 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
   AxesRegister pos;
   pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
   pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
-  plantest.Enqueue(pos, kFeedrate);
+  plantest.Enqueue(pos, feedrate);
 
   radangle += 2 * M_PI * delta_angle / 360;
-  pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
-  pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
-  plantest.Enqueue(pos, kFeedrate);
+  pos[AXIS_X] = (kSegmentLen * len_factor) * cos(radangle) + pos[AXIS_X];
+  pos[AXIS_Y] = (kSegmentLen * len_factor) * sin(radangle) + pos[AXIS_Y];
+  plantest.Enqueue(pos, feedrate);
   std::vector<LinearSegmentSteps> segments = plantest.segments();
   VerifyCommonExpectations(segments);
   return segments;
 }
 
 TEST(PlannerTest, CornerMove_90Degrees) {
+  const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
   const float kThresholdAngle = 5.0f;
-  std::vector<LinearSegmentSteps> segments = DoAngleMove(kThresholdAngle, 0, 90);
+  std::vector<LinearSegmentSteps> segments =
+    DoAngleMove(kThresholdAngle, 0, 90, kFeedrate, 1);
+
   ASSERT_EQ(4, segments.size());
 
   // This is a 90 degree move, we expect to slow down all the way to zero
@@ -246,28 +195,42 @@ TEST(PlannerTest, CornerMove_90Degrees) {
   EXPECT_EQ(segments[1].v1, segments[2].v0);
 }
 
+// kFeedrate  kLenFactor  Result
+// 3000.0     1.0         Passes with glitch where final move does not reach 0 speed
+//                          The first move is all accel. The second move is
+//                          sometimes to short to fully decel.
+// 3000.0     1.1         Passes
+//                          The first move is all accel. The second move is
+//                          always long enough to decel
+// 100.0      1.0         Passes
+//                          The first move accels to full speed, moves at that
+//                          speed, then decels to the max speed of the second
+//                          move. The second move moves at max speed then decels.
+// 100.0      0.5         Passes
+//                          Same as above. The second move just has a shorter
+//                          move segment.
+// 100.0      0.4         Passes with glitch where final move does not reach 0 speed
+//                           The second move is sometimes to short to fully decel.
+//
+// If USE_DIFFERENT_STEP_SPEEDS is enabled, the tests still pass. But the
+// glitches start going away as the angles get closer to the axis with
+// higher resolution (i.e. there are more steps to do the decel).
 void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
+  const float kFeedrate = 3000.0f;
+  const float kLenFactor = 1.0f;
   // Essentially, we go around the circle as starting segments.
   for (float angle = 0; angle < 360; angle += threshold/2) {
     std::vector<LinearSegmentSteps> segments =
-      DoAngleMove(threshold, angle, testing_angle);
-#if EXPECT_SHORT_SEGMENT_GLITCH
-    // With the short segment glitch, we sometimes get three segments.
-    ASSERT_GE(segments.size(), 2);
-#else
-    // We essentially expect two segments, plowing through in the middle
-    // with full speed
-    ASSERT_EQ(2, segments.size()) << "For start-angle " << angle;
-#endif
+      DoAngleMove(threshold, angle, testing_angle, kFeedrate, kLenFactor);
+
+    // No matter what we get at least 2 segments
+    ASSERT_GT(segments.size(), 1);
+
+    // VerifyCommonExpectations() already checked the "knots" between segments
 
     // A shallow move just plows through the middle, so we expect a larger
     // speed than zero
     EXPECT_GT(segments[0].v1, 0);
-
-    // Still, the join-speed at the elbow is the same.
-    EXPECT_NEAR(segments[0].v1, segments[1].v0,
-                segments[0].v1 * SPEED_COMPARISON_EQUAL_FUDGE_FRACTION)
-      << "At angle " << angle;
   }
 }
 
