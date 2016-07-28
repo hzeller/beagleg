@@ -40,6 +40,7 @@
 #include "gcode-parser.h"
 #include "hardware-mapping.h"
 #include "logging.h"
+#include "pru-hardware-interface.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
 #include "spindle-control.h"
@@ -424,6 +425,7 @@ int main(int argc, char *argv[]) {
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
   MotionQueue *motion_backend;
+  PruHardwareInterface *pru_hw_interface = NULL;
   if (dry_run) {
     // The backend
     if (simulation_output) {
@@ -437,7 +439,8 @@ int main(int argc, char *argv[]) {
                 "Use the dryrun option -n to not write to GPIO).");
       return 1;
     }
-    motion_backend = new PRUMotionQueue(&hardware_mapping);
+    pru_hw_interface = new UioPrussInterface();
+    motion_backend = new PRUMotionQueue(&hardware_mapping, pru_hw_interface);
   }
 
   // Listen port bound, GPIO initialized. Ready to drop privileges.
@@ -488,6 +491,7 @@ int main(int argc, char *argv[]) {
   motion_backend->Shutdown(!caught_signal);
 
   delete motion_backend;
+  delete pru_hw_interface;
 
   free(bind_addr);
 
