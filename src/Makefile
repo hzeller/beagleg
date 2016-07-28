@@ -53,7 +53,7 @@ GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o \
 	      string-util.o machine-control-config.o hardware-mapping.o \
 	      spindle-control.o planner.o
-OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o $(GCODE_OBJECTS)
+OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
@@ -101,7 +101,7 @@ $(PASM):
 	gs -q -r144 -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$@ $<
 
 # Explicit dependencies
-pru-motion-queue.o : $(PRU_BIN)
+uio-pruss-interface.o : $(PRU_BIN)
 
 # Auto generated dependencies
 -include $(OBJECTS:.o=.d)

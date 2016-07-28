@@ -24,8 +24,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <pruss_intc_mapping.h>
-#include <prussdrv.h>
 #include <stdio.h>
 #include <strings.h>
 
@@ -33,12 +31,9 @@
 #include "pwm-timer.h"
 #include "logging.h"
 #include "hardware-mapping.h"
-
-// Generated PRU code from motor-interface-pru.p
-#include "motor-interface-pru_bin.h"
+#include "pru-hardware-interface.h"
 
 //#define DEBUG_QUEUE
-#define PRU_NUM 0
 
 // The communication with the PRU. We memory map the static RAM in the PRU
 // and write stuff into it from here. Mostly this is a ring-buffer with
@@ -47,31 +42,6 @@
 struct PRUCommunication {
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
 };
-
-// The queue is a physical singleton, so simply reflect that here.
-static volatile struct PRUCommunication *pru_data_;
-static unsigned int queue_pos_;
-
-static volatile struct PRUCommunication *map_pru_communication() {
-  void *result;
-  prussdrv_map_prumem(PRUSS0_PRU0_DATARAM, &result);
-  bzero(result, sizeof(*pru_data_));
-  pru_data_ = (struct PRUCommunication*) result;
-  for (int i = 0; i < QUEUE_LEN; ++i) {
-    pru_data_->ring_buffer[i].state = STATE_EMPTY;
-  }
-  queue_pos_ = 0;
-  return pru_data_;
-}
-
-static volatile struct MotionSegment *next_queue_element() {
-  queue_pos_ %= QUEUE_LEN;
-  while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
-  }
-  return &pru_data_->ring_buffer[queue_pos_++];
-}
 
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e) {
@@ -126,8 +96,15 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
   // to avoid a race condition while copying.
   element->state = STATE_EMPTY;
 
+  queue_pos_ %= QUEUE_LEN;
+  while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
+    pru_interface_->WaitEvent();
+  }
+
   // Need to case volatile away, otherwise c++ complains.
-  MotionSegment *queue_element = (MotionSegment*) next_queue_element();
+  MotionSegment *queue_element =
+    (MotionSegment*) &pru_data_->ring_buffer[queue_pos_++];
+
   unaligned_memcpy(queue_element, element, sizeof(*queue_element));
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
@@ -140,8 +117,7 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 void PRUMotionQueue::WaitQueueEmpty() {
   const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
   while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
-    prussdrv_pru_wait_event(PRU_EVTOUT_0);
-    prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
+    pru_interface_->WaitEvent();
   }
 }
 
@@ -156,12 +132,13 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
     Enqueue(&end_element);
     WaitQueueEmpty();
   }
-  prussdrv_pru_disable(PRU_NUM);
-  prussdrv_exit();
+  pru_interface_->Shutdown();
   MotorEnable(false);
 }
 
-PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw) : hardware_mapping_(hw) {
+PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
+                               : hardware_mapping_(hw),
+                                 pru_interface_(pru) {
   const int init_result = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
@@ -170,24 +147,17 @@ PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw) : hardware_mapping_(hw) {
 
 int PRUMotionQueue::Init() {
   MotorEnable(false);  // motors off initially.
+  bool status = pru_interface_->Init();
+  if (!status) return status;
 
-  tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
-  prussdrv_init();
+  status =
+    pru_interface_->AllocateSharedMem((void **) &pru_data_, sizeof(*pru_data_));
+  if (!status) return status;
 
-  /* Get the interrupt initialized */
-  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
-  if (ret) {
-    Log_error("prussdrv_open() failed (%d) %s\n", ret, strerror(errno));
-    return ret;
+  for (int i = 0; i < QUEUE_LEN; ++i) {
+    pru_data_->ring_buffer[i].state = STATE_EMPTY;
   }
-  prussdrv_pruintc_init(&pruss_intc_initdata);
-  if (map_pru_communication() == NULL) {
-    Log_error("Couldn't map PRU memory for queue.\n");
-    return 1;
-  }
+  queue_pos_ = 0;
 
-  prussdrv_pru_write_memory(PRUSS0_PRU0_IRAM, 0, PRUcode, sizeof(PRUcode));
-  prussdrv_pru_enable(0);
-
-  return 0;
+  return pru_interface_->StartExecution();
 }

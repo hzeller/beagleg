@@ -20,6 +20,7 @@
 #define _BEAGLEG_MOTION_QUEUE_H_
 
 #include <stdint.h>
+#include "pru-hardware-interface.h"
 
 // Number of motors handled by motion segment.
 // TODO: this and BEAGLEG_NUM_MOTORS should be coming from the same place.
@@ -98,9 +99,10 @@ public:
 // There is only one PRU, so it can only be initialzed once until shutdown() is
 // called.
 class HardwareMapping;
+struct PRUCommunication;
 class PRUMotionQueue : public MotionQueue {
 public:
-  PRUMotionQueue(HardwareMapping *hw);
+  PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
 
   void Enqueue(MotionSegment *segment);
   void WaitQueueEmpty();
@@ -111,6 +113,10 @@ private:
   int Init();
 
   HardwareMapping *const hardware_mapping_;
+  PruHardwareInterface *const pru_interface_;
+
+  volatile struct PRUCommunication *pru_data_;
+  unsigned int queue_pos_;
 };
 
 
