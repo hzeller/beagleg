@@ -42,6 +42,7 @@ struct AxisTarget {
   int delta_steps[GCODE_NUM_AXES];     // Difference to previous position.
   enum GCodeParserAxis defining_axis;  // index into defining axis.
   float speed;                         // (desired) speed in steps/s on defining axis.
+  float angle;
   unsigned short aux_bits;             // Auxillary bits in this segment; set with M42
 };
 
@@ -70,18 +71,6 @@ public:
     // TODO: we need to scale the acceleration if one of the other axes could't
     // deal with it. Look at axis steps for that.
   }
-
-  // Avoid division by zero if there is no config defined for axis.
-  float axis_delta_to_mm(const AxisTarget *pos, enum GCodeParserAxis axis) {
-    if (cfg_->steps_per_mm[axis])
-      return (float)pos->delta_steps[axis] / cfg_->steps_per_mm[axis];
-    return 0.0f;
-  }
-
-  float speed_to_euclidian_speed(const struct AxisTarget *t);
-
-  float get_next_speed(const struct AxisTarget *to,
-                       const struct AxisTarget *next);
 
   void GetCurrentPosition(AxesRegister *pos);
   int DirectDrive(GCodeParserAxis axis, float distance, float v0, float v1);
@@ -124,6 +113,13 @@ static float get_speed_for_axis(const struct AxisTarget *target,
   return target->speed * get_speed_factor_for_axis(target, request_axis);
 }
 
+static bool within_acceptable_range(float new_val, float old_val, float fraction) {
+  const float max_diff = fraction * old_val;
+  if (new_val < old_val - max_diff) return false;
+  if (new_val > old_val + max_diff) return false;
+  return true;
+}
+
 // Given that we want to travel "s" steps, start with speed "v0",
 // accelerate peak speed v1 and slow down to "v2" with acceleration "a",
 // what is v1 ?
@@ -163,71 +159,46 @@ static uint8_t substract_steps(struct LinearSegmentSteps *value,
   return has_nonzero;
 }
 
-float Planner::Impl::speed_to_euclidian_speed(const struct AxisTarget *t) {
-  const float dx = axis_delta_to_mm(t, AXIS_X);
-  const float dz = axis_delta_to_mm(t, AXIS_Z);
-  const float dy = axis_delta_to_mm(t, AXIS_Y);
-  const float len = euclid_distance(dx, dy, dz);
-  float speed_factor = 1.0;
-  if (len > 0) {
-    const float axis_len_mm = axis_delta_to_mm(t, t->defining_axis);
-    speed_factor = fabs(axis_len_mm) / len;
+
+// Determine the fraction of the speed that "from" should decelerate
+// to at the end of its travel.
+// The way trapezoidal moves work, be still have to decelerate to zero in
+// most times, which is inconvenient. TODO(hzeller): speed matching is not
+// cutting it :)
+static float determine_joining_speed(const struct AxisTarget *from,
+                                     const struct AxisTarget *to,
+                                     const float threshold,
+                                     const float angle_in,
+                                     const float angle_out) {
+  // Our goal is to figure out what our from defining speed should
+  // be at the end of the move.
+  char is_first = 1;
+  float from_defining_speed = from->speed;
+  for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
+    const GCodeParserAxis axis = (GCodeParserAxis) ai;
+    const int from_delta = from->delta_steps[axis];
+    const int to_delta = to->delta_steps[axis];
+
+    // Quick integer decisions
+    if (angle_in < threshold && angle_out < threshold) continue;
+    if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
+    if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
+    if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
+      return 0.0f;  // turing around
+
+    float to_speed = get_speed_for_axis(to, axis);
+    // What would this speed translated to our defining axis be ?
+    float speed_conversion = 1.0f * from->delta_steps[from->defining_axis] / from->delta_steps[axis];
+    float goal = to_speed * speed_conversion;
+    if (goal < 0.0f) return 0.0f;
+    if (is_first || within_acceptable_range(goal, from_defining_speed, 1e-5)) {
+      if (goal < from_defining_speed) from_defining_speed = goal;
+      is_first = 0;
+    } else {
+      return 0.0f;  // Too far off.
+    }
   }
-  return t->speed * speed_factor;
-}
-
-// If the 3D angle is within the allowed tolerance we can accel/decel to
-// the speed of the defining axis for the "next" move.
-float Planner::Impl::get_next_speed(const struct AxisTarget *from,
-                                    const struct AxisTarget *next) {
-  const float rad2deg = 180.0 / M_PI;
-
-  // convert the euclidian space vectors from steps to real units
-  const float from_dx = axis_delta_to_mm(from, AXIS_X);
-  const float from_dy = axis_delta_to_mm(from, AXIS_Y);
-  const float from_dz = axis_delta_to_mm(from, AXIS_Z);
-  const float next_dx = axis_delta_to_mm(next, AXIS_X);
-  const float next_dy = axis_delta_to_mm(next, AXIS_Y);
-  const float next_dz = axis_delta_to_mm(next, AXIS_Z);
-
-  // set some state flags about the next vector
-  bool changed = (from_dx != next_dx || from_dy != next_dy || from_dz != next_dz);
-  bool moving = (next_dx || next_dy || next_dz);
-
-  // the 3D length of both vectors
-  const float from_len = euclid_distance(from_dx, from_dy, from_dz);
-  const float next_len = euclid_distance(next_dx, next_dy, next_dz);
-
-  // the dot product of the vectors
-  const float dot = from_dx*next_dx + from_dy*next_dy + from_dz*next_dz;
-
-  // finally the angle between the vectors
-  float angle;
-  if (changed == 0) angle = 0.0f;                            // straight vector (0 degrees)
-  else if (!moving) angle = 90.0f;                           // full stop (90 degrees)
-  else angle = acosf(dot / (from_len * next_len)) * rad2deg; // true angle 0-180 degrees
-
-  // calculate the next speed based on the defining axis move
-  float next_speed;
-  if (angle == 0.0f || fabsf(angle) < cfg_->threshold_angle) {
-    next_speed = speed_to_euclidian_speed(next);
-  } else {
-    next_speed = 0.0f;
-  }
-
-#if 0
-  // REMOVE THIS: output some debug info about this next_speed calc
-  fprintf(stderr, "(%8.2f %8.2f %8.2f) to (%8.2f %8.2f %8.2f)\t"
-                  "angle:%7.2f  from speed:%9.2f  next speed:%9.2f (%6.2f%% of %3.2f)  (%s)\n",
-          from_dx, from_dy, from_dz, next_dx, next_dy, next_dz,
-          angle, from->speed, next_speed,
-	  next->speed ? 100.0 * (next_speed / next->speed) : -0.0f, next->speed,
-          (!changed) ? "straight" :
-          (!moving) ? "full stop" :
-          (angle > cfg_->threshold_angle) ? "turn" : "move");
-#endif
-
-  return next_speed;
+  return from_defining_speed;
 }
 
 Planner::Impl::Impl(const MachineControlConfig *config,
@@ -276,8 +247,6 @@ void Planner::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
   hardware_mapping_->AssignMotorSteps(axis, steps, command);
 }
 
-#define VELOCITY_DEBUG 0
-
 // Move the given number of machine steps for each axis.
 //
 // This will be up to three segments: accelerating from last_pos speed to
@@ -301,7 +270,6 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
     }
     return;
   }
-
   struct LinearSegmentSteps accel_command = {0};
   struct LinearSegmentSteps move_command = {0};
   struct LinearSegmentSteps decel_command = {0};
@@ -316,24 +284,31 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   memcpy(&accel_command, &move_command, sizeof(accel_command));
   memcpy(&decel_command, &move_command, sizeof(decel_command));
 
-  // If the target_pos is in the XYZ plane we need to adjust the desired speed
-  // for the euclidian move. If the move has no X, Y, or Z component, or only
-  // has one X, Y, or Z component, the target_speed will be the desired
-  // target_pos->speed (i.e. the desired feedrate of the defining axis from
-  // machine_move).
-  // FIXME: What happens when we have an euclidian move but a non-XYZ axis
-  // is the defining axis?
-  float target_speed = speed_to_euclidian_speed(target_pos);
+  move_command.v0 = target_pos->speed;
+  move_command.v1 = target_pos->speed;
 
-  // We always start from the last pulse rate speed that was generated,
-  // regardless of what the defining axis was.
-  const float last_speed = last_pos->speed;
+  // Let's see what our defining axis had as speed in the previous segment. The
+  // last segment might have had a different defining axis, so we calculate
+  // what the the fraction of the speed that our _current_ defining axis had.
+  const float last_speed = fabsf(get_speed_for_axis(last_pos, defining_axis));
+
+  // The delta angle between the vectors is always (target - last). But we
+  // have to deal with the sign flip when the vectors cross +/-180 degrees
+  // between quadrants II (positive 180) and III (negative 180).
+  float angle_in = target_pos->angle - last_pos->angle;
+  if (angle_in > 180.0) angle_in -= 360.0;  // Quadrant II -> III
+  if (angle_in < -180.0) angle_in += 360.0; // Quadrant III -> II
+  float angle_out = upcoming->angle - target_pos->angle;
+  if (angle_out > 180.0) angle_out -= 360.0;  // Quadrant II -> III
+  if (angle_out < -180.0) angle_out += 360.0; // Quadrant III -> II
 
   // We need to arrive at a speed that the upcoming move does not have
   // to decelerate further (after all, it has a fixed feed-rate it should not
   // go over).
-  const float next_speed = get_next_speed(target_pos, upcoming) *
-                           fabsf(get_speed_factor_for_axis(upcoming, defining_axis));
+  float next_speed = determine_joining_speed(target_pos, upcoming,
+                                             cfg_->threshold_angle,
+                                             fabsf(angle_in),
+                                             fabsf(angle_out));
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
@@ -342,81 +317,26 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
                                           last_speed, next_speed, a);
   assert(peak_speed > 0);
 
-#if VELOCITY_DEBUG
-  fprintf(stderr, "    target_pos vector (");
-  for (int i = 0; i < GCODE_NUM_AXES; ++i)
-    fprintf(stderr, "%d%s", axis_steps[i], (i < GCODE_NUM_AXES-1) ? ", " : ")\n");
-  fprintf(stderr, "                   desired pulse rate: %10.2f\n", target_pos->speed);
-  fprintf(stderr, "            desired euclid pulse rate: %10.2f\n", target_speed);
-  fprintf(stderr, "       next desired euclid pulse rate: %10.2f\n", next_speed);
-  fprintf(stderr, "                      last pulse rate: %10.2f\n", last_speed);
-  fprintf(stderr, "            reachable peak pulse rate: %10.2f\n", peak_speed);
-#endif
-
   // TODO: if we only have < 5 steps or so, we should not even consider
   // accelerating or decelerating, but just do one speed.
 
-  if (peak_speed < target_speed) {
-    target_speed = peak_speed;       // Don't manage to accelerate to desired v
-#if VELOCITY_DEBUG
-    fprintf(stderr, "           clamped desired pulse rate: %10.2f\n", target_speed);
-#endif
+  if (peak_speed < target_pos->speed) {
+    target_pos->speed = peak_speed;  // Don't manage to accelerate to desired v
   }
-
-#if VELOCITY_DEBUG
-  // duplicate the accel_fraction calc below so we can dump the pieces
-  if (last_speed < target_speed) {
-    float reached_speed = target_speed;
-    const float steps = steps_for_speed_change(a, last_speed, &reached_speed,
-                                               abs_defining_axis_steps);
-    const float fraction = steps / abs_defining_axis_steps;
-    fprintf(stderr, "               pulse rate after accel: %10.2f "
-                    "in %.1f steps (%.1f%% of move)\n",
-            reached_speed, steps, fraction * 100.0f);
-  }
-#endif
 
   const float accel_fraction =
-    (last_speed < target_speed)
-    ? steps_for_speed_change(a, last_speed, &target_speed,
-                             abs_defining_axis_steps)  / abs_defining_axis_steps
+    (last_speed < target_pos->speed)
+    ? steps_for_speed_change(a, last_speed, &target_pos->speed,
+                             abs_defining_axis_steps) / abs_defining_axis_steps
     : 0;
-
-#if VELOCITY_DEBUG
-  // duplicate the decel_fraction calc below so we can dump the pieces
-  if (next_speed < target_speed) {
-    float final_speed = next_speed;
-    const float steps = steps_for_speed_change(-a, target_speed, &final_speed,
-                                               abs_defining_axis_steps);
-    const float fraction = steps / abs_defining_axis_steps;
-    fprintf(stderr, "               pulse rate after decel: %10.2f"
-                    " in %.1f steps (%.1f%% of move)",
-            final_speed, steps, fraction * 100.0f);
-    // FIXME: we still get a glitch if the previous vector was accelerated
-    // to a speed faster than this vector can can decelerate.
-    // NOTE: The glitch doesn't happen if this vector is slightly longed than
-    // the previous vector.
-    if (final_speed != next_speed)
-      fprintf(stderr, " \033[1m\033[31mGLITCH\033[0m - move too short for full decel");
-    fprintf(stderr, "\n");
-  }
-#endif
 
   // We only decelerate if the upcoming speed is _slower_
   float dummy_next_speed = next_speed;  // Don't care to modify; we don't have
   const float decel_fraction =
-    (next_speed < target_speed)
-    ? steps_for_speed_change(-a, target_speed, &dummy_next_speed,
-                             abs_defining_axis_steps)  / abs_defining_axis_steps
+    (next_speed < target_pos->speed)
+    ? steps_for_speed_change(-a, target_pos->speed, &dummy_next_speed,
+                             abs_defining_axis_steps) / abs_defining_axis_steps
     : 0;
-
-#if VELOCITY_DEBUG == 0
-  // output the same glitch info when debug is disabled
-  if (dummy_next_speed != next_speed)
-    fprintf(stderr, "  vvv \033[1m\033[31mGLITCH\033[0m "
-                    "- move to short for full decel (reached v1: %10.2f)\n",
-            dummy_next_speed);
-#endif
 
   assert(accel_fraction + decel_fraction <= 1.0 + 1e-3);
 
@@ -442,7 +362,7 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   if (do_accel && accel_fraction * abs_defining_axis_steps > 0) {
     has_accel = 1;
     accel_command.v0 = last_speed;           // Last speed of defining axis
-    accel_command.v1 = target_speed;         // New speed of defining axis
+    accel_command.v1 = target_pos->speed;    // New speed of defining axis
 
     // Now map axis steps to actual motor driver
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
@@ -450,19 +370,11 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
       assign_steps_to_motors(&accel_command, (GCodeParserAxis)i,
                              accel_steps);
     }
-  } else {
-    // Since we did not accel, the target speed for the move/decel is the
-    // same as the last speed.
-    target_speed = last_speed;
   }
-
-  move_command.v0 = target_speed;
-  move_command.v1 = target_speed;
-  target_pos->speed = target_speed;
 
   if (do_accel && decel_fraction * abs_defining_axis_steps > 0) {
     has_decel = 1;
-    decel_command.v0 = target_speed;
+    decel_command.v0 = target_pos->speed;
     decel_command.v1 = next_speed;
     target_pos->speed = next_speed;
 
@@ -536,12 +448,40 @@ void Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
 
   new_pos->aux_bits = hardware_mapping_->GetAuxBits();
   new_pos->defining_axis = defining_axis;
+  new_pos->angle = previous->angle + 180.0f; // default angle to force a speed change
 
-  // Work out the desired travel speed in steps/s on the defining axis.
+  // Now let's calculate the travel speed in steps/s on the defining axis.
   if (max_steps > 0) {
-    new_pos->speed = feedrate * cfg_->steps_per_mm[defining_axis];
-    if (new_pos->speed > max_axis_speed_[defining_axis])
-      new_pos->speed = max_axis_speed_[defining_axis];
+    float travel_speed = feedrate * cfg_->steps_per_mm[defining_axis];
+
+    // If we're in the euclidian space, choose the step-frequency according to
+    // the relative feedrate of the defining axis.
+    // (A straight 200mm/s should be the same as a diagnoal 200mm/s)
+    if (defining_axis == AXIS_X || defining_axis == AXIS_Y || defining_axis == AXIS_Z) {
+      // We need to calculate the feedrate in real-world coordinates as each
+      // axis can have a different amount of steps/mm
+      // TODO(hzeller): avoid this back calculation.
+
+      // DSTEPS: avoid division by zero if there is no config defined for axis.
+#define DSTEPS(ax) (new_pos->delta_steps[ax]) ? new_pos->delta_steps[ax] / cfg_->steps_per_mm[ax] : 0
+      const float dx = DSTEPS(AXIS_X);
+      const float dy = DSTEPS(AXIS_Y);
+      const float dz = DSTEPS(AXIS_Z);
+#undef DSTEPS
+      const float total_xyz_len_mm = euclid_distance(dx, dy, dz);
+      const float steps_per_mm = cfg_->steps_per_mm[defining_axis];
+      const float defining_axis_len_mm = new_pos->delta_steps[defining_axis] / steps_per_mm;
+      const float euclid_fraction = fabsf(defining_axis_len_mm) / total_xyz_len_mm;
+      travel_speed *= euclid_fraction;
+
+      // If this is a truish XY vector, calculate the angle of the vector
+      if (fabsf(dz) < 0.01)
+        new_pos->angle = (atan2f(dy, dx) / 3.14159265359) * 180.0f;
+    }
+    if (travel_speed > max_axis_speed_[defining_axis]) {
+      travel_speed = max_axis_speed_[defining_axis];
+    }
+    new_pos->speed = travel_speed;
   } else {
     new_pos->speed = 0;
   }
@@ -564,6 +504,7 @@ void Planner::Impl::bring_path_to_halt() {
   new_pos->defining_axis = AXIS_X;
   new_pos->speed = 0;
   new_pos->aux_bits = hardware_mapping_->GetAuxBits();
+  new_pos->angle = 0;
   issue_motor_move_if_possible();
   path_halted_ = true;
 }
