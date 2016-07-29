@@ -80,8 +80,8 @@ bool UioPrussInterface::StartExecution() {
 }
 
 unsigned UioPrussInterface::WaitEvent() {
-  const unsigned num_events = prussdrv_pru_wait_event(PRU_EVTOUT0);
-  prussdrv_pru_clear_event(PRU_EVTOUT0, PRU_ARM_INTERRUPT);
+  const unsigned num_events = prussdrv_pru_wait_event(PRU_EVTOUT_0);
+  prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU_ARM_INTERRUPT);
   return num_events;
 }
 
