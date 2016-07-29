@@ -81,10 +81,10 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 
 // Stop gap for compiler attempting to be overly clever when copying between
 // host and PRU memory.
-static void unaligned_memcpy(void *dest, const void *src, size_t size) {
-  char *d = (char*) dest;
+static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) {
+  volatile char *d = (volatile char*) dest;
   const char *s = (char*) src;
-  const char *end = d + size;
+  const volatile char *end = d + size;
   while (d < end) {
     *d++ = *s++;
   }
@@ -102,10 +102,7 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
     pru_interface_->WaitEvent();
   }
 
-  // Need to case volatile away, otherwise c++ complains.
-  MotionSegment *queue_element =
-    (MotionSegment*) &pru_data_->ring_buffer[queue_pos_++];
-
+  volatile MotionSegment *queue_element = &pru_data_->ring_buffer[queue_pos_++];
   unaligned_memcpy(queue_element, element, sizeof(*queue_element));
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
