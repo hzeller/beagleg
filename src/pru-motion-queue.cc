@@ -139,20 +139,20 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
                                : hardware_mapping_(hw),
                                  pru_interface_(pru) {
-  const int init_result = Init();
+  const bool success = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
-  assert(init_result == 0);
+  assert(success);
 }
 
-int PRUMotionQueue::Init() {
+bool PRUMotionQueue::Init() {
   MotorEnable(false);  // motors off initially.
-  bool status = pru_interface_->Init();
-  if (!status) return status;
+  if (!pru_interface_->Init())
+    return false;
 
-  status =
-    pru_interface_->AllocateSharedMem((void **) &pru_data_, sizeof(*pru_data_));
-  if (!status) return status;
+  if (!pru_interface_->AllocateSharedMem((void **) &pru_data_,
+                                         sizeof(*pru_data_)))
+    return false;
 
   for (int i = 0; i < QUEUE_LEN; ++i) {
     pru_data_->ring_buffer[i].state = STATE_EMPTY;

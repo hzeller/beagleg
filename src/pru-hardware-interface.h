@@ -37,7 +37,7 @@ public:
   // Enable the PRU and start predetermined program.
   virtual bool StartExecution() = 0;
 
-  // Wait for a beagleg-mapped event
+  // Wait for a beagleg-mapped event. Return number of events that have occured.
   virtual unsigned WaitEvent() = 0;
 
   // Halt the PRU

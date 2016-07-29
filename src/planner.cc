@@ -397,7 +397,7 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
     // NOTE: The glitch doesn't happen if this vector is slightly longed than
     // the previous vector.
     if (final_speed != next_speed)
-      fprintf(stderr, " \033[1m\033[31mGLITCH\033[0m - move to short for full decel");
+      fprintf(stderr, " \033[1m\033[31mGLITCH\033[0m - move too short for full decel");
     fprintf(stderr, "\n");
   }
 #endif

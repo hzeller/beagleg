@@ -110,7 +110,7 @@ public:
   void Shutdown(bool flush_queue);
 
 private:
-  int Init();
+  bool Init();
 
   HardwareMapping *const hardware_mapping_;
   PruHardwareInterface *const pru_interface_;
