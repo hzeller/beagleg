@@ -44,14 +44,15 @@ struct PRUCommunication {
 };
 
 #ifdef DEBUG_QUEUE
-static void DumpMotionSegment(volatile const struct MotionSegment *e) {
+static void DumpMotionSegment(volatile const struct MotionSegment *e,
+                              volatile struct PRUCommunication *pru_data) {
   if (e->state == STATE_EXIT) {
-    Log_debug("enqueue[%02td]: EXIT", e - pru_data_->ring_buffer);
+    Log_debug("enqueue[%02td]: EXIT", e - pru_data->ring_buffer);
   } else {
     MotionSegment copy = (MotionSegment&) *e;
     std::string line;
     line = StringPrintf("enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
-                        e - pru_data_->ring_buffer, copy.direction_bits,
+                        e - pru_data->ring_buffer, copy.direction_bits,
                         copy.loops_accel, copy.loops_travel, copy.loops_decel,
                         copy.loops_accel + copy.loops_travel + copy.loops_decel);
 
@@ -110,7 +111,7 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;
 #ifdef DEBUG_QUEUE
-  DumpMotionSegment(queue_element);
+  DumpMotionSegment(queue_element, pru_data_);
 #endif
 }
 
