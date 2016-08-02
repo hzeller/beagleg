@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <strings.h>
+#include <stdlib.h>
 
 #include "generic-gpio.h"
 #include "pwm-timer.h"
@@ -41,7 +42,8 @@
 // an endswitch fires.
 struct PRUCommunication {
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
-};
+  volatile struct QueueStatus status;
+} __attribute__((packed));
 
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e,
@@ -79,6 +81,80 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
+struct HistorySegment {
+  uint32_t total_loops;
+  uint32_t fractions[MOTION_MOTOR_COUNT];
+  uint8_t direction_bits;
+};
+
+void PRUMotionQueue::RegisterHistorySegment(MotionSegment *element) {
+  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
+  struct HistorySegment *new_slot = &shadow_queue_[last_insert_position];
+
+  bzero(new_slot, sizeof(struct HistorySegment));
+
+  new_slot->total_loops += element->loops_accel;
+  new_slot->total_loops += element->loops_travel;
+  new_slot->total_loops += element->loops_decel;
+
+  new_slot->direction_bits = element->direction_bits;
+
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    new_slot->fractions[i] = element->fractions[i];
+  }
+}
+
+static void fractions_to_loops(const struct HistorySegment &segment,
+                               int32_t *motors_loops) {
+  const uint64_t max_fraction = 0xFFFFFFFF;
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    const int sign = (segment.direction_bits >> i) & 1 ? -1 : 1;
+    uint64_t loops = (uint64_t) segment.fractions[i] * (uint64_t) segment.total_loops;
+    loops /= max_fraction;
+    motors_loops[i] = sign * loops;
+  }
+}
+
+void PRUMotionQueue::UpdateAbsolutePosition() {
+  const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
+  struct HistorySegment current = shadow_queue_[status.index];
+  const int shadow_queue_delay
+    = (status.index + QUEUE_LEN - back_shadow_queue_) % QUEUE_LEN;
+  int32_t motors_loops[MOTION_MOTOR_COUNT];
+
+  for (int i = 0; i < shadow_queue_delay; ++i) {
+    fractions_to_loops(shadow_queue_[back_shadow_queue_], motors_loops);
+    for (int j = 0; j < MOTION_MOTOR_COUNT; ++j) {
+      absolute_pos_loops_[j] += motors_loops[j];
+    }
+    shadow_queue_[back_shadow_queue_].total_loops = 0;
+    back_shadow_queue_ = (back_shadow_queue_ + 1) % QUEUE_LEN;
+  }
+
+  // Now update the current executing slot.
+  if (current.total_loops) {
+    uint64_t delta;
+    fractions_to_loops(current, motors_loops);
+    for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+      absolute_pos_loops_[i] -= segment_partials_[i];
+
+      delta = status.counter * abs(motors_loops[i]);
+      delta /= current.total_loops;
+
+      segment_partials_[i]
+        = motors_loops[i] < 0 ? motors_loops[i] + delta
+                              : motors_loops[i] - delta;
+
+      absolute_pos_loops_[i] += segment_partials_[i];
+    }
+  }
+}
+
+void PRUMotionQueue::GetMotorsLoops(int32_t *absolute_pos_loops) {
+  UpdateAbsolutePosition();
+  memcpy(absolute_pos_loops, absolute_pos_loops_, sizeof(absolute_pos_loops_));
+}
+
 // Stop gap for compiler attempting to be overly clever when copying between
 // host and PRU memory.
 static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) {
@@ -107,6 +183,12 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;
+
+  // Update the HistoryQueue before registering a new slot.
+  UpdateAbsolutePosition();
+
+  // Register the last inserted motion segment in the shadow queue.
+  RegisterHistorySegment(element);
 #ifdef DEBUG_QUEUE
   DumpMotionSegment(queue_element, pru_data_);
 #endif
@@ -134,6 +216,8 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
+PRUMotionQueue::~PRUMotionQueue() { delete shadow_queue_; }
+
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
                                : hardware_mapping_(hw),
                                  pru_interface_(pru) {
@@ -141,6 +225,12 @@ PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
   assert(success);
+
+  // Initialize Shadow queue
+  shadow_queue_ = new HistorySegment[QUEUE_LEN];
+  bzero(absolute_pos_loops_, sizeof(absolute_pos_loops_));
+  bzero(segment_partials_, sizeof(segment_partials_));
+  back_shadow_queue_ = 0;
 }
 
 bool PRUMotionQueue::Init() {
