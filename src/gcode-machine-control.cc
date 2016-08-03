@@ -117,7 +117,7 @@ private:
                               enum GCodeParserAxis defining_axis);
   int move_to_endstop(enum GCodeParserAxis axis,
                       float feedrate, bool backoff,
-                      HardwareMapping::AxisTrigger trigger);
+                      HardwareMapping::AxisTrigger trigger, int max_steps=0);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
 
@@ -666,7 +666,8 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
 // Moves to endstop and returns how many steps it moved in the process.
 int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
                                                float feedrate, bool backoff,
-                                               HardwareMapping::AxisTrigger trigger) {
+                                               HardwareMapping::AxisTrigger trigger,
+                                               int max_steps) {
   if (hardware_mapping_->IsHardwareSimulated()) {
     return 0;  // There are no switches to trigger, so pretend we stopped.
   }
@@ -681,6 +682,10 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
   while (!hardware_mapping_->TestAxisSwitch(axis, trigger)) {
     total_movement += planner_->DirectDrive(axis, dir * kHomingMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.
+    if (max_steps && abs(total_movement) > max_steps) {
+      mprintf("// G30: max probe reached\n");
+      return total_movement;
+    }
   }
 
   if (backoff) {   // Go back until switch is not triggered anymore.
@@ -756,9 +761,8 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   }
 
   if (feedrate <= 0) feedrate = 20;
-  // TODO: if the probe fails to trigger, there is no mechanism to stop
-  // it right now...
-  int total_steps = move_to_endstop(axis, feedrate, false, probe_trigger);
+  int max_steps = abs(cfg_.move_range_mm[axis] * cfg_.steps_per_mm[axis]);
+  int total_steps = move_to_endstop(axis, feedrate, false, probe_trigger, max_steps);
   float distance_moved = total_steps / cfg_.steps_per_mm[axis];
   AxesRegister machine_pos;
   planner_->GetCurrentPosition(&machine_pos);
