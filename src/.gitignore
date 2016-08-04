@@ -6,6 +6,7 @@ gcode-parser_test
 config-parser_test
 string-util_test
 arc-gen_test
+planner_test
 machine-control-config_test
 motor-interface-pru_bin.h
 compiler-flags
