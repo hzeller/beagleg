@@ -76,6 +76,14 @@ public:
   int DirectDrive(GCodeParserAxis axis, float distance, float v0, float v1);
   void SetExternalPosition(GCodeParserAxis axis, float pos);
 
+  // Given the desired target speed of the defining axis and the steps to be
+  // performed on all axes, determine if we need to scale down as to not exceed
+  // the individual maximum speed constraints on any axis. Return the new speed
+  // of the defining axis.
+  float clamp_to_limits(enum GCodeParserAxis defining_axis,
+                        const float target_value,
+                        const int *axis_steps);
+
 private:
   const struct MachineControlConfig *const cfg_;
   HardwareMapping *const hardware_mapping_;
@@ -249,6 +257,25 @@ void Planner::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
   hardware_mapping_->AssignMotorSteps(axis, steps, command);
 }
 
+// Example with speed: given i the axis with the highest (relative) out of bounds
+// speed, what's the speed of the defining_axis so that every speed respects i's
+// bounds? The defining axis should be rescaled with this maximum offset.
+// offset = speed_limit[i] / speed[i]
+float Planner::Impl::clamp_to_limits(enum GCodeParserAxis defining_axis,
+                                     const float target_speed,
+                                     const int *axis_steps) {
+  float ratio, max_offset = 1, offset;
+  const FloatAxisConfig &max_axis_speed = cfg_->max_feedrate;
+  const FloatAxisConfig &steps_per_mm = cfg_->steps_per_mm;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    ratio = fabs(((float) axis_steps[i] * steps_per_mm[defining_axis])
+            / (axis_steps[defining_axis] * steps_per_mm[i]));
+    offset = ratio > 0 ? max_axis_speed[i] / (target_speed * ratio) : 1;
+    if (offset < max_offset) max_offset = offset;
+  }
+  return target_speed * max_offset;
+}
+
 // Move the given number of machine steps for each axis.
 //
 // This will be up to three segments: accelerating from last_pos speed to
@@ -326,11 +353,7 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   // Make sure the target feedrate for the move is clamped to what all the
   // moving axes can reach.
   float target_feedrate = target_pos->speed / cfg_->steps_per_mm[defining_axis];
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (axis_steps[i] && target_feedrate > cfg_->max_feedrate[i]) {
-      target_feedrate = cfg_->max_feedrate[i];
-    }
-  }
+  target_feedrate = clamp_to_limits(defining_axis, target_feedrate, axis_steps);
   target_pos->speed = target_feedrate * cfg_->steps_per_mm[defining_axis];
 
   const float accel_fraction =
