@@ -39,13 +39,6 @@ static void InitTestConfig(struct MachineControlConfig *c) {
   c->require_homing = false;
 }
 
-GCodeParserAxis GetDefiningAxis(const LinearSegmentSteps &seg) {
-  GCodeParserAxis defining = AXIS_X;
-  if (abs(seg.steps[AXIS_Y]) > abs(seg.steps[defining])) defining = AXIS_Y;
-  if (abs(seg.steps[AXIS_Z]) > abs(seg.steps[defining])) defining = AXIS_Z;
-  return defining;
-}
-
 class FakeMotorOperations : public MotorOperations {
 public:
   FakeMotorOperations(const MachineControlConfig &config)
@@ -278,11 +271,6 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   // We accelerate and decelerate, the middle section is constant speed.
   const LinearSegmentSteps &constant_speed_section = plantest.segments()[1];
   EXPECT_EQ(constant_speed_section.v0, constant_speed_section.v1);
-
-  // The axis with the slowest allowed feedrate should now about max out
-  // its declared speed.
-  GCodeParserAxis result_defining = GetDefiningAxis(constant_speed_section);
-  EXPECT_EQ(defining_axis, result_defining);
 
   // Get the step speed of the axis we're interested in.
   float step_speed_of_interest = constant_speed_section.v0
