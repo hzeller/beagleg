@@ -172,6 +172,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
                                      const float angle_out) {
   // Our goal is to figure out what our from defining speed should
   // be at the end of the move.
+  bool moving = false;
   char is_first = 1;
   float from_defining_speed = from->speed;
   for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
@@ -180,6 +181,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
     const int to_delta = to->delta_steps[axis];
 
     // Quick integer decisions
+    if (to_delta) moving = true;
     if (angle_in < threshold && angle_out < threshold) continue;
     if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
     if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
@@ -198,7 +200,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
       return 0.0f;  // Too far off.
     }
   }
-  return from_defining_speed;
+  return moving ? from_defining_speed : 0.0f;
 }
 
 Planner::Impl::Impl(const MachineControlConfig *config,
@@ -284,9 +286,6 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   memcpy(&accel_command, &move_command, sizeof(accel_command));
   memcpy(&decel_command, &move_command, sizeof(decel_command));
 
-  move_command.v0 = target_pos->speed;
-  move_command.v1 = target_pos->speed;
-
   // Let's see what our defining axis had as speed in the previous segment. The
   // last segment might have had a different defining axis, so we calculate
   // what the the fraction of the speed that our _current_ defining axis had.
@@ -323,6 +322,16 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   if (peak_speed < target_pos->speed) {
     target_pos->speed = peak_speed;  // Don't manage to accelerate to desired v
   }
+
+  // Make sure the target feedrate for the move is clamped to what all the
+  // moving axes can reach.
+  float target_feedrate = target_pos->speed / cfg_->steps_per_mm[defining_axis];
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    if (axis_steps[i] && target_feedrate > cfg_->max_feedrate[i]) {
+      target_feedrate = cfg_->max_feedrate[i];
+    }
+  }
+  target_pos->speed = target_feedrate * cfg_->steps_per_mm[defining_axis];
 
   const float accel_fraction =
     (last_speed < target_pos->speed)
@@ -370,7 +379,12 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
       assign_steps_to_motors(&accel_command, (GCodeParserAxis)i,
                              accel_steps);
     }
+  } else {
+    if (last_speed) target_pos->speed = last_speed; // No accel so use the last speed
   }
+
+  move_command.v0 = target_pos->speed;
+  move_command.v1 = target_pos->speed;
 
   if (do_accel && decel_fraction * abs_defining_axis_steps > 0) {
     has_decel = 1;

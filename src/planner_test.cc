@@ -24,11 +24,6 @@
 // TODO: This should work being set to 1
 #define USE_DIFFERENT_STEP_SPEEDS 1
 
-// How much we allow adjacent segments to differ in euclidian speed.
-// This means essentially, we allow 8% joining-speed mismatch.
-// TODO: this is too high! This should probably be more in the 0.001 range.
-#define SPEED_COMPARISON_EQUAL_FUDGE_FRACTION 0.08
-
 // Set up config that they are the same for all the tests.
 static void InitTestConfig(struct MachineControlConfig *c) {
   float steps_per_mm = 1000;
@@ -191,8 +186,7 @@ static void VerifyCommonExpectations(
   for (size_t i = 0; i < segments.size()-1; ++i) {
     // Let's determine the speed in euclidian space.
 #if 1
-    EXPECT_NEAR(segments[i].v1, segments[i+1].v0,
-                segments[i].v1 * SPEED_COMPARISON_EQUAL_FUDGE_FRACTION)
+    EXPECT_EQ(segments[i].v1, segments[i+1].v0)
       << "Joining speed between " << i << " and " << (i+1);
 #endif
   }
@@ -245,7 +239,7 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
 // overall speed to whatever the defining axis is. Which in our case would be:
 // the whole 1000mm segment would move with 10mm/s if Z is the dominant axis
 // (which they can - they often have many more steps/mm).
-TEST(PlannerTest, DISABLED_SimpleMove_AxisSpeedLimitClampsOverallSpeed) {
+TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed) {
   const float kClampFeedrate = 10.0;
   const float kFastFactor = 17;   // Faster axis is faster by this much.
   GCodeParserAxis kSlowAxis = AXIS_X;  // most interesting if it is not defining.
@@ -348,20 +342,19 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
     EXPECT_GT(segments[0].v1, 0);
 
     // Still, the join-speed at the elbow is the same.
-    EXPECT_NEAR(segments[0].v1, segments[1].v0,
-                segments[0].v1 * SPEED_COMPARISON_EQUAL_FUDGE_FRACTION)
+    EXPECT_EQ(segments[0].v1, segments[1].v0)
       << "At angle " << angle;
   }
 }
 
 // these tests don't work currently.
-TEST(PlannerTest, DISABLED_CornerMove_Shallow_PositiveAngle) {
+TEST(PlannerTest, CornerMove_Shallow_PositiveAngle) {
   const float kThresholdAngle = 5.0f;
   const float kTestingAngle = 0.7 * kThresholdAngle;
   testShallowAngleAllStartingPoints(kThresholdAngle, kTestingAngle);
 }
 
-TEST(PlannerTest, DISABLED_CornerMove_Shallow_NegativeAngle) {
+TEST(PlannerTest, CornerMove_Shallow_NegativeAngle) {
   const float kThresholdAngle = 5.0f;
   const float kTestingAngle = -0.7 * kThresholdAngle;
   testShallowAngleAllStartingPoints(kThresholdAngle, kTestingAngle);
