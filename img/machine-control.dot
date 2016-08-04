@@ -19,7 +19,7 @@ digraph beagleg {
 		PRUMotionQueue;
 		SimFirmwareQueue [label = "SimFirmwareQueue\nSimulating PRU", style=dotted];
 		GCode2PS [ style=dotted];
-		PRU [ label = "PRU firmware\n(motor-interface-pru.p)" ];
+		PruHardwareInterface;
 	}
 
 	// Inputs, and configuration files
@@ -29,8 +29,14 @@ digraph beagleg {
 		CapeConfig [ label = "Cape config in\nhardware/"];
 		UserMapConfig [ label = "User config file:\nMapping sections"];
 		UserAxisConfig [ label = "User config file:\nAxis sections"];
-		GNUPlotOutput [ style = dotted ];
+	}
+
+	// Final action nodes
+	{
+		node [ shape=box, style=rounded ];
+		GNUPlotOutput [ style = "dotted" ];
 		PinToggeling [ label = "Pin Toggling,\nPWM control." ];
+		PRU [ label = "PRU firmware\n(motor-interface-pru.p)" ];
 	}
 
 	GCodeFile -> GCodeParser [ label="G-Code", style=dotted];
@@ -46,8 +52,8 @@ digraph beagleg {
 		MotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
 		MotorOperations -> DummyMotionQueue;
 		MotorOperations -> GCode2PS;
-
-		PRUMotionQueue -> PRU [ label = "Host -> PRU\lringbuffer"];
+		PRUMotionQueue -> PruHardwareInterface;
+		PruHardwareInterface -> PRU [ label = "Host -> PRU\lringbuffer"];
 	}
 
 	{
