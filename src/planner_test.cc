@@ -22,18 +22,16 @@
 
 // Using different steps/mm speeds results in problems right now.
 // TODO: This should work being set to 1
-#define USE_DIFFERENT_STEP_SPEEDS 1
+#define SPEED_STEP_FACTOR 4
 
 // Set up config that they are the same for all the tests.
 static void InitTestConfig(struct MachineControlConfig *c) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
     c->steps_per_mm[i] = steps_per_mm;
-#if USE_DIFFERENT_STEP_SPEEDS
     // We do different steps/mm to detect problems when going between
     // euclidian space and step-space.
-    steps_per_mm *= 4;
-#endif
+    steps_per_mm *= SPEED_STEP_FACTOR;
     c->acceleration[i] = 100;  // mm/s^2
     c->max_feedrate[i] = 10000;
   }
@@ -239,16 +237,31 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
 // overall speed to whatever the defining axis is. Which in our case would be:
 // the whole 1000mm segment would move with 10mm/s if Z is the dominant axis
 // (which they can - they often have many more steps/mm).
-TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed) {
+
+// We set up two axis, one that can be very fast and one that is much slower.
+// Also, each of these can be a defining axis.
+//
+// When we do a diagnoal move we expect that the overall speed is limited so
+// that the slow axis is maxed out, i.e. we expect that the slow axis reaches
+// its clamped speed.
+static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
+                                     GCodeParserAxis slowAxis) {
   const float kClampFeedrate = 10.0;
   const float kFastFactor = 17;   // Faster axis is faster by this much.
-  GCodeParserAxis kSlowAxis = AXIS_X;  // most interesting if it is not defining.
   MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
-  config->max_feedrate[AXIS_X] = (AXIS_X == kSlowAxis)
+  config->max_feedrate[AXIS_X] = (AXIS_X == slowAxis)
     ? kClampFeedrate : kClampFeedrate * kFastFactor;
-  config->max_feedrate[AXIS_Y] = (AXIS_Y == kSlowAxis)
+  config->max_feedrate[AXIS_Y] = (AXIS_Y == slowAxis)
     ? kClampFeedrate : kClampFeedrate * kFastFactor;
+
+  // We want to force one of these to be the defining axis. Since both will
+  // travel the same distance, we can achieve that by having one of the axis
+  // reuire more steps/mm.
+  config->steps_per_mm[AXIS_X] = 1000;
+  config->steps_per_mm[AXIS_Y] = 1000;
+  config->steps_per_mm[defining_axis] *= 12.345;
+
   PlannerHarness plantest(0, config);
 
   // Let's do a diagonal move.
@@ -268,25 +281,41 @@ TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed) {
 
   // The axis with the slowest allowed feedrate should now about max out
   // its declared speed.
-  GCodeParserAxis defining = GetDefiningAxis(constant_speed_section);
+  GCodeParserAxis result_defining = GetDefiningAxis(constant_speed_section);
+  EXPECT_EQ(defining_axis, result_defining);
+
   // Get the step speed of the axis we're interested in.
   float step_speed_of_interest = constant_speed_section.v0
-    * constant_speed_section.steps[kSlowAxis]
-    / constant_speed_section.steps[defining];
+    * constant_speed_section.steps[slowAxis]
+    / constant_speed_section.steps[defining_axis];
   fprintf(stderr, "Defining axis: %c speed: defining %.1f ; "
           "slow axis %c speed %.1f\n",
-          gcodep_axis2letter(defining), constant_speed_section.v0,
-          gcodep_axis2letter(kSlowAxis), step_speed_of_interest);
-  // This is failing. Instead of limiting the speed to the maximum the axis can
-  // do, it looks like we clamp the euklidian speed to what the defining
-  // axis can do.
-  //
-  // TODO: this is failing right now. It seems the speed is clamped, but we
-  // see that it is kFastFactor faster clamped. That would indicate that the
-  // clamping is applied to whatever the defining axis does.
-  EXPECT_FLOAT_EQ(kClampFeedrate * config->steps_per_mm[kSlowAxis],
+          gcodep_axis2letter(defining_axis), constant_speed_section.v0,
+          gcodep_axis2letter(slowAxis), step_speed_of_interest);
+
+  // We have reached the maximum speed we can do. This is, because one of
+  // our axes reached its maximum speed it can do. So we expect that axis
+  // (the slow axis) to go at exactly the speed it is to be clamped to.
+  EXPECT_FLOAT_EQ(kClampFeedrate * config->steps_per_mm[slowAxis],
                   step_speed_of_interest);
- }
+}
+
+// We test all combinations of defining axis and which shall be the slow axis.
+TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_XX) {
+  parametrizedAxisClamping(AXIS_X, AXIS_X);
+}
+
+TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_XY) {
+  parametrizedAxisClamping(AXIS_X, AXIS_Y);
+}
+
+TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_YX) {
+  parametrizedAxisClamping(AXIS_Y, AXIS_X);
+}
+
+TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_YY) {
+  parametrizedAxisClamping(AXIS_Y, AXIS_Y);
+}
 
 static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
                                                    float start_angle,
