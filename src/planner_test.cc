@@ -261,7 +261,7 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   // First: AXIS_X shall be dominant
   AxesRegister pos;
   pos[AXIS_X] = 1000;
-  pos[AXIS_Y] = 1000;
+  pos[AXIS_Y] = 3000;
   // We request an extremely high speed, but expect it to be clamped to whatever
   // that axis can do.
   plantest.Enqueue(pos, 100000);

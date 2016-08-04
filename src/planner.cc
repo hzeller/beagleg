@@ -249,6 +249,25 @@ void Planner::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
   hardware_mapping_->AssignMotorSteps(axis, steps, command);
 }
 
+// Example with speed: given i the axis with the highest (relative) out of bounds
+// speed, what's the speed of the defining_axis so that every speed respects i's
+// bounds? The defining axis should be rescaled with this maximum offset.
+// offset = speed_limit[i] / speed[i]
+static float clamp_to_limits(const float value,
+                             const FloatAxisConfig &max_axis_value,
+                             const int *axis_steps,
+                             const FloatAxisConfig &steps_per_mm,
+                             enum GCodeParserAxis defining_axis) {
+  float ratio, max_offset = 1, offset;
+  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+    ratio = fabs(((float) axis_steps[i] * steps_per_mm[defining_axis])
+            / (axis_steps[defining_axis] * steps_per_mm[i]));
+    offset = ratio > 0 ? max_axis_value[i] / (value * ratio) : 1;
+    if (offset < max_offset) max_offset = offset;
+  }
+  return value * max_offset;
+}
+
 // Move the given number of machine steps for each axis.
 //
 // This will be up to three segments: accelerating from last_pos speed to
@@ -326,11 +345,17 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   // Make sure the target feedrate for the move is clamped to what all the
   // moving axes can reach.
   float target_feedrate = target_pos->speed / cfg_->steps_per_mm[defining_axis];
+#if 0
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (axis_steps[i] && target_feedrate > cfg_->max_feedrate[i]) {
       target_feedrate = cfg_->max_feedrate[i];
     }
   }
+#else
+  target_feedrate
+    = clamp_to_limits(target_feedrate,
+                      cfg_->max_feedrate, axis_steps, cfg_->steps_per_mm, defining_axis);
+#endif
   target_pos->speed = target_feedrate * cfg_->steps_per_mm[defining_axis];
 
   const float accel_fraction =
