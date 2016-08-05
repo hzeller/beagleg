@@ -57,7 +57,7 @@ OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o uio-pruss-interface
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
-TARGETS=../machine-control ../gcode-print-stats gcode2ps
+TARGETS=../machine-control ../gcode-print-stats gcode2ps speed-control-client
 UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test arc-gen_test planner_test
 
 all : $(TARGETS)
@@ -72,6 +72,9 @@ all : $(TARGETS)
 # it a toplevel tool in ../
 gcode2ps: gcode2ps.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+speed-control-client: speed-control-client.o $(OBJECTS)
+	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done

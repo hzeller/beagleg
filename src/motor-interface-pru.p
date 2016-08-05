@@ -28,6 +28,7 @@
 #define CONST_PRUDRAM	   C24
 
 #define QUEUE_ELEMENT_SIZE (SIZE(QueueHeader) + SIZE(TravelParameters))
+#define SKIP_FRAC (QUEUE_LEN * QUEUE_ELEMENT_SIZE)
 
 #define PARAM_START r7
 #define PARAM_END  r19
@@ -231,10 +232,30 @@ STEP_GEN:
 
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
-STEP_DELAY:				; Create time delay between steps.
-	SUB r1, r1, 1                   ; two cycles per loop.
-	QBNE STEP_DELAY, r1, 0
 
+WAIT_RESUME:
+	;; Store the address of the loop skip fractions
+	MOV r4, SKIP_FRAC
+	;; Update the loop_skip fraction
+	LBCO &r4, CONST_PRUDRAM, r4, 4
+	;; Set to zero the counter
+	QBEQ WAIT_RESUME, r4, 0
+
+	MOV r5, 0
+
+RESET_COUNTER:
+	MOV r6, r1
+STEP_DELAY:				; Create time delay between steps.
+	SUB r6, r6, 1                   ; two cycles per loop.
+	QBNE STEP_DELAY, r6, 0
+
+	;; r4 == 0, special value, we are in a complete stop. Let's wait for a resume
+	QBEQ WAIT_RESUME, r4, 0
+
+	;; Add the delay fraction to the skip counter
+	ADD r5, r5, r4
+	;; If the 32 bit is not set in the skip counter do another delay
+	QBBC RESET_COUNTER, r5, 31
 	JMP STEP_GEN
 
 DONE_STEP_GEN:

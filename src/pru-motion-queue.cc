@@ -41,7 +41,8 @@
 // an endswitch fires.
 struct PRUCommunication {
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
-};
+  volatile uint32_t skip_frac;
+} __attribute__((packed));
 
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e,
@@ -156,6 +157,7 @@ bool PRUMotionQueue::Init() {
     pru_data_->ring_buffer[i].state = STATE_EMPTY;
   }
   queue_pos_ = 0;
+  pru_data_->skip_frac = 0xFFFFFFFF;
 
   return pru_interface_->StartExecution();
 }
