@@ -1,0 +1,44 @@
+# output signals (set these first so that the outputs get turned off)
+P8.07 low     # OUT0 output low, 2.5A FET to GND, HI = on
+P8.08 low     # OUT1 output low, 2.5A FET to GND, HI = on
+P8.09 low     # OUT2 output low, 2.5A FET to GND, HI = on
+P8.10 timer   # OUT3 timer, 2.5A FET to GND, HI = on
+P9.14 low     # OUT4 output low, 2.5A FET to GND, HI = on
+P9.16 low     # ENA output low, 2N7002 to ESTOP, HI = enable drivers
+P8.26 low     # LED output low, 2N7002 to GND, HI = on
+
+# step signals
+P9.41 low     # STEP0 output low, direct to Pololu
+P9.27 low     # STEP1 output low, direct to Pololu
+P9.11 low     # STEP2 output low, direct to Pololu
+P9.23 low     # STEP3 output low, direct to Pololu
+P9.13 low     # STEP4 output low, direct to Pololu
+
+# direction signals
+P9.42 low     # DIR0 output low, direct to Pololu
+P9.30 low     # DIR1 output low, direct to Pololu
+P9.12 low     # DIR2 output low, direct to Pololu
+P9.25 low     # DIR3 output low, direct to Pololu
+P9.15 low     # DIR4 output low, direct to Pololu
+
+# input signals
+P8.17 in      # ESTOP input, 4K7 pu, LO = ok
+P8.19 in      # START input. 4K7 pu, LO = pressed
+P8.18 in      # PAUSE input, 4K7 pu, LO = pressed
+P8.15 in      # IN0 input, from 74AC14 shmitt trigger inverter
+P8.16 in      # IN1 input, from 74AC14 shmitt trigger inverter
+P8.11 in      # IN2 input, from 74AC14 shmitt trigger inverter
+P8.12 in      # IN3 input, from 74AC14 shmitt trigger inverter
+P8.13 in      # IN4 input, from 74AC14 shmitt trigger inverter
+P8.14 in      # IN5 input, from 74AC14 shmitt trigger inverter
+
+# unmapped signals
+#P9.17        # SPI0_CS0
+#P9.18        # SPI0_D1
+#P9.21        # SPI0_D0
+#P9.22        # SPI0_SCLK
+#P9.24        # UART1_TXD
+#P9.26        # UART1_RXD
+#P9.28        # SPI1_CS0
+#P9.29        # SPI1_D0
+#P9.31        # SPI1_SCLK
