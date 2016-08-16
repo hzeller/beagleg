@@ -48,7 +48,7 @@ public:
   }
 
   virtual void gcode_start()     { Count(CALL_gcode_start); }
-  virtual void gcode_finished()  { Count(CALL_gcode_finished); }
+  virtual void gcode_finished(bool)  { Count(CALL_gcode_finished); }
   virtual void inform_origin_offset(const AxesRegister &offset) {
     parser_offset = offset;
   }

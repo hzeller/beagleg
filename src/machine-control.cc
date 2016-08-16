@@ -194,7 +194,7 @@ static int run_server(int listen_socket,
   do {
     struct sockaddr_in client;
     socklen_t socklen = sizeof(client);
-    struct sigaction sa = {0};
+    struct sigaction sa = {};
     sa.sa_handler = eatsignal;
     sa.sa_flags = SA_RESETHAND | SA_NODEFER;  // oneshot, no restart
     sigaction(SIGINT, &sa, NULL);

@@ -21,7 +21,7 @@
 
 #include "gcode-parser.h"  // AxesRegister
 
-class MachineControlConfig;
+struct MachineControlConfig;
 class HardwareMapping;
 class MotorOperations;
 

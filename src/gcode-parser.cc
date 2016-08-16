@@ -666,7 +666,7 @@ static void receive_signal(int signo) {
 }
 static void arm_signal_handler() {
   caught_signal = false;
-  struct sigaction sa = {0};
+  struct sigaction sa = {};
   sa.sa_handler = receive_signal;
   sa.sa_flags = SA_RESETHAND;  // oneshot, no restart
   sigaction(SIGTERM, &sa, NULL);  // Regular kill

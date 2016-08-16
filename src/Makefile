@@ -41,7 +41,7 @@ CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(AR
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.
 export CXXFLAGS+=$(CFLAGS) -std=c++03
-export CXX=g++
+export CXX?=g++
 
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a

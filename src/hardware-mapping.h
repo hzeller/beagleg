@@ -26,7 +26,7 @@
 #include "string-util.h"
 
 class ConfigParser;
-class LinearSegmentSteps;
+struct LinearSegmentSteps;
 
 // The hardware connected to the BeagleBone typically has a number of universal
 // motor, PWM and Aux outputs and inputs. The user wants to tie a universal
