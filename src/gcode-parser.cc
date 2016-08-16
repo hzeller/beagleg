@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <math.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,30 @@
 #include "arc-gen.h"
 #include "logging.h"
 #include "string-util.h"
+
+// gcode-printf. Prints message to stream or stderr.
+// level
+//   0    Information
+//   1    G-Code Syntax Error with line number
+//   2    G-Code Syntax Error
+static void gprintf(FILE *stream, int level, int line_num,
+                    const char *format, ...) {
+  if (stream == NULL) stream = stderr;
+  switch (level) {
+  case 0:
+    fprintf(stream, "// ");
+    break;
+  case 1:
+    fprintf(stream, "// Line %d: G-Code Syntax Error: ", line_num);
+    break;
+  default:
+    fprintf(stream, "// G-Code Syntax Error: ");
+  }
+  va_list ap;
+  va_start(ap, format);
+  vfprintf(stream, format, ap);
+  va_end(ap);
+}
 
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
                                                      const char *line,
@@ -306,9 +331,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
 
   *letter = toupper(*line++);
   if (*line == '\0') {
-    fprintf(err_stream ? err_stream : stderr,
-            "// Line %d G-Code Syntax Error: expected value after '%c'\n",
-            line_num, *letter);
+    gprintf(err_stream, 1, line_num, "expected value after '%c'\n", *letter);
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
@@ -321,9 +344,9 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
   *value = ParseGcodeNumber(line, &endptr);
 
   if (line == endptr) {
-    fprintf(err_stream ? err_stream : stderr, "// Line %d G-Code Syntax Error:"
-            " Letter '%c' is not followed by a number but '%s'.\n",
-            line_num, *letter, line);
+    gprintf(err_stream, 1, line_num,
+            "Letter '%c' is not followed by a number but '%s'\n",
+            *letter, line);
     return NULL;
   }
   line = endptr;
@@ -494,9 +517,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   // Should the arc parameters be sanity checked?
   if (turns != 1) {
     // Currently, we ignore turns, so we check that it is exactly one.
-    fprintf(err_msg_ ? err_msg_ : stderr,
-            "// G-Code Syntax Error: handle_arc: turns=%d (must be 1)\n",
-            turns);
+    gprintf(err_msg_, 2, -1, "handle_arc: turns=%d (must be 1)\n", turns);
     return remaining_line;
   }
 
