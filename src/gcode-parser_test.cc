@@ -368,6 +368,72 @@ TEST(GCodeParserTest, parameters) {
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
 }
 
+TEST(GCodeParserTest, set_system_origin) {
+  ParseTester counter;
+
+  // set the G54 coordinate system to 100,100,0
+  counter.TestParseLine("G10 L2 P1 X100 Y100 Z0");
+
+  // make sure we are at the home position with no offset
+  counter.TestParseLine("G1 X0 Y0 Z0");
+  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
+  EXPECT_EQ(HOME_X, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
+
+  // change to the G54 coordinate system
+  counter.TestParseLine("G54");
+  counter.TestParseLine("#5220");          // 5220 = 1.00000
+  // the machine is not expected to move
+  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
+  // the offset should be set
+  EXPECT_EQ(100, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(100, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(0, counter.parser_offset[AXIS_Z]);
+
+  // test the remaing GCodes
+  counter.TestParseLine("G55");
+  counter.TestParseLine("#5220");          // 5220 = 2.00000
+  counter.TestParseLine("G56");
+  counter.TestParseLine("#5220");          // 5220 = 3.00000
+  counter.TestParseLine("G57");
+  counter.TestParseLine("#5220");          // 5220 = 4.00000
+  counter.TestParseLine("G58");
+  counter.TestParseLine("#5220");          // 5220 = 5.00000
+  counter.TestParseLine("G59");
+  counter.TestParseLine("#5220");          // 5220 = 6.00000
+  counter.TestParseLine("G59.1");
+  counter.TestParseLine("#5220");          // 5220 = 7.00000
+  counter.TestParseLine("G59.2");
+  counter.TestParseLine("#5220");          // 5220 = 8.00000
+  counter.TestParseLine("G59.3");
+  counter.TestParseLine("#5220");          // 5220 = 9.00000
+  // this one should fail
+  counter.TestParseLine("G59.4");          // invalid coordinate system
+  counter.TestParseLine("#5220");          // 5220 = 9.00000
+
+  // set the G56 coordinate system to 25,50,10
+  counter.TestParseLine("G10 L2 P3 X25 Y50 Z10");
+  counter.TestParseLine("G56");
+  // the machine is still not expected to move
+  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
+  // the offset should be set
+  EXPECT_EQ(25, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(50, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(10, counter.parser_offset[AXIS_Z]);
+  // move to the new origin
+  counter.TestParseLine("G1 X0 Y0 Z0");
+  EXPECT_EQ(25, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(50, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(10, counter.abs_pos[AXIS_Z]);
+}
+
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

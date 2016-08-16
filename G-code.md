@@ -45,6 +45,7 @@ G1 [coordinates] | `coordinated_move()` | Like G0, but guarantee linear move
 G2 [end] [offset]| `coordinated_move()` | Clockwise arc
 G3 [end] [offset]| `coordinated_move()` | Counterclockwise arc
 G4 Pnnn          | `dwell()`            | Dwell (wait) for nnn milliseconds.
+G10 L2 Px [coord]| -                    | Set coordinate system data
 G17              | -                    | XY plane selection.
 G18              | -                    | ZX plane selection.
 G19              | -                    | YZ plane selection.
@@ -52,6 +53,15 @@ G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
 G28 [coordinates]| `handle_home()`      | Home the machine on given axes.
 G30 [Z<thick>]   | `handle_z_probe()`   | Z Probe, with optional target thickness.
+G54              | -                    | Select coordinate system 1 (G10 L2 P1 ...)
+G55              | -                    | Select coordinate system 2 (G10 L2 P2 ...)
+G56              | -                    | Select coordinate system 3 (G10 L2 P3 ...)
+G57              | -                    | Select coordinate system 4 (G10 L2 P4 ...)
+G58              | -                    | Select coordinate system 5 (G10 L2 P5 ...)
+G59              | -                    | Select coordinate system 6 (G10 L2 P6 ...)
+G59.1            | -                    | Select coordinate system 7 (G10 L2 P7 ...)
+G59.2            | -                    | Select coordinate system 8 (G10 L2 P8 ...)
+G59.3            | -                    | Select coordinate system 9 (G10 L2 P9 ...)
 G70              | -                    | Set coordinates to inches.
 G71              | -                    | Set coordinates to millimeter.
 G90              | -                    | Coordinates are absolute.

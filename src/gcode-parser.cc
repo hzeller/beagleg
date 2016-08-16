@@ -192,6 +192,8 @@ private:
   }
 
   const char *handle_home(const char *line);
+  const char *handle_G10(const char *line);
+  void change_coord_system(float sub_command);
   const char *handle_G92(float sub_command, const char *line);
   const char *handle_move(const char *line, bool force_change);
   const char *handle_arc(const char *line, bool is_cw);
@@ -233,7 +235,8 @@ private:
   // The home position is not necessarily {0,0,0...}, but it is where
   // the end-switches are.
   const AxesRegister home_position_;
-  // ... + other origins.
+  // Coordinate systems 1-9 (G54 to G59.3) (zero-indexed)
+  AxesRegister coord_system_[9];
 
   // -- Offsets
   AxesRegister global_offset_g92_;
@@ -483,6 +486,69 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   return line;
 }
 
+// Set coordinate system data
+const char *GCodeParser::Impl::handle_G10(const char *line) {
+  AxesRegister coords;
+  int l_val = -1;
+  int p_val = -1;
+  bool have_val[GCODE_NUM_AXES];
+  for (int i = 0; i < GCODE_NUM_AXES; ++i)
+    have_val[i] = false;
+
+  char letter;
+  float value;
+  const char *remaining_line;
+  while ((remaining_line = gparse_pair(line, &letter, &value))) {
+    if (letter == 'L') l_val = (int)value;
+    else if (letter == 'P') p_val = (int)value;
+    else {
+      const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
+      const float unit_val = value * unit_to_mm_factor_;
+      if (axis == GCODE_NUM_AXES)
+        break;  //  Possibly start of new command.
+      coords[axis] = unit_val;
+      have_val[axis] = true;
+    }
+    line = remaining_line;
+  }
+  if (l_val == 2 && p_val >= 1 && p_val <= 9) {
+    for (int i = 0; i < GCODE_NUM_AXES; ++i)
+      if (!have_val[i]) coords[i] = coord_system_[p_val-1][i];
+    coord_system_[p_val-1] = coords;
+    // Now update the parameters
+    int offset = (p_val-1) * 20;
+    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+      parameters_[5221 + offset + i] = coords[i];
+    }
+  } else {
+    gprintf(err_msg_, 1, line_number_, "handle_G10: invalid L or P value\n");
+  }
+  return line;
+}
+
+void GCodeParser::Impl::change_coord_system(float sub_command) {
+  int coord_system = -1;
+  switch ((int)sub_command) {
+  case 54: coord_system = 1; break;
+  case 55: coord_system = 2; break;
+  case 56: coord_system = 3; break;
+  case 57: coord_system = 4; break;
+  case 58: coord_system = 5; break;
+  case 59:
+    if (sub_command == 59.0f) { coord_system = 6; break; }
+    if (sub_command == 59.1f) { coord_system = 7; break; }
+    if (sub_command == 59.2f) { coord_system = 8; break; }
+    if (sub_command == 59.3f) { coord_system = 9; break; }
+    // fallthru
+  default:
+    gprintf(err_msg_, 1, line_number_, "invalid coordinate system\n");
+    return;
+  }
+  parameters_[5220] = coord_system;
+  current_origin_ = &coord_system_[coord_system-1];
+  inform_origin_offset_change();
+}
+
 // Set relative coordinate system
 const char *GCodeParser::Impl::handle_G92(float sub_command, const char *line) {
   // It is safe to compare raw float values here, as long as we give float
@@ -704,6 +770,7 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
       case  4: line = set_param('P', &GCodeParser::EventReceiver::dwell,
                                 1.0f, line);
         break;
+      case 10: line = handle_G10(line); break;
       case 17: arc_normal_ = AXIS_Z; break;
       case 18: arc_normal_ = AXIS_Y; break;
       case 19: arc_normal_ = AXIS_X; break;
@@ -711,6 +778,9 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
       case 21: unit_to_mm_factor_ = 1.0f; break;
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
+      case 54: case 55: case 56: case 57: case 58: case 59:
+        change_coord_system(value);
+        break;
       case 70: unit_to_mm_factor_ = 25.4f; break;
       case 71: unit_to_mm_factor_ = 1.0f; break;
       case 90: set_all_axis_to_absolute(true); break;
