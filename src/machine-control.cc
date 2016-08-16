@@ -465,6 +465,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   GCodeParser::Config parser_cfg;
+
+  // TODO(hzeller): read these parameters from permanent storage somewhere.
+  float parameters[5400];
+  parser_cfg.parameters = parameters;
+  parser_cfg.num_parameters = sizeof(parameters) / sizeof(float);
+
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
                                         machine_control->ParseEventReceiver(),

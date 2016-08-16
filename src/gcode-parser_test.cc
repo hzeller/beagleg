@@ -38,16 +38,23 @@ public:
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
+    config.num_parameters = sizeof(parameters_) / sizeof(float);
+    config.parameters = parameters_;
     parser_ = new GCodeParser(config, this, false);
   }
   virtual ~ParseTester() { delete parser_; }
+
+  float get_parameter(int num) {
+    assert(num >= 0 && num < sizeof(parameters_)/sizeof(float));
+    return parameters_[num];
+  }
 
   // Main function to test.
   void TestParseLine(const char *block) {
     parser_->ParseLine(block, stderr);
   }
 
-  virtual void gcode_start()     { Count(CALL_gcode_start); }
+  virtual void gcode_start(GCodeParser *)     { Count(CALL_gcode_start); }
   virtual void gcode_finished(bool)  { Count(CALL_gcode_finished); }
   virtual void inform_origin_offset(const AxesRegister &offset) {
     parser_offset = offset;
@@ -91,6 +98,7 @@ public:
 
 private:
   void Count(int what) { call_count[what]++; }
+  float parameters_[5400];
 
   GCodeParser *parser_;
 };
@@ -360,11 +368,13 @@ TEST(GCodeParserTest, parameters) {
 
   // test indexed parameters
   counter.TestParseLine("#1=25");
+  EXPECT_EQ(25, counter.get_parameter(1));
   counter.TestParseLine("#2=1");
   counter.TestParseLine("#1");             // 1 = 25.00000
   counter.TestParseLine("#2");             // 2 = 1.00000
   counter.TestParseLine("##2");            // [1] = 25.00000
   counter.TestParseLine("G1 X##2");
+
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
 }
 
@@ -385,6 +395,7 @@ TEST(GCodeParserTest, set_system_origin) {
 
   // change to the G54 coordinate system
   counter.TestParseLine("G54");
+  EXPECT_EQ(1, counter.get_parameter(5220));
   counter.TestParseLine("#5220");          // 5220 = 1.00000
   // the machine is not expected to move
   EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
@@ -397,24 +408,41 @@ TEST(GCodeParserTest, set_system_origin) {
 
   // test the remaing GCodes
   counter.TestParseLine("G55");
+  EXPECT_EQ(2, counter.get_parameter(5220));
   counter.TestParseLine("#5220");          // 5220 = 2.00000
+
   counter.TestParseLine("G56");
   counter.TestParseLine("#5220");          // 5220 = 3.00000
+  EXPECT_EQ(3, counter.get_parameter(5220));
+
   counter.TestParseLine("G57");
   counter.TestParseLine("#5220");          // 5220 = 4.00000
+  EXPECT_EQ(4, counter.get_parameter(5220));
+
   counter.TestParseLine("G58");
   counter.TestParseLine("#5220");          // 5220 = 5.00000
+  EXPECT_EQ(5, counter.get_parameter(5220));
+
   counter.TestParseLine("G59");
   counter.TestParseLine("#5220");          // 5220 = 6.00000
+  EXPECT_EQ(6, counter.get_parameter(5220));
+
   counter.TestParseLine("G59.1");
   counter.TestParseLine("#5220");          // 5220 = 7.00000
+  EXPECT_EQ(7, counter.get_parameter(5220));
+
   counter.TestParseLine("G59.2");
   counter.TestParseLine("#5220");          // 5220 = 8.00000
+  EXPECT_EQ(8, counter.get_parameter(5220));
+
   counter.TestParseLine("G59.3");
   counter.TestParseLine("#5220");          // 5220 = 9.00000
+  EXPECT_EQ(9, counter.get_parameter(5220));
+
   // this one should fail
   counter.TestParseLine("G59.4");          // invalid coordinate system
   counter.TestParseLine("#5220");          // 5220 = 9.00000
+  EXPECT_EQ(9, counter.get_parameter(5220));
 
   // set the G56 coordinate system to 25,50,10
   counter.TestParseLine("G10 L2 P3 X25 Y50 Z10");

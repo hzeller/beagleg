@@ -83,7 +83,7 @@ public:
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
 
   // -- GCodeParser::Events interface implementation --
-  virtual void gcode_start();          // Start program. Use for initialization.
+  virtual void gcode_start(GCodeParser *parser);
   virtual void gcode_finished(bool end_of_stream);  // End of program or stream.
 
   virtual void inform_origin_offset(const AxesRegister &origin);
@@ -131,6 +131,7 @@ private:
   HardwareMapping *const hardware_mapping_;
   Spindle *const spindle_;
   FILE *msg_stream_;
+  GCodeParser *parser_;
 
   // Derived configuration
   float g0_feedrate_mm_per_sec_;         // Highest of all axes; used for G0
@@ -158,6 +159,7 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
     hardware_mapping_(hardware_mapping),
     spindle_(spindle),
     msg_stream_(msg_stream),
+    parser_(NULL),
     g0_feedrate_mm_per_sec_(-1),
     current_feedrate_mm_per_sec_(-1),
     prog_speed_factor_(1),
@@ -395,7 +397,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
   switch (m_code) {
   case 3: case 4:
     for (;;) {
-      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
       else if (letter == 'S') spindle_rpm = round2int(value);
       else break;
@@ -419,7 +421,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
     int bit_value = -1;
     int pin = -1;
     for (;;) {
-      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
       if (letter == 'P') pin = round2int(value);
       else if (letter == 'S' && m_code == 42) bit_value = round2int(value);
@@ -451,7 +453,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
   case 355: {
     int on_value = 0;
     for (;;) {
-      after_pair = GCodeParser::ParsePair(remaining, &letter, &value, msg_stream_);
+      after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
       if (after_pair == NULL) break;
       if (letter == 'S') on_value = round2int(value);
       else break;
@@ -524,7 +526,8 @@ void GCodeMachineControl::Impl::get_endstop_status() {
   }
 }
 
-void GCodeMachineControl::Impl::gcode_start() {
+void GCodeMachineControl::Impl::gcode_start(GCodeParser *parser) {
+  parser_ = parser;
   if (cfg_.auto_fan_pwm > 0)
     set_fanspeed(cfg_.auto_fan_pwm);
 }
@@ -780,12 +783,15 @@ GCodeMachineControl::~GCodeMachineControl() {
   delete impl_;
 }
 
-GCodeMachineControl* GCodeMachineControl::Create(const MachineControlConfig &config,
-                                                 MotorOperations *motor_ops,
-                                                 HardwareMapping *hardware_mapping,
-                                                 Spindle *spindle,
-                                                 FILE *msg_stream) {
-  Impl *result = new Impl(config, motor_ops, hardware_mapping, spindle, msg_stream);
+GCodeMachineControl* GCodeMachineControl::Create(
+  const MachineControlConfig &config,
+  MotorOperations *motor_ops,
+  HardwareMapping *hardware_mapping,
+  Spindle *spindle,
+  FILE *msg_stream)
+{
+  Impl *result = new Impl(config, motor_ops,
+                          hardware_mapping, spindle, msg_stream);
   if (!result->Init()) {
     delete result;
     return NULL;

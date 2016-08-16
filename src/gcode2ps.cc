@@ -105,7 +105,7 @@ public:
     return NULL;
   }
 
-  virtual void gcode_start() {
+  virtual void gcode_start(GCodeParser *parser) {
     if (pass_ == 2) {
       fprintf(file_, "\n%% -- Path generated from GCode.\n");
       fprintf(file_, "0.1 setlinewidth 0 0 0 setrgbcolor\n0 0 moveto\n");
@@ -478,9 +478,16 @@ int main(int argc, char *argv[]) {
   // TODO(hzeller): only parse the file once, so that we can read from stdin.
   const char *filename = argv[optind];
 
+  GCodeParser::Config parser_cfg;
+
+  // TODO(hzeller): read these parameters from permanent storage somewhere.
+  float parameters[5400];
+  parser_cfg.parameters = parameters;
+  parser_cfg.num_parameters = sizeof(parameters) / sizeof(float);
+
   GCodePrintVisualizer gcode_printer(output_file);
   gcode_printer.SetPass(1);
-  GCodeParser gcode_viz_parser(GCodeParser::Config(), &gcode_printer, false);
+  GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true);
 
   gcode_printer.PrintPostscriptBoundingBox(printMargin,
@@ -505,14 +512,12 @@ int main(int argc, char *argv[]) {
     }
     machine_config.threshold_angle = threshold_angle;
 
-    GCodeParser::Config gcode_config;
-
     // This is not connected to any machine. Don't assume homing, but
     // at least extract the home position from the config.
     machine_config.require_homing = false;
     for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
       HardwareMapping::AxisTrigger trigger = machine_config.homing_trigger[axis];
-      gcode_config.machine_origin[axis] =
+      parser_cfg.machine_origin[axis] =
         (trigger & HardwareMapping::TRIGGER_MAX)
         ? machine_config.move_range_mm[axis]
         : 0;
@@ -542,7 +547,7 @@ int main(int argc, char *argv[]) {
     } else {
       machine_control->SetMsgOut(NULL);
       motor_printer.SetPass(1);
-      GCodeParser parser(gcode_config, machine_control->ParseEventReceiver(),
+      GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver(),
                          false);
       ParseFile(&parser, filename, true);
 

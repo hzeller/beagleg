@@ -70,8 +70,12 @@ public:
   class EventReceiver {
   public:
     virtual ~EventReceiver() {}
-    virtual void gcode_start() {}    // Start program. Use for initialization.
-    virtual void gcode_finished(bool end_of_stream) {} // End of program or stream.
+    // Start program. Use for initialization. Informs about gcode parser so that
+    // it is possible to call ParsePair().
+    virtual void gcode_start(GCodeParser *parser) {}
+
+    // End of program or stream.
+    virtual void gcode_finished(bool end_of_stream) {}
 
     // The parser handles relative positions and coordinate systems internally,
     // so the machine does not have to worry about that.
@@ -144,15 +148,19 @@ public:
 
   // Configuration for the parser.
   struct Config {
+    Config() : num_parameters(0), parameters(NULL) {}
+
     // The machine origin. This is where the end-switches are. Typically,
     // for CNC machines, that might have Z at the highest point for instance,
     // while 3D printers have Z at zero.
     AxesRegister machine_origin;
 
-    // TODO(hzeller): here, there should be references to registers
-    // G54..G59. They can be set externally to GCode by some operating
-    // terminal, but need to be accessed in gcode.
-    //float *position_register[6];  // register G54..G59
+    // The NIST-RS274NGC parameters. The pointer needs to point to some
+    // allocated area that will be modified by the parser.
+    // The surrounding code needs to take care of allocating and persisting.
+    // TODO: this needs refinement, maybe with read/write access logic.
+    size_t num_parameters;
+    float *parameters;
   };
 
 public:
@@ -186,8 +194,10 @@ public:
   //
   // Returns the remainder of the line or NULL if no pair has been found and the
   // end-of-string has been reached.
-  static const char *ParsePair(const char *line, char *letter, float *value,
-                               FILE *err_stream);
+  //
+  // Resolves variables.
+  const char *ParsePair(const char *line, char *letter, float *value,
+                        FILE *err_stream);
 
 private:
   class Impl;

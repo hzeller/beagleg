@@ -43,35 +43,6 @@
 #include "logging.h"
 #include "string-util.h"
 
-// gcode-printf. Prints message to stream or stderr.
-// level
-//   0    Information
-//   1    G-Code Syntax Error with line number
-//   2    G-Code Syntax Error
-static void gprintf(FILE *stream, int level, int line_num,
-                    const char *format, ...) {
-  if (stream == NULL) stream = stderr;
-  switch (level) {
-  case 0:
-    fprintf(stream, "// ");
-    break;
-  case 1:
-    fprintf(stream, "// Line %d: G-Code Syntax Error: ", line_num);
-    break;
-  default:
-    fprintf(stream, "// G-Code Syntax Error: ");
-  }
-  va_list ap;
-  va_start(ap, format);
-  vfprintf(stream, format, ap);
-  va_end(ap);
-}
-
-static const char *gcodep_parse_pair_with_linenumber(int line_num,
-                                                     const char *line,
-                                                     char *letter, float *value,
-                                                     FILE *err_stream);
-
 const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
    | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C)
@@ -120,9 +91,13 @@ public:
        GCodeParser::EventReceiver *parse_events, bool allow_m111);
   ~Impl();
 
-  void ParseLine(const char *line, FILE *err_stream);
-  int ParseStream(int input_fd, FILE *err_stream);
-
+  void ParseLine(GCodeParser *owner, const char *line, FILE *err_stream);
+  int ParseStream(GCodeParser *owner, int input_fd, FILE *err_stream);
+  const char *gcodep_parse_pair_with_linenumber(int line_num,
+                                                const char *line,
+                                                char *letter,
+                                                float *value,
+                                                FILE *err_stream);
 private:
   enum DebugLevel {
     DEBUG_NONE   = 0,
@@ -207,8 +182,42 @@ private:
   const char *set_param(char param_letter, EventValueSetter setter,
                         float factor, const char *line);
 
+  const char *gcode_parse_parameter(int line_num, const char *line,
+                                    int *param_num, float *param_val,
+                                    bool query);
+
+  // Read parameter. Do range check.
+  bool read_parameter(int num, float *result) {
+    if (num < 0 || num >= config.num_parameters) {
+      gprintf(GLOG_SEMANTIC_ERR,
+              "reading unsupported parameter number (%d)\n", num);
+      return false;
+    }
+    *result = config.parameters[num];
+    return true;
+  }
+
+  // Read parameter. Do range check.
+  bool store_parameter(int num, float value) {
+    // zero parameter can never be written.
+    if (num <= 0 || num >= config.num_parameters) {
+      gprintf(GLOG_SEMANTIC_ERR,
+              "writing unsupported parameter number (%d)\n", num);
+      return false;
+    }
+    config.parameters[num] = value;
+    return true;
+  }
+
   const AxesRegister &current_origin() const { return *current_origin_; }
   const AxesRegister &current_global_offset() const { return *current_global_offset_; }
+
+  enum GCodePrintLevel {
+    GLOG_INFO,
+    GLOG_SYNTAX_ERR,
+    GLOG_SEMANTIC_ERR,
+  };
+  void gprintf(enum GCodePrintLevel level, const char *format, ...);
 
   static AxesRegister kZeroOffset;
 
@@ -255,15 +264,7 @@ private:
 
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
   bool allow_m111_;
-
-  // The NIST-RS274NGC parameters.
-  size_t num_parameters_;
-  float *parameters_;
 };
-
-// HACK: allow gcode_parse_parameter() to access the NIST-RS274NGC parameters.
-static size_t global_num_params;
-static float *global_params;
 
 AxesRegister GCodeParser::Impl::kZeroOffset;
 
@@ -288,23 +289,37 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     debug_level_(DEBUG_NONE), allow_m111_(allow_m111)
 {
   assert(callbacks);  // otherwise, this is not very useful.
-  num_parameters_ = 5400;
-  parameters_ = new float[num_parameters_];
-  // TODO: Load the parameters
-
-  // HACK: allow gcode_parse_parameter() to access the NIST-RS274NGC parameters.
-  global_num_params = num_parameters_;
-  global_params = parameters_;
-
   reset_G92();
   InitProgramDefaults();
 }
 
 GCodeParser::Impl::~Impl() {
-  if (parameters_) {
-    // TODO: Save the parameters
-    delete[] parameters_;
+}
+
+// gcode-printf. Prints message to stream or stderr.
+// level
+//   0    Information
+//   1    G-Code Syntax Error with line number
+//   2    G-Code Syntax Error
+void GCodeParser::Impl::gprintf(enum GCodePrintLevel level,
+                                const char *format, ...) {
+  FILE *stream = err_msg_;
+  if (stream == NULL) stream = stderr;
+  switch (level) {
+  case GLOG_INFO:
+    fprintf(stream, "// ");
+    break;
+  case GLOG_SYNTAX_ERR:
+    fprintf(stream, "// Line %d: G-Code Syntax Error: ", line_number_);
+    break;
+  case GLOG_SEMANTIC_ERR:
+    fprintf(stream, "// Line %d: G-Code Error: ", line_number_);
+    break;
   }
+  va_list ap;
+  va_start(ap, format);
+  vfprintf(stream, format, ap);
+  va_end(ap);
 }
 
 static const char *skip_white(const char *line) {
@@ -335,14 +350,15 @@ static float ParseGcodeNumber(const char *line, const char **endptr) {
   return result;
 }
 
-static const char *gcode_parse_parameter(int line_num, const char *line,
-                                         int *param_num, float *param_val,
-                                         bool query, FILE *err_stream) {
+const char *GCodeParser::Impl::gcode_parse_parameter(
+  int line_num, const char *line, int *param_num, float *param_val,
+  bool query)
+{
   *param_num = 0;
   *param_val = 0.0f;
   line = skip_white(line);
   if (*line == '\0') {
-    gprintf(err_stream, 1, line_num, "expected value after '#'\n");
+    gprintf(GLOG_SYNTAX_ERR, "expected value after '#'\n");
     return NULL;
   }
 
@@ -355,14 +371,18 @@ static const char *gcode_parse_parameter(int line_num, const char *line,
   const char *endptr;
   *param_num = (int)ParseGcodeNumber(line, &endptr);
   if (line == endptr) {
-    gprintf(err_stream, 1, line_num,
+    gprintf(GLOG_SYNTAX_ERR,
             "'#' is not followed by a number but '%s'\n", line);
     return NULL;
   }
-  if (indexed) *param_num = global_params[*param_num];
-  if (*param_num <= 0 || *param_num > (int)global_num_params-1) {
-    gprintf(err_stream, 1, line_num, "unsupported parameter number (%d)\n",
-            *param_num);
+  if (indexed) {
+    float val;
+    if (!read_parameter(*param_num, &val))
+      return NULL;
+    *param_num = val;
+  }
+  if (*param_num <= 0 || *param_num > (int)config.num_parameters-1) {
+    gprintf(GLOG_SYNTAX_ERR, "unsupported parameter number (%d)\n", *param_num);
     return NULL;
   }
   line = endptr;
@@ -372,19 +392,20 @@ static const char *gcode_parse_parameter(int line_num, const char *line,
     line++;
     float new_val = ParseGcodeNumber(line, &endptr);
     if (line == endptr) {
-      gprintf(err_stream, 1, line_num,
+      gprintf(GLOG_SYNTAX_ERR,
               "'#%d=' is not followed by a number but '%s'\n",
               *param_num, line);
       return NULL;
     }
     line = endptr;
-    global_params[*param_num] = new_val;
+    store_parameter(*param_num, new_val);
     *param_val = new_val;
   } else {
-    *param_val = global_params[*param_num];
-    if (query)
-      gprintf(err_stream, 0, -1, "%s%d%s = %f\n",
+    read_parameter(*param_num, param_val);
+    if (query) {
+      gprintf(GLOG_INFO, "%s%d%s = %f\n",
               indexed ? "[" : "", *param_num, indexed ? "]" : "", *param_val);
+    }
   }
   line = skip_white(line); // Makes the line better to deal with.
   return line;  // We parsed something; return whatever is remaining.
@@ -392,10 +413,11 @@ static const char *gcode_parse_parameter(int line_num, const char *line,
 
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
-static const char *gcodep_parse_pair_with_linenumber(int line_num,
-                                                     const char *line,
-                                                     char *letter, float *value,
-                                                     FILE *err_stream) {
+const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
+  int line_num, const char *line,
+  char *letter, float *value,
+  FILE *err_stream)
+{
   // TODO: error callback when we have errors with messages.
   if (line == NULL)
     return NULL;
@@ -417,7 +439,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
     float param_val;
     const char *remaining_line = gcode_parse_parameter(line_num, line,
                                                        &param_num, &param_val,
-                                                       true, err_stream);
+                                                       true);
 
     // recursive call to parse the letter/number pair
     line = remaining_line;
@@ -426,7 +448,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
 
   *letter = toupper(*line++);
   if (*line == '\0') {
-    gprintf(err_stream, 1, line_num, "expected value after '%c'\n", *letter);
+    gprintf(GLOG_SYNTAX_ERR, "expected value after '%c'\n", *letter);
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
@@ -438,9 +460,12 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
   if (*line == '#') {  // parameter get with a letter
     line++;
     int param_num;
-    endptr = gcode_parse_parameter(line_num, line, &param_num, value, false, err_stream);
+    endptr = gcode_parse_parameter(line_num, line, &param_num, value, false);
+    if (endptr == NULL) {
+      return NULL;   // got some error.
+    }
     if (line == endptr) {
-      gprintf(err_stream, 1, line_num,
+      gprintf(GLOG_SYNTAX_ERR,
               "Letter '%c' is not followed by a parameter number but '%s'\n",
               *letter, line);
       return NULL;
@@ -449,7 +474,7 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
     *value = ParseGcodeNumber(line, &endptr);
 
     if (line == endptr) {
-      gprintf(err_stream, 1, line_num,
+      gprintf(GLOG_SYNTAX_ERR,
               "Letter '%c' is not followed by a number but '%s'\n",
               *letter, line);
       return NULL;
@@ -518,10 +543,10 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
     // Now update the parameters
     int offset = (p_val-1) * 20;
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      parameters_[5221 + offset + i] = coords[i];
+      store_parameter(5221 + offset + i, coords[i]);
     }
   } else {
-    gprintf(err_msg_, 1, line_number_, "handle_G10: invalid L or P value\n");
+    gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L or P value\n");
   }
   return line;
 }
@@ -541,10 +566,10 @@ void GCodeParser::Impl::change_coord_system(float sub_command) {
     if (sub_command == 59.3f) { coord_system = 9; break; }
     // fallthru
   default:
-    gprintf(err_msg_, 1, line_number_, "invalid coordinate system\n");
+    gprintf(GLOG_SYNTAX_ERR, "invalid coordinate system\n");
     return;
   }
-  parameters_[5220] = coord_system;
+  store_parameter(5220, coord_system);
   current_origin_ = &coord_system_[coord_system-1];
   inform_origin_offset_change();
 }
@@ -686,7 +711,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   // Should the arc parameters be sanity checked?
   if (turns != 1) {
     // Currently, we ignore turns, so we check that it is exactly one.
-    gprintf(err_msg_, 2, -1, "handle_arc: turns=%d (must be 1)\n", turns);
+    gprintf(GLOG_SYNTAX_ERR, "handle_arc: turns=%d (must be 1)\n", turns);
     return remaining_line;
   }
 
@@ -746,7 +771,8 @@ const char *GCodeParser::Impl::handle_M111(const char *line) {
 }
 
 // Note: changes here should be documented in G-code.md as well.
-void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
+void GCodeParser::Impl::ParseLine(GCodeParser *owner,
+                                  const char *line, FILE *err_stream) {
   if (debug_level_ & DEBUG_PARSER) {
     Log_debug("GCodeParser| %s", line);
   }
@@ -757,7 +783,7 @@ void GCodeParser::Impl::ParseLine(const char *line, FILE *err_stream) {
   float value;
   while ((line = gparse_pair(line, &letter, &value))) {
     if (!program_in_progress_) {
-      callbacks->gcode_start();
+      callbacks->gcode_start(owner);
       program_in_progress_ = true;
     }
     char processed_command = 1;
@@ -883,7 +909,8 @@ static void disarm_signal_handler() {
 }
 
 // Public facade function.
-int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
+int GCodeParser::Impl::ParseStream(GCodeParser *owner,
+                                   int input_fd, FILE *err_stream) {
   if (err_stream) {
     // Output needs to be unbuffered, otherwise they'll never make it.
     setvbuf(err_stream, NULL, _IONBF, 0);
@@ -929,7 +956,7 @@ int GCodeParser::Impl::ParseStream(int input_fd, FILE *err_stream) {
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
       break;
 
-    ParseLine(buffer, err_stream);
+    ParseLine(owner, buffer, err_stream);
   }
   disarm_signal_handler();
 
@@ -955,13 +982,14 @@ GCodeParser::~GCodeParser() {
   delete impl_;
 }
 void GCodeParser::ParseLine(const char *line, FILE *err_stream) {
-  impl_->ParseLine(line, err_stream);
+  impl_->ParseLine(this, line, err_stream);
 }
 int GCodeParser::ParseStream(int input_fd, FILE *err_stream) {
-  return impl_->ParseStream(input_fd, err_stream);
+  return impl_->ParseStream(this, input_fd, err_stream);
 }
 const char *GCodeParser::ParsePair(const char *line,
                                    char *letter, float *value,
                                    FILE *err_stream) {
-  return gcodep_parse_pair_with_linenumber(-1, line, letter, value, err_stream);
+  return impl_->gcodep_parse_pair_with_linenumber(-1, line, letter, value,
+                                                  err_stream);
 }
