@@ -199,6 +199,9 @@ public:
   const char *ParsePair(const char *line, char *letter, float *value,
                         FILE *err_stream);
 
+  // Number of errors seen.
+  int error_count() const;
+
 private:
   class Impl;
   Impl *impl_;

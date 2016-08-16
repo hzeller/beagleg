@@ -98,6 +98,8 @@ public:
                                                 char *letter,
                                                 float *value,
                                                 FILE *err_stream);
+  int error_count() const { return error_count_; }
+
 private:
   enum DebugLevel {
     DEBUG_NONE   = 0,
@@ -264,6 +266,10 @@ private:
 
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
   bool allow_m111_;
+
+  // TODO(hzeller): right now, we hook the error count to the gprintf(), but
+  // maybe this needs to be more explicit.
+  int error_count_;
 };
 
 AxesRegister GCodeParser::Impl::kZeroOffset;
@@ -286,7 +292,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     home_position_(config.machine_origin),
     current_origin_(&home_position_), current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
-    debug_level_(DEBUG_NONE), allow_m111_(allow_m111)
+    debug_level_(DEBUG_NONE), allow_m111_(allow_m111), error_count_(0)
 {
   assert(callbacks);  // otherwise, this is not very useful.
   reset_G92();
@@ -311,9 +317,11 @@ void GCodeParser::Impl::gprintf(enum GCodePrintLevel level,
     break;
   case GLOG_SYNTAX_ERR:
     fprintf(stream, "// Line %d: G-Code Syntax Error: ", line_number_);
+    ++error_count_;
     break;
   case GLOG_SEMANTIC_ERR:
     fprintf(stream, "// Line %d: G-Code Error: ", line_number_);
+    ++error_count_;
     break;
   }
   va_list ap;
@@ -381,7 +389,7 @@ const char *GCodeParser::Impl::gcode_parse_parameter(
       return NULL;
     *param_num = val;
   }
-  if (*param_num <= 0 || *param_num > (int)config.num_parameters-1) {
+  if (*param_num < 0 || *param_num > (int)config.num_parameters-1) {
     gprintf(GLOG_SYNTAX_ERR, "unsupported parameter number (%d)\n", *param_num);
     return NULL;
   }
@@ -987,6 +995,8 @@ void GCodeParser::ParseLine(const char *line, FILE *err_stream) {
 int GCodeParser::ParseStream(int input_fd, FILE *err_stream) {
   return impl_->ParseStream(this, input_fd, err_stream);
 }
+int GCodeParser::error_count() const { return impl_->error_count(); }
+
 const char *GCodeParser::ParsePair(const char *line,
                                    char *letter, float *value,
                                    FILE *err_stream) {
