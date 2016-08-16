@@ -486,10 +486,7 @@ private:
 
 bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
   HardwareMapping::ConfigReader reader(this);
-  if (parser->EmitConfigValues(&reader)) {
-    return true;
-  }
-  return false;
+  return parser->EmitConfigValues(&reader);
 }
 
 const char *HardwareMapping::OutputToName(LogicOutput output) {
