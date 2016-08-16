@@ -176,7 +176,6 @@ static uint8_t substract_steps(struct LinearSegmentSteps *value,
 static float determine_joining_speed(const struct AxisTarget *from,
                                      const struct AxisTarget *to,
                                      const float threshold,
-                                     const float angle_in,
                                      const float angle_out) {
   // Our goal is to figure out what our from defining speed should
   // be at the end of the move.
@@ -190,7 +189,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
 
     // Quick integer decisions
     if (to_delta) moving = true;
-    if (angle_in < threshold && angle_out < threshold) continue;
+    if (angle_out < threshold) continue;
     if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
     if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
     if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
@@ -313,17 +312,14 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   memcpy(&accel_command, &move_command, sizeof(accel_command));
   memcpy(&decel_command, &move_command, sizeof(decel_command));
 
-  // Let's see what our defining axis had as speed in the previous segment. The
-  // last segment might have had a different defining axis, so we calculate
-  // what the the fraction of the speed that our _current_ defining axis had.
-  const float last_speed = fabsf(get_speed_for_axis(last_pos, defining_axis));
+  // Always start from the last steps/sec speed to avoid motion glitches.
+  // The planner will use that speed to determine what the peak speed for
+  // this move is and if we need to accel to reach the desired target speed.
+  const float last_speed = last_pos->speed;
 
   // The delta angle between the vectors is always (target - last). But we
   // have to deal with the sign flip when the vectors cross +/-180 degrees
   // between quadrants II (positive 180) and III (negative 180).
-  float angle_in = target_pos->angle - last_pos->angle;
-  if (angle_in > 180.0) angle_in -= 360.0;  // Quadrant II -> III
-  if (angle_in < -180.0) angle_in += 360.0; // Quadrant III -> II
   float angle_out = upcoming->angle - target_pos->angle;
   if (angle_out > 180.0) angle_out -= 360.0;  // Quadrant II -> III
   if (angle_out < -180.0) angle_out += 360.0; // Quadrant III -> II
@@ -333,7 +329,6 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   // go over).
   float next_speed = determine_joining_speed(target_pos, upcoming,
                                              cfg_->threshold_angle,
-                                             fabsf(angle_in),
                                              fabsf(angle_out));
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.

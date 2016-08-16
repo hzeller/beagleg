@@ -14,12 +14,6 @@
 #include "motor-operations.h"
 #include "gcode-machine-control.h"
 
-// We have a bug in which we generate extremely short segments that
-// are very fast.
-// TODO: This test should work with this set to 0 (and then
-// the ifdef's removed).
-#define EXPECT_SHORT_SEGMENT_GLITCH 1
-
 // Using different steps/mm speeds results in problems right now.
 // TODO: This should work being set to 1
 #define SPEED_STEP_FACTOR 4
@@ -49,30 +43,36 @@ public:
     LinearSegmentSteps euclidian_speeds = segment;
     const float hypotenuse = FixEuclidSpeed(&euclidian_speeds);
 #if 1
-    // Somewhat verbose, but useful :). All these values are calculated
-    // back into actual distances and speeds from steps.
+    // We recognize what we call a 'rounding_glitch' for segments that
+    // are very short (a few steps). These are move steps from the planner
+    // that are created due to rounding of the accel/decel steps. They
+    // should have speeds equal to the last v0.
+    bool rounding_glitch = false;
+    if (abs(segment.steps[AXIS_X]) < 2 &&
+        abs(segment.steps[AXIS_Y]) < 2 &&
+        abs(segment.steps[AXIS_Z]) < 2 &&
+        segment.v0 == segment.v1)
+      rounding_glitch = true;
+
+    // Somewhat verbose, but useful :).
+    // The values are calculated back back into actual distances from steps.
+    // Speeds are in steps/sec to avoid displaying incorrect speeds for the
+    // 'rounding_glitch'.
     fprintf(stderr, "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
-            "len: %5.1f ; v: %7.1f -> %7.1f\n",
+            "len: %5.1f ; v: %8.1f -> %8.1f %s %s",
             euclidian_speeds.steps[AXIS_X] / config_.steps_per_mm[AXIS_X],
             euclidian_speeds.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
             euclidian_speeds.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
             hypotenuse,
-            euclidian_speeds.v0, euclidian_speeds.v1);
+            segment.v0, segment.v1,
+            (segment.v0 < segment.v1) ? "accel" :
+            (segment.v0 > segment.v1) ? "decel" : "move",
+            rounding_glitch ? "rounding GLITCH!" : "");
+    if (!rounding_glitch)
+      fprintf(stderr, " ; v: %7.1f -> %7.1f",
+              euclidian_speeds.v0, euclidian_speeds.v1);
+    fprintf(stderr, "\n");
 #endif
-
-    // We recognize what we call 'glitch' at segments that are very
-    // short (a few steps), and have some very high speeds
-    if (abs(euclidian_speeds.steps[AXIS_X]) < 2 &&
-        abs(euclidian_speeds.steps[AXIS_Y]) < 2 &&
-        abs(euclidian_speeds.steps[AXIS_Z]) < 2) {
-      fprintf(stderr, "^^^^^^^^ steps:(%d, %d, %d): GLITCH!\n",
-              euclidian_speeds.steps[AXIS_X], euclidian_speeds.steps[AXIS_Y],
-              euclidian_speeds.steps[AXIS_Z]);
-#if EXPECT_SHORT_SEGMENT_GLITCH
-      // When we expect it, we ignore it by not adding to collected segments.
-      return;
-#endif
-    }
 
     collected_.push_back(segment);
   }
@@ -345,22 +345,32 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   for (float angle = 0; angle < 360; angle += threshold/2) {
     std::vector<LinearSegmentSteps> segments =
       DoAngleMove(threshold, angle, testing_angle);
-#if EXPECT_SHORT_SEGMENT_GLITCH
-    // With the short segment glitch, we sometimes get three segments.
+
+    // Depending on the two move angles we expect 2 to 4 segments.
+    // 2 segments (first move euclid speed is faster than the second)
+    //   1- accel of the first move to the angle
+    //   2- decel of the second move
+    //      Note that the planner will output a GLITCH about the second move
+    //      being too short for full decel.
+    // 3 segments (first move euclid speed is slower than the second)
+    //   1- accel of the first move to the angle
+    //   2- accel of the second move
+    //   3- decel of the second move
+    // 4 segments (first move euclid speed is slower than the second)
+    //   1- accel of the first move to the angle
+    //   2- accel of the second move
+    //   3- a 1 step move segment due to rounding of the accel/decel
+    //   4- decel of the second move
     ASSERT_GE(segments.size(), 2);
-#else
-    // We essentially expect two segments, plowing through in the middle
-    // with full speed
-    ASSERT_EQ(2, segments.size()) << "For start-angle " << angle;
-#endif
 
-    // A shallow move just plows through the middle, so we expect a larger
-    // speed than zero
-    EXPECT_GT(segments[0].v1, 0);
-
-    // Still, the join-speed at the elbow is the same.
-    EXPECT_EQ(segments[0].v1, segments[1].v0)
-      << "At angle " << angle;
+    // A shallow move just plows through the middle, so we expect all the
+    // joint speeds to be larger than zero.
+    for (size_t i = 0; i < segments.size(); ++i) {
+      if (i > 0)
+        EXPECT_GT(segments[i].v0, 0) << "At angle " << angle;
+      if (i < segments.size()-1)
+        EXPECT_GT(segments[i].v1, 0) << "At angle " << angle;
+    }
   }
 }
 
