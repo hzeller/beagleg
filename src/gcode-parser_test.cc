@@ -306,6 +306,68 @@ TEST(GCodeParserTest, probe_axis) {
   EXPECT_EQ(PROBE_POSITION - 3 + 1, counter.abs_pos[AXIS_Z]);
 }
 
+TEST(GCodeParserTest, parameters) {
+  ParseTester counter;
+
+  // test set/get parameter without comments
+  counter.TestParseLine("#1=25");
+  counter.TestParseLine("#1");             // 1 = 25.00000
+  counter.TestParseLine("G1 X#1");
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+
+  // test set/get parameter with comments before
+  counter.TestParseLine("(set param) #1=50");
+  counter.TestParseLine("(get param) #1"); // 1 = 50.00000
+  counter.TestParseLine("G1 X#1");
+  EXPECT_EQ(HOME_X + 50, counter.abs_pos[AXIS_X]);
+
+  // test set/get parameter with comments after
+  counter.TestParseLine("#1=75 (set param)");
+  counter.TestParseLine("#1 (get param)"); // 1 = 75.00000
+  counter.TestParseLine("G1 X#1");
+  EXPECT_EQ(HOME_X + 75, counter.abs_pos[AXIS_X]);
+
+  // test set/get parameter with letter
+  counter.TestParseLine("G1 X#1=100");
+  counter.TestParseLine("#1");             // 1 = 100.00000
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+
+  // test multiple parameters
+  counter.TestParseLine("#1=25");
+  counter.TestParseLine("#2=50");
+  counter.TestParseLine("#3=75");
+  counter.TestParseLine("#1");             // 1 = 25.00000
+  counter.TestParseLine("#2");             // 2 = 50.00000
+  counter.TestParseLine("#3");             // 3 = 75.00000
+  counter.TestParseLine("G1 X#1 Y#2 Z#3");
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
+
+  counter.TestParseLine("G1 X#1=100 Y#2=200 Z#3=300");
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 200, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 300, counter.abs_pos[AXIS_Z]);
+
+  // test invalid parameter parsing
+  counter.TestParseLine("#");              // expected value after '#'
+  counter.TestParseLine("#G1 X20");        // expected value after '#'
+  counter.TestParseLine("#0");             // unsupported parameter number
+  counter.TestParseLine("#5400=100");      // unsupported parameter number
+  counter.TestParseLine("#1=");            // not followed by a number
+  counter.TestParseLine("#1=G1 X10");      // not followed by a number
+  EXPECT_NE(HOME_X + 10, counter.abs_pos[AXIS_X]);
+
+  // test indexed parameters
+  counter.TestParseLine("#1=25");
+  counter.TestParseLine("#2=1");
+  counter.TestParseLine("#1");             // 1 = 25.00000
+  counter.TestParseLine("#2");             // 2 = 1.00000
+  counter.TestParseLine("##2");            // [1] = 25.00000
+  counter.TestParseLine("G1 X##2");
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+}
+
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

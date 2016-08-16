@@ -118,6 +118,7 @@ class GCodeParser::Impl {
 public:
   Impl(const GCodeParser::Config &config,
        GCodeParser::EventReceiver *parse_events, bool allow_m111);
+  ~Impl();
 
   void ParseLine(const char *line, FILE *err_stream);
   int ParseStream(int input_fd, FILE *err_stream);
@@ -251,7 +252,15 @@ private:
 
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
   bool allow_m111_;
+
+  // The NIST-RS274NGC parameters.
+  size_t num_parameters_;
+  float *parameters_;
 };
+
+// HACK: allow gcode_parse_parameter() to access the NIST-RS274NGC parameters.
+static size_t global_num_params;
+static float *global_params;
 
 AxesRegister GCodeParser::Impl::kZeroOffset;
 
@@ -276,8 +285,23 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     debug_level_(DEBUG_NONE), allow_m111_(allow_m111)
 {
   assert(callbacks);  // otherwise, this is not very useful.
+  num_parameters_ = 5400;
+  parameters_ = new float[num_parameters_];
+  // TODO: Load the parameters
+
+  // HACK: allow gcode_parse_parameter() to access the NIST-RS274NGC parameters.
+  global_num_params = num_parameters_;
+  global_params = parameters_;
+
   reset_G92();
   InitProgramDefaults();
+}
+
+GCodeParser::Impl::~Impl() {
+  if (parameters_) {
+    // TODO: Save the parameters
+    delete[] parameters_;
+  }
 }
 
 static const char *skip_white(const char *line) {
@@ -308,6 +332,61 @@ static float ParseGcodeNumber(const char *line, const char **endptr) {
   return result;
 }
 
+static const char *gcode_parse_parameter(int line_num, const char *line,
+                                         int *param_num, float *param_val,
+                                         bool query, FILE *err_stream) {
+  *param_num = 0;
+  *param_val = 0.0f;
+  line = skip_white(line);
+  if (*line == '\0') {
+    gprintf(err_stream, 1, line_num, "expected value after '#'\n");
+    return NULL;
+  }
+
+  bool indexed = false;
+  if (*line == '#') {  // indexed parameter access
+    line++;
+    indexed = true;
+  }
+
+  const char *endptr;
+  *param_num = (int)ParseGcodeNumber(line, &endptr);
+  if (line == endptr) {
+    gprintf(err_stream, 1, line_num,
+            "'#' is not followed by a number but '%s'\n", line);
+    return NULL;
+  }
+  if (indexed) *param_num = global_params[*param_num];
+  if (*param_num <= 0 || *param_num > (int)global_num_params-1) {
+    gprintf(err_stream, 1, line_num, "unsupported parameter number (%d)\n",
+            *param_num);
+    return NULL;
+  }
+  line = endptr;
+  line = skip_white(line);
+
+  if (*line == '=') {
+    line++;
+    float new_val = ParseGcodeNumber(line, &endptr);
+    if (line == endptr) {
+      gprintf(err_stream, 1, line_num,
+              "'#%d=' is not followed by a number but '%s'\n",
+              *param_num, line);
+      return NULL;
+    }
+    line = endptr;
+    global_params[*param_num] = new_val;
+    *param_val = new_val;
+  } else {
+    *param_val = global_params[*param_num];
+    if (query)
+      gprintf(err_stream, 0, -1, "%s%d%s = %f\n",
+              indexed ? "[" : "", *param_num, indexed ? "]" : "", *param_val);
+  }
+  line = skip_white(line); // Makes the line better to deal with.
+  return line;  // We parsed something; return whatever is remaining.
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 static const char *gcodep_parse_pair_with_linenumber(int line_num,
@@ -329,6 +408,19 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
     if (*line == '\0') return NULL;
   }
 
+  if (*line == '#') {  // parameter set/get without a letter
+    line++;
+    int param_num;
+    float param_val;
+    const char *remaining_line = gcode_parse_parameter(line_num, line,
+                                                       &param_num, &param_val,
+                                                       true, err_stream);
+
+    // recursive call to parse the letter/number pair
+    line = remaining_line;
+    return gcodep_parse_pair_with_linenumber(line_num, line, letter, value, err_stream);
+  }
+
   *letter = toupper(*line++);
   if (*line == '\0') {
     gprintf(err_stream, 1, line_num, "expected value after '%c'\n", *letter);
@@ -337,17 +429,28 @@ static const char *gcodep_parse_pair_with_linenumber(int line_num,
   // If this line has a checksum, we ignore it. In fact, the line is done.
   if (*letter == '*')
     return NULL;
-  while (*line && isspace(*line))
-    line++;
+  line = skip_white(line);
 
   const char *endptr;
-  *value = ParseGcodeNumber(line, &endptr);
+  if (*line == '#') {  // parameter get with a letter
+    line++;
+    int param_num;
+    endptr = gcode_parse_parameter(line_num, line, &param_num, value, false, err_stream);
+    if (line == endptr) {
+      gprintf(err_stream, 1, line_num,
+              "Letter '%c' is not followed by a parameter number but '%s'\n",
+              *letter, line);
+      return NULL;
+    }
+  } else {
+    *value = ParseGcodeNumber(line, &endptr);
 
-  if (line == endptr) {
-    gprintf(err_stream, 1, line_num,
-            "Letter '%c' is not followed by a number but '%s'\n",
-            *letter, line);
-    return NULL;
+    if (line == endptr) {
+      gprintf(err_stream, 1, line_num,
+              "Letter '%c' is not followed by a number but '%s'\n",
+              *letter, line);
+      return NULL;
+    }
   }
   line = endptr;
 
