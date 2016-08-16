@@ -672,8 +672,10 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
     return 0;  // There are no switches to trigger, so pretend we stopped.
   }
 
-  const float kHomingMM = 0.5;
-  const float kBackoffMM = 0.1;
+  // This is a G30 probe if there is no backoff, use a smaller move for the
+  // probe to increase accuracy.
+  const float kHomingMM = (backoff) ? 0.5 : 0.05; // TODO: make configurable?
+  const float kBackoffMM = kHomingMM / 10.0;      // TODO: make configurable?
 
   int total_movement = 0;
   const int dir = trigger == HardwareMapping::TRIGGER_MIN ? -1 : 1;
