@@ -29,8 +29,8 @@ CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 # package, that is probably in /usr/src.
 # You also can check out from head in https://github.com/google/googletest and
 # point to the googletest/ and googlemock/ directories.
-GTEST_SOURCE=/usr/src/gtest
-GMOCK_SOURCE=/usr/src/gmock
+GTEST_SOURCE?=/usr/src/gtest
+GMOCK_SOURCE?=/usr/src/gmock
 
 # In particular, if this is a checked out version of google test/mock, this
 # makes sure that we see the right includes.
@@ -130,6 +130,6 @@ clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS)
 
 compiler-flags: FORCE
-	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@
+	@echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' > $@
 
 .PHONY: FORCE
