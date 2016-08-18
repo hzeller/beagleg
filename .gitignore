@@ -3,3 +3,4 @@
 *.d
 machine-control
 gcode-print-stats
+gcode2ps

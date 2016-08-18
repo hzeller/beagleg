@@ -308,16 +308,16 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
     if (last_aux_bits_ != target_pos->aux_bits) {
       // Special treatment: bits changed since last time, let's push them through.
-      struct LinearSegmentSteps bit_set_command = {0};
+      struct LinearSegmentSteps bit_set_command = {};
       bit_set_command.aux_bits = target_pos->aux_bits;
       motor_ops_->Enqueue(bit_set_command);
       last_aux_bits_ = target_pos->aux_bits;
     }
     return;
   }
-  struct LinearSegmentSteps accel_command = {0};
-  struct LinearSegmentSteps move_command = {0};
-  struct LinearSegmentSteps decel_command = {0};
+  struct LinearSegmentSteps accel_command = {};
+  struct LinearSegmentSteps move_command = {};
+  struct LinearSegmentSteps decel_command = {};
 
   assert(target_pos->speed > 0);  // Speed is always a positive scalar.
 
@@ -554,7 +554,7 @@ int Planner::Impl::DirectDrive(GCodeParserAxis axis, float distance,
 
   const float steps_per_mm = cfg_->steps_per_mm[axis];
 
-  struct LinearSegmentSteps move_command = {0};
+  struct LinearSegmentSteps move_command = {};
 
   move_command.v0 = v0 * steps_per_mm;
   if (move_command.v0 > max_axis_speed_[axis])

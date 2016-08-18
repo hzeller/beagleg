@@ -164,7 +164,7 @@ private:
 // Conditions that we expect in all moves.
 static void VerifyCommonExpectations(
       const std::vector<LinearSegmentSteps> &segments) {
-  ASSERT_GT(segments.size(), 1) << "Expected more than one segment";
+  ASSERT_GT((int)segments.size(), 1) << "Expected more than one segment";
 
   // Some basic assumption: something is moving.
   EXPECT_GT(segments[0].v1, 0);
@@ -193,7 +193,7 @@ TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
 
   // We expect two segments: accelerating to maximum speed we can
   // reach, then decelerating.
-  EXPECT_EQ(2, plantest.segments().size());
+  EXPECT_EQ(2, (int)plantest.segments().size());
 
   VerifyCommonExpectations(plantest.segments());
 }
@@ -207,7 +207,7 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
   plantest.Enqueue(pos, 10);
 
   // We expect three segments: accelerating, plateau and decelerating.
-  EXPECT_EQ(3, plantest.segments().size());
+  EXPECT_EQ(3, (int)plantest.segments().size());
 
   VerifyCommonExpectations(plantest.segments());
 }
@@ -266,7 +266,7 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   // that axis can do.
   plantest.Enqueue(pos, 100000);
 
-  EXPECT_EQ(3, plantest.segments().size());  // accel - move - decel
+  EXPECT_EQ(3, (int)plantest.segments().size());  // accel - move - decel
 
   // We accelerate and decelerate, the middle section is constant speed.
   const LinearSegmentSteps &constant_speed_section = plantest.segments()[1];
@@ -332,7 +332,7 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
 TEST(PlannerTest, CornerMove_90Degrees) {
   const float kThresholdAngle = 5.0f;
   std::vector<LinearSegmentSteps> segments = DoAngleMove(kThresholdAngle, 0, 90);
-  ASSERT_EQ(4, segments.size());
+  ASSERT_EQ(4, (int)segments.size());
 
   // This is a 90 degree move, we expect to slow down all the way to zero
   // in the elbow.
@@ -361,7 +361,7 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
     //   2- accel of the second move
     //   3- a 1 step move segment due to rounding of the accel/decel
     //   4- decel of the second move
-    ASSERT_GE(segments.size(), 2);
+    ASSERT_GE((int)segments.size(), 2);
 
     // A shallow move just plows through the middle, so we expect all the
     // joint speeds to be larger than zero.

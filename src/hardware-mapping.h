@@ -73,7 +73,7 @@ public:
     NUM_SWITCHES      =  9,
     NUM_BOOL_OUTPUTS  = 16,
     NUM_PWM_OUTPUTS   =  4,
-    NUM_MOTORS        =  8,
+    NUM_MOTORS        =  8
   };
 
   // A register containing all the necessary bits.
@@ -86,7 +86,7 @@ public:
     TRIGGER_NONE = 0x00,   // None of the Axis is triggering
     TRIGGER_MIN  = 0x01,   // Min position of axis is triggering
     TRIGGER_MAX  = 0x02,   // Max position of axis is triggering
-    TRIGGER_ANY  = 0x03,   // Any of the axis is triggering
+    TRIGGER_ANY  = 0x03    // Any of the axis is triggering
   };
 
   enum LogicOutput {

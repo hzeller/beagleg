@@ -86,7 +86,7 @@ static char test_acceleration_ok(float acceleration) {
 
 void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param,
                                                  int defining_axis_steps) {
-  struct MotionSegment new_element = {0};
+  struct MotionSegment new_element = {};
   new_element.direction_bits = 0;
 
   // The defining_axis_steps is the number of steps of the axis that requires
@@ -168,7 +168,7 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
 
   if (defining_axis_steps == 0) {
     // No move, but we still have to set the bits.
-    struct MotionSegment empty_element = {0};
+    struct MotionSegment empty_element = {};
     empty_element.aux = param.aux_bits;
     empty_element.state = STATE_FILLED;
     backend_->Enqueue(&empty_element);
@@ -184,7 +184,7 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
       hires_steps_per_div[i] = ((int64_t)param.steps[i] << 32)/divisions + 1;
     }
 
-    struct LinearSegmentSteps previous = {0}, accumulator = {0}, output;
+    struct LinearSegmentSteps previous = {}, accumulator = {}, output;
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
     double previous_speed = param.v0;   // speed calculation in double
 

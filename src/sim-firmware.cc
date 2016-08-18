@@ -154,7 +154,7 @@ static struct HardwareState state;
 enum {
   X_MOTOR = 0,
   Y_MOTOR = 1,
-  Z_MOTOR = 2,
+  Z_MOTOR = 2
 };
 
 static double euclid(double x, double y, double z) {

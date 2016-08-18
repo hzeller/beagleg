@@ -26,7 +26,7 @@ enum {
   CALL_coordinated_move,
   CALL_rapid_move,
   CALL_unprocessed,
-  NUM_COUNTED_CALLS,
+  NUM_COUNTED_CALLS
 };
 
 class ParseTester : public GCodeParser::EventReceiver {
@@ -38,6 +38,7 @@ public:
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
+    memset(parameters_, 0, sizeof(parameters_));
     config.num_parameters = sizeof(parameters_) / sizeof(float);
     config.parameters = parameters_;
     parser_ = new GCodeParser(config, this, false);
@@ -46,7 +47,7 @@ public:
   virtual ~ParseTester() { delete parser_; }
 
   float get_parameter(int num) {
-    assert(num >= 0 && num < sizeof(parameters_)/sizeof(float));
+    assert(num >= 0 && num < (int)(sizeof(parameters_)/sizeof(float)));
     return parameters_[num];
   }
 

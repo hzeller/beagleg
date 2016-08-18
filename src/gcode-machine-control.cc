@@ -56,7 +56,7 @@
 enum HomingState {
   HOMING_STATE_NEVER_HOMED,
   HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED,
-  HOMING_STATE_HOMED,
+  HOMING_STATE_HOMED
 };
 
 // The GCode control implementation. Essentially we are a state machine

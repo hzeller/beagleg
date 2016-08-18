@@ -65,7 +65,7 @@ public:
     return strncmp(data_, other.data_, len_) == 0;
   }
 
-  const char operator[](size_t pos) const { return data_[pos]; }
+  char operator[](size_t pos) const { return data_[pos]; }
   const char *data() const { return data_; }
   size_t length() const { return len_; }
   bool empty() const { return len_ == 0; }

@@ -25,22 +25,29 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 
-# where the google test source has been unpacked.
+# Where the google test source has been unpacked. If this is via debian
+# package, that is probably in /usr/src.
+# You also can check out from head in https://github.com/google/googletest and
+# point to the googletest/ and googlemock/ directories.
 GTEST_SOURCE=/usr/src/gtest
 GMOCK_SOURCE=/usr/src/gmock
+
+# In particular, if this is a checked out version of google test/mock, this
+# makes sure that we see the right includes.
+GTEST_INCLUDE=-I$(GTEST_SOURCE)/include -I$(GMOCK_SOURCE)/include
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
 # environment variable.
 BEAGLEG_OPT_CFLAGS?=-O3
 
-CFLAGS+= -Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"'
+CFLAGS+=-Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"'
 
 # We export the following variables so that the googletest library will get
 # the same variables when compiling.
 # Using old < c++11 standard as not all embedded devices have recent compilers.
 # Sigh.
-export CXXFLAGS+=$(CFLAGS) -std=c++03
+export CXXFLAGS+=-std=c++03 $(CFLAGS)
 export CXX?=g++
 
 LDFLAGS+=-lpthread -lm
@@ -60,18 +67,20 @@ TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
 UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test arc-gen_test planner_test
 
+DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
+
 all : $(TARGETS)
 
 ../gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
-	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
 
 ../machine-control: machine-control.o $(OBJECTS)
-	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
 
 # While this is developed and does not have a final name yet, let's not make
 # it a toplevel tool in ../
 gcode2ps: gcode2ps.o $(GCODE_OBJECTS)
-	$(CROSS_COMPILE)$(CXX) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
 
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done
@@ -84,11 +93,15 @@ $(PRU_BIN) : motor-interface-constants.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
 %_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
-	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -MM $< > $*.d
+	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -MM $< > $@.d
+
+%_test.o: %_test.cc compiler-flags
+	$(CROSS_COMPILE)$(CXX)  $(GTEST_INCLUDE) $(CXXFLAGS) -c  $< -o $@
+	@$(CROSS_COMPILE)$(CXX) $(GTEST_INCLUDE) $(CXXFLAGS) -MM $< > $@.d
 
 %_bin.h : %.p $(PASM)
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
@@ -104,17 +117,17 @@ $(PASM):
 uio-pruss-interface.o : $(PRU_BIN)
 
 # Auto generated dependencies
--include $(OBJECTS:.o=.d)
+-include $(DEPENDENCY_RULES)
 
 # Test and Mock framework.
 gtest-all.o : $(GTEST_SOURCE)/src/gtest-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GTEST_SOURCE) -c  $< -o $@
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GTEST_SOURCE) -I$(GTEST_SOURCE)/include -c  $< -o $@
 
 gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -I$(GMOCK_SOURCE) -c  $< -o $@
+	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GMOCK_SOURCE) -I$(GMOCK_SOURCE)/include -c  $< -o $@
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(OBJECTS:.o=.d) $(MAIN_OBJECTS:.o=.d) $(TEST_FRAMEWORK_OBJECTS)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS)
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS)' > $@

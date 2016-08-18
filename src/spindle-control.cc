@@ -313,7 +313,7 @@ private:
     RESET_FLAGS_SOFTWARE                  = 0x14,
     RESET_FLAGS_WATCHDOG                  = 0x24,
 
-    MAX_SPEED                             = 3200,
+    MAX_SPEED                             = 3200
   };
 
 public:

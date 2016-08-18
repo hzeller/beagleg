@@ -125,7 +125,7 @@ void PRUMotionQueue::MotorEnable(bool on) {
 
 void PRUMotionQueue::Shutdown(bool flush_queue) {
   if (flush_queue) {
-    struct MotionSegment end_element = {0};
+    struct MotionSegment end_element = {};
     end_element.state = STATE_EXIT;
     Enqueue(&end_element);
     WaitQueueEmpty();

@@ -121,7 +121,7 @@ TEST(GCodeMachineControlTest, straight_segments_same_speed) {
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 1st move @100mm/s
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 2nd move @100mm/s
     { /*v0*/ 10000.0, /*v1*/     0.0, 0, /*steps*/ { 500}},  // decel back to 0
-    { 0.0, 0.0, END_SENTINEL},
+    { 0.0, 0.0, END_SENTINEL, {}},
   };
   Harness harness(expected);
 
@@ -146,7 +146,7 @@ TEST(GCodeMachineControlTest, speed_clamping) {
     { /*v0*/     0.0, /*v1*/ 120000.0, 0, /*steps*/ { 60000, 72000}},  // accel
     { /*v0*/120000.0, /*v1*/ 120000.0, 0, /*steps*/ { 80000, 96000}},  // move
     { /*v0*/120000.0, /*v1*/      0.0, 0, /*steps*/ { 60000, 72000}},  // decel back to 0
-    { 0.0, 0.0, END_SENTINEL},
+    { 0.0, 0.0, END_SENTINEL, {}},
   };
   Harness harness(expected);
 
@@ -171,7 +171,7 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
     { /*v0*/ 10000.0, /*v1*/  5000.0, 0, /*steps*/ { 375}},  // slow: match next speed
     { /*v0*/  5000.0, /*v1*/  5000.0, 0, /*steps*/ {9875}},  // move @50mm/s
     { /*v0*/  5000.0, /*v1*/     0.0, 0, /*steps*/ { 125}},  // final slow to zero
-    { 0.0, 0.0, END_SENTINEL},
+    { 0.0, 0.0, END_SENTINEL, {}},
   };
   Harness harness(expected);
 

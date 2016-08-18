@@ -190,7 +190,7 @@ private:
 
   // Read parameter. Do range check.
   bool read_parameter(int num, float *result) {
-    if (num < 0 || num >= config.num_parameters) {
+    if (num < 0 || num >= (int)config.num_parameters) {
       gprintf(GLOG_SEMANTIC_ERR,
               "reading unsupported parameter number (%d)\n", num);
       return false;
@@ -202,7 +202,7 @@ private:
   // Read parameter. Do range check.
   bool store_parameter(int num, float value) {
     // zero parameter can never be written.
-    if (num <= 0 || num >= config.num_parameters) {
+    if (num <= 0 || num >= (int)config.num_parameters) {
       gprintf(GLOG_SEMANTIC_ERR,
               "writing unsupported parameter number (%d)\n", num);
       return false;
@@ -217,7 +217,7 @@ private:
   enum GCodePrintLevel {
     GLOG_INFO,
     GLOG_SYNTAX_ERR,
-    GLOG_SEMANTIC_ERR,
+    GLOG_SEMANTIC_ERR
   };
   void gprintf(enum GCodePrintLevel level, const char *format, ...);
 

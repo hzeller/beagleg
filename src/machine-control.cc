@@ -152,7 +152,7 @@ static int open_server(const char *bind_addr, int port) {
     return -1;
   }
 
-  struct sockaddr_in serv_addr = {0};
+  struct sockaddr_in serv_addr = {};
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {
@@ -467,8 +467,7 @@ int main(int argc, char *argv[]) {
   GCodeParser::Config parser_cfg;
 
   // TODO(hzeller): read these parameters from permanent storage somewhere.
-  float parameters[5400] = {0};
-  parser_cfg.parameters = parameters;
+  float parameters[5400] = {};
   parser_cfg.num_parameters = sizeof(parameters) / sizeof(float);
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
