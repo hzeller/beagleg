@@ -86,7 +86,7 @@ test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done
 
 valgrind-test: $(UNITTEST_BINARIES)
-	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --leak-check=full -q ./$$test_bin || exit 1; done
+	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \

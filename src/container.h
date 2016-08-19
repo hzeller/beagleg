@@ -54,7 +54,9 @@ private:
 template <typename T, int CAPACITY>
 class RingDeque {
 public:
-  RingDeque() : write_pos_(0), read_pos_(0) {}
+  RingDeque() : write_pos_(0), read_pos_(0) {
+    bzero(buffer_, sizeof(buffer_));
+  }
 
   size_t size() const {
     return (write_pos_ + CAPACITY - read_pos_) % CAPACITY;
