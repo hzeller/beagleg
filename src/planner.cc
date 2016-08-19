@@ -179,18 +179,15 @@ static bool subtract_steps(struct LinearSegmentSteps *value,
 static float determine_joining_speed(const struct AxisTarget *from,
                                      const struct AxisTarget *to,
                                      const float threshold) {
-  const bool moving = (to->dx || to->dy || to->dz);
-  if (!moving) return 0.0f;        // full stop
-
-  const bool changed = (from->dx != to->dx || from->dy != to->dy || from->dz != to->dz);
-  if (!changed) return to->speed;  // straight vector, keep accelerating
-
   // the dot product of the vectors
   const float dot = from->dx*to->dx + from->dy*to->dy + from->dz*to->dz;
+  const float mag = from->len * to->len;
+  if (dot == 0) return 0.0f;        // orthogonal 90 degree, full stop
+  if (dot == mag) return to->speed; // codirectional 0 degree, keep accelerating
 
   // the angle between the vectors
   const float rad2deg = 180.0 / M_PI;
-  const float angle = acosf(dot / (from->len * to->len)) * rad2deg;
+  const float angle = acosf(dot / mag) * rad2deg;
 
   // Our goal is to figure out what our from defining speed should
   // be at the end of the move.
@@ -202,11 +199,13 @@ static float determine_joining_speed(const struct AxisTarget *from,
     const int to_delta = to->delta_steps[axis];
 
     // Quick integer decisions
+    if (from_delta == 0 && to_delta == 0) continue; // uninteresting: no move.
     if (angle > threshold) {
-      if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
-      if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
+      if (from_delta == 0 || to_delta == 0) return 0.0f;  // accel from/to zero, full stop
       if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
-        return 0.0f;  // turing around
+        return 0.0f;  // turing around, full stop
+    } else {
+      if (to_delta == 0) continue;                  // no adjustment necessary
     }
 
     const float to_speed = get_speed_for_axis(to, axis);
@@ -215,6 +214,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
     const float goal = fabsf(to_speed * speed_conversion);
     if (goal < from_defining_speed) from_defining_speed = goal;
   }
+
   return from_defining_speed;
 }
 
