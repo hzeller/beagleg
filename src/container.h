@@ -55,7 +55,7 @@ template <typename T, int CAPACITY>
 class RingDeque {
 public:
   RingDeque() : write_pos_(0), read_pos_(0) {
-    bzero(buffer_, sizeof(buffer_));
+    // intentionally not initializing memory to better see if users do.
   }
 
   size_t size() const {

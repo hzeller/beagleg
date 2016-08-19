@@ -533,6 +533,7 @@ void Planner::Impl::bring_path_to_halt() {
   new_pos->defining_axis = AXIS_X;
   new_pos->speed = 0;
   new_pos->aux_bits = hardware_mapping_->GetAuxBits();
+  new_pos->dx = new_pos->dy = new_pos->dz = new_pos->len = 0.0;
   issue_motor_move_if_possible();
   path_halted_ = true;
 }
