@@ -364,6 +364,9 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   case 355:                                 // aux pin case lights control
     remaining = aux_bit_commands(letter, value, remaining);
     break;
+  case 400:
+    dwell(0);
+    break;
   case 80:
   case 81:
     set_output_flags(HardwareMapping::OUT_ATX_POWER, code == 80);

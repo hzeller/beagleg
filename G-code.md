@@ -126,6 +126,7 @@ M121             | Disable pause switch detection.
 M245             | Start cooler
 M246             | Stop cooler
 M355             | Turn case lights on/off
+M400             | Wait for queue to be empty. Equivalent to G4 P0.
 M999             | Clear Software E-Stop.
 
 ### Feedrate in Euclidian space
