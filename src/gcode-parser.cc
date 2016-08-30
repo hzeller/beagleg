@@ -156,6 +156,70 @@ private:
     program_in_progress_ = false;
   }
 
+  enum Operation {
+    NO_OPERATION = 0,
+
+    // binary operations
+    POWER,                                              // precedence 4
+    DIVIDED_BY, MODULO, TIMES,                          // precedence 3
+    AND2, EXCLUSIVE_OR, MINUS, NON_EXCLUSIVE_OR, PLUS,  // precedence 2
+    RIGHT_BRACKET,                                      // precedence 1
+
+    // unary operations
+    ABS, ACOS, ASIN, ATAN, COS, EXP, FIX, FUP, LN, ROUND, SIN, SQRT, TAN
+  };
+
+  const char *op_string(Operation op) {
+    switch (op) {
+    default:
+    case NO_OPERATION:      return "?";
+    case POWER:             return "**";
+    case DIVIDED_BY:        return "/";
+    case MODULO:            return "MOD";
+    case TIMES:             return "*";
+    case AND2:              return "AND";
+    case EXCLUSIVE_OR:      return "XOR";
+    case MINUS:             return "-";
+    case NON_EXCLUSIVE_OR:  return "OR";
+    case PLUS:              return "+";
+    case RIGHT_BRACKET:     return "]";
+    case ABS:               return "ABS";
+    case ACOS:              return "ACOS";
+    case ASIN:              return "ASIN";
+    case ATAN:              return "ATAN";
+    case COS:               return "COS";
+    case EXP:               return "EXP";
+    case FIX:               return "FIX";
+    case FUP:               return "FUP";
+    case LN:                return "LN";
+    case ROUND:             return "ROUND";
+    case SIN:               return "SIN";
+    case SQRT:              return "SQRT";
+    case TAN:               return "TAN";
+    }
+  }
+
+  int precedence(Operation op) {
+    if (op == RIGHT_BRACKET) return 1;
+    if (op == POWER) return 4;
+    if (op >= AND2) return 2;
+    return 3;
+  }
+
+  bool execute_unary(float *value, Operation op);
+  const char *gcodep_atan(const char *line, float *value);
+  const char *gcodep_operation_unary(const char *line, Operation *op);
+  const char *gcodep_unary(const char *line, float *value);
+
+  bool execute_binary(float *left, Operation op, float *right);
+  const char *gcodep_operation(const char *line, Operation *op);
+
+  const char *gcodep_expression(const char *line, float *value);
+
+  const char *gcodep_value(const char *line, float *value);
+
+  const char *gcodep_set_parameter(const char *line);
+
   const char *gparse_pair(const char *line, char *letter, float *value) {
     return gcodep_parse_pair_with_linenumber(line_number_, line,
                                              letter, value, err_msg_);
@@ -184,9 +248,7 @@ private:
   const char *set_param(char param_letter, EventValueSetter setter,
                         float factor, const char *line);
 
-  const char *gcode_parse_parameter(int line_num, const char *line,
-                                    int *param_num, float *param_val,
-                                    bool query);
+  const char *gcodep_parameter(const char *line, float *value);
 
   // Read parameter. Do range check.
   bool read_parameter(int num, float *result) {
@@ -340,6 +402,7 @@ static const char *skip_white(const char *line) {
 // string after the value had been parsed; if there was an error parsing,
 // returns the beginning of the line.
 static const char *ParseGcodeNumber(const char *line, float *value) {
+  line = skip_white(line);
   // We need to copy the number into a temporary buffer as strtof() does
   // not accept an end-limiter.
   char buffer[40];
@@ -347,7 +410,15 @@ static const char *ParseGcodeNumber(const char *line, float *value) {
   char *dst = buffer;
   const char *end = buffer + sizeof(buffer) - 1;
   const char *extra_allowed = "+-.";
+  bool have_point = false;
   while (*src && (isdigit(*src) || index(extra_allowed, *src)) && dst < end) {
+    // the sign is only allowed in the first character of the buffer
+    if ((*src == '+' || *src == '-') && dst != buffer) break;
+    // only allow one decimal point
+    if (*src == '.') {
+      if (have_point) break;
+      else have_point = true;
+    }
     *dst++ = *src++;
   }
   *dst = '\0';
@@ -357,66 +428,493 @@ static const char *ParseGcodeNumber(const char *line, float *value) {
   return (parsed_end == dst) ? src : line;
 }
 
-const char *GCodeParser::Impl::gcode_parse_parameter(
-  int line_num, const char *line, int *param_num, float *param_val,
-  bool query)
-{
-  *param_num = 0;
-  *param_val = 0.0f;
+const char *GCodeParser::Impl::gcodep_parameter(const char *line, float *value) {
   line = skip_white(line);
   if (*line == '\0') {
     gprintf(GLOG_SYNTAX_ERR, "expected value after '#'\n");
     return NULL;
   }
 
-  bool indexed = false;
-  if (*line == '#') {  // indexed parameter access
-    line++;
-    indexed = true;
-  }
-
-  float value;
+  float index;
   const char *endptr;
-  endptr = ParseGcodeNumber(line, &value);
-  *param_num = (int)value;
-  if (line == endptr) {
+  endptr = gcodep_value(line, &index);
+  if (endptr == NULL) {
     gprintf(GLOG_SYNTAX_ERR,
             "'#' is not followed by a number but '%s'\n", line);
     return NULL;
   }
-  if (indexed) {
-    if (!read_parameter(*param_num, &value))
-      return NULL;
-    *param_num = (int)value;
+  line = endptr;
+
+  read_parameter((int)index, value);
+
+  return line;  // We parsed something; return whatever is remaining.
+}
+
+bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
+  float val;
+  switch (op) {
+  case ABS:
+    val = fabsf(*value);
+    break;
+  case ACOS:
+    if (*value < -1.0f || *value > 1.0f) {
+      gprintf(GLOG_SYNTAX_ERR, "ACOS argument out of range\n");
+      return false;
+    }
+    val = (acosf(*value) * 180.0f) / M_PI;
+    break;
+  case ASIN:
+    if (*value < -1.0f || *value > 1.0f) {
+      gprintf(GLOG_SYNTAX_ERR, "ASIN argument out of range\n");
+      return false;
+    }
+    val = (asinf(*value) * 180.0f) / M_PI;
+    break;
+  case COS:
+    val = cosf((*value * M_PI) / 180.0f);
+    break;
+  case EXP:
+    val = expf(*value);
+    break;
+  case FIX:
+    val = floorf(*value);
+    break;
+  case FUP:
+    val = ceilf(*value);
+    break;
+  case LN:
+    if (*value <= 0.0f) {
+      gprintf(GLOG_SYNTAX_ERR, "Zero or negative argument to LN\n");
+      return false;
+    }
+    val = logf(*value);
+    break;
+  case ROUND:
+    val = (double)((int)(*value + ((*value < 0.0f) ? -0.5f : 0.5f)));
+    break;
+  case SIN:
+    val = sinf((*value * M_PI) / 180.0f);
+    break;
+  case SQRT:
+    if (*value < 0.0f) {
+      gprintf(GLOG_SYNTAX_ERR, "Negative argument to SQRT\n");
+      return false;
+    }
+    val = sqrtf(*value);
+    break;
+  case TAN:
+    val = tanf((*value * M_PI) / 180.0f);
+    break;
+  default:
+    gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown unary operation\n");
+    return false;
   }
-  if (*param_num < 0 || *param_num > (int)config.num_parameters-1) {
-    gprintf(GLOG_SYNTAX_ERR, "unsupported parameter number (%d)\n", *param_num);
+  gprintf(GLOG_INFO, "%s[%f] -> %f\n", op_string(op), *value, val);
+  *value = val;
+  return true;
+}
+
+const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
+  if (*line != '/') {
+    gprintf(GLOG_SYNTAX_ERR, "expected '/' after ATAN got '%s'\n", line);
+    return NULL;
+  }
+  line++;
+
+  if (*line != '[') {
+    gprintf(GLOG_SYNTAX_ERR, "expected '[' after ATAN/ got '%s'\n", line);
+    return NULL;
+  }
+  line++;
+
+  float value2;
+  const char *endptr;
+  endptr = gcodep_expression(line, &value2);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
     return NULL;
   }
   line = endptr;
+
+  float val = (atan2f(*value, value2) * 180.0f) / M_PI;
+  gprintf(GLOG_INFO, "%s[%f/[%f]] -> %f\n", op_string(ATAN), *value, value2, val);
+  *value = val;
+  return line;
+}
+
+const char *GCodeParser::Impl::gcodep_operation_unary(const char *line,
+                                                      Operation *op) {
+  const char c = toupper(*line);
+  line++;
+  switch (c) {
+  case 'A':
+    if (toupper(*line)     == 'B' &&
+        toupper(*(line+1)) == 'S') {
+      line += 2;
+      *op = ABS;
+    } else if (toupper(*line)     == 'C' &&
+               toupper(*(line+1)) == 'O' &&
+               toupper(*(line+2)) == 'S') {
+      line += 3;
+      *op = ACOS;
+    } else if (toupper(*line)     == 'S' &&
+               toupper(*(line+1)) == 'I' &&
+               toupper(*(line+2)) == 'N') {
+      line += 3;
+      *op = ASIN;
+    } else if (toupper(*line)     == 'T' &&
+               toupper(*(line+1)) == 'A' &&
+               toupper(*(line+2)) == 'N') {
+      line += 3;
+      *op = ATAN;
+    }
+    break;
+  case 'C':
+    if (toupper(*line)     == 'O' &&
+        toupper(*(line+1)) == 'S') {
+      line += 2;
+      *op = COS;
+    }
+    break;
+  case 'E':
+    if (toupper(*line)     == 'X' &&
+        toupper(*(line+1)) == 'P') {
+      line += 2;
+      *op = EXP;
+    }
+    break;
+  case 'F':
+    if (toupper(*line)     == 'I' &&
+        toupper(*(line+1)) == 'X') {
+      line += 2;
+      *op = FIX;
+    } else if (toupper(*line)     == 'U' &&
+               toupper(*(line+1)) == 'P') {
+      line += 2;
+      *op = FUP;
+    }
+    break;
+  case 'L':
+    if (toupper(*line) == 'N') {
+      line++;
+      *op = LN;
+    }
+    break;
+  case 'R':
+    if (toupper(*line)     == 'O' &&
+        toupper(*(line+1)) == 'U' &&
+        toupper(*(line+2)) == 'N' &&
+        toupper(*(line+3)) == 'D') {
+      line += 4;
+      *op = ROUND;
+    }
+    break;
+  case 'S':
+    if (toupper(*line)   == 'I' &&
+        toupper(*(line+1)) == 'N') {
+      line += 2;
+      *op = SIN;
+    } else if (toupper(*line)     == 'Q' &&
+               toupper(*(line+1)) == 'R' &&
+               toupper(*(line+2)) == 'T') {
+      line += 3;
+      *op = SQRT;
+    }
+    break;
+  case 'T':
+    if (toupper(*line)     == 'A' &&
+        toupper(*(line+1)) == 'N') {
+      line += 2;
+      *op = TAN;
+    }
+    break;
+  default:
+    *op = NO_OPERATION;
+    break;
+  }
+
+  return (*op == NO_OPERATION) ? NULL : line;
+}
+
+const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
+  Operation op;
+  const char *endptr;
+
   line = skip_white(line);
 
-  if (*line == '=') {
-    line++;
-    endptr = ParseGcodeNumber(line, &value);
-    if (line == endptr) {
-      gprintf(GLOG_SYNTAX_ERR,
-              "'#%d=' is not followed by a number but '%s'\n",
-              *param_num, line);
+  endptr = gcodep_operation_unary(line, &op);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR, "unknown unary got '%s'\n", line);
+    return NULL;
+  }
+  line = skip_white(endptr);
+
+  if (*line != '[') {
+    gprintf(GLOG_SYNTAX_ERR, "expected '[' got '%s'\n", line);
+    return NULL;
+  }
+  line = skip_white(line + 1);
+
+  endptr = gcodep_expression(line, value);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
+    return NULL;
+  }
+  line = skip_white(endptr);
+
+  if (op == ATAN) {
+    endptr = gcodep_atan(line, value);
+    if (endptr == NULL) {
+      gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
+      return NULL;
+    }
+    line = skip_white(endptr);
+  } else {
+    if (!execute_unary(value, op)) {
+      gprintf(GLOG_SYNTAX_ERR, "unary operation failed\n");
+      return NULL;
+    }
+  }
+
+  return line;
+}
+
+bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) {
+  float val = *left;
+  switch (op) {
+  case POWER:
+    if (*left < 0.0f && floor(*right) != *right) {
+      gprintf(GLOG_SYNTAX_ERR, "Attempt to raise negative to non-integer power\n");
+      return false;
+    }
+    val = powf(*left, *right);
+    break;
+  case DIVIDED_BY:
+    if (*right == 0.0f) {
+      gprintf(GLOG_SYNTAX_ERR, "Attempt to divide by zero\n");
+      return false;
+    }
+    val = *left / *right;
+    break;
+  case MODULO:
+    val = fmodf(*left, *right);
+    // always calculates a positive answer
+    if (val < 0.0f)
+      val += fabsf(*right);
+    break;
+  case TIMES:
+    val = *left * *right;
+    break;
+  case AND2:
+    val = (*left == 0.0f || *right == 0.0f) ? 0.0f : 1.0f;
+    break;
+  case EXCLUSIVE_OR:
+    val = (((*left == 0.0f) && (*right != 0.0f)) ||
+           ((*left != 0.0f) && (*right == 0.0f))) ? 1.0f : 0.0f;
+    break;
+  case MINUS:
+    val = *left - *right;
+    break;
+  case NON_EXCLUSIVE_OR:
+    val = ((*left != 0.0f) || (*right != 0.0f)) ? 1.0f : 0.0f;
+    break;
+  case PLUS:
+    val = *left + *right;
+    break;
+  default:
+    gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown binary operation\n");
+    return false;
+  }
+  gprintf(GLOG_INFO, "[%f %s %f] -> %f\n", *left, op_string(op), *right, val);
+  *left = val;
+  return true;
+}
+
+const char *GCodeParser::Impl::gcodep_operation(const char *line,
+                                                Operation *op) {
+  char c = toupper(*line);
+  line++;
+  switch (c) {
+  case '+':
+    *op = PLUS;
+    break;
+  case '-':
+    *op = MINUS;
+    break;
+  case '/':
+    *op = DIVIDED_BY;
+    break;
+  case '*':
+    if (*line == '*') {
+      line++;
+      *op = POWER;
+    } else {
+      *op = TIMES;
+    }
+    break;
+  case ']':
+    *op = RIGHT_BRACKET;
+    break;
+  case 'A':
+    if (toupper(*line)     == 'N' &&
+        toupper(*(line+1)) == 'D') {
+      line += 2;
+      *op = AND2;
+    }
+    break;
+  case 'M':
+    if (toupper(*line)     == 'O' &&
+        toupper(*(line+1)) == 'D') {
+      line += 2;
+      *op = MODULO;
+    }
+    break;
+  case 'O':
+    if (toupper(*line) == 'R') {
+      line++;
+      *op = NON_EXCLUSIVE_OR;
+    }
+    break;
+  case 'X':
+    if (toupper(*line)     == 'O' &&
+        toupper(*(line+1)) == 'R') {
+      line += 2;
+      *op = EXCLUSIVE_OR;
+    }
+    break;
+  default:
+    *op = NO_OPERATION;
+    break;
+  }
+
+  return (*op == NO_OPERATION) ? NULL : line;
+}
+
+// the expression stack needs to be at least one greater than the max precedence
+#define MAX_STACK   5
+
+const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value) {
+  float vals[MAX_STACK];
+  Operation ops[MAX_STACK];
+  int stack = 0;
+  const char *endptr;
+  line = skip_white(line);
+
+  for (ops[0] = NO_OPERATION; ops[0] != RIGHT_BRACKET; ) {
+    endptr = gcodep_value(line, &vals[stack]);
+    if (endptr == NULL) {
+      gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
       return NULL;
     }
     line = endptr;
-    store_parameter(*param_num, value);
-    *param_val = value;
-  } else {
-    read_parameter(*param_num, param_val);
-    if (query) {
-      gprintf(GLOG_INFO, "%s%d%s = %f\n",
-              indexed ? "[" : "", *param_num, indexed ? "]" : "", *param_val);
+
+    endptr = gcodep_operation(line, &ops[stack]);
+    if (endptr == NULL) {
+      gprintf(GLOG_SYNTAX_ERR, "unknown operator '%s'\n", line);
+      return NULL;
+    }
+    line = skip_white(endptr);
+
+    // handle the first left value and single value for the unary operations
+    if (stack == 0) {
+      if (ops[stack] == RIGHT_BRACKET)
+        break;
+      stack++;
+      continue;
+    }
+
+    if (precedence(ops[stack]) > precedence(ops[stack - 1])) {
+      stack++;
+      if (stack >= MAX_STACK) {
+        gprintf(GLOG_SYNTAX_ERR, "stack overflow\n");
+        return NULL;
+      }
+    } else {  // precedence of latest operator is <= previous precedence
+      for ( ; precedence(ops[stack]) <= precedence(ops[stack - 1]); ) {
+        if (!execute_binary(&vals[stack - 1], ops[stack - 1], &vals[stack]))
+          return NULL;
+
+        ops[stack - 1] = ops[stack];
+        if (stack > 1 && precedence(ops[stack - 1]) <= precedence(ops[stack - 2]))
+          stack--;
+        else
+          break;
+      }
     }
   }
-  line = skip_white(line); // Makes the line better to deal with.
-  return line;  // We parsed something; return whatever is remaining.
+  *value = vals[0];
+
+  return line;
+}
+
+// Parse a value out of the line.
+// The value may be a number, a parameter value, a unary function, or an
+// expression.
+const char *GCodeParser::Impl::gcodep_value(const char *line, float *value) {
+  char c = toupper(*line);
+  if (isalpha(c)) c = 'U';  // indicates a unary in the switch below
+
+  const char *endptr;
+  switch (c) {
+  case '\0':
+    endptr = NULL;
+    break;
+  case '[':
+    endptr = gcodep_expression(line + 1, value);
+    break;
+  case '#':
+    endptr = gcodep_parameter(line + 1, value);
+    break;
+  case 'U':
+    endptr = gcodep_unary(line, value);
+    break;
+  default:
+    endptr = ParseGcodeNumber(line, value);
+    break;
+  }
+  if (line == endptr || endptr == NULL)
+    return NULL;
+
+  line = skip_white(endptr); // Makes the line better to deal with.
+  return line;
+}
+
+const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
+  float value;
+  const char *endptr;
+  endptr = gcodep_value(line, &value);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR,
+            "gcodep_set_parameter: expected value after '#' got '%s'\n",
+            line);
+    return NULL;
+  }
+  line = skip_white(endptr);
+
+  int index = (int)value;
+
+  if (*line != '=') {
+    gprintf(GLOG_SYNTAX_ERR,
+            "gcodep_set_parameter: expected '=' after '#%d' got '%s'\n",
+            index, line);
+    return NULL;
+  }
+  line = skip_white(line+1);
+
+  endptr = gcodep_value(line, &value);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR,
+            "gcodep_set_parameter: expected value after '#%d=' got '%s'\n",
+            index, line);
+    return NULL;
+  }
+  line = skip_white(endptr);
+
+  store_parameter(index, value);
+
+  gprintf(GLOG_INFO, "#%d=%f\n", index, value);
+
+  return line;
 }
 
 // Parse next letter/number pair.
@@ -441,16 +939,15 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
     if (*line == '\0') return NULL;
   }
 
-  if (*line == '#') {  // parameter set/get without a letter
+  const char *endptr;
+  if (*line == '#') {  // parameter set without a letter
     line++;
-    int param_num;
-    float param_val;
-    const char *remaining_line = gcode_parse_parameter(line_num, line,
-                                                       &param_num, &param_val,
-                                                       true);
+    endptr = gcodep_set_parameter(line);
+    if (endptr == NULL)
+      return NULL;
 
     // recursive call to parse the letter/number pair
-    line = remaining_line;
+    line = endptr;
     return gcodep_parse_pair_with_linenumber(line_num, line, letter, value, err_stream);
   }
 
@@ -464,33 +961,15 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
     return NULL;
   line = skip_white(line);
 
-  const char *endptr;
-  if (*line == '#') {  // parameter get with a letter
-    line++;
-    int param_num;
-    endptr = gcode_parse_parameter(line_num, line, &param_num, value, false);
-    if (endptr == NULL) {
-      return NULL;   // got some error.
-    }
-    if (line == endptr) {
-      gprintf(GLOG_SYNTAX_ERR,
-              "Letter '%c' is not followed by a parameter number but '%s'\n",
-              *letter, line);
-      return NULL;
-    }
-  } else {
-    endptr = ParseGcodeNumber(line, value);
-
-    if (line == endptr) {
-      gprintf(GLOG_SYNTAX_ERR,
-              "Letter '%c' is not followed by a number but '%s'\n",
-              *letter, line);
-      return NULL;
-    }
+  endptr = gcodep_value(line, value);
+  if (endptr == NULL) {
+    gprintf(GLOG_SYNTAX_ERR,
+            "Letter '%c' is not followed by a number but '%s'\n",
+            *letter, line);
+    return NULL;
   }
   line = endptr;
 
-  line = skip_white(line); // Makes the line better to deal with.
   return line;  // We parsed something; return whatever is remaining.
 }
 

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 
 #include <gtest/gtest.h>
 
@@ -319,32 +320,29 @@ TEST(GCodeParserTest, probe_axis) {
   EXPECT_EQ(PROBE_POSITION - 3 + 1, counter.abs_pos[AXIS_Z]);
 }
 
-TEST(GCodeParserTest, parameters_set_and_get) {
+TEST(GCodeParserTest, parameters) {
   ParseTester counter;
 
-  // test set/get parameter without comments
+  // without comments
   EXPECT_TRUE(counter.TestParseLine("#1=25"));
   EXPECT_EQ(25, counter.get_parameter(1));
-  EXPECT_TRUE(counter.TestParseLine("#1"));
   EXPECT_TRUE(counter.TestParseLine("G1 X#1"));
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
 
-  // test set/get parameter with comments before
+  // with comments before
   EXPECT_TRUE(counter.TestParseLine("(set param) #1=50"));
   EXPECT_EQ(50, counter.get_parameter(1));
-  EXPECT_TRUE(counter.TestParseLine("(get param) #1"));
   EXPECT_TRUE(counter.TestParseLine("G1 X#1"));
   EXPECT_EQ(HOME_X + 50, counter.abs_pos[AXIS_X]);
 
-  // test set/get parameter with comments after
+  // with comments after
   EXPECT_TRUE(counter.TestParseLine("#1=75 (set param)"));
   EXPECT_EQ(75, counter.get_parameter(1));
-  EXPECT_TRUE(counter.TestParseLine("#1 (get param)")); // 1 = 75.00000
   EXPECT_TRUE(counter.TestParseLine("G1 X#1"));
   EXPECT_EQ(HOME_X + 75, counter.abs_pos[AXIS_X]);
 
-  // test set/get parameter with letter
-  EXPECT_TRUE(counter.TestParseLine("G1 X#1=100"));
+  // test inline set
+  EXPECT_TRUE(counter.TestParseLine("G1 #1=100 X#1"));
   EXPECT_EQ(100, counter.get_parameter(1));
   EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
 
@@ -360,22 +358,23 @@ TEST(GCodeParserTest, parameters_set_and_get) {
   EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
 
-  EXPECT_TRUE(counter.TestParseLine("G1 X#1=100 Y#2=200 Z#3=300"));
+  EXPECT_TRUE(counter.TestParseLine("G1 #1=100 #2=200 #3=300 X#1 Y#2 Z#3"));
   EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 200, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 300, counter.abs_pos[AXIS_Z]);
 
   // test invalid parameter parsing
-  EXPECT_FALSE(counter.TestParseLine("#")); // expected value after '#'
-  EXPECT_FALSE(counter.TestParseLine("#G1 X20"));    // expected value after '#'
+  EXPECT_FALSE(counter.TestParseLine("#"));          // expected value after '#'
+  EXPECT_FALSE(counter.TestParseLine("#G1 X20"));    // unknown unary
   EXPECT_FALSE(counter.TestParseLine("#5400=100"));  // unsupported parameter number
-  EXPECT_FALSE(counter.TestParseLine("#1="));        // not followed by a number
-  EXPECT_FALSE(counter.TestParseLine("#1=G1 X10"));  // not followed by a number
+  EXPECT_FALSE(counter.TestParseLine("#1="));        // expected value after '#1='
+  EXPECT_FALSE(counter.TestParseLine("#1=G1 X10"));  // expected value after '#1='
   EXPECT_NE(HOME_X + 10, counter.abs_pos[AXIS_X]);
 
   // Parameter #0 is special: we can read it, but we can't set it.
-  EXPECT_TRUE(counter.TestParseLine("#0"));
-  EXPECT_FALSE(counter.TestParseLine("#0=42"));
+  EXPECT_TRUE(counter.TestParseLine("G1 X#0"));
+  EXPECT_EQ(HOME_X + 0, counter.abs_pos[AXIS_X]);
+  EXPECT_FALSE(counter.TestParseLine("#0=42"));      // writing unsupported parameter number
   EXPECT_EQ(0, counter.get_parameter(0));
 
   // test indexed parameters
@@ -384,7 +383,6 @@ TEST(GCodeParserTest, parameters_set_and_get) {
   EXPECT_TRUE(counter.TestParseLine("#2=1"));
   EXPECT_EQ(1, counter.get_parameter(2));
 
-  EXPECT_TRUE(counter.TestParseLine("##2"));       // [1] = 25.00000
   EXPECT_TRUE(counter.TestParseLine("G1 X##2"));
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
 }
@@ -462,6 +460,150 @@ TEST(GCodeParserTest, set_system_origin) {
   EXPECT_EQ(25, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(50, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(10, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, expressions) {
+  ParseTester counter;
+
+  // binary operations
+
+  // addition
+  EXPECT_TRUE(counter.TestParseLine("#1=[100 + 20]"));
+  EXPECT_EQ(100 + 20, counter.get_parameter(1));
+
+  // subtraction
+  EXPECT_TRUE(counter.TestParseLine("#1=[100 - 20]"));
+  EXPECT_EQ(100 - 20, counter.get_parameter(1));
+
+  // division
+  EXPECT_TRUE(counter.TestParseLine("#1=[100 / 20]"));
+  EXPECT_EQ(100 / 20, counter.get_parameter(1));
+
+  // multiplication
+  EXPECT_TRUE(counter.TestParseLine("#1=[100 * 20]"));
+  EXPECT_EQ(100 * 20, counter.get_parameter(1));
+
+  // power
+  EXPECT_TRUE(counter.TestParseLine("#1=[2 ** 3]"));
+  EXPECT_EQ(powf(2, 3), counter.get_parameter(1));
+
+  // modulus
+  EXPECT_TRUE(counter.TestParseLine("#1=[5 MOD 2]"));
+  EXPECT_EQ(fabs(fmodf(5, 2)), counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[-5 MOD 2]"));
+  EXPECT_EQ(fabs(fmodf(5, 2)), counter.get_parameter(1));
+
+  // logical and
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 AND 1]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 AND 0]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 AND 1]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 AND 0]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+
+  // logical or
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 OR 1]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 OR 0]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 OR 1]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 OR 0]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+
+  // logical xor
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 XOR 1]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 XOR 0]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 XOR 1]"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=[0 XOR 0]"));
+  EXPECT_EQ(0, counter.get_parameter(1));
+
+  // precedence
+  EXPECT_TRUE(counter.TestParseLine("#1=[2.0 / 3 * 1.5 - 5.5 / 11.0]"));
+  EXPECT_EQ(((2.0 / 3) * 1.5) - (5.5 / 11.0), counter.get_parameter(1));
+
+  // unary operations
+
+  // absolute value
+  EXPECT_TRUE(counter.TestParseLine("#1=abs[-100]"));
+  EXPECT_EQ(fabsf(-100.0f), counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=abs[100]"));
+  EXPECT_EQ(fabsf(100.0f), counter.get_parameter(1));
+
+  // arc cosine
+  EXPECT_TRUE(counter.TestParseLine("#1=acos[.5]"));
+  EXPECT_FLOAT_EQ((acosf(.5f) * 180.0f) / M_PI, counter.get_parameter(1));
+  EXPECT_EQ(60, counter.get_parameter(1));
+
+  // arc sine
+  EXPECT_TRUE(counter.TestParseLine("#1=asin[.5]"));
+  EXPECT_FLOAT_EQ((asinf(.5f) * 180.0f) / M_PI, counter.get_parameter(1));
+  EXPECT_EQ(30, counter.get_parameter(1));
+
+  // arc tangent
+  EXPECT_TRUE(counter.TestParseLine("#1=atan[4]/[4]"));
+  EXPECT_FLOAT_EQ((atan2f(4.0f, 4.0f) * 180.0f) / M_PI,
+                  counter.get_parameter(1));
+  EXPECT_EQ(45, counter.get_parameter(1));
+
+  // cosine
+  EXPECT_TRUE(counter.TestParseLine("#1=cos[60]"));
+  EXPECT_EQ(cosf((60 * M_PI) / 180.0f), counter.get_parameter(1));
+
+  // e raised to the given power
+  EXPECT_TRUE(counter.TestParseLine("#1=exp[4]"));
+  EXPECT_EQ(expf(4), counter.get_parameter(1));
+
+  // round down
+  EXPECT_TRUE(counter.TestParseLine("#1=fix[4.5]"));
+  EXPECT_EQ(floorf(4.5), counter.get_parameter(1));
+
+  // round up
+  EXPECT_TRUE(counter.TestParseLine("#1=fup[4.5]"));
+  EXPECT_EQ(ceilf(4.5), counter.get_parameter(1));
+
+  // natural logarithm
+  EXPECT_TRUE(counter.TestParseLine("#1=ln[10]"));
+  EXPECT_EQ(logf(10), counter.get_parameter(1));
+
+  // round to nearest whole number
+  EXPECT_TRUE(counter.TestParseLine("#1=round[4.4]"));
+  EXPECT_EQ(4, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1=round[4.5]"));
+  EXPECT_EQ(5, counter.get_parameter(1));
+
+  // sine
+  EXPECT_TRUE(counter.TestParseLine("#1=sin[30]"));
+  EXPECT_EQ(sinf((30 * M_PI) / 180.0f), counter.get_parameter(1));
+
+  // square root
+  EXPECT_TRUE(counter.TestParseLine("#1=sqrt[4]"));
+  EXPECT_EQ(sqrt(4), counter.get_parameter(1));
+
+  // sine
+  EXPECT_TRUE(counter.TestParseLine("#1=tan[30]"));
+  EXPECT_EQ(tanf((30 * M_PI) / 180.0f), counter.get_parameter(1));
+}
+
+TEST(GCodeParserTest, precedence) {
+  ParseTester counter;
+
+  EXPECT_TRUE(counter.TestParseLine("#1=[1 + 1]"));
+  EXPECT_EQ(1 + 1, counter.get_parameter(1));
+
+  EXPECT_TRUE(counter.TestParseLine("#1=[6 + 15 / 3]"));
+  EXPECT_EQ(6 + 15 / 3, counter.get_parameter(1));
+
+  EXPECT_TRUE(counter.TestParseLine("#1=[[6 + 15] / 3]"));
+  EXPECT_EQ((6 + 15) / 3, counter.get_parameter(1));
+
+  EXPECT_TRUE(counter.TestParseLine("#1=[3 * 2**3]"));
+  EXPECT_EQ(3 * 8, counter.get_parameter(1));
 }
 
 int main(int argc, char *argv[]) {
