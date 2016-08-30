@@ -336,7 +336,10 @@ static const char *skip_white(const char *line) {
   return line;
 }
 
-static float ParseGcodeNumber(const char *line, const char **endptr) {
+// Parse number from "line" and store in "value". Returns the position in the
+// string after the value had been parsed; if there was an error parsing,
+// returns the beginning of the line.
+static const char *ParseGcodeNumber(const char *line, float *value) {
   // We need to copy the number into a temporary buffer as strtof() does
   // not accept an end-limiter.
   char buffer[40];
@@ -349,13 +352,9 @@ static float ParseGcodeNumber(const char *line, const char **endptr) {
   }
   *dst = '\0';
   char *parsed_end;
-  const float result = strtof(buffer, &parsed_end);
-  if (parsed_end == dst) {
-    *endptr = src;
-  } else {
-    *endptr = line;
-  }
-  return result;
+  *value = strtof(buffer, &parsed_end);
+
+  return (parsed_end == dst) ? src : line;
 }
 
 const char *GCodeParser::Impl::gcode_parse_parameter(
@@ -376,18 +375,19 @@ const char *GCodeParser::Impl::gcode_parse_parameter(
     indexed = true;
   }
 
+  float value;
   const char *endptr;
-  *param_num = (int)ParseGcodeNumber(line, &endptr);
+  endptr = ParseGcodeNumber(line, &value);
+  *param_num = (int)value;
   if (line == endptr) {
     gprintf(GLOG_SYNTAX_ERR,
             "'#' is not followed by a number but '%s'\n", line);
     return NULL;
   }
   if (indexed) {
-    float val;
-    if (!read_parameter(*param_num, &val))
+    if (!read_parameter(*param_num, &value))
       return NULL;
-    *param_num = val;
+    *param_num = (int)value;
   }
   if (*param_num < 0 || *param_num > (int)config.num_parameters-1) {
     gprintf(GLOG_SYNTAX_ERR, "unsupported parameter number (%d)\n", *param_num);
@@ -398,7 +398,7 @@ const char *GCodeParser::Impl::gcode_parse_parameter(
 
   if (*line == '=') {
     line++;
-    float new_val = ParseGcodeNumber(line, &endptr);
+    endptr = ParseGcodeNumber(line, &value);
     if (line == endptr) {
       gprintf(GLOG_SYNTAX_ERR,
               "'#%d=' is not followed by a number but '%s'\n",
@@ -406,8 +406,8 @@ const char *GCodeParser::Impl::gcode_parse_parameter(
       return NULL;
     }
     line = endptr;
-    store_parameter(*param_num, new_val);
-    *param_val = new_val;
+    store_parameter(*param_num, value);
+    *param_val = value;
   } else {
     read_parameter(*param_num, param_val);
     if (query) {
@@ -479,7 +479,7 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
       return NULL;
     }
   } else {
-    *value = ParseGcodeNumber(line, &endptr);
+    endptr = ParseGcodeNumber(line, value);
 
     if (line == endptr) {
       gprintf(GLOG_SYNTAX_ERR,
