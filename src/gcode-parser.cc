@@ -1161,6 +1161,46 @@ static void arc_callback(void *data, const AxesRegister &new_pos) {
   cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
 }
 
+// The algorithm used here is based on finding the midpoint M of the line
+// L between the current point and the end point of the arc. The center
+// of the arc lies on a line through M perpendicular to L.
+//
+// If the value of the radius argument is negative, that means [NCMS,
+// page 21] that an arc larger than a semicircle is to be made.
+// Otherwise, an arc of a semicircle or less is made.
+static bool arc_radius_to_center(float start1, float start2,
+                                 float end1, float end2,
+                                 float radius, bool is_cw,
+                                 float *center1, float *center2) {
+  if (end1 == start1 && end2 == start2)
+    return false;               // start point same as end point
+
+  const float abs_radius = fabs(radius);
+  const float mid1 = (end1 + start1) / 2.0f;
+  const float mid2 = (end2 + start2) / 2.0f;
+
+  float half_length = hypotf(mid1 - end1, mid2 - end2);
+  if ((half_length / abs_radius) > (1 + 1e-6))
+    return false;               // radius to small to reach end point
+  if ((half_length / abs_radius) > (1 - 1e-6))
+    half_length = abs_radius;   // allow a small error for semicircle
+
+  float theta;
+  if ((is_cw && radius > 0) || (!is_cw && radius < 0))
+    theta = atan2f(end2 - start2, end1 - start1) - (M_PI / 2.0f);
+  else
+    theta = atan2f(end2 - start2, end1 - start1) + (M_PI / 2.0f);
+
+  const float turn2 = asinf(half_length / abs_radius);
+  const float offset = abs_radius * cosf(turn2);
+
+  // return the offset to the center of the arc
+  *center1 = (mid1 + (offset * cosf(theta))) - start1;
+  *center2 = (mid2 + (offset * sinf(theta))) - start2;
+
+  return true;
+}
+
 // For we just generate an arc by emitting many small steps for
 // now. TODO(hzeller): actually generate a curve profile for that.
 // With G17, G18, G19, the plane was selected before.
@@ -1169,12 +1209,15 @@ static void arc_callback(void *data, const AxesRegister &new_pos) {
 //          Only the two in the given plane are relevant.
 // F      : Optional feedrate.
 // P      : number of turns. currently ignored.
-// R      : TODO: implement. Modern systems allow that.
+// R      : arc radius
 const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   const char *remaining_line;
   AxesRegister target = axes_pos_;
-  AxesRegister offset;
+  AxesRegister offset = kZeroOffset;
   float feedrate = -1;
+  float radius = 0.0f;
+  bool have_ijk = false;
+  bool have_r = false;
   float value;
   char letter;
   int turns = 1;
@@ -1184,22 +1227,81 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
     if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
     else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
     else if (letter == 'Z') target[AXIS_Z] = abs_axis_pos(AXIS_Z, unit_value);
-    else if (letter == 'I') offset[AXIS_X] = unit_value;
-    else if (letter == 'J') offset[AXIS_Y] = unit_value;
-    else if (letter == 'K') offset[AXIS_Z] = unit_value;
+    else if (letter == 'I') { offset[AXIS_X] = unit_value; have_ijk = true; }
+    else if (letter == 'J') { offset[AXIS_Y] = unit_value; have_ijk = true; }
+    else if (letter == 'K') { offset[AXIS_Z] = unit_value; have_ijk = true; }
     else if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
     else if (letter == 'P') turns = (int)value; // currently ignored
-    // TODO: 'R'
+    else if (letter == 'R') { radius = unit_value; have_r = true; }
     else break;
 
     line = remaining_line;
   }
 
-  // Should the arc parameters be sanity checked?
+  if (!have_ijk && !have_r) {
+    gprintf(GLOG_SYNTAX_ERR, "handle_arc: missing IJK or R\n");
+    return line;
+  } else if (have_ijk && have_r) {
+    gprintf(GLOG_SYNTAX_ERR, "handle_arc: mixed IJK and R\n");
+    return line;
+  }
   if (turns != 1) {
     // Currently, we ignore turns, so we check that it is exactly one.
     gprintf(GLOG_SYNTAX_ERR, "handle_arc: turns=%d (must be 1)\n", turns);
-    return remaining_line;
+    return line;
+  }
+
+  if (have_ijk) {
+    switch (arc_normal_) {
+    case AXIS_Z:
+      if (offset[AXIS_Z] != 0.0f) {
+        gprintf(GLOG_SYNTAX_ERR, "handle_arc: invalid K in XY plane\n");
+        return line;
+      }
+      break;
+    case AXIS_X:
+      if (offset[AXIS_X] != 0.0f) {
+        gprintf(GLOG_SYNTAX_ERR, "handle_arc: invalid I in YZ plane\n");
+        return line;
+      }
+      break;
+    case AXIS_Y:
+      if (offset[AXIS_Y] != 0.0f) {
+        gprintf(GLOG_SYNTAX_ERR, "handle_arc: invalid J in ZX plane\n");
+        return line;
+      }
+      break;
+    default:
+      return line;  // invalid plane
+    }
+  } else if (have_r) {
+    bool have_center;
+    switch (arc_normal_) {
+    case AXIS_Z:
+      have_center = arc_radius_to_center(axes_pos_[AXIS_X], axes_pos_[AXIS_Y],
+                                         target[AXIS_X], target[AXIS_Y],
+                                         radius, is_cw,
+                                         &offset[AXIS_X], &offset[AXIS_Y]);
+      break;
+    case AXIS_X:
+      have_center = arc_radius_to_center(axes_pos_[AXIS_Y], axes_pos_[AXIS_Z],
+                                         target[AXIS_Y], target[AXIS_Z],
+                                         radius, is_cw,
+                                         &offset[AXIS_Y], &offset[AXIS_Z]);
+      break;
+    case AXIS_Y:
+      have_center = arc_radius_to_center(axes_pos_[AXIS_X], axes_pos_[AXIS_Z],
+                                         target[AXIS_X], target[AXIS_Z],
+                                         radius, is_cw,
+                                         &offset[AXIS_X], &offset[AXIS_Z]);
+      break;
+    default:
+      return line;  // invalid plane
+    }
+    if (!have_center) {
+      gprintf(GLOG_SYNTAX_ERR, "handle_arc: unable to handle radius\n");
+      return line;
+    }
   }
 
   struct ArcCallbackData cb_arc_data;
