@@ -38,4 +38,11 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
              void (*segment_output)(void *, const AxesRegister &),
              void *segment_output_user_data);
 
+void spline_gen(AxesRegister *position,     // start position. Will be updated.
+                const AxesRegister &cp1,    // Offset from start to first control point.
+                const AxesRegister &cp2,    // Offset from target to second control point.
+                const AxesRegister &target, // Target position.
+                void (*segment_output)(void *, const AxesRegister &),
+                void *segment_output_user_data);
+
 #endif  // _BEAGLEG_ARC_GEN_H

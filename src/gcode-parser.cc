@@ -118,6 +118,9 @@ private:
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
 
+    last_spline_cp2_ = kZeroOffset;
+    have_first_spline_ = false;
+
     // Some initial machine states emitted as events.
     callbacks->set_speed_factor(1.0);
     callbacks->set_fanspeed(0);
@@ -239,6 +242,7 @@ private:
   const char *handle_G92(float sub_command, const char *line);
   const char *handle_move(const char *line, bool force_change);
   const char *handle_arc(const char *line, bool is_cw);
+  const char *handle_spline(float sub_command, const char *line);
   const char *handle_z_probe(const char *line);
   const char *handle_M111(const char *line);
 
@@ -327,6 +331,9 @@ private:
   // more: tool offset.
 
   enum GCodeParserAxis arc_normal_;  // normal vector of arcs.
+
+  AxesRegister last_spline_cp2_;
+  bool have_first_spline_;
 
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
   bool allow_m111_;
@@ -1330,6 +1337,160 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   return line;
 }
 
+// G5 X- Y- <I- J-> P- Q- (Cubic spline)
+//   I - X relative offset from start point to first control point
+//   J - Y relative offset from start point to first control point
+//   P - X relative offset from start point to second control point
+//   Q - Y relative offset from start point to second control point
+//
+// G5 creates a cubic B-spline in the XY plane with the X and Y axes only.
+// P and Q must be specified for every G5 command.
+//
+// For the first G5 command in a series of G5 commands, I and J must be
+// specified. For subsequent G5 commands, either I and I must be specified,
+// or neither. If I and J are unspecified, the starting direction of this
+// cubic will automaticall match the ending direction of the previous cubic
+// (as if I and J are the negation of the previous P and Q).
+//
+// For example, to program a curvy N shape:
+//
+// G90 G17
+// G0 X0 Y0
+// G5 I0 J30 P0 Q-30 X10 Y10
+//
+// A second curvy N that attaches smoothly to this one can now be made without
+// specifying I and J:
+//
+// G5 P0 Q-30 X20 Y20
+//
+// It is an error if:
+//   1) P and Q are not both specified.
+//   2) Just one of I or J are specified.
+//   3) I or J are unspecified in the first of a series of G5 commands.
+//   4) An axis other than X or Y is specified.
+//   5) The active plane is not G17.
+//
+// G5.1 X- Y- I- J- (Quadratic spline)
+//   I - X relative offset from start point to control point
+//   J - Y relative offset from start point to control point
+//
+// G5.1 creates a quadratic B-spline in the XY plane with the X and Y axis
+// only. Not specifying I or J gives zero offset for the specified axis, so
+// one or both must be given.
+//
+// For example, to program a parabola, through the origin from X-20 Y-40 to
+// X20 Y40:
+//
+// G90 G17
+// G0 X-20 Y40
+// G5.1 X20 I20 J-80
+//
+// It is an error if:
+//   1) Both I and J offset are unspecified or zero.
+//   2) An axis other than X or Y is specified.
+//   3) The active plane is not G17.
+//
+// G5.2 ...  G5.3 (NURBS Block)
+// Not currently supported.
+const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line) {
+  if (arc_normal_ != AXIS_Z) {
+    gprintf(GLOG_SEMANTIC_ERR, "handle_spline: not in XY plane\n");
+    return NULL;
+  }
+
+  bool is_cubic;
+  if (sub_command == 5.0f) {
+    is_cubic = true;
+  } else if (sub_command == 5.1f) {
+    is_cubic = false;
+  } else {
+    gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G%.1f is not supported\n",
+            sub_command);
+    return NULL;
+  }
+
+  AxesRegister target = axes_pos_;
+  AxesRegister cp1 = kZeroOffset;
+  AxesRegister cp2 = kZeroOffset;
+  bool have_i = false;
+  bool have_j = false;
+  bool have_p = false;
+  bool have_q = false;
+  const char *remaining_line;
+  float value;
+  char letter;
+  while ((remaining_line = gparse_pair(line, &letter, &value))) {
+    const float unit_value = value * unit_to_mm_factor_;
+    if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
+    else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
+    else if (letter == 'I') { cp1[AXIS_X] = unit_value; have_i = true; }
+    else if (letter == 'J') { cp1[AXIS_Y] = unit_value; have_j = true; }
+    else if (letter == 'P') { cp2[AXIS_X] = unit_value; have_p = true; }
+    else if (letter == 'Q') { cp2[AXIS_Y] = unit_value; have_q = true; }
+    else {
+      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: invalid axis specified\n");
+      return NULL;
+    }
+    line = remaining_line;
+  }
+
+  if (is_cubic) {
+    if (!have_p && !have_q) {
+      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G5 missing P and Q\n");
+      return NULL;
+    }
+    if ((have_i && !have_j) || (!have_i && have_j)) {
+      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G5 missing I or J\n");
+      return NULL;
+    }
+    if (!have_i && !have_j) {
+      if (!have_first_spline_) {
+        gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G5 missing I and J\n");
+        return NULL;
+      } else {
+        cp1[AXIS_X] = -last_spline_cp2_[AXIS_X];
+        cp1[AXIS_Y] = -last_spline_cp2_[AXIS_Y];
+      }
+    }
+    last_spline_cp2_ = cp2;
+    have_first_spline_ = true;
+
+    // convert the control points from offsets to absolutes
+    cp1[AXIS_X] += axes_pos_[AXIS_X];
+    cp1[AXIS_Y] += axes_pos_[AXIS_Y];
+    cp2[AXIS_X] += target[AXIS_X];
+    cp2[AXIS_Y] += target[AXIS_Y];
+  } else {
+    if (!have_i && !have_j) {
+      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G5.1 missing I and J\n");
+      return NULL;
+    }
+    if (cp1[AXIS_X] == 0.0f && cp1[AXIS_Y] == 0.0f) {
+      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: G5.1 I and J are zero\n");
+      return NULL;
+    }
+    have_first_spline_ = false;
+
+    // convert the quadratic control point to two cubic control points
+    AxesRegister _cp1;
+    AxesRegister _cp2;
+    _cp1[AXIS_X] = axes_pos_[AXIS_X] + (cp1[AXIS_X] * 2.0f) / 3.0f;
+    _cp1[AXIS_Y] = axes_pos_[AXIS_Y] + (cp1[AXIS_Y] * 2.0f) / 3.0f;
+    _cp2[AXIS_X] = _cp1[AXIS_X] + (cp1[AXIS_X] * 1.0f) / 3.0f;
+    _cp2[AXIS_Y] = _cp1[AXIS_Y] + (cp1[AXIS_Y] * 1.0f) / 3.0f;
+
+    cp1 = _cp1;
+    cp2 = _cp2;
+  }
+
+  struct ArcCallbackData cb_arc_data;
+  cb_arc_data.callbacks = callbacks;
+  cb_arc_data.feedrate = -1;
+  spline_gen(&axes_pos_, cp1, cp2, target, &arc_callback, &cb_arc_data);
+
+  return line;
+}
+
 const char *GCodeParser::Impl::handle_z_probe(const char *line) {
   char letter;
   float value;
@@ -1392,6 +1553,8 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
       callbacks->gcode_start(owner);
       program_in_progress_ = true;
     }
+    bool last_spline = have_first_spline_;
+    have_first_spline_ = false;
     bool processed_command = true;
     if (letter == 'G') {
       switch ((int) value) {
@@ -1401,6 +1564,10 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
       case  3: line = handle_arc(line, false); break;
       case  4: line = set_param('P', &GCodeParser::EventReceiver::dwell,
                                 1.0f, line);
+        break;
+      case  5:
+        have_first_spline_ = last_spline;
+        line = handle_spline(value, line);
         break;
       case 10: line = handle_G10(line); break;
       case 17: arc_normal_ = AXIS_Z; break;

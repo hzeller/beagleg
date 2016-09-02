@@ -91,6 +91,8 @@ G1 [coordinates] | `coordinated_move()` | Like G0, but guarantee linear move
 G2 [end] [offset]| `coordinated_move()` | Clockwise arc
 G3 [end] [offset]| `coordinated_move()` | Counterclockwise arc
 G4 Pnnn          | `dwell()`            | Dwell (wait) for nnn milliseconds.
+G5 [see below]   | `coordinated_move()` | Cubic spline in XY plane
+G5.1 [see below] | `coordinated_move()` | Quadratic spline in XY plane
 G10 L2 Px [coord]| -                    | Set coordinate system data
 G17              | -                    | XY plane selection.
 G18              | -                    | ZX plane selection.
@@ -116,6 +118,33 @@ G92 [coordinates]| -                    | Set position to be the new zero.
 G92.1            | -                    | Reset G92 offset
 G92.2            | -                    | Suspend G92 offset
 G92.3            | -                    | Restore G92 offset
+
+#### G5 syntax
+
+G5 creates a cubic B-spline in the XY plane with the X and Y axes only. P and Q
+must both be specified for every G5 command.
+
+For the first G5 command in a series of G5 commands, I and J must both be specified.
+For subsequent G5 commands, either bot I and J must be specified, or neither. If
+I and J are unspecified, the first control point will be the negation of the
+previous second control point.
+
+`G5 X- Y- <I- J-> P- Q-`
+
+* `X- Y-` - end point of spline (absolute or relative depending on current mode)
+* `I- J-` - relative offset from start point to first control point
+* `P- Q-` - relative offset from end point to second control point
+
+#### G5.1 syntax
+
+G5.1 creates a quadratic B-spline in the XY plane with the X and Y axes only.
+Not specifying I or J gives zero offset for the unspecified axis, so one or
+both must be given.
+
+`G5.1 X- Y- I- J-`
+
+* `X- Y-` - end point of spline (absolute or relative depending on current mode)
+* `I- J-` - relative offset from start point to control point
 
 ### M Codes
 

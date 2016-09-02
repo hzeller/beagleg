@@ -121,3 +121,55 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
   }
   segment_output(segment_output_user_data, position);
 }
+
+static AxesRegister calc_bezier_point(float t,
+                                      const AxesRegister &p0,
+                                      const AxesRegister &p1,
+                                      const AxesRegister &p2,
+                                      const AxesRegister &p3) {
+  float u = 1.0f - t;
+  float uu = u * u;
+  float tt = t * t;
+  float uuu = uu * u;
+  float ttt = tt * t;
+
+  AxesRegister p = p0;
+  p[AXIS_X] = uuu * p0[AXIS_X];               // first term
+  p[AXIS_Y] = uuu * p0[AXIS_Y];
+  p[AXIS_X] += (3.0f * uu * t * p1[AXIS_X]);  // second term
+  p[AXIS_Y] += (3.0f * uu * t * p1[AXIS_Y]);
+  p[AXIS_X] += (3.0f * u * tt * p2[AXIS_X]);  // third term
+  p[AXIS_Y] += (3.0f * u * tt * p2[AXIS_Y]);
+  p[AXIS_X] += (ttt * p3[AXIS_X]);            // forth term
+  p[AXIS_Y] += (ttt * p3[AXIS_Y]);
+  return p;
+}
+
+void spline_gen(AxesRegister *position_out, // start position. Will be updated.
+                const AxesRegister &cp1,    // Offset from start to first control point.
+                const AxesRegister &cp2,    // Offset from target to second control point.
+                const AxesRegister &target, // Target position.
+                void (*segment_output)(void *, const AxesRegister &),
+                void *segment_output_user_data) {
+  // Alias reference for readable use with [] operator
+  AxesRegister &position = *position_out;
+
+#if 0
+  Log_debug("spline_gen: start:%.3f,%.3f cp1:%.3f,%.3f cp2:%.3f,%.3f end:%.3f,%.3f\n",
+            position[AXIS_X], position[AXIS_Y],
+            cp1[AXIS_X], cp1[AXIS_Y],
+            cp2[AXIS_X], cp2[AXIS_Y],
+            target[AXIS_X], target[AXIS_Y]);
+#endif
+
+  for (float t = 0; t < 1; t += 0.01f) {
+    AxesRegister p = calc_bezier_point(t, position, cp1, cp2, target);
+
+    segment_output(segment_output_user_data, p);
+  }
+
+  // Ensure last segment arrives at target location.
+  position[AXIS_X] = target[AXIS_X];
+  position[AXIS_Y] = target[AXIS_Y];
+  segment_output(segment_output_user_data, position);
+}
