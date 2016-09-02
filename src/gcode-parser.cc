@@ -1146,7 +1146,7 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
     line = remaining_line;
   }
 
-  char did_move = 0;
+  bool did_move = false;
   if (any_change) {
     if (modal_g0_g1_) {
       did_move = callbacks->coordinated_move(feedrate, new_pos);
@@ -1384,7 +1384,7 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
       callbacks->gcode_start(owner);
       program_in_progress_ = true;
     }
-    char processed_command = 1;
+    bool processed_command = true;
     if (letter == 'G') {
       switch ((int) value) {
       case  0: modal_g0_g1_ = 0; line = handle_move(line, false); break;
@@ -1447,7 +1447,7 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
     }
     else if (letter == 'N') {
       // Line number? Yeah, ignore for now :)
-      processed_command = 0;
+      processed_command = false;
     }
     else {
       const enum GCodeParserAxis axis = gcodep_letter2axis(letter);

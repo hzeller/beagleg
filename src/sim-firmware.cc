@@ -182,7 +182,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
 #if JERK_EXPERIMENT
   uint32_t jerk_index = 1;
 #endif
-  char is_first = 1;
+  bool is_first = true;
   uint32_t remainder = 0;
   const char *msg = "";
 
@@ -213,7 +213,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
         msg = "# jerk";
         fprintf(stderr, "jerk start: jerk-timer-cycles=%.3f\n",
                 segment->jerk_motion);
-        is_first = 0;
+        is_first = false;
       }
       // TODO: index 0 ?
       // TODO: is it 2* ?
@@ -230,7 +230,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
       if (segment->jerk_start == 0) {
         fprintf(stderr, "jerk end  : jerk-timer-cycles=%.3f\n",
                 segment->jerk_motion);
-        is_first = 1;
+        is_first = true;
       }
     }
     else
@@ -243,7 +243,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
                 segment->loops_accel);
-        is_first = 0;
+        is_first = false;
       }
       if (segment->accel_series_index != 0) {
         const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
@@ -268,7 +268,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
         msg = "# travel.";
         fprintf(stderr, "SIM: travel      -- :                               timer-cycles=%6u     (%d loops)\n", delay_loops,
                 segment->loops_travel);
-        is_first = 0;
+        is_first = false;
       }
       --segment->loops_travel;
     }
@@ -280,7 +280,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
                 segment->accel_series_index,
                 1.0 * segment->hires_accel_cycles / (1<<DELAY_CYCLE_SHIFT),
                 segment->loops_decel);
-        is_first = 0;
+        is_first = false;
       }
       const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
       const uint32_t divisor = (segment->accel_series_index << 2) - 1;

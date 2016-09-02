@@ -182,8 +182,8 @@ static int enable_gpio_clocks(int fd) {
   return 1;
 }
 
-int map_gpio() {
-  int ret = 0;
+bool map_gpio() {
+  bool ret = false;
   int fd;
 
   fd = open("/dev/mem", O_RDWR);
@@ -203,7 +203,7 @@ int map_gpio() {
   // Prepare all the pins we need for output.
   cfg_gpio_outputs();
 
-  ret = 1;
+  ret = true;
 
 exit:
   close(fd);

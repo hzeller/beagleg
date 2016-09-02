@@ -27,7 +27,7 @@ int get_gpio(uint32_t gpio_def);
 void set_gpio(uint32_t gpio_def);
 void clr_gpio(uint32_t gpio_def);
 
-int map_gpio();
+bool map_gpio();
 void unmap_gpio();
 
 #endif // __GENERIC_GPIO_H

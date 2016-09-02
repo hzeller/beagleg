@@ -245,8 +245,8 @@ static int pwm_timers_enable_clocks(int fd) {
   return 1;
 }
 
-int pwm_timers_map() {
-  int ret = 0;
+bool pwm_timers_map() {
+  bool ret = false;
   int fd;
 
   memset(timers, 0x00, sizeof(*timers));
@@ -265,7 +265,7 @@ int pwm_timers_map() {
   timers[3].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER7_BASE);
   if (timers[3].regs == MAP_FAILED) { perror("mmap() TIMER7"); goto exit; }
 
-  ret = 1;
+  ret = true;
 
  exit:
   close(fd);

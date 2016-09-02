@@ -29,7 +29,7 @@ void pwm_timer_start(uint32_t gpio_def, bool start);
 void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle);
 void pwm_timer_set_freq(uint32_t gpio_def, int pwm_freq);
 
-int pwm_timers_map();
+bool pwm_timers_map();
 void pwm_timers_unmap();
 
 #endif // __PWM_TIMER_H
