@@ -294,7 +294,7 @@ bool HardwareMapping::TestStartSwitch() {
   return true;
 }
 
-class HardwareMapping::ConfigReader : public ConfigParser::EventReceiver {
+class HardwareMapping::ConfigReader : public ConfigParser::Reader {
 public:
   ConfigReader(HardwareMapping *config) : config_(config){}
 

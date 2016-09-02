@@ -25,15 +25,15 @@
 
 class ConfigParser {
 public:
-  class EventReceiver {
+  class Reader {
   public:
-    virtual ~EventReceiver() {}
+    virtual ~Reader() {}
 
-    // Inform about new section. If the EventReceiver is interested int
+    // Inform about new section. If the Reader is interested in
     // name/value pairs seen in that section, it should return 'true'.
     virtual bool SeenSection(int line_no, const std::string &section_name) = 0;
 
-    // SeenNameValue() is only called if this EventReceiver expressed interest
+    // SeenNameValue() is only called if this Reader expressed interest
     // in the current section. Returns 'true' if it could deal with the
     // name/value, 'false' if there was an error and the configuration should
     // be deemed invalid.
@@ -70,11 +70,11 @@ public:
   // Overwrites any previous content.
   void SetContent(const std::string &content);
 
-  // Emit configuration values to the EventReceiver. Returns 'true' if
+  // Emit configuration values to the Reader. Returns 'true' if
   // configuration file could be parsed (no syntax errors, and all calls to
   // SeenNameValue() returned true).
-  // EventReceiver is not taken over.
-  bool EmitConfigValues(EventReceiver *event_receiver);
+  // Reader is not taken over.
+  bool EmitConfigValues(Reader *reader);
 
 private:
   std::string content_;

@@ -48,7 +48,7 @@ MachineControlConfig::MachineControlConfig() {
 
 namespace {
 // Expermential. Work in progress.
-class MachineControlConfigReader : public ConfigParser::EventReceiver {
+class MachineControlConfigReader : public ConfigParser::Reader {
 public:
   MachineControlConfigReader(MachineControlConfig *config)
     : config_(config) {}

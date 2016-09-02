@@ -29,21 +29,21 @@
 #include "logging.h"
 #include "string-util.h"
 
-bool ConfigParser::EventReceiver::ParseString(const std::string &value,
-                                              std::string *result) {
+bool ConfigParser::Reader::ParseString(const std::string &value,
+                                       std::string *result) {
   *result = value;
   return true;
 }
 
-bool ConfigParser::EventReceiver::ParseInt(const std::string &value,
-                                           int *result) {
+bool ConfigParser::Reader::ParseInt(const std::string &value,
+                                    int *result) {
   char *end;
   *result = strtol(value.c_str(), &end, 10);
   return *end == '\0';
 }
 
-bool ConfigParser::EventReceiver::ParseBool(const std::string &value,
-                                            bool *result) {
+bool ConfigParser::Reader::ParseBool(const std::string &value,
+                                     bool *result) {
   if (value == "1" || value == "yes" || value == "true") {
     *result = true;
     return true;
@@ -55,8 +55,8 @@ bool ConfigParser::EventReceiver::ParseBool(const std::string &value,
   return false;
 }
 
-bool ConfigParser::EventReceiver::ParseFloatExpr(const std::string &value,
-                                                 float *result) {
+bool ConfigParser::Reader::ParseFloatExpr(const std::string &value,
+                                          float *result) {
   char *end;
   double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
   if (end == NULL || *end == '\0') {
@@ -70,9 +70,9 @@ bool ConfigParser::EventReceiver::ParseFloatExpr(const std::string &value,
   return false;
 }
 
-double ConfigParser::EventReceiver::ParseDoubleExpression(const char *input,
-                                                          double fallback,
-                                                          char **end) {
+double ConfigParser::Reader::ParseDoubleExpression(const char *input,
+                                                   double fallback,
+                                                   char **end) {
   const char *full_expr = input;
   double value = strtod(input, end);
   if (*end == input) return fallback;
@@ -106,8 +106,7 @@ double ConfigParser::EventReceiver::ParseDoubleExpression(const char *input,
   return value;
 }
 
-void ConfigParser::EventReceiver::ReportError(int line_no,
-                                              const std::string &msg) {
+void ConfigParser::Reader::ReportError(int line_no, const std::string &msg) {
   std::cerr << line_no << ":" << msg << std::endl;
 }
 
@@ -155,7 +154,7 @@ static std::string CanonicalizeName(const StringPiece &s) {
   return ToLower(TrimWhitespace(s));
 }
 
-bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
+bool ConfigParser::EmitConfigValues(Reader *reader) {
   // The first pass collects all the parse errors and emits them. Later on,
   // we refuse to run another time.
   if (!parse_success_)
@@ -175,7 +174,7 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
     // Sections start with '['
     if (line[0] == '[') {
       if (line[line.length() - 1] != ']') {
-        event_receiver->ReportError(line_no, "Section line does not end in ']'");
+        reader->ReportError(line_no, "Section line does not end in ']'");
         parse_success_ = false;
         current_section_interested = false;  // rest is probably bogus.
         continue;
@@ -183,13 +182,12 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
 
       StringPiece section = line.substr(1, line.length() - 2);
       current_section = CanonicalizeName(section);
-      current_section_interested = event_receiver
-        ->SeenSection(line_no, current_section);
+      current_section_interested = reader->SeenSection(line_no, current_section);
     }
     else {
       StringPiece::iterator eq_pos = std::find(line.begin(), line.end(), '=');
       if (eq_pos == line.end()) {
-        event_receiver->ReportError(line_no, "name=value pair expected.");
+        reader->ReportError(line_no, "name=value pair expected.");
         parse_success_ = false;
         continue;
       }
@@ -199,13 +197,12 @@ bool ConfigParser::EmitConfigValues(EventReceiver *event_receiver) {
         StringPiece value_piece
           = TrimWhitespace(StringPiece(eq_pos + 1, line.end() - eq_pos - 1));
         std::string value = value_piece.ToString();
-        bool could_parse = event_receiver->SeenNameValue(line_no, name, value);
+        bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {
-          event_receiver
-            ->ReportError(line_no,
-                          StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
-                                       current_section.c_str(),
-                                       name.c_str(), value.c_str()));
+          reader->ReportError(line_no,
+                              StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
+                                           current_section.c_str(),
+                                           name.c_str(), value.c_str()));
         }
         success &= could_parse;
       }

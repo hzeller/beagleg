@@ -26,7 +26,7 @@
 using ::testing::Return;
 
 namespace {
-class MockEventReceiver : public ConfigParser::EventReceiver {
+class MockConfigReader : public ConfigParser::Reader {
 public:
   MOCK_METHOD2(SeenSection, bool(int line_no, const std::string &section_name));
   MOCK_METHOD3(SeenNameValue, bool(int line_no,
@@ -45,7 +45,7 @@ TEST(ConfigParserTest, BasicParser) {
                " some line = bar  # foo\n"
                "another line = x\r\n"
                "  something = unfinished-line");
-  MockEventReceiver events;
+  MockConfigReader events;
   EXPECT_CALL(events, SeenSection(1, "some-section"))
     .WillOnce(Return(true));
   EXPECT_CALL(events, SeenNameValue(5, "some line", "bar"))
@@ -62,7 +62,7 @@ TEST(ConfigParserTest, ErrorReporting) {
   p.SetContent(" incomplete line\n"
                "[ incomplete-section \n");
 
-  MockEventReceiver events;
+  MockConfigReader events;
   EXPECT_CALL(events, ReportError(1, "name=value pair expected."));
   EXPECT_CALL(events, ReportError(2, "Section line does not end in ']'"));
 

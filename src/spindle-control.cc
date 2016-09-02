@@ -71,7 +71,7 @@ Spindle::Spindle() {
   allow_ccw_ = false;
 }
 
-class Spindle::ConfigReader : public ConfigParser::EventReceiver {
+class Spindle::ConfigReader : public ConfigParser::Reader {
 public:
   ConfigReader(Spindle *config) : config_(config) {}
 
