@@ -83,6 +83,14 @@ private:
 
   int errors_;
 };
+
+class DummyMotorOps : public MotorOperations {
+public:
+  DummyMotorOps() {}
+  virtual void Enqueue(const LinearSegmentSteps &param) {}
+  virtual void MotorEnable(bool on) {}
+  virtual void WaitQueueEmpty(){}
+};
 }
 
 class Harness {
@@ -111,6 +119,33 @@ class Harness {
   HardwareMapping hardware_;
   GCodeMachineControl *machine_control;
 };
+
+TEST(GCodeMachineControlTest, single_motor_non_euclidean_axis) {
+  struct MachineControlConfig config;
+  bzero(&config, sizeof(config));
+  config.steps_per_mm[AXIS_A] = 100;  // step/mm
+  config.acceleration[AXIS_A] = 1000;  // mm/s^2
+  config.max_feedrate[AXIS_A] = 1000;
+  HardwareMapping hardware;
+  DummyMotorOps motor_ops;
+
+  GCodeMachineControl *machine_control;
+  machine_control = GCodeMachineControl::Create(config, &motor_ops,
+                                                &hardware,
+                                                NULL,   // spindle
+                                                NULL);  // msg-stream
+  assert(machine_control != NULL);
+  // Move to pos 100, then 200, use default feedrate.
+  AxesRegister coordinates;
+  coordinates[AXIS_A] = 100;
+  machine_control->ParseEventReceiver()
+    ->coordinated_move(-1, coordinates);
+
+  coordinates[AXIS_A] = 200;
+  machine_control->ParseEventReceiver()
+    ->coordinated_move(-1, coordinates);  // also 100mm/s
+
+}
 
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
