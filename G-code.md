@@ -22,6 +22,52 @@ by every G-Code interpreter, but BeagleG does:
 
     G1(coordinated move) X10(to this position)
 
+## Parameters / Expressions and Binary/Unary Operations
+
+BeagleG supportes the use of parameters. A parameter is specified by a pound
+character `#` followed by an integer value. Currently parameters 0 to 5399 are
+supported. Parameter 0 is read-only and always evaluates to `0.0f`. Some of the
+parameters are used internally, these are all in the > 5000 range and should
+not be used.
+
+Parameter setting is done by:
+* a pound character `#`
+* an integer value between `1` and `5399`
+* an equal sign `=`
+* a real value
+
+For example `#1=123.4` is a parameter setting meaning set parameter 1 to 123.4.
+
+Unlike the [NIST RS274NGC] specification, parameter setting takes effect immediately.
+For example, `G1 #1=10 X#1` will result in a coordinated move to X=10.
+
+Parameters are not currently persistent. All parameters default to `0.0f`.
+
+Expressions are also supported along with Binary/Unary operations. An expression
+is a set of character starting with a left bracket `[` and ending with a balanced
+right bracket `]`. In between the brackets are numbers, parameter values,
+mathematical operations, and other expressions. Expressions are evaluated to
+produce a number. An example of an expression is `[1 + cos[0] - [#3 ** [4.0/2]]]`.
+
+Binary operations appear only inside excpressions. Nine binary operations are
+defined. These are four basic mathematical operations: addition `+`, subtraction `-`,
+multiplication `*`, and division `/`. There are three logical operations:
+non-exclusive or `OR`, exculsive or `XOR`, and logical and `AND`. The eighth
+operation is the modulus operation `MOD`. The ninth operation is the "power"
+operation `**` of raising the number on the left of the operation to the power
+on the right.
+
+A unary operation is either `ATAN` followed by one expression divided by another
+expression (for example `ATAN[2]/[1+3]`) or any other unary operation followed
+by an expression (for example `SIN[90]`). The unary operations are: absolute value
+`ABS`, arc cosine `ACOS`, arc sine `ASIN`, arc tangent `ATAN`, cosine `COS`,
+e raised to the given power `EXP`, round down `FIX`, round up `FUP`, natural
+logarithm `LN`, round down to the nearest whole number `ROUND`, sine `SIN`,
+square root `SQRT`, and tangent `TAN`. Arguments to unary operations which
+take angle measurements (`COS`, `SIN`, and `TAN`) are in degrees. Values returned
+by unary operations which return angle measurements (`ACOS`, `ASIN`, and `ATAN`)
+are also in degrees.
+
 ## Supported commands
 
 Supported commands are currently added on a need-to-have basis. They are a subset
@@ -157,3 +203,4 @@ for the user to handle (see description in API).
 [LinuxCNC]: http://linuxcnc.org/docs/html/gcode.html
 [RepRap Wiki]: http://reprap.org/wiki/G-code
 [Intro GCode]: http://en.wikipedia.org/wiki/G-code
+[NIST RS274NGC]: http://spin1-www.nist.gov/customcf/get_pdf.cfm?pub_id=823374
