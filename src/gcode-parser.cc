@@ -102,8 +102,9 @@ public:
 
 private:
   enum DebugLevel {
-    DEBUG_NONE   = 0,
-    DEBUG_PARSER = (1 << 0)
+    DEBUG_NONE        = 0,
+    DEBUG_PARSER      = (1 << 0),
+    DEBUG_EXPRESSION  = (1 << 1)
   };
 
   // Reset parser, mostly reset relative coordinate systems to whatever they
@@ -279,7 +280,8 @@ private:
   enum GCodePrintLevel {
     GLOG_INFO,
     GLOG_SYNTAX_ERR,
-    GLOG_SEMANTIC_ERR
+    GLOG_SEMANTIC_ERR,
+    GLOG_EXPRESSION
   };
   void gprintf(enum GCodePrintLevel level, const char *format, ...);
 
@@ -369,11 +371,16 @@ GCodeParser::Impl::~Impl() {
 //   0    Information
 //   1    G-Code Syntax Error with line number
 //   2    G-Code Syntax Error
+//   3    Expression handling information (conditional on M111 S2)
 void GCodeParser::Impl::gprintf(enum GCodePrintLevel level,
                                 const char *format, ...) {
   FILE *stream = err_msg_;
   if (stream == NULL) stream = stderr;
   switch (level) {
+  case GLOG_EXPRESSION:
+    if (!(debug_level_ & DEBUG_EXPRESSION))
+      return;
+    // fallthru
   case GLOG_INFO:
     fprintf(stream, "// ");
     break;
@@ -509,7 +516,7 @@ bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown unary operation\n");
     return false;
   }
-  gprintf(GLOG_INFO, "%s[%f] -> %f\n", op_string(op), *value, val);
+  gprintf(GLOG_EXPRESSION, "%s[%f] -> %f\n", op_string(op), *value, val);
   *value = val;
   return true;
 }
@@ -537,7 +544,8 @@ const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
   line = endptr;
 
   float val = (atan2f(*value, value2) * 180.0f) / M_PI;
-  gprintf(GLOG_INFO, "%s[%f/[%f]] -> %f\n", op_string(ATAN), *value, value2, val);
+  gprintf(GLOG_EXPRESSION, "%s[%f]/[%f] -> %f\n",
+          op_string(ATAN), *value, value2, val);
   *value = val;
   return line;
 }
@@ -725,7 +733,8 @@ bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) 
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown binary operation\n");
     return false;
   }
-  gprintf(GLOG_INFO, "[%f %s %f] -> %f\n", *left, op_string(op), *right, val);
+  gprintf(GLOG_EXPRESSION, "[%f %s %f] -> %f\n",
+          *left, op_string(op), *right, val);
   *left = val;
   return true;
 }
@@ -912,7 +921,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
 
   store_parameter(index, value);
 
-  gprintf(GLOG_INFO, "#%d=%f\n", index, value);
+  gprintf(GLOG_EXPRESSION, "#%d=%f\n", index, value);
 
   return line;
 }
