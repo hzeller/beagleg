@@ -812,6 +812,14 @@ const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value)
   for (ops[0] = NO_OPERATION; ops[0] != RIGHT_BRACKET; ) {
     endptr = gcodep_value(line, &vals[stack]);
     if (endptr == NULL) {
+      if (*line == '-') {
+        // make [-expression] work like [-1 * expression]
+        line++;
+        vals[stack] = -1.0f;
+        ops[stack] = TIMES;
+        stack++;
+        continue;
+      }
       gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
       return NULL;
     }
