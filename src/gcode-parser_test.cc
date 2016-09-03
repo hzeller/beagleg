@@ -612,24 +612,21 @@ TEST(GCodeParserTest, NegativeNumbers) {
   EXPECT_TRUE(counter.TestParseLine("#1=[1 + -1]"));
   EXPECT_EQ(1 + -1, counter.get_parameter(1));
 
-  // This is also accepted, but should actually yield an error
+  // This double-negation also accepted, but should probably yield an error,
+  // as it is most likely a typo.
   EXPECT_TRUE(counter.TestParseLine("#1=[1 + --1]"));
   EXPECT_EQ(1 + 1, counter.get_parameter(1));
 
-#if 0  // This is not working yet
   EXPECT_TRUE(counter.TestParseLine("#1=42"));
-  EXPECT_TRUE(counter.TestParseLine("#2=-#1"));
+  EXPECT_TRUE(counter.TestParseLine("#2=[-#1]"));
   EXPECT_EQ(-42, counter.get_parameter(2));
-#endif
 
-  EXPECT_TRUE(counter.TestParseLine("#1=-1 * sin[90]"));
+  EXPECT_TRUE(counter.TestParseLine("#1=[sin[90] * -1]"));
   EXPECT_EQ(-1, counter.get_parameter(1));
 
-#if 0
   // however, this does not work yet
-  EXPECT_TRUE(counter.TestParseLine("#1=-sin[90]"));
+  EXPECT_TRUE(counter.TestParseLine("#1=[-sin[90]]"));
   EXPECT_EQ(-1, counter.get_parameter(1));
-#endif
 }
 
 int main(int argc, char *argv[]) {
