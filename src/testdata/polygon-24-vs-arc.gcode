@@ -1,7 +1,8 @@
 #1=15       ; degrees
 #2=-7.5     ; rotation offset. We want to start with a vertical line.
 #3=50       ; polygon radius
-#4=40       ; circle radius
+#4=45       ; circle radius G2
+#5=40       ; circle radius G3
 
 G92 X[-#3] Y[-#3]    ; Put center of circle on convenient (0,0) coordinate.
 
@@ -36,3 +37,6 @@ X[#3 * cos[24 * #1 + #2]] Y[#3 * sin[24 * #1 + #2]]
 ; Now compare that to an inner 'regular' circle.
 G1 X#4 Y0
 G2 X#4 Y0 I[-#4] J0
+
+G1 X#5 Y0
+G3 X#5 Y0 I[-#5] J0
