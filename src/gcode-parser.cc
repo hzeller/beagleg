@@ -820,8 +820,12 @@ const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value)
     endptr = gcodep_value(line, &vals[stack]);
     if (endptr == NULL) {
       if (*line == '-') {
+        line = skip_white(line+1);
+        if (*line == '-') {
+          gprintf(GLOG_SYNTAX_ERR, "double-negative detected\n");
+          return NULL;
+        }
         // make [-expression] work like [-1 * expression]
-        line++;
         vals[stack] = -1.0f;
         ops[stack] = TIMES;
         stack++;
