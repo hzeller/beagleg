@@ -49,8 +49,9 @@ extern const char *viridis_colors[];
 extern const char *measureLinePS;
 }
 
-// Simple gcode visualizer
-
+// Simple gcode visualizer. Takes the gcode and shows its range.
+// Takes two passes: first determines the bounding box to show axes, second
+// draws within these.
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
   GCodePrintVisualizer(FILE *file) : file_(file), segment_count_(0), pass_(1),
@@ -136,7 +137,7 @@ public:
     // Font-size dependent on overall drawing size.
     fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
             std::max(1.0f, 0.015f * GetDiagonalLength()));
-    fprintf(file_, "%% Dotted box around item\n");
+    fprintf(file_, "\n%% -- Dotted box around item\n");
     fprintf(file_, "%f %f moveto "
             "%f %f lineto stroke %% width\n",
             min_[AXIS_X], max_[AXIS_Y] + margin,
@@ -209,6 +210,11 @@ private:
   bool prefer_inch_display_;
 };
 
+// Taking the low-level motor operations and visualize them. Uses color
+// to visualize speed. Needs two passes - first pass determines available
+// speed range, second outputs PostScript with colored segments.
+// This also helps do determine if things line up properly with what the gcode
+// parser spits out.
 class MotorOperationsPrinter : public MotorOperations {
 public:
   MotorOperationsPrinter(FILE *file, const MachineControlConfig &config,
@@ -349,13 +355,13 @@ public:
     if (min_color_range_ == max_color_range_)
       return;
     const float barheight = std::min(8.0, 0.05 * width);
-    const float fontsize = barheight / 2;
-    fprintf(file_, "%% Color range visualization\n");
-    fprintf(file_, "gsave /Helvetica findfont %f scalefont setfont\n",
+    const float fontsize = barheight * 0.75;
+    fprintf(file_, "\n%% Color range visualization\n");
+    fprintf(file_, "gsave /Helvetica findfont %.1f scalefont setfont\n",
             fontsize);
     fprintf(file_, "0 setgray 0.1 setlinewidth\n");
-    fprintf(file_, "%f %f moveto (mm/s) show\n", x+width + 1, y-fontsize/2);
-    fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+    fprintf(file_, "%.1f %.1f moveto (mm/s) show\n", x+width + 1, y-fontsize/2);
+    fprintf(file_, "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto"
             "(<=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
             x, y, barheight, min_color_range_);
 
@@ -363,22 +369,34 @@ public:
     for (int i = 1; i < kLegendPartitions; ++i) {
       float val = i * (max_color_range_-min_color_range_)/kLegendPartitions;
       float pos = i * width/kLegendPartitions;
-      fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+      fprintf(file_, "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto"
               "(%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
               x + pos, y, barheight, min_color_range_ + val);
     }
-    fprintf(file_, "%f %f moveto 0 %f rlineto 0 0.5 rmoveto"
+    fprintf(file_, "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto"
             "(>=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
             x+width, y, barheight, max_color_range_);
 
+    fprintf(file_, "\n%% -- paint gradient\n");
     const float step = width/256;
-    fprintf(file_, "%f setlinewidth %f %f moveto\n", barheight, x, y);
+    fprintf(file_, "%.1f setlinewidth %.1f %.1f moveto\n", barheight, x, y);
     for (int i = 0; i < 256; ++i) {
       // little overlap of 0.1, seems that the postscript interpreter otherwise
       // might leave little gaps.
       fprintf(file_, "%s setrgbcolor %f 0.1 add 0 rlineto currentpoint stroke moveto -0.1 0 rmoveto\n",
               viridis_colors[i], step);
     }
+    fprintf(file_, "0 0 0 setrgbcolor  %% Done with gradient\n");
+
+    // Show min/max range.
+    fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
+            fontsize * 0.75);
+    fprintf(file_, "%.1f %.1f moveto (max %.1f mm/s) dup "
+            "stringwidth pop neg 0 rmoveto show\n",
+            x+width + 1, y-barheight, max_v_);
+    fprintf(file_, "%.1f %.1f moveto (min %.1f mm/s) show\n",
+            x, y-barheight, min_v_);
+
     fprintf(file_, "grestore\n");
   }
 
