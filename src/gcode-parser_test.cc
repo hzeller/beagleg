@@ -624,7 +624,6 @@ TEST(GCodeParserTest, NegativeNumbers) {
   EXPECT_TRUE(counter.TestParseLine("#1=[sin[90] * -1]"));
   EXPECT_EQ(-1, counter.get_parameter(1));
 
-  // however, this does not work yet
   EXPECT_TRUE(counter.TestParseLine("#1=[-sin[90]]"));
   EXPECT_EQ(-1, counter.get_parameter(1));
 }
