@@ -82,6 +82,11 @@ all : $(TARGETS)
 gcode2ps: gcode2ps.o $(GCODE_OBJECTS)
 	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
 
+test-html: test-out/test.html
+
+test-out/test.html: gcode2ps test-create-html.sh testdata/*.gcode
+	./test-create-html.sh testdata/*.gcode
+
 test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done
 
