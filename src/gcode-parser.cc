@@ -1020,13 +1020,50 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
 
   int index = (int)value;
 
-  if (*line != '=') {
+  if (*line     == '+' &&
+      *(line+1) == '+') {
+    line = skip_white(line+2);
+    read_parameter(index, &value);
+    value++;
+    store_parameter(index, value);
+    gprintf(GLOG_EXPRESSION, "#%d++ -> #%d=%f\n", index, index, value);
+    return line;
+  }
+  if (*line     == '-' &&
+      *(line+1) == '-') {
+    line = skip_white(line+2);
+    read_parameter(index, &value);
+    value--;
+    store_parameter(index, value);
+    gprintf(GLOG_EXPRESSION, "#%d-- -> #%d=%f\n", index, index, value);
+    return line;
+  }
+
+  Operation op = NO_OPERATION;
+  if (*line     == '+' &&
+      *(line+1) == '=') {
+    line = skip_white(line+2);
+    op = PLUS;
+  } else if (*line     == '-' &&
+             *(line+1) == '=') {
+    line = skip_white(line+2);
+    op = MINUS;
+  } else if (*line     == '*' &&
+             *(line+1) == '=') {
+    line = skip_white(line+2);
+    op = TIMES;
+  } else if (*line     == '/' &&
+             *(line+1) == '=') {
+    line = skip_white(line+2);
+    op = DIVIDED_BY;
+  } else if (*line == '=') {
+    line = skip_white(line+1);
+  } else {
     gprintf(GLOG_SYNTAX_ERR,
             "gcodep_set_parameter: expected '=' after '#%d' got '%s'\n",
             index, line);
     return NULL;
   }
-  line = skip_white(line+1);
 
   endptr = gcodep_value(line, &value);
   if (endptr == NULL) {
@@ -1036,6 +1073,14 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
     return NULL;
   }
   line = skip_white(endptr);
+
+  if (op != NO_OPERATION) {
+    float left;
+    read_parameter(index, &left);
+    if (!execute_binary(&left, op, &value))
+      return NULL;
+    value = left;
+  }
 
   store_parameter(index, value);
 

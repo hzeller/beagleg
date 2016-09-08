@@ -679,14 +679,33 @@ TEST(GCodeParserTest, Conditional) {
   EXPECT_TRUE(counter.TestParseLine("IF [#1==1] THEN #2=1 ELSE"));
 }
 
+TEST(GCodeParserTest, AssignmentOperators) {
+  ParseTester counter;
+
+  EXPECT_TRUE(counter.TestParseLine("#1=10"));
+  EXPECT_EQ(10, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1++"));  // #1=[#1+1]
+  EXPECT_EQ(11, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1--"));  // #1=[#1-1]
+  EXPECT_EQ(10, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1+=5"));  // #1=[#1+5]
+  EXPECT_EQ(15, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1-=5"));  // #1=[#1-5]
+  EXPECT_EQ(10, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1*=2"));  // #1=[#1*2]
+  EXPECT_EQ(20, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#1/=2"));  // #1=[#1/2]
+  EXPECT_EQ(10, counter.get_parameter(1));
+}
+
 TEST(GCodeParserTest, WhileLoop) {
   ParseTester counter;
 
   EXPECT_TRUE(counter.TestParseLine("#1=0"));
   EXPECT_TRUE(counter.TestParseLine("#2=1"));
   EXPECT_TRUE(counter.TestParseLine("WHILE [#1 < 10] DO"));
-  EXPECT_TRUE(counter.TestParseLine("#2=[#2+#2]"));
-  EXPECT_TRUE(counter.TestParseLine("#1=[#1+1]"));
+  EXPECT_TRUE(counter.TestParseLine("#2 += #2"));
+  EXPECT_TRUE(counter.TestParseLine("#1++"));
   EXPECT_TRUE(counter.TestParseLine("END"));
   EXPECT_EQ(10, counter.get_parameter(1));
   EXPECT_EQ(1024, counter.get_parameter(2));

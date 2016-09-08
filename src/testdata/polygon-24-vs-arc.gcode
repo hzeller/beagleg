@@ -13,7 +13,7 @@ G1 F[150 * 60]
 #7=0        ; Loop counter
 WHILE [#7 <= #1] DO
       X[#4 * cos[#7 * #2 + #3]] Y[#4 * sin[#7 * #2 + #3]]
-      #7=[#7+1]
+      #7++
 END
 
 ; Now compare that to an inner 'regular' circle.
