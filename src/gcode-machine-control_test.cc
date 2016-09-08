@@ -112,6 +112,30 @@ class Harness {
   GCodeMachineControl *machine_control;
 };
 
+TEST(GCodeMachineControlTest, initial_feedrate_not_set) {
+  static const struct LinearSegmentSteps expected[] = {
+    { 0.0, 0.0, END_SENTINEL, {}},
+  };
+
+  // Move to pos 100, do not set the feedrate.
+  AxesRegister coordinates;
+  coordinates[AXIS_A] = 100;
+  {
+    Harness harness(expected);
+    EXPECT_FALSE(harness.gcode_emit()->coordinated_move(-1, coordinates));
+    // ... but after we have set the feedrate once
+    EXPECT_TRUE(harness.gcode_emit()->coordinated_move(42, coordinates));
+    // ... we remember it next time.
+    EXPECT_TRUE(harness.gcode_emit()->coordinated_move(-1, coordinates));
+  }
+
+  // G0 feedrate is always initialized derived from the configuration.
+  {
+    Harness harness(expected);
+    EXPECT_TRUE(harness.gcode_emit()->rapid_move(-1, coordinates));
+  }
+}
+
 // If we get two line segments that are straight and don't change speed, we
 // expect no slow-down.
 TEST(GCodeMachineControlTest, straight_segments_same_speed) {
