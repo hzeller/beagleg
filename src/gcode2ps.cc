@@ -267,6 +267,11 @@ public:
 
     switch (pass_) {
     case 1: {
+      // A very short diagnoal move, quantized to steps has a speed of sqrt(2);
+      // let's not include these in the min/max calculation.
+      if (abs(param.steps[AXIS_X]) == 1 && abs(param.steps[AXIS_Y]) == 1)
+        break;  // don't include super-short segments in the MinMax
+
       const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
       const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
       const float segment_len = hypotf(dx_mm, dy_mm);
