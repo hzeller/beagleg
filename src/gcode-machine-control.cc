@@ -195,7 +195,6 @@ bool GCodeMachineControl::Impl::Init() {
     }
   }
 
-  current_feedrate_mm_per_sec_ = cfg_.max_feedrate[AXIS_X] / 10;
   for (int i = 0; i < GCODE_NUM_AXES; ++i) {
     if (cfg_.max_feedrate[i] > g0_feedrate_mm_per_sec_) {
       g0_feedrate_mm_per_sec_ = cfg_.max_feedrate[i];
@@ -608,6 +607,11 @@ bool GCodeMachineControl::Impl::coordinated_move(float feed,
   if (feed > 0) {
     current_feedrate_mm_per_sec_ = cfg_.speed_factor * feed;
   }
+  if (current_feedrate_mm_per_sec_ <= 0) {
+    mprintf("// Error: Set a valid feedrate.\n");
+    return false;
+  }
+
   float feedrate = prog_speed_factor_ * current_feedrate_mm_per_sec_;
   planner_->Enqueue(axis, feedrate);
   return true;
