@@ -1080,6 +1080,42 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
     if (!execute_binary(&left, op, &value))
       return NULL;
     value = left;
+  } else {
+    // see if this is a ternary operation '? :'
+    if (*line == '?') {
+      bool condition = (value != 0.0f);
+      line = skip_white(line+1);
+
+      endptr = gcodep_value(line, &value);
+      if (endptr == NULL) {
+        gprintf(GLOG_SYNTAX_ERR,
+                "gcodep_set_parameter: expected value after '#%d=[%d] ? ' got '%s'\n",
+                index, line, condition);
+        return NULL;
+      }
+      line = skip_white(endptr);
+      float true_value = value;
+
+      if (*line == ':') {
+        line = skip_white(line+1);
+        endptr = gcodep_value(line, &value);
+        if (endptr == NULL) {
+          gprintf(GLOG_SYNTAX_ERR,
+                  "gcodep_set_parameter: expected value after '#%d=[%d] ? %f :' got '%s'\n",
+                  index, line, condition, true_value);
+          return NULL;
+        }
+        line = skip_white(endptr);
+
+        if (condition)
+          value = true_value;
+      } else {
+        gprintf(GLOG_SYNTAX_ERR,
+                "gcodep_set_parameter: expected ':' after '#%d=[%d] ? %f' got '%s'\n",
+                index, line, condition, true_value);
+        return NULL;
+      }
+    }
   }
 
   store_parameter(index, value);

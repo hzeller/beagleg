@@ -698,6 +698,29 @@ TEST(GCodeParserTest, AssignmentOperators) {
   EXPECT_EQ(10, counter.get_parameter(1));
 }
 
+TEST(GCodeParserTest, TernaryOperation) {
+  ParseTester counter;
+
+  EXPECT_TRUE(counter.TestParseLine("#1=0"));
+  EXPECT_TRUE(counter.TestParseLine("#2=[#1<=0] ? -1 : 1"));
+  EXPECT_EQ(-1, counter.get_parameter(2));
+  EXPECT_TRUE(counter.TestParseLine("#2=[#1>0] ? -1 : 1"));
+  EXPECT_EQ(1, counter.get_parameter(2));
+
+  EXPECT_TRUE(counter.TestParseLine("#1=10"));
+  EXPECT_TRUE(counter.TestParseLine("#2=10"));
+  EXPECT_TRUE(counter.TestParseLine("#3=[[#1>0] AND [#2>0]] ? 1 : 0"));
+  EXPECT_EQ(1, counter.get_parameter(3));
+
+  EXPECT_TRUE(counter.TestParseLine("#1=10"));
+  EXPECT_TRUE(counter.TestParseLine("#2=-10"));
+  EXPECT_TRUE(counter.TestParseLine("#3=[[#1>0] AND [#2>0]] ? [#1*#2] : 0"));
+  EXPECT_EQ(0, counter.get_parameter(3));
+  EXPECT_TRUE(counter.TestParseLine("#2=10"));
+  EXPECT_TRUE(counter.TestParseLine("#3=[[#1>0] AND [#2>0]] ? [#1*#2] : 0"));
+  EXPECT_EQ(100, counter.get_parameter(3));
+}
+
 TEST(GCodeParserTest, WhileLoop) {
   ParseTester counter;
 
