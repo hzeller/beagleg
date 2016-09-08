@@ -121,6 +121,8 @@ private:
     last_spline_cp2_ = kZeroOffset;
     have_first_spline_ = false;
 
+    do_while_ = false;
+
     // Some initial machine states emitted as events.
     callbacks->set_speed_factor(1.0);
     callbacks->set_fanspeed(0);
@@ -234,6 +236,10 @@ private:
 
   void gcodep_conditional(const char *line);
 
+  void gcodep_while_end();
+  void gcodep_while_do(const char *line);
+  void gcodep_while_start(const char *line);
+
   const char *gparse_pair(const char *line, char *letter, float *value) {
     return gcodep_parse_pair_with_linenumber(line_number_, line,
                                              letter, value, err_msg_);
@@ -345,6 +351,12 @@ private:
   AxesRegister last_spline_cp2_;
   bool have_first_spline_;
 
+  GCodeParser *while_owner_;
+  FILE *while_err_stream_;
+  bool do_while_;
+  std::string while_condition_;
+  std::string while_loop_;
+
   unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
   bool allow_m111_;
 
@@ -373,6 +385,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     home_position_(config.machine_origin),
     current_origin_(&home_position_), current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
+    while_err_stream_(NULL), do_while_(false),
     debug_level_(DEBUG_NONE), allow_m111_(allow_m111), error_count_(0)
 {
   assert(callbacks);  // otherwise, this is not very useful.
@@ -1102,6 +1115,63 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
   }
 }
 
+void GCodeParser::Impl::gcodep_while_end() {
+    int loops = 0;
+    while (1) {
+      const char *line = while_condition_.c_str();
+      const char *endptr;
+      float value;
+      // the '[' was already parsed
+      endptr = gcodep_expression(line, &value);
+      if (endptr == NULL) {
+        gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
+        return;
+      }
+      if (value == 0.0f)
+        break;
+
+      line = skip_white(endptr);
+      if (toupper(*line)     == 'D' &&
+          toupper(*(line+1)) == 'O') {
+        std::vector<StringPiece> piece = SplitString(while_loop_.c_str(), "\n");
+        for (size_t i=0; i < piece.size(); i++)
+          ParseLine(while_owner_, piece[i].ToString().c_str(), while_err_stream_);
+      } else {
+        gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
+        return;
+      }
+      loops++;
+    }
+    gprintf(GLOG_INFO, "Executed %d loops\n", loops);
+}
+
+void GCodeParser::Impl::gcodep_while_do(const char *line) {
+  if (toupper(*line)     == 'E' &&
+      toupper(*(line+1)) == 'N' &&
+      toupper(*(line+2)) == 'D') {
+    do_while_ = false;
+    gcodep_while_end();
+    return;
+  }
+
+  while_loop_ += line;
+}
+
+// WHILE [conditionalexpression is true] DO
+// ...
+// END
+void GCodeParser::Impl::gcodep_while_start(const char *line) {
+  if (*line != '[') {
+    gprintf(GLOG_SYNTAX_ERR, "expected '[' after WHILE got '%s'\n", line);
+    return;
+  }
+  line = skip_white(line+1);
+
+  while_condition_ = line;
+  while_loop_ = "";
+  do_while_= true;
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
@@ -1117,6 +1187,11 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
   if (*line == '\0' || *line == ';' || *line == '%')
     return NULL;
 
+  if (do_while_) {
+    gcodep_while_do(line);
+    return NULL;
+  }
+
   if (*line == '(') {  // Comment between words; e.g. G0(move) X1(this axis)
     while (*line && *line != ')')
       line++;
@@ -1128,6 +1203,16 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
       toupper(*(line+1)) == 'F') {
     line = skip_white(line+2);
     gcodep_conditional(line);
+    return NULL;
+  }
+
+  if (toupper(*line)     == 'W' &&
+      toupper(*(line+1)) == 'H' &&
+      toupper(*(line+2)) == 'I' &&
+      toupper(*(line+3)) == 'L' &&
+      toupper(*(line+4)) == 'E') {
+    line = skip_white(line+5);
+    gcodep_while_start(line);
     return NULL;
   }
 
@@ -1870,6 +1955,9 @@ int GCodeParser::Impl::ParseStream(GCodeParser *owner,
   wait_time.tv_sec = 0;
   wait_time.tv_usec = 50 * 1000;
   FD_ZERO(&read_fds);
+
+  while_owner_ = owner;
+  while_err_stream_ = err_stream;
 
   arm_signal_handler();
   char buffer[8192];
