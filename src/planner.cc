@@ -170,6 +170,12 @@ static bool subtract_steps(struct LinearSegmentSteps *value,
   return has_nonzero;
 }
 
+static bool within_acceptable_range(float new_val, float old_val, float fraction) {
+  const float max_diff = fraction * old_val;
+  if (new_val < old_val - max_diff) return false;
+  if (new_val > old_val + max_diff) return false;
+  return true;
+}
 
 // Determine the fraction of the speed that "from" should decelerate
 // to at the end of its travel.
@@ -187,10 +193,19 @@ static float determine_joining_speed(const struct AxisTarget *from,
 
   // the angle between the vectors
   const float rad2deg = 180.0 / M_PI;
-  const float angle = acosf(dot / mag) * rad2deg;
+  const float angle = fabsf(acosf(dot / mag) * rad2deg);
 
+  if (angle <= threshold)
+    return to->speed;               // in tolerance, keep accelerating
+  if (angle >= 45.0f)
+    return 0.0f;                    // angle to large, come to full stop
+
+  // The angle between the from and to segments is < 45 degrees but greater
+  // than the threshold. Use the "old" logic to determine the joining speed
+  //
   // Our goal is to figure out what our from defining speed should
   // be at the end of the move.
+  bool is_first = true;
   float from_defining_speed = from->speed;
   const int from_defining_steps = from->delta_steps[from->defining_axis];
   for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
@@ -199,20 +214,22 @@ static float determine_joining_speed(const struct AxisTarget *from,
     const int to_delta = to->delta_steps[axis];
 
     // Quick integer decisions
-    if (from_delta == 0 && to_delta == 0) continue; // uninteresting: no move.
-    if (angle > threshold) {
-      if (from_delta == 0 || to_delta == 0) return 0.0f;  // accel from/to zero, full stop
-      if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
-        return 0.0f;  // turing around, full stop
-    } else {
-      if (to_delta == 0) continue;                  // no adjustment necessary
-    }
+    if (from_delta == 0 && to_delta == 0) continue;   // uninteresting: no move.
+    if (from_delta == 0 || to_delta == 0) return 0.0f; // accel from/to zero
+    if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
+      return 0.0f;  // turing around
 
-    const float to_speed = get_speed_for_axis(to, axis);
+    float to_speed = get_speed_for_axis(to, axis);
     // What would this speed translated to our defining axis be ?
-    const float speed_conversion = 1.0f * from_defining_steps / from_delta;
-    const float goal = fabsf(to_speed * speed_conversion);
-    if (goal < from_defining_speed) from_defining_speed = goal;
+    float speed_conversion = 1.0f * from_defining_steps / from_delta;
+    float goal = to_speed * speed_conversion;
+    if (goal < 0.0f) return 0.0f;
+    if (is_first || within_acceptable_range(goal, from_defining_speed, 1e-5)) {
+      if (goal < from_defining_speed) from_defining_speed = goal;
+      is_first = false;
+    } else {
+      return 0.0f;  // Too far off.
+    }
   }
 
   return from_defining_speed;
@@ -339,6 +356,9 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   // go over).
   float next_speed = determine_joining_speed(target_pos, upcoming,
                                              cfg_->threshold_angle);
+  // Clamp the next speed to insure that this segment does not go over.
+  if (next_speed > target_pos->speed)
+    next_speed = target_pos->speed;
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
@@ -387,7 +407,7 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
 
   assert(accel_fraction + decel_fraction <= 1.0 + 1e-3);
 
-#if 1
+#if 0
   // fudging: if we have tiny acceleration segments, don't do these at all
   // but only do speed; otherwise we have a lot of rattling due to many little
   // segments of acceleration/deceleration (e.g. for G2/G3).
