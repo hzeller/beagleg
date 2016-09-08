@@ -164,9 +164,10 @@ private:
     NO_OPERATION = 0,
 
     // binary operations
-    POWER,                                              // precedence 4
-    DIVIDED_BY, MODULO, TIMES,                          // precedence 3
-    AND2, EXCLUSIVE_OR, MINUS, NON_EXCLUSIVE_OR, PLUS,  // precedence 2
+    POWER,                                              // precedence 5
+    DIVIDED_BY, MODULO, TIMES,                          // precedence 4
+    AND2, EXCLUSIVE_OR, MINUS, NON_EXCLUSIVE_OR, PLUS,  // precedence 3
+    EQ, NE, GT, GE, LT, LE,                             // precedence 2
     RIGHT_BRACKET,                                      // precedence 1
 
     // unary operations
@@ -186,6 +187,12 @@ private:
     case MINUS:             return "-";
     case NON_EXCLUSIVE_OR:  return "OR";
     case PLUS:              return "+";
+    case EQ:                return "==";
+    case NE:                return "!=";
+    case GT:                return ">";
+    case GE:                return ">=";
+    case LT:                return "<";
+    case LE:                return "<=";
     case RIGHT_BRACKET:     return "]";
     case ABS:               return "ABS";
     case ACOS:              return "ACOS";
@@ -205,9 +212,10 @@ private:
 
   int precedence(Operation op) {
     if (op == RIGHT_BRACKET) return 1;
-    if (op == POWER) return 4;
-    if (op >= AND2) return 2;
-    return 3;
+    if (op == POWER) return 5;
+    if (op >= EQ) return 2;
+    if (op >= AND2) return 3;
+    return 4;
   }
 
   bool execute_unary(float *value, Operation op);
@@ -223,6 +231,8 @@ private:
   const char *gcodep_value(const char *line, float *value);
 
   const char *gcodep_set_parameter(const char *line);
+
+  void gcodep_conditional(const char *line);
 
   const char *gparse_pair(const char *line, char *letter, float *value) {
     return gcodep_parse_pair_with_linenumber(line_number_, line,
@@ -736,6 +746,24 @@ bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) 
   case PLUS:
     val = *left + *right;
     break;
+  case EQ:
+    val = (*left == *right) ? 1.0f : 0.0f;
+    break;
+  case NE:
+    val = (*left != *right) ? 1.0f : 0.0f;
+    break;
+  case GT:
+    val = (*left > *right) ? 1.0f : 0.0f;
+    break;
+  case GE:
+    val = (*left >= *right) ? 1.0f : 0.0f;
+    break;
+  case LT:
+    val = (*left < *right) ? 1.0f : 0.0f;
+    break;
+  case LE:
+    val = (*left <= *right) ? 1.0f : 0.0f;
+    break;
   default:
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown binary operation\n");
     return false;
@@ -768,6 +796,34 @@ const char *GCodeParser::Impl::gcodep_operation(const char *line,
       *op = TIMES;
     }
     break;
+  case '=':
+    if (*line == '=') {
+      line++;
+      *op = EQ;
+    }
+    break;
+  case '!':
+    if (*line == '=') {
+      line++;
+      *op = NE;
+    }
+    break;
+  case '>':
+    if (*line == '=') {
+      line++;
+      *op = GE;
+    } else {
+      *op = GT;
+    }
+    break;
+  case '<':
+    if (*line == '=') {
+      line++;
+      *op = LE;
+    } else {
+      *op = LT;
+    }
+    break;
   case ']':
     *op = RIGHT_BRACKET;
     break;
@@ -778,11 +834,41 @@ const char *GCodeParser::Impl::gcodep_operation(const char *line,
       *op = AND2;
     }
     break;
+  case 'E':
+    if (toupper(*line) == 'Q') {
+      line++;
+      *op = EQ;
+    }
+    break;
+  case 'G':
+    if (toupper(*line) == 'E') {
+      line++;
+      *op = GE;
+    } else if (toupper(*line) == 'T') {
+      line++;
+      *op = GT;
+    }
+    break;
+  case 'L':
+    if (toupper(*line) == 'E') {
+      line++;
+      *op = LE;
+    } else if (toupper(*line) == 'T') {
+      line++;
+      *op = LT;
+    }
+    break;
   case 'M':
     if (toupper(*line)     == 'O' &&
         toupper(*(line+1)) == 'D') {
       line += 2;
       *op = MODULO;
+    }
+    break;
+  case 'N':
+    if (toupper(*line) == 'E') {
+      line++;
+      *op = NE;
     }
     break;
   case 'O':
@@ -807,7 +893,7 @@ const char *GCodeParser::Impl::gcodep_operation(const char *line,
 }
 
 // the expression stack needs to be at least one greater than the max precedence
-#define MAX_STACK   5
+#define MAX_STACK   6
 
 const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value) {
   float vals[MAX_STACK];
@@ -945,6 +1031,77 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   return line;
 }
 
+void GCodeParser::Impl::gcodep_conditional(const char *line) {
+  if (*line != '[') {
+    gprintf(GLOG_SYNTAX_ERR, "expected '[' after IF got '%s'\n", line);
+    return;
+  }
+
+  float value = 0.0f;
+  const char *endptr;
+  endptr = gcodep_expression(line + 1, &value);
+  if (line == endptr || endptr == NULL)
+    return;
+
+  bool condition = (value == 1.0f) ? true : false;
+
+  line = skip_white(endptr);
+
+  if (toupper(*line)     == 'T' &&
+      toupper(*(line+1)) == 'H' &&
+      toupper(*(line+2)) == 'E' &&
+      toupper(*(line+3)) == 'N') {
+    line = skip_white(line+4);
+  } else {
+    gprintf(GLOG_SEMANTIC_ERR, "unsupported IF [...] %s\n", line);
+    return;
+  }
+
+  if (condition == true) {
+    // parse the true condition
+    if (*line == '#') {
+      line++;
+      endptr = gcodep_set_parameter(line);
+    } else {
+      gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN got '%s'\n", line);
+      return;
+    }
+  } else {
+    bool have_else = false;
+    // see if there is an ELSE
+    while (*line != '\0') {
+      if (toupper(*line)     == 'E' &&
+          toupper(*(line+1)) == 'L' &&
+          toupper(*(line+2)) == 'S' &&
+          toupper(*(line+3)) == 'E') {
+        line = skip_white(line+4);
+        have_else = true;
+        break;
+      } else {
+        line++;
+      }
+    }
+    if (have_else) {
+      // ELSEIF
+      if (toupper(*line)     == 'I' &&
+          toupper(*(line+1)) == 'F') {
+        line = skip_white(line+2);
+        gcodep_conditional(line);
+        return;
+      }
+
+      // parse the false condition
+      if (*line == '#') {
+        line++;
+        endptr = gcodep_set_parameter(line);
+      } else {
+        gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN ... ELSE got '%s'\n", line);
+        return;
+      }
+    }
+  }
+}
+
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
@@ -965,6 +1122,13 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
       line++;
     line = skip_white(line + 1);
     if (*line == '\0') return NULL;
+  }
+
+  if (toupper(*line)     == 'I' &&
+      toupper(*(line+1)) == 'F') {
+    line = skip_white(line+2);
+    gcodep_conditional(line);
+    return NULL;
   }
 
   const char *endptr;

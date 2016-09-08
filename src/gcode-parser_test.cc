@@ -629,6 +629,56 @@ TEST(GCodeParserTest, NegativeNumbers) {
   EXPECT_EQ(-1, counter.get_parameter(1));
 }
 
+TEST(GCodeParserTest, Conditional) {
+  ParseTester counter;
+
+  // Test IF/THEN
+  EXPECT_TRUE(counter.TestParseLine("#1=1"));
+  EXPECT_TRUE(counter.TestParseLine("#2=100"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 LE 0] THEN #2=1"));
+  EXPECT_EQ(1, counter.get_parameter(1));
+  EXPECT_EQ(100, counter.get_parameter(2));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 GE 0] THEN #2=1"));
+  EXPECT_EQ(1, counter.get_parameter(2));
+
+  // Test IF/THEN/ELSE
+  EXPECT_TRUE(counter.TestParseLine("#1=-1"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 < 0] THEN #2=1 ELSE #2=0"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 == 0] THEN #3=1 ELSE #3=0"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 > 0] THEN #4=1 ELSE #4=0"));
+  EXPECT_EQ(-1, counter.get_parameter(1));
+  EXPECT_EQ(1, counter.get_parameter(2));
+  EXPECT_EQ(0, counter.get_parameter(3));
+  EXPECT_EQ(0, counter.get_parameter(4));
+
+  // Test IF/THEN/ELSEIF/THEN/ELSE
+  EXPECT_TRUE(counter.TestParseLine("#1=-100"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_EQ(-1, counter.get_parameter(2));
+  EXPECT_TRUE(counter.TestParseLine("#1=0"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_EQ(0, counter.get_parameter(2));
+  EXPECT_TRUE(counter.TestParseLine("#1=100"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_EQ(1, counter.get_parameter(2));
+
+  // Test error conditions
+  EXPECT_TRUE(counter.TestParseLine("#1=1"));
+  EXPECT_FALSE(counter.TestParseLine("IF"));                        // expected '[' after IF got ''
+  EXPECT_FALSE(counter.TestParseLine("IF [#1=1]"));                 // unknown operator '=0]'
+  EXPECT_FALSE(counter.TestParseLine("IF [#1==1]"));                // unsupported IF [...]
+  EXPECT_FALSE(counter.TestParseLine("IF [#1==1] THEN"));           // expected '#' after IF [...] THEN got ''
+  EXPECT_FALSE(counter.TestParseLine("IF [#1==0] THEN #2=1 ELSE")); // expected '#' after IF [...] THEN ... ELSE got ''
+
+  // SIDE-CASES - these are not syntaxed correctly but will not error
+
+  // this will pass because the conditional is false and there is no ELSE
+  EXPECT_TRUE(counter.TestParseLine("IF [#1==0] THEN"));
+
+  // this will pass because the conditional is true and the ELSE is not parsed
+  EXPECT_TRUE(counter.TestParseLine("IF [#1==1] THEN #2=1 ELSE"));
+}
+
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
