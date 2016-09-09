@@ -59,13 +59,13 @@ PRU_BIN=motor-interface-pru_bin.h
 GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o \
 	      string-util.o machine-control-config.o hardware-mapping.o \
-	      spindle-control.o planner.o
+	      spindle-control.o planner.o simple-lexer.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
-UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test arc-gen_test planner_test
+UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test arc-gen_test planner_test simple-lexer_test
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
 

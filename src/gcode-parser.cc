@@ -42,6 +42,7 @@
 #include "arc-gen.h"
 #include "logging.h"
 #include "string-util.h"
+#include "simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
@@ -166,6 +167,7 @@ private:
     NO_OPERATION = 0,
 
     // binary operations
+    BINARY_OP_START,
     POWER,                                              // precedence 5
     DIVIDED_BY, MODULO, TIMES,                          // precedence 4
     AND2, EXCLUSIVE_OR, MINUS, NON_EXCLUSIVE_OR, PLUS,  // precedence 3
@@ -173,6 +175,7 @@ private:
     RIGHT_BRACKET,                                      // precedence 1
 
     // unary operations
+    UNARY_OP_START,
     ABS, ACOS, ASIN, ATAN, COS, EXP, FIX, FUP, LN, ROUND, SIN, SQRT, TAN
   };
 
@@ -310,6 +313,15 @@ private:
   GCodeParser::EventReceiver *const callbacks;
   const GCodeParser::Config config;
 
+  SimpleLexer<Operation> op_parse_;
+
+  enum ControlKeyword {
+    NO_CONTROL_KEYWORD,
+    CK_IF, CK_THEN, CK_ELSE, CK_ELSEIF,
+    CK_WHILE, CK_DO, CK_END
+  };
+  SimpleLexer<ControlKeyword> control_parse_;
+
   bool program_in_progress_;
 
   FILE *err_msg_;
@@ -391,6 +403,41 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
   assert(callbacks);  // otherwise, this is not very useful.
   reset_G92();
   InitProgramDefaults();
+  op_parse_.AddKeyword("+",  PLUS);
+  op_parse_.AddKeyword("-",  MINUS);
+  op_parse_.AddKeyword("/",  DIVIDED_BY);
+  op_parse_.AddKeyword("MOD", MODULO); op_parse_.AddKeyword("%", MODULO);
+  op_parse_.AddKeyword("*",  TIMES);
+  op_parse_.AddKeyword("**", POWER);
+  op_parse_.AddKeyword("==", EQ); op_parse_.AddKeyword("EQ", EQ);
+  op_parse_.AddKeyword("!=", NE); op_parse_.AddKeyword("NE", NE);
+  op_parse_.AddKeyword(">",  GT); op_parse_.AddKeyword("GT", GT);
+  op_parse_.AddKeyword(">=", GE); op_parse_.AddKeyword("GE", GE);
+  op_parse_.AddKeyword("<",  LT); op_parse_.AddKeyword("LT", LT);
+  op_parse_.AddKeyword("<=", LE); op_parse_.AddKeyword("LE", LE);
+  op_parse_.AddKeyword("AND", AND2); op_parse_.AddKeyword("&&",  AND2);
+  op_parse_.AddKeyword("OR", NON_EXCLUSIVE_OR);
+  op_parse_.AddKeyword("||", NON_EXCLUSIVE_OR);
+  op_parse_.AddKeyword("XOR", EXCLUSIVE_OR);
+  op_parse_.AddKeyword("]",  RIGHT_BRACKET);
+
+  op_parse_.AddKeyword("abs",  ABS);
+  op_parse_.AddKeyword("tan",  TAN); op_parse_.AddKeyword("atan", ATAN);
+  op_parse_.AddKeyword("sin",  SIN); op_parse_.AddKeyword("asin", ASIN);
+  op_parse_.AddKeyword("cos",  COS); op_parse_.AddKeyword("acos", ACOS);
+  op_parse_.AddKeyword("exp",  EXP); op_parse_.AddKeyword("ln",   LN);
+  op_parse_.AddKeyword("fix",  FIX);
+  op_parse_.AddKeyword("fup",  FUP);
+  op_parse_.AddKeyword("round", ROUND);
+  op_parse_.AddKeyword("sqrt", SQRT);
+
+  control_parse_.AddKeyword("if",     CK_IF);
+  control_parse_.AddKeyword("then",   CK_THEN);
+  control_parse_.AddKeyword("else",   CK_ELSE);
+  control_parse_.AddKeyword("elseif", CK_ELSEIF);
+  control_parse_.AddKeyword("while",  CK_WHILE);
+  control_parse_.AddKeyword("do",     CK_DO);
+  control_parse_.AddKeyword("end",    CK_END);
 }
 
 GCodeParser::Impl::~Impl() {
@@ -582,96 +629,13 @@ const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
 
 const char *GCodeParser::Impl::gcodep_operation_unary(const char *line,
                                                       Operation *op) {
-  const char c = toupper(*line);
-  line++;
-  switch (c) {
-  case 'A':
-    if (toupper(*line)     == 'B' &&
-        toupper(*(line+1)) == 'S') {
-      line += 2;
-      *op = ABS;
-    } else if (toupper(*line)     == 'C' &&
-               toupper(*(line+1)) == 'O' &&
-               toupper(*(line+2)) == 'S') {
-      line += 3;
-      *op = ACOS;
-    } else if (toupper(*line)     == 'S' &&
-               toupper(*(line+1)) == 'I' &&
-               toupper(*(line+2)) == 'N') {
-      line += 3;
-      *op = ASIN;
-    } else if (toupper(*line)     == 'T' &&
-               toupper(*(line+1)) == 'A' &&
-               toupper(*(line+2)) == 'N') {
-      line += 3;
-      *op = ATAN;
-    }
-    break;
-  case 'C':
-    if (toupper(*line)     == 'O' &&
-        toupper(*(line+1)) == 'S') {
-      line += 2;
-      *op = COS;
-    }
-    break;
-  case 'E':
-    if (toupper(*line)     == 'X' &&
-        toupper(*(line+1)) == 'P') {
-      line += 2;
-      *op = EXP;
-    }
-    break;
-  case 'F':
-    if (toupper(*line)     == 'I' &&
-        toupper(*(line+1)) == 'X') {
-      line += 2;
-      *op = FIX;
-    } else if (toupper(*line)     == 'U' &&
-               toupper(*(line+1)) == 'P') {
-      line += 2;
-      *op = FUP;
-    }
-    break;
-  case 'L':
-    if (toupper(*line) == 'N') {
-      line++;
-      *op = LN;
-    }
-    break;
-  case 'R':
-    if (toupper(*line)     == 'O' &&
-        toupper(*(line+1)) == 'U' &&
-        toupper(*(line+2)) == 'N' &&
-        toupper(*(line+3)) == 'D') {
-      line += 4;
-      *op = ROUND;
-    }
-    break;
-  case 'S':
-    if (toupper(*line)   == 'I' &&
-        toupper(*(line+1)) == 'N') {
-      line += 2;
-      *op = SIN;
-    } else if (toupper(*line)     == 'Q' &&
-               toupper(*(line+1)) == 'R' &&
-               toupper(*(line+2)) == 'T') {
-      line += 3;
-      *op = SQRT;
-    }
-    break;
-  case 'T':
-    if (toupper(*line)     == 'A' &&
-        toupper(*(line+1)) == 'N') {
-      line += 2;
-      *op = TAN;
-    }
-    break;
-  default:
+  *op = op_parse_.MatchNext(&line);
+  if (*op > UNARY_OP_START) {
+    return line;
+  } else {
     *op = NO_OPERATION;
-    break;
+    return NULL;
   }
-
-  return (*op == NO_OPERATION) ? NULL : line;
 }
 
 const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
@@ -789,120 +753,13 @@ bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) 
 
 const char *GCodeParser::Impl::gcodep_operation(const char *line,
                                                 Operation *op) {
-  char c = toupper(*line);
-  line++;
-  switch (c) {
-  case '+':
-    *op = PLUS;
-    break;
-  case '-':
-    *op = MINUS;
-    break;
-  case '/':
-    *op = DIVIDED_BY;
-    break;
-  case '*':
-    if (*line == '*') {
-      line++;
-      *op = POWER;
-    } else {
-      *op = TIMES;
-    }
-    break;
-  case '=':
-    if (*line == '=') {
-      line++;
-      *op = EQ;
-    }
-    break;
-  case '!':
-    if (*line == '=') {
-      line++;
-      *op = NE;
-    }
-    break;
-  case '>':
-    if (*line == '=') {
-      line++;
-      *op = GE;
-    } else {
-      *op = GT;
-    }
-    break;
-  case '<':
-    if (*line == '=') {
-      line++;
-      *op = LE;
-    } else {
-      *op = LT;
-    }
-    break;
-  case ']':
-    *op = RIGHT_BRACKET;
-    break;
-  case 'A':
-    if (toupper(*line)     == 'N' &&
-        toupper(*(line+1)) == 'D') {
-      line += 2;
-      *op = AND2;
-    }
-    break;
-  case 'E':
-    if (toupper(*line) == 'Q') {
-      line++;
-      *op = EQ;
-    }
-    break;
-  case 'G':
-    if (toupper(*line) == 'E') {
-      line++;
-      *op = GE;
-    } else if (toupper(*line) == 'T') {
-      line++;
-      *op = GT;
-    }
-    break;
-  case 'L':
-    if (toupper(*line) == 'E') {
-      line++;
-      *op = LE;
-    } else if (toupper(*line) == 'T') {
-      line++;
-      *op = LT;
-    }
-    break;
-  case 'M':
-    if (toupper(*line)     == 'O' &&
-        toupper(*(line+1)) == 'D') {
-      line += 2;
-      *op = MODULO;
-    }
-    break;
-  case 'N':
-    if (toupper(*line) == 'E') {
-      line++;
-      *op = NE;
-    }
-    break;
-  case 'O':
-    if (toupper(*line) == 'R') {
-      line++;
-      *op = NON_EXCLUSIVE_OR;
-    }
-    break;
-  case 'X':
-    if (toupper(*line)     == 'O' &&
-        toupper(*(line+1)) == 'R') {
-      line += 2;
-      *op = EXCLUSIVE_OR;
-    }
-    break;
-  default:
+  *op = op_parse_.MatchNext(&line);
+  if (*op > NO_OPERATION && *op < UNARY_OP_START) {
+    return line;
+  } else {
     *op = NO_OPERATION;
-    break;
+    return NULL;
   }
-
-  return (*op == NO_OPERATION) ? NULL : line;
 }
 
 // the expression stack needs to be at least one greater than the max precedence
@@ -1137,32 +994,28 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
   if (line == endptr || endptr == NULL)
     return;
 
-  bool condition = (value == 1.0f) ? true : false;
+  const bool condition = (value == 1.0f) ? true : false;
 
   line = skip_white(endptr);
-
-  if (toupper(*line)     == 'T' &&
-      toupper(*(line+1)) == 'H' &&
-      toupper(*(line+2)) == 'E' &&
-      toupper(*(line+3)) == 'N') {
-    line = skip_white(line+4);
-  } else {
-    gprintf(GLOG_SEMANTIC_ERR, "unsupported IF [...] %s\n", line);
+  if (!control_parse_.ExpectNext(&line, CK_THEN)) {
+    gprintf(GLOG_SEMANTIC_ERR, "unsupported IF [...] %s (expected 'then')\n",
+            line);
     return;
   }
 
+  line = skip_white(line);
   if (condition == true) {
     // parse the true condition
     if (*line == '#') {
-      line++;
-      endptr = gcodep_set_parameter(line);
+      gcodep_set_parameter(++line);
     } else {
-      gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN got '%s'\n", line);
-      return;
+      gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN got '%s'\n",
+              line);
     }
   } else {
     bool have_else = false;
     // see if there is an ELSE
+    // (TODO: make these with control_parser_)
     while (*line != '\0') {
       if (toupper(*line)     == 'E' &&
           toupper(*(line+1)) == 'L' &&
@@ -1186,10 +1039,10 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
 
       // parse the false condition
       if (*line == '#') {
-        line++;
-        endptr = gcodep_set_parameter(line);
+        gcodep_set_parameter(++line);  // TODO: error handling ?
       } else {
-        gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN ... ELSE got '%s'\n", line);
+        gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN ... ELSE "
+                "got '%s'\n", line);
         return;
       }
     }
@@ -1212,9 +1065,8 @@ void GCodeParser::Impl::gcodep_while_end() {
         break;
 
       line = skip_white(endptr);
-      if (toupper(*line)     == 'D' &&
-          toupper(*(line+1)) == 'O') {
-        std::vector<StringPiece> piece = SplitString(while_loop_.c_str(), "\n");
+      if (control_parse_.ExpectNext(&line, CK_DO)) {
+        std::vector<StringPiece> piece = SplitString(while_loop_, "\n");
         for (size_t i=0; i < piece.size(); i++)
           ParseLine(while_owner_, piece[i].ToString().c_str(), while_err_stream_);
       } else {
@@ -1227,9 +1079,7 @@ void GCodeParser::Impl::gcodep_while_end() {
 }
 
 void GCodeParser::Impl::gcodep_while_do(const char *line) {
-  if (toupper(*line)     == 'E' &&
-      toupper(*(line+1)) == 'N' &&
-      toupper(*(line+2)) == 'D') {
+  if (control_parse_.ExpectNext(&line, CK_END)) {
     do_while_ = false;
     gcodep_while_end();
     return;
@@ -1280,20 +1130,13 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
     if (*line == '\0') return NULL;
   }
 
-  if (toupper(*line)     == 'I' &&
-      toupper(*(line+1)) == 'F') {
-    line = skip_white(line+2);
-    gcodep_conditional(line);
+  if (control_parse_.ExpectNext(&line, CK_IF)) {
+    gcodep_conditional(skip_white(line));
     return NULL;
   }
 
-  if (toupper(*line)     == 'W' &&
-      toupper(*(line+1)) == 'H' &&
-      toupper(*(line+2)) == 'I' &&
-      toupper(*(line+3)) == 'L' &&
-      toupper(*(line+4)) == 'E') {
-    line = skip_white(line+5);
-    gcodep_while_start(line);
+  if (control_parse_.ExpectNext(&line, CK_WHILE)) {
+    gcodep_while_start(skip_white(line));
     return NULL;
   }
 
