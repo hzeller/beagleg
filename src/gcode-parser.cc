@@ -370,7 +370,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
   op_parse_.AddKeyword("+",  PLUS);
   op_parse_.AddKeyword("-",  MINUS);
   op_parse_.AddKeyword("/",  DIVIDED_BY);
-  op_parse_.AddKeyword("MOD", MODULO); op_parse_.AddKeyword("%", MODULO);
+  op_parse_.AddKeyword("MOD", MODULO);
   op_parse_.AddKeyword("*",  TIMES);
   op_parse_.AddKeyword("**", POWER);
   op_parse_.AddKeyword("==", EQ); op_parse_.AddKeyword("EQ", EQ);
