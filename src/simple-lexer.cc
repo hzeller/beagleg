@@ -24,6 +24,12 @@
 #include <ctype.h>
 #include <string.h>
 
+static const char *skip_white(const char *line) {
+  while (*line && isspace(*line))
+    line++;
+  return line;
+}
+
 class SimpleLexerBase::Node {
 public:
   Node() : value(0) {
@@ -47,6 +53,17 @@ SimpleLexerBase::~SimpleLexerBase() {
 void SimpleLexerBase::AddKeywordIntValue(const char *keyword, int value) {
   assert(value > 0);
   AddKeywordAtNode(root_, keyword, value);
+  if (keyword_mappings_.find(value) == keyword_mappings_.end()) {
+    keyword_mappings_[value] = keyword;
+  }
+}
+
+const char *SimpleLexerBase::ReverseMapToString(int value) {
+  if (value == 0) return "?";
+  KeywordMap::const_iterator found = keyword_mappings_.find(value);
+  if (found == keyword_mappings_.end())
+    return NULL;
+  return found->second;
 }
 
 void SimpleLexerBase::AddKeywordAtNode(Node *node, const char *keyword,
@@ -55,6 +72,7 @@ void SimpleLexerBase::AddKeywordAtNode(Node *node, const char *keyword,
     assert(node->value == 0);  // otherwise, the same keyword is already there.
     node->value = value;
   } else {
+    assert(!isspace(*keyword));  // Keywords cannot have spaces.
     const int up = toupper(*keyword);
     if (node->next_character[up] == NULL) {
       node->next_character[up] = new Node();
@@ -67,9 +85,10 @@ void SimpleLexerBase::AddKeywordAtNode(Node *node, const char *keyword,
 int SimpleLexerBase::ConsumeKeyword(const char **input) {
   int result = 0;
   const char *word = *input;
+  word = skip_white(word);
   for (const Node *node = root_; node; ++word) {
     if (node->value > 0) {
-      *input = word;
+      *input = skip_white(word);
       result = node->value;
     }
     node = node->next_character[toupper(*word)];

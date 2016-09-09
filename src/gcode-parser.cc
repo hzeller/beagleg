@@ -179,42 +179,6 @@ private:
     ABS, ACOS, ASIN, ATAN, COS, EXP, FIX, FUP, LN, ROUND, SIN, SQRT, TAN
   };
 
-  const char *op_string(Operation op) {
-    switch (op) {
-    default:
-    case NO_OPERATION:      return "?";
-    case POWER:             return "**";
-    case DIVIDED_BY:        return "/";
-    case MODULO:            return "MOD";
-    case TIMES:             return "*";
-    case AND2:              return "AND";
-    case EXCLUSIVE_OR:      return "XOR";
-    case MINUS:             return "-";
-    case NON_EXCLUSIVE_OR:  return "OR";
-    case PLUS:              return "+";
-    case EQ:                return "==";
-    case NE:                return "!=";
-    case GT:                return ">";
-    case GE:                return ">=";
-    case LT:                return "<";
-    case LE:                return "<=";
-    case RIGHT_BRACKET:     return "]";
-    case ABS:               return "ABS";
-    case ACOS:              return "ACOS";
-    case ASIN:              return "ASIN";
-    case ATAN:              return "ATAN";
-    case COS:               return "COS";
-    case EXP:               return "EXP";
-    case FIX:               return "FIX";
-    case FUP:               return "FUP";
-    case LN:                return "LN";
-    case ROUND:             return "ROUND";
-    case SIN:               return "SIN";
-    case SQRT:              return "SQRT";
-    case TAN:               return "TAN";
-    }
-  }
-
   int precedence(Operation op) {
     if (op == RIGHT_BRACKET) return 1;
     if (op == POWER) return 5;
@@ -593,7 +557,8 @@ bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown unary operation\n");
     return false;
   }
-  gprintf(GLOG_EXPRESSION, "%s[%f] -> %f\n", op_string(op), *value, val);
+  gprintf(GLOG_EXPRESSION, "%s[%f] -> %f\n", op_parse_.AsString(op),
+          *value, val);
   *value = val;
   return true;
 }
@@ -622,7 +587,7 @@ const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
 
   float val = (atan2f(*value, value2) * 180.0f) / M_PI;
   gprintf(GLOG_EXPRESSION, "%s[%f]/[%f] -> %f\n",
-          op_string(ATAN), *value, value2, val);
+          op_parse_.AsString(ATAN), *value, value2, val);
   *value = val;
   return line;
 }
@@ -642,14 +607,11 @@ const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
   Operation op;
   const char *endptr;
 
-  line = skip_white(line);
-
-  endptr = gcodep_operation_unary(line, &op);
-  if (endptr == NULL) {
+  line = gcodep_operation_unary(line, &op);
+  if (line == NULL) {
     gprintf(GLOG_SYNTAX_ERR, "unknown unary got '%s'\n", line);
     return NULL;
   }
-  line = skip_white(endptr);
 
   if (*line != '[') {
     gprintf(GLOG_SYNTAX_ERR, "expected '[' got '%s'\n", line);
@@ -746,7 +708,7 @@ bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) 
     return false;
   }
   gprintf(GLOG_EXPRESSION, "[%f %s %f] -> %f\n",
-          *left, op_string(op), *right, val);
+          *left, op_parse_.AsString(op), *right, val);
   *left = val;
   return true;
 }
@@ -1068,7 +1030,8 @@ void GCodeParser::Impl::gcodep_while_end() {
       if (control_parse_.ExpectNext(&line, CK_DO)) {
         std::vector<StringPiece> piece = SplitString(while_loop_, "\n");
         for (size_t i=0; i < piece.size(); i++)
-          ParseLine(while_owner_, piece[i].ToString().c_str(), while_err_stream_);
+          ParseLine(while_owner_, piece[i].ToString().c_str(),
+                    while_err_stream_);
       } else {
         gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
         return;
@@ -1149,7 +1112,8 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
 
     // recursive call to parse the letter/number pair
     line = endptr;
-    return gcodep_parse_pair_with_linenumber(line_num, line, letter, value, err_stream);
+    return gcodep_parse_pair_with_linenumber(line_num, line, letter, value,
+                                             err_stream);
   }
 
   *letter = toupper(*line++);
