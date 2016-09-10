@@ -84,6 +84,65 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
+static const int kSystemParameters = 5000;
+
+bool GCodeParser::Config::LoadParams(const std::string &filename) {
+  FILE *fp = fopen(filename.c_str(), "r");
+  if (!fp) {
+    Log_error("Unable to read param file %s", filename.c_str());
+    return false;
+  }
+  if (parameters == NULL) {
+    Log_error("No parameters assigned");
+    return false;
+  }
+  Log_debug("Loading parameters from %s", filename.c_str());
+
+  char line[256];
+  while (fgets(line, sizeof(line), fp)) {
+    int index;
+    float value;
+    if (sscanf(line, "%d %f", &index, &value) == 2) {
+      if (index <= 0 || index >= (int)num_parameters
+          || index >= kSystemParameters) {
+        Log_error("Param %d is out of range", index);
+        continue;
+      }
+      parameters[index] = value;
+    }
+  }
+  fclose(fp);
+  return true;
+}
+
+bool GCodeParser::Config::SaveParams(const std::string &filename) {
+  const std::string tmp_name = filename + ".tmp";
+  // create new param file
+  FILE *fp = fopen(tmp_name.c_str(), "w");
+  if (!fp) {
+    Log_error("Unable to write param file %s", tmp_name.c_str());
+    return false;
+  }
+  Log_debug("Saving parameters to %s", filename.c_str());
+
+  char line[256];
+  // Save all the non-zero parameters except the system parameters
+  for (int i = 1; i < std::min((int)num_parameters, kSystemParameters); ++i) {
+    if (parameters[i] != 0) {
+      sprintf(line, "%d\t%f\n", i, parameters[i]);
+      fputs(line, fp);
+    }
+  }
+  if (fclose(fp) == 0) {
+    rename(filename.c_str(), (filename + ".bak").c_str());
+    if (rename(tmp_name.c_str(), filename.c_str()) == 0)
+      return true;
+  }
+  Log_error("Trouble writing parameter file %s (%s)", filename.c_str(),
+            strerror(errno));
+  return false;
+}
+
 // We keep the implementation with all its unnecessary details for the user
 // in this implementation.
 class GCodeParser::Impl {

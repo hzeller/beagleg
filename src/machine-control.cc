@@ -58,6 +58,7 @@ static int usage(const char *prog, const char *msg) {
           "  -p, --port <port>          : Listen on this TCP port for GCode.\n"
           "  -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).\n"
           "  -l, --logfile <logfile>    : Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
+          "      --param <paramfile>    : Parameter file to use.\n"
           "  -d, --daemon               : Run as daemon.\n"
           "      --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
           "      --help                 : Display this help text and exit.\n"
@@ -232,6 +233,7 @@ int main(int argc, char *argv[]) {
   bool dry_run = false;
   bool simulation_output = false;
   const char *logfile = NULL;
+  const char *paramfile = NULL;
   const char *config_file = NULL;
   bool as_daemon = false;
   const char *privs = "daemon:daemon";
@@ -246,6 +248,7 @@ int main(int argc, char *argv[]) {
     OPT_LOOP,
     OPT_PRIVS,
     OPT_ENABLE_M111,
+    OPT_PARAM_FILE,
   };
 
   static struct option long_options[] = {
@@ -264,6 +267,7 @@ int main(int argc, char *argv[]) {
     { "bind-addr",          required_argument, NULL, 'b'},
     { "loop",               optional_argument, NULL, OPT_LOOP },
     { "logfile",            required_argument, NULL, 'l'},
+    { "param",              required_argument, NULL, OPT_PARAM_FILE },
     { "daemon",             no_argument,       NULL, 'd'},
     { "priv",               required_argument, NULL, OPT_PRIVS },
     { "allow-m111",         no_argument,       NULL, OPT_ENABLE_M111 },
@@ -326,6 +330,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'l':
       logfile = strdup(optarg);
+      break;
+    case OPT_PARAM_FILE:
+      paramfile = strdup(optarg);
       break;
     case 'd':
       as_daemon = true;
@@ -470,6 +477,7 @@ int main(int argc, char *argv[]) {
   float parameters[5400] = {};
   parser_cfg.num_parameters = sizeof(parameters) / sizeof(float);
   parser_cfg.parameters = parameters;
+  if (paramfile) parser_cfg.LoadParams(paramfile);
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
@@ -485,6 +493,8 @@ int main(int argc, char *argv[]) {
     ret = run_server(listen_socket, machine_control, parser,
                      bind_addr, listen_port);
   }
+
+  if (paramfile) parser_cfg.SaveParams(paramfile);
 
   delete parser;
   delete machine_control;

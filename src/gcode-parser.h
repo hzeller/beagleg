@@ -29,6 +29,9 @@
 
 #include <stdint.h>
 #include <stdio.h>
+
+#include <string>
+
 #include "container.h"
 
 // Axis supported by this parser.
@@ -149,6 +152,9 @@ public:
   // Configuration for the parser.
   struct Config {
     Config() : num_parameters(0), parameters(NULL) {}
+
+    bool LoadParams(const std::string &filename);
+    bool SaveParams(const std::string &filename);
 
     // The machine origin. This is where the end-switches are. Typically,
     // for CNC machines, that might have Z at the highest point for instance,
