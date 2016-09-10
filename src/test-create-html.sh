@@ -40,4 +40,4 @@ EOF
 done
 
 echo
-echo "Output is on $OUT_HTML"
+echo "Output is in $(realpath $OUT_HTML)"

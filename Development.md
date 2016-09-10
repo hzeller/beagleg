@@ -54,7 +54,15 @@ $ src/gcode2ps -o /tmp/hello.ps -c machine.config -s somegcode.gcode
 $ make -C src /tmp/hello.png   # create a PNG image out of it if needed.
 ```
 
-<img src="./img/sample-gcode2ps.png" width="200"/></a>
+<img src="./img/sample-gcode2ps.png" width="200"/>
+<img src="./img/sample-gcode2ps-2.png" width="200"/>
+
+This is used for the visual end2end output creating a HTML page with images
+of a set of testing `*.gcode` files.
+
+```
+make -C src test-html
+```
 
 ### Overview: processing pipeline
 The processing is event driven: The incoming GCode gets fed through the
