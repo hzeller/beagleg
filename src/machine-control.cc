@@ -285,6 +285,7 @@ int main(int argc, char *argv[]) {
   bool dont_require_homing = false;
   bool disable_range_check = false;
   bool allow_m111 = false;
+  config.threshold_angle = 10;
   int opt;
   while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:",
                             long_options, NULL)) != -1) {
