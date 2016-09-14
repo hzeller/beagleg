@@ -44,6 +44,7 @@
 #include "pwm-timer.h"
 #include "string-util.h"
 #include "planner.h"
+#include "adc.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
@@ -120,6 +121,7 @@ private:
                       HardwareMapping::AxisTrigger trigger, int max_steps=0);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
+  void handle_M105();
 
   // Print to msg_stream.
   void mprintf(const char *format, ...);
@@ -338,6 +340,16 @@ bool GCodeMachineControl::Impl::check_for_pause() {
   return hardware_mapping_->TestPauseSwitch();
 }
 
+void GCodeMachineControl::Impl::handle_M105() {
+  mprintf("// ");
+  for (int chan = 0; chan < 8; chan++) {
+    int raw = arc_read_raw(chan);
+    mprintf("RAW%d:%d ", chan, raw);
+  }
+  mprintf("\n");
+  mprintf("T-300\n");
+}
+
 const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
                                                    const char *remaining) {
   return special_commands(letter, value, remaining);
@@ -371,7 +383,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     set_output_flags(HardwareMapping::OUT_ATX_POWER, code == 80);
     hardware_mapping_->SetAuxOutputs();
     break;
-  case 105: mprintf("T-300\n"); break;  // no temp yet.
+  case 105: handle_M105(); break;
   case 114: get_current_position(); break;
   case 115: mprintf("%s\n", VERSION_STRING); break;
   case 117:
