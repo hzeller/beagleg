@@ -365,6 +365,12 @@ TEST(GCodeParserTest, numeric_parameters) {
   EXPECT_EQ(HOME_Y + 200, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 300, counter.abs_pos[AXIS_Z]);
 
+  // Same thing without spaces. Ugly, but parseable.
+  EXPECT_TRUE(counter.TestParseLine("G1#1=150#2=250#3=350X#1Y#2Z#3"));
+  EXPECT_EQ(HOME_X + 150, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 250, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 350, counter.abs_pos[AXIS_Z]);
+
   // test invalid parameter parsing
   EXPECT_FALSE(counter.TestParseLine("#"));          // expected value after '#'
   EXPECT_FALSE(counter.TestParseLine("#G1 X20"));    // unknown unary
@@ -405,6 +411,24 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
+
+  EXPECT_TRUE(counter.TestParseLine(
+                "G1 #foo=100 #bar=200 #baz=300 X#foo Y#bar Z#baz"));
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 200, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 300, counter.abs_pos[AXIS_Z]);
+
+  // As long as we have '#' as delimiter, we can get rid of many spaces.
+  EXPECT_TRUE(counter.TestParseLine(
+                "G1#foo=150#bar=250#baz=350X#foo Y#bar Z#baz"));
+  EXPECT_EQ(HOME_X + 150, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 250, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 350, counter.abs_pos[AXIS_Z]);
+
+  // But of course, when used in coordinates that are followed by other letters,
+  // without spaces as delimiter it won't work
+  EXPECT_FALSE(counter.TestParseLine(
+                 "G1 #foo=150#bar=250#baz=350X#fooY#barZ#baz"));
 }
 
 TEST(GCodeParserTest, set_system_origin) {
