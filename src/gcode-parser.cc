@@ -168,10 +168,11 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   for (ParamMap::const_iterator it = parameters->begin();
        it != parameters->end();
        ++it) {
-    if (isdigit(it->first[0])) continue;  // already written
+    if (isdigit(it->first[0])) continue;  // Numeric: already written
+    if (it->first[0] != '_') continue;    // We only write global parameters
     if (it->second != 0) {
       if (pcount == start_alpha) {
-        fprintf(fp, "\n# Alphanumeric parameters\n");
+        fprintf(fp, "\n# Alphanumeric global parameters\n");
       }
       fprintf(fp, "%s\t%f\n", it->first.c_str(), it->second);
       ++pcount;
