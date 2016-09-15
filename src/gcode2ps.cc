@@ -502,11 +502,8 @@ int main(int argc, char *argv[]) {
   const char *filename = argv[optind];
 
   GCodeParser::Config parser_cfg;
-
-  // TODO(hzeller): read these parameters from permanent storage somewhere.
-  float parameters[5400] = {};
-  parser_cfg.parameters = parameters;
-  parser_cfg.num_parameters = sizeof(parameters) / sizeof(float);
+  GCodeParser::Config::ParamMap parameters;  // TODO: read from file ?
+  parser_cfg.parameters = &parameters;
 
   GCodePrintVisualizer gcode_printer(output_file);
   gcode_printer.SetPass(1);

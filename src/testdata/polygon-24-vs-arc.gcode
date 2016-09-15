@@ -1,24 +1,23 @@
-#1=24       ; Polygon faces count
+#faces=24       ; Polygon faces count
+#angle=[360/#faces] ; Angle.
+#aoff=[-#angle/2]  ; rotation offset. Half a segment off so that we have vertical lines.
 
-#2=[360/#1] ; Angle.
-#3=[-#2/2]  ; rotation offset. Half a segment off so that we have vertical lines.
+#poly_r=50      ; polygon radius
+#cg2_r=45       ; circle radius G2
+#cg3_r=40       ; circle radius G3
 
-#4=50       ; polygon radius
-#5=45       ; circle radius G2
-#6=40       ; circle radius G3
-
-G92 X[-#4] Y[-#4]    ; Put center of circle on convenient (0,0) coordinate.
+G92 X[-#poly_r] Y[-#poly_r]    ; Put center of circle to (0,0) coordinate.
 
 G1 F[150 * 60]
-#7=0        ; Loop counter
-WHILE [#7 <= #1] DO
-      X[#4 * cos[#7 * #2 + #3]] Y[#4 * sin[#7 * #2 + #3]]
-      #7++
+#i=0        ; Loop counter
+WHILE [#i <= #faces] DO
+      X[#poly_r * cos[#i * #angle + #aoff]] Y[#poly_r * sin[#i * #angle + #aoff]]
+      #i++
 END
 
 ; Now compare that to an inner 'regular' circle.
-G1 X#5 Y0
-G2 X#5 Y0 I[-#5] J0
+G1 X#cg2_r Y0
+G2 X#cg2_r Y0 I[-#cg2_r] J0
 
-G1 X#6 Y0
-G3 X#6 Y0 I[-#6] J0
+G1 X#cg3_r Y0
+G3 X#cg3_r Y0 I[-#cg3_r] J0

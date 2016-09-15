@@ -87,28 +87,25 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
 static const int kSystemParameters = 5000;
 
 bool GCodeParser::Config::LoadParams(const std::string &filename) {
+  if (parameters == NULL) {
+    Log_error("No parameters to load into.");
+    return false;
+  }
+
   FILE *fp = fopen(filename.c_str(), "r");
   if (!fp) {
     Log_error("Unable to read param file %s", filename.c_str());
-    return false;
-  }
-  if (parameters == NULL) {
-    Log_error("No parameters assigned");
     return false;
   }
   Log_debug("Loading parameters from %s", filename.c_str());
 
   char line[256];
   while (fgets(line, sizeof(line), fp)) {
-    int index;
+    char name[256];
     float value;
-    if (sscanf(line, "%d %f", &index, &value) == 2) {
-      if (index <= 0 || index >= (int)num_parameters
-          || index >= kSystemParameters) {
-        Log_error("Param %d is out of range", index);
-        continue;
-      }
-      parameters[index] = value;
+    if (sscanf(line, "%s %f", name, &value) == 2) {
+      // TODO(hzeller): ignore invalid parameters. Which are invalid ?
+      (*parameters)[name] = value;
     }
   }
   fclose(fp);
@@ -116,6 +113,10 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
 }
 
 bool GCodeParser::Config::SaveParams(const std::string &filename) {
+  if (parameters == NULL) {
+    Log_error("No parameters to save.");
+    return false;
+  }
   const std::string tmp_name = filename + ".tmp";
   // create new param file
   FILE *fp = fopen(tmp_name.c_str(), "w");
@@ -125,12 +126,12 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   }
   Log_debug("Saving parameters to %s", filename.c_str());
 
-  char line[256];
   // Save all the non-zero parameters except the system parameters
-  for (int i = 1; i < std::min((int)num_parameters, kSystemParameters); ++i) {
-    if (parameters[i] != 0) {
-      sprintf(line, "%d\t%f\n", i, parameters[i]);
-      fputs(line, fp);
+  for (ParamMap::const_iterator it = parameters->begin();
+       it != parameters->end();
+       ++it) {
+    if (it->second != 0) {
+      fprintf(fp, "%s\t%f\n", it->first.c_str(), it->second);
     }
   }
   if (fclose(fp) == 0) {
@@ -297,26 +298,32 @@ private:
 
   const char *gcodep_parameter(const char *line, float *value);
 
+  // Read name of parameter (after #) which is either a number or a
+  // non-alphanumeric character.
+  const char *read_param_name(const char *line, std::string *result);
+
   // Read parameter. Do range check.
-  bool read_parameter(int num, float *result) {
-    if (num < 0 || num >= (int)config.num_parameters) {
-      gprintf(GLOG_SEMANTIC_ERR,
-              "reading unsupported parameter number (%d)\n", num);
+  bool read_parameter(StringPiece param_name, float *result) {
+    if (config.parameters == NULL)
       return false;
-    }
-    *result = config.parameters[num];
+    param_name = TrimWhitespace(param_name);
+    // TODO: should we provide an error if a value is not assigned yet ?
+    *result = (*config.parameters)[ToLower(param_name)];
     return true;
   }
 
   // Read parameter. Do range check.
-  bool store_parameter(int num, float value) {
+  bool store_parameter(StringPiece param_name, float value) {
+    if (config.parameters == NULL)
+      return false;
+    param_name = TrimWhitespace(param_name);
     // zero parameter can never be written.
-    if (num <= 0 || num >= (int)config.num_parameters) {
-      gprintf(GLOG_SEMANTIC_ERR,
-              "writing unsupported parameter number (%d)\n", num);
+    if (param_name == "0" || atoi(param_name.ToString().c_str()) >= 5400) {
+      gprintf(GLOG_SEMANTIC_ERR, "writing unsupported parameter number (%s)\n",
+              param_name.ToString().c_str());
       return false;
     }
-    config.parameters[num] = value;
+    (*config.parameters)[ToLower(param_name)] = value;
     return true;
   }
 
@@ -535,24 +542,52 @@ static const char *ParseGcodeNumber(const char *line, float *value) {
   return (parsed_end == dst) ? src : line;
 }
 
-const char *GCodeParser::Impl::gcodep_parameter(const char *line, float *value) {
+// Parameter/variable names can be simple integers (traditional NIST), or
+// a named one.
+// Returns the remainder of the line or NULL if parameter name could not
+// be parsed.
+const char* GCodeParser::Impl::read_param_name(const char *line,
+                                               std::string *result) {
   line = skip_white(line);
   if (*line == '\0') {
     gprintf(GLOG_SYNTAX_ERR, "expected value after '#'\n");
     return NULL;
   }
 
-  float index;
-  const char *endptr;
-  endptr = gcodep_value(line, &index);
-  if (endptr == NULL) {
-    gprintf(GLOG_SYNTAX_ERR,
-            "'#' is not followed by a number but '%s'\n", line);
-    return NULL;
+  const bool numeric_parameter = *line == '#' || isdigit(*line);
+  // if (!numeric_parameter && strict_nist) warn("using extension");
+  const char *start = line;
+  if (numeric_parameter) {
+    float index;
+    const char *endptr = gcodep_value(line, &index);
+    if (endptr == NULL) {
+      gprintf(GLOG_SYNTAX_ERR,
+              "'#' is not followed by a number but '%s'\n", line);
+      return NULL;
+    }
+    line = endptr;
+    *result = StringPrintf("%d", (int) index);
+  } else {
+    // Allowing alpha-numeric parameters.
+    while (*line
+           && ((*line >= '0' && *line <= '9')
+               || (*line >= 'A' && *line <= 'Z')
+               || (*line >= 'a' && *line <= 'z')
+               || *line == '_')) {
+      ++line;
+    }
+    result->assign(start, line - start);
   }
-  line = endptr;
 
-  read_parameter((int)index, value);
+  return result->empty() ? NULL : skip_white(line);
+}
+
+const char *GCodeParser::Impl::gcodep_parameter(const char *line, float *value) {
+  std::string param_name;
+  line = read_param_name(line, &param_name);
+  if (line == NULL) return NULL;
+
+  read_parameter(param_name, value);
 
   return line;  // We parsed something; return whatever is remaining.
 }
@@ -885,35 +920,28 @@ const char *GCodeParser::Impl::gcodep_value(const char *line, float *value) {
 }
 
 const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
+  std::string param_name;
+  line = read_param_name(line, &param_name);
+  if (line == NULL) return NULL;
+  const char *log_name = param_name.c_str();
+
   float value;
-  const char *endptr;
-  endptr = gcodep_value(line, &value);
-  if (endptr == NULL) {
-    gprintf(GLOG_SYNTAX_ERR,
-            "gcodep_set_parameter: expected value after '#' got '%s'\n",
-            line);
-    return NULL;
-  }
-  line = skip_white(endptr);
-
-  int index = (int)value;
-
   if (*line     == '+' &&
       *(line+1) == '+') {
     line = skip_white(line+2);
-    read_parameter(index, &value);
+    read_parameter(param_name, &value);
     value++;
-    store_parameter(index, value);
-    gprintf(GLOG_EXPRESSION, "#%d++ -> #%d=%f\n", index, index, value);
+    store_parameter(param_name, value);
+    gprintf(GLOG_EXPRESSION, "#%s++ -> #%s=%f\n", log_name, log_name, value);
     return line;
   }
   if (*line     == '-' &&
       *(line+1) == '-') {
     line = skip_white(line+2);
-    read_parameter(index, &value);
+    read_parameter(param_name, &value);
     value--;
-    store_parameter(index, value);
-    gprintf(GLOG_EXPRESSION, "#%d-- -> #%d=%f\n", index, index, value);
+    store_parameter(param_name, value);
+    gprintf(GLOG_EXPRESSION, "#%s-- -> #%s=%f\n", log_name, log_name, value);
     return line;
   }
 
@@ -938,23 +966,25 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
     line = skip_white(line+1);
   } else {
     gprintf(GLOG_SYNTAX_ERR,
-            "gcodep_set_parameter: expected '=' after '#%d' got '%s'\n",
-            index, line);
+            "gcodep_set_parameter: expected '=' after '#%s' got '%s'\n",
+            log_name, line);
     return NULL;
   }
 
+  // Assignment
+  const char *endptr;
   endptr = gcodep_value(line, &value);
   if (endptr == NULL) {
     gprintf(GLOG_SYNTAX_ERR,
-            "gcodep_set_parameter: expected value after '#%d=' got '%s'\n",
-            index, line);
+            "gcodep_set_parameter: expected value after '#%s=' got '%s'\n",
+            log_name, line);
     return NULL;
   }
   line = skip_white(endptr);
 
   if (op != NO_OPERATION) {
     float left;
-    read_parameter(index, &left);
+    read_parameter(param_name, &left);
     if (!execute_binary(&left, op, &value))
       return NULL;
     value = left;
@@ -968,7 +998,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
       if (endptr == NULL) {
         gprintf(GLOG_SYNTAX_ERR,
                 "gcodep_set_parameter: expected value after '#%d=[%d] ? ' got '%s'\n",
-                index, line, condition);
+                log_name, line, condition);
         return NULL;
       }
       line = skip_white(endptr);
@@ -980,7 +1010,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
         if (endptr == NULL) {
           gprintf(GLOG_SYNTAX_ERR,
                   "gcodep_set_parameter: expected value after '#%d=[%d] ? %f :' got '%s'\n",
-                  index, line, condition, true_value);
+                  log_name, line, condition, true_value);
           return NULL;
         }
         line = skip_white(endptr);
@@ -990,15 +1020,15 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
       } else {
         gprintf(GLOG_SYNTAX_ERR,
                 "gcodep_set_parameter: expected ':' after '#%d=[%d] ? %f' got '%s'\n",
-                index, line, condition, true_value);
+                log_name, line, condition, true_value);
         return NULL;
       }
     }
   }
 
-  store_parameter(index, value);
+  store_parameter(param_name, value);
 
-  gprintf(GLOG_EXPRESSION, "#%d=%f\n", index, value);
+  gprintf(GLOG_EXPRESSION, "#%d=%f\n", log_name, value);
 
   return line;
 }
@@ -1254,7 +1284,7 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
     // Now update the parameters
     int offset = (p_val-1) * 20;
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      store_parameter(5221 + offset + i, coords[i]);
+      store_parameter(StringPrintf("%d", 5221 + offset + i), coords[i]);
     }
   } else {
     gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L or P value\n");
@@ -1280,7 +1310,7 @@ void GCodeParser::Impl::change_coord_system(float sub_command) {
     gprintf(GLOG_SYNTAX_ERR, "invalid coordinate system\n");
     return;
   }
-  store_parameter(5220, coord_system);
+  store_parameter("5220", coord_system);
   current_origin_ = &coord_system_[coord_system-1];
   inform_origin_offset_change();
 }

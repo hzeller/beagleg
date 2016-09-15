@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include "string-util.h"
+
 // 'home' position of our simulated machine. Arbitrary values.
 #define HOME_X 123
 #define HOME_Y 456
@@ -39,17 +41,18 @@ public:
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
-    memset(parameters_, 0, sizeof(parameters_));
-    config.num_parameters = sizeof(parameters_) / sizeof(float);
-    config.parameters = parameters_;
+    config.parameters = &parameters_;
     parser_ = new GCodeParser(config, this, false);
     EXPECT_EQ(0, parser_->error_count());
   }
   virtual ~ParseTester() { delete parser_; }
 
   float get_parameter(int num) {
-    assert(num >= 0 && num < (int)(sizeof(parameters_)/sizeof(float)));
-    return parameters_[num];
+    return parameters_[StringPrintf("%d", num)];
+  }
+
+  float get_parameter(const std::string &name) {
+    return parameters_[ToLower(name)];
   }
 
   // Main function to test. Returns 'false' if parsing failed.
@@ -103,8 +106,7 @@ public:
 
 private:
   void Count(int what) { call_count[what]++; }
-  float parameters_[5400];
-
+  GCodeParser::Config::ParamMap parameters_;
   GCodeParser *parser_;
 };
 
@@ -320,7 +322,7 @@ TEST(GCodeParserTest, probe_axis) {
   EXPECT_EQ(PROBE_POSITION - 3 + 1, counter.abs_pos[AXIS_Z]);
 }
 
-TEST(GCodeParserTest, parameters) {
+TEST(GCodeParserTest, numeric_parameters) {
   ParseTester counter;
 
   // without comments
@@ -385,6 +387,24 @@ TEST(GCodeParserTest, parameters) {
 
   EXPECT_TRUE(counter.TestParseLine("G1 X##2"));
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+}
+
+TEST(GCodeParserTest, alphanumeric_parameters) {
+  ParseTester counter;
+
+  EXPECT_TRUE(counter.TestParseLine("#foo=25"));
+  EXPECT_TRUE(counter.TestParseLine("#BAR=50"));  // Store case insensitive
+  EXPECT_TRUE(counter.TestParseLine("#baz=75"));
+
+  EXPECT_EQ(25, counter.get_parameter("foo"));
+  EXPECT_EQ(50, counter.get_parameter("bar"));
+  EXPECT_EQ(75, counter.get_parameter("baz"));
+
+  // Parameters are looked up case-insensitively.
+  EXPECT_TRUE(counter.TestParseLine("G1 X#FOO Y#Bar Z#baz"));
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
 }
 
 TEST(GCodeParserTest, set_system_origin) {

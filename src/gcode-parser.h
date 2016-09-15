@@ -31,6 +31,7 @@
 #include <stdio.h>
 
 #include <string>
+#include <map>
 
 #include "container.h"
 
@@ -151,7 +152,8 @@ public:
 
   // Configuration for the parser.
   struct Config {
-    Config() : num_parameters(0), parameters(NULL) {}
+    typedef std::map<std::string, float> ParamMap;
+    Config() : parameters(NULL) {}
 
     bool LoadParams(const std::string &filename);
     bool SaveParams(const std::string &filename);
@@ -161,12 +163,10 @@ public:
     // while 3D printers have Z at zero.
     AxesRegister machine_origin;
 
-    // The NIST-RS274NGC parameters. The pointer needs to point to some
-    // allocated area that will be modified by the parser.
-    // The surrounding code needs to take care of allocating and persisting.
-    // TODO: this needs refinement, maybe with read/write access logic.
-    size_t num_parameters;
-    float *parameters;
+    // The NIST-RS274NGC parameters/variables.
+    // This maps the name to the value of the parameter. The original RS274
+    // only supports integer variables, but we allow arbitrary variable names.
+    ParamMap *parameters;
   };
 
 public:
