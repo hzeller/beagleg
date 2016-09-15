@@ -84,8 +84,6 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
-static const int kSystemParameters = 5000;
-
 bool GCodeParser::Config::LoadParams(const std::string &filename) {
   if (parameters == NULL) {
     Log_error("No parameters to load into.");
