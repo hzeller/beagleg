@@ -90,6 +90,8 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
     return false;
   }
 
+  (*parameters)["5220"] = 1.0f;  // Only non-zero default.
+
   FILE *fp = fopen(filename.c_str(), "r");
   if (!fp) {
     Log_error("Unable to read param file %s (%s)",
@@ -103,7 +105,9 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
     char name[256];
     float value;
     if (sscanf(line, "%s %f", name, &value) == 2) {
-      // TODO(hzeller): ignore invalid parameters. Which are invalid ?
+      // Technically, we should ignore parameters which are not coming in
+      // order according to RS274NGC. But that sounds like a non-userfriendly
+      // restriction.
       (*parameters)[name] = value;
       ++pcount;
     }
@@ -133,11 +137,42 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   }
 
   int pcount = 0;
-  // Save all the non-zero parameters except the system parameters
+  // We have to go through the list twice. The numeric parameters need to be
+  // stored in numerical order, followed by all the alphanumeric fields.
+  //
+  // Given that we are using a string-key in the map, the numeric fields are
+  // sorted alphanumerically, which is not the same as numerically. So we
+  // simply copy them to a temporary structure that sorts them numerically.
+  std::map<int, float> numeric_params;
   for (ParamMap::const_iterator it = parameters->begin();
        it != parameters->end();
        ++it) {
+    if (!isdigit(it->first[0]))
+      break;
+    numeric_params[atoi(it->first.c_str())] = it->second;
+  }
+
+  for (std::map<int, float>::const_iterator it = numeric_params.begin();
+       it != numeric_params.end();
+       ++it) {
+    if (it->first == 0)
+      continue;  // Never write this parameter. It should always be zero
     if (it->second != 0) {
+      fprintf(fp, "%i\t%f\n", it->first, it->second);
+      ++pcount;
+    }
+  }
+
+  // Now, all the non-numeric parmeters
+  int start_alpha = pcount;
+  for (ParamMap::const_iterator it = parameters->begin();
+       it != parameters->end();
+       ++it) {
+    if (isdigit(it->first[0])) continue;  // already written
+    if (it->second != 0) {
+      if (pcount == start_alpha) {
+        fprintf(fp, "\n# Alphanumeric parameters\n");
+      }
       fprintf(fp, "%s\t%f\n", it->first.c_str(), it->second);
       ++pcount;
     }
