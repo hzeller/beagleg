@@ -92,11 +92,12 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
 
   FILE *fp = fopen(filename.c_str(), "r");
   if (!fp) {
-    Log_error("Unable to read param file %s", filename.c_str());
+    Log_error("Unable to read param file %s (%s)",
+              filename.c_str(), strerror(errno));
     return false;
   }
-  Log_debug("Loading parameters from %s", filename.c_str());
 
+  int pcount = 0;
   char line[256];
   while (fgets(line, sizeof(line), fp)) {
     char name[256];
@@ -104,8 +105,10 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
     if (sscanf(line, "%s %f", name, &value) == 2) {
       // TODO(hzeller): ignore invalid parameters. Which are invalid ?
       (*parameters)[name] = value;
+      ++pcount;
     }
   }
+  Log_debug("Loaded %d parameters from %s", pcount, filename.c_str());
   fclose(fp);
   return true;
 }
@@ -119,19 +122,28 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   // create new param file
   FILE *fp = fopen(tmp_name.c_str(), "w");
   if (!fp) {
-    Log_error("Unable to write param file %s", tmp_name.c_str());
+    const int err = errno;
+    Log_error("Unable to write param file %s (%s)", tmp_name.c_str(),
+              strerror(err));
+    if (err == EACCES) {
+      Log_error("Permission problem: maybe because we run as uid=%d, gid=%d ?",
+                getuid(), getgid());
+    }
     return false;
   }
-  Log_debug("Saving parameters to %s", filename.c_str());
 
+  int pcount = 0;
   // Save all the non-zero parameters except the system parameters
   for (ParamMap::const_iterator it = parameters->begin();
        it != parameters->end();
        ++it) {
     if (it->second != 0) {
       fprintf(fp, "%s\t%f\n", it->first.c_str(), it->second);
+      ++pcount;
     }
   }
+  Log_debug("Saving %d parameters to %s", pcount, filename.c_str());
+
   if (fclose(fp) == 0) {
     rename(filename.c_str(), (filename + ".bak").c_str());
     if (rename(tmp_name.c_str(), filename.c_str()) == 0)
