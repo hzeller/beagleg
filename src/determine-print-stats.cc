@@ -41,6 +41,9 @@ public:
     : stats_(stats), delegatee_(delegatee) {
   }
 
+  virtual void gcode_start(GCodeParser *p) { delegatee_->gcode_start(p); }
+  virtual void gcode_finished(bool eos) { delegatee_->gcode_finished(eos); }
+
   // GCode parser event receivers, that forward calls to the delegate
   // but also determine relevant height information.
   virtual void set_speed_factor(float f) { delegatee_->set_speed_factor(f);  }
@@ -113,6 +116,7 @@ private:
 }
 
 bool determine_print_stats(int input_fd, const MachineControlConfig &config,
+                           FILE *msg_out,
                            struct BeagleGPrintStats *result) {
   bzero(result, sizeof(*result));
 
@@ -133,9 +137,12 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   // machine event receiver.
   StatsCollectingEventDelegator
     stats_event_receiver(result, machine_control->ParseEventReceiver());
-
-  GCodeParser parser(GCodeParser::Config(), &stats_event_receiver, false);
-  const bool success = parser.ParseStream(input_fd, stderr) == 0;
+  GCodeParser::Config parser_cfg;
+  GCodeParser::Config::ParamMap parameters;
+  parser_cfg.parameters = &parameters;
+  GCodeParser parser(parser_cfg, &stats_event_receiver, false);
+  const bool success = parser.ParseStream(input_fd, msg_out) == 0
+    && parser.error_count() == 0;
   delete machine_control;
   return success;
 }

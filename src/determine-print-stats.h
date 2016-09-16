@@ -19,6 +19,8 @@
 #ifndef _BEAGLEG_DETERMINE_PRINT_STATS_H
 #define _BEAGLEG_DETERMINE_PRINT_STATS_H
 
+#include <stdio.h>
+
 struct MachineControlConfig;   // gcode-machine-control.h
 
 struct BeagleGPrintStats {
@@ -34,5 +36,6 @@ struct BeagleGPrintStats {
 // Returns true on success.
 bool determine_print_stats(int input_fd,
                            const MachineControlConfig &config,
+                           FILE *msg_out,
                            struct BeagleGPrintStats *result);
 #endif // _BEAGLEG_DETERMINE_PRINT_STATS_H

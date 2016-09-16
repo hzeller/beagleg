@@ -76,7 +76,7 @@ public:
     virtual ~EventReceiver() {}
     // Start program. Use for initialization. Informs about gcode parser so that
     // it is possible to call ParsePair().
-    virtual void gcode_start(GCodeParser *parser) {}
+    virtual void gcode_start(GCodeParser *parser) = 0;
 
     // End of program or stream.
     virtual void gcode_finished(bool end_of_stream) {}

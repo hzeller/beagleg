@@ -42,10 +42,11 @@ int usage(const char *prog) {
 }
 
 static void print_file_stats(const char *filename, int indentation,
+                             FILE *msg_out,
                              const MachineControlConfig &config) {
   struct BeagleGPrintStats result;
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
-  if (determine_print_stats(fd, config, &result)) {
+  if (determine_print_stats(fd, config, msg_out, &result)) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s %10.0f %12.1f %14.1f",
            indentation, filename,
@@ -90,6 +91,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  FILE *msg_out = fopen("/dev/null", "w");
   Log_init("/dev/null");
 
   ConfigParser config_parser;
@@ -122,7 +124,8 @@ int main(int argc, char *argv[]) {
            "[filament{mm}]");
   }
   for (int i = optind; i < argc; ++i) {
-    print_file_stats(argv[i], longest_filename, config);
+    print_file_stats(argv[i], longest_filename, msg_out, config);
   }
+  fclose(msg_out);
   return 0;
 }
