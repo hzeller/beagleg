@@ -357,12 +357,12 @@ public:
   virtual void WaitQueueEmpty() {}
 
   void PrintColorLegend(float x, float y, float width) {
-    if (min_color_range_ == max_color_range_)
+    if (min_color_range_ >= max_color_range_)
       return;
     const float barheight = std::min(8.0, 0.05 * width);
-    const float fontsize = barheight * 0.75;
+    const float fontsize = std::max(1.0, barheight * 0.75);
     fprintf(file_, "\n%% Color range visualization\n");
-    fprintf(file_, "gsave /Helvetica findfont %.1f scalefont setfont\n",
+    fprintf(file_, "gsave /Helvetica findfont %.2f scalefont setfont\n",
             fontsize);
     fprintf(file_, "0 setgray 0.1 setlinewidth\n");
     fprintf(file_, "%.1f %.1f moveto (mm/s) show\n", x+width + 1, y-fontsize/2);
