@@ -180,7 +180,7 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   }
   Log_debug("Saving %d parameters to %s", pcount, filename.c_str());
 
-  if (fclose(fp) == 0) {
+  if (fflush(fp) == 0 && fdatasync(fileno(fp)) == 0 && fclose(fp) == 0) {
     rename(filename.c_str(), (filename + ".bak").c_str());
     if (rename(tmp_name.c_str(), filename.c_str()) == 0)
       return true;
