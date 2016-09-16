@@ -596,6 +596,8 @@ int main(int argc, char *argv[]) {
   fprintf(output_file, "\nshowpage\n");
 
   fclose(output_file);
+
+  return gcode_viz_parser.error_count() == 0 ? 0 : 1;
 }
 
 namespace {

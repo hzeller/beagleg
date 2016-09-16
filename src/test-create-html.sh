@@ -26,7 +26,11 @@ while [ $# -ne 0 ] ; do
     GCODE_FILE=$1
     BASENAME=$(basename $GCODE_FILE .gcode)
     $GCODE2PS $THRESHOLD_ANGLE -o $TEST_OUT_DIR/${BASENAME}.ps -c $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
-
+    if [ $? -ne 0 ] ; then
+	ERRMSG="<span style='color:#ff0000; font-weight:bold;'>Got gcode errors</span>"
+    else
+	ERRMSG=""
+    fi
     # create PNG
     gs -q -r144 -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$TEST_OUT_DIR/${BASENAME}.png $TEST_OUT_DIR/${BASENAME}.ps
 
@@ -34,6 +38,7 @@ while [ $# -ne 0 ] ; do
 <div style="width:${IMAGE_SIZE}; float:left; border:1px solid #ccc; margin:2px; background-color:#ccc;">
 <a href="../testdata/${BASENAME}.gcode" style="text-align:center; font-weight:bold;">${BASENAME}</a>
 <a href='${BASENAME}.png'><img src='${BASENAME}.png' width='100%' title='${BASENAME}'></a>
+$ERRMSG
 </div>
 EOF
     shift  # next file
