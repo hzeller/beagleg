@@ -54,8 +54,10 @@ extern const char *measureLinePS;
 // draws within these.
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
-  GCodePrintVisualizer(FILE *file) : file_(file), segment_count_(0), pass_(1),
-                                     prefer_inch_display_(false) {
+  GCodePrintVisualizer(FILE *file, float scale)
+    : file_(file), segment_count_(0), pass_(1),
+      prefer_inch_display_(false),
+      scale_(scale) {
   }
 
   // We have multiple passes to determine ranges first.
@@ -183,9 +185,10 @@ public:
   void PrintPostscriptBoundingBox(float margin_x, float margin_y) {
     fprintf(file_, "%%!PS-Adobe-3.0 EPSF-3.0\n"
             "%%%%BoundingBox: %d %d %d %d\n",
-            ToPoint(min_[AXIS_X] - 10), ToPoint(min_[AXIS_Y] - 10),
-            ToPoint(max_[AXIS_X] + 10 + margin_x),
-            ToPoint(max_[AXIS_Y] + 10 + margin_y));
+            ToPoint(scale_ * (min_[AXIS_X] - 10)),
+            ToPoint(scale_ * (min_[AXIS_Y] - 10)),
+            ToPoint(scale_ * (max_[AXIS_X] + 10 + margin_x)),
+            ToPoint(scale_ * (max_[AXIS_Y] + 10 + margin_y)));
   }
 
 private:
@@ -208,6 +211,7 @@ private:
   unsigned int segment_count_;
   int pass_;
   bool prefer_inch_display_;
+  float scale_;
 };
 
 // Taking the low-level motor operations and visualize them. Uses color
@@ -428,6 +432,7 @@ static int usage(const char *progname) {
           "\t-t <threshold-angle> : Threshold angle for accleration opt\n"
           "\t-s                : Visualize speeds\n"
           "\t-D                : show dimensions\n"
+          "\t-S<factor>        : Scale the output (e.g. to fit on page)\n"
           "Without config, only GCode path is shown; with config also the\n"
           "actual machine path.\n", progname);
   return 1;
@@ -456,9 +461,10 @@ int main(int argc, char *argv[]) {
   float threshold_angle = 0;
   bool show_speeds = false;
   bool range_check = false;
+  float scale = 1.0f;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:Dt:sr")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:Dt:srS:")) != -1) {
     switch (opt) {
     case 'o':
       output_file = fopen(optarg, "w");
@@ -477,6 +483,9 @@ int main(int argc, char *argv[]) {
       break;
     case 's':
       show_speeds = true;
+      break;
+    case 'S':
+      scale = atof(optarg);
       break;
     case 'r':
       range_check = true;
@@ -505,7 +514,7 @@ int main(int argc, char *argv[]) {
   GCodeParser::Config::ParamMap parameters;  // TODO: read from file ?
   parser_cfg.parameters = &parameters;
 
-  GCodePrintVisualizer gcode_printer(output_file);
+  GCodePrintVisualizer gcode_printer(output_file, scale);
   gcode_printer.SetPass(1);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true);
@@ -514,6 +523,9 @@ int main(int argc, char *argv[]) {
                                            printMargin + (show_speeds ? 15 : 0));
 
   fprintf(output_file, "72 25.4 div dup scale  %% Numbers mean millimeter\n");
+  if (scale != 1.0f) {
+    fprintf(output_file, "%f %f scale  %% Scale for page fit\n", scale, scale);
+  }
   if (show_dimensions) {
     gcode_printer.PrintShowRange(printMargin);
   }
