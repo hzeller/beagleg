@@ -637,6 +637,9 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
     return false;
   float rapid_feed = g0_feedrate_mm_per_sec_;
   const float given = cfg_.speed_factor * prog_speed_factor_ * feed;
+  if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
+    current_feedrate_mm_per_sec_ = given;  // At least something for G1.
+  }
   planner_->Enqueue(axis, given > 0 ? given : rapid_feed);
   return true;
 }
