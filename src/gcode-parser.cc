@@ -600,9 +600,18 @@ const char* GCodeParser::Impl::read_param_name(const char *line,
     return NULL;
   }
 
+  const bool bracketed = (*line == '<');   // #<foo>-style variables.
+  if (bracketed)
+    ++line;
+
   const bool numeric_parameter = *line == '#' || isdigit(*line);
+  if (numeric_parameter && bracketed) {
+    gprintf(GLOG_SYNTAX_ERR, "The #<> bracket syntax is only allowed for "
+            "the alphanumeric parameters (at %s)", line);
+    return NULL;
+  }
+
   // if (!numeric_parameter && strict_nist) warn("using extension");
-  const char *start = line;
   if (numeric_parameter) {
     float index;
     const char *endptr = gcodep_value(line, &index);
@@ -614,15 +623,28 @@ const char* GCodeParser::Impl::read_param_name(const char *line,
     line = endptr;
     *result = StringPrintf("%d", (int) index);
   } else {
+    result->clear();
     // Allowing alpha-numeric parameters.
     while (*line
            && ((*line >= '0' && *line <= '9')
                || (*line >= 'A' && *line <= 'Z')
                || (*line >= 'a' && *line <= 'z')
-               || *line == '_')) {
+               || *line == '_'
+               || (bracketed && isspace(*line)))) {
+      if (!isspace(*line)) {
+        result->append(1, *line);
+      }
       ++line;
     }
-    result->assign(start, line - start);
+  }
+
+  if (bracketed) {
+    if (*line != '>') {
+      gprintf(GLOG_SYNTAX_ERR, "Missed closing bracket for parameter <%s>\n",
+              result->c_str());
+      return NULL;
+    }
+    ++line;
   }
 
   return result->empty() ? NULL : skip_white(line);

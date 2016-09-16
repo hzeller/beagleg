@@ -400,14 +400,16 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
 
   EXPECT_TRUE(counter.TestParseLine("#foo=25"));
   EXPECT_TRUE(counter.TestParseLine("#BAR=50"));  // Store case insensitive
-  EXPECT_TRUE(counter.TestParseLine("#baz=75"));
+  EXPECT_TRUE(counter.TestParseLine("#<b a z>=75")); // <> with spaces.
+
+  EXPECT_FALSE(counter.TestParseLine("#<b a z=1"));  // bracket not closed.
 
   EXPECT_EQ(25, counter.get_parameter("foo"));
   EXPECT_EQ(50, counter.get_parameter("bar"));
   EXPECT_EQ(75, counter.get_parameter("baz"));
 
   // Parameters are looked up case-insensitively.
-  EXPECT_TRUE(counter.TestParseLine("G1 X#FOO Y#Bar Z#baz"));
+  EXPECT_TRUE(counter.TestParseLine("G1 X#FOO Y#<B ar> Z#baz"));
   EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
@@ -429,6 +431,27 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
   // without spaces as delimiter it won't work
   EXPECT_FALSE(counter.TestParseLine(
                  "G1 #foo=150#bar=250#baz=350X#fooY#barZ#baz"));
+
+  // If there is the <> delimiter, things can be squished together again.
+  EXPECT_TRUE(counter.TestParseLine(
+                 "G1 #foo=160#bar=260#baz=360X#<foo>Y#<bar>Z#<baz>"));
+  EXPECT_EQ(HOME_X + 160, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 260, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 360, counter.abs_pos[AXIS_Z]);
+
+  // Test named parameters that return an index into the numeric parameters
+  EXPECT_TRUE(counter.TestParseLine("#1=25"));
+  EXPECT_EQ(25, counter.get_parameter(1));
+  EXPECT_TRUE(counter.TestParseLine("#index=1"));
+  EXPECT_EQ(1, counter.get_parameter("index"));
+
+  EXPECT_TRUE(counter.TestParseLine("G1 X##index"));
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+  EXPECT_TRUE(counter.TestParseLine("G1 X##<index>"));
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+
+  // Don't allow bracketed parameters with numeric parameters
+  EXPECT_FALSE(counter.TestParseLine("#<3>=42"));
 }
 
 TEST(GCodeParserTest, set_system_origin) {

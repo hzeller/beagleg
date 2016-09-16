@@ -4,7 +4,7 @@
 
 #poly_r=50      ; polygon radius
 #cg2_r=45       ; circle radius G2
-#cg3_r=40       ; circle radius G3
+#<cg3_r>=40     ; circle radius G3. Example with parameter bracket syntax.
 
 G92 X[-#poly_r] Y[-#poly_r]    ; Put center of circle to (0,0) coordinate.
 
