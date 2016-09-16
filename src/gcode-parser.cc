@@ -1918,6 +1918,12 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
       default: line = callbacks->unprocessed(letter, value, line); break;
       }
     }
+    else if (letter == 'F') {
+      // Feedrate is sometimes used in absence of a move command.
+      const float unit_value = value * unit_to_mm_factor_;
+      const float feedrate = f_param_to_feedrate(unit_value);
+      callbacks->coordinated_move(feedrate, axes_pos_);  // No move, just feed
+    }
     else if (letter == 'N') {
       // Line number? Yeah, ignore for now :)
       processed_command = false;

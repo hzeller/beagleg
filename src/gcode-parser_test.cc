@@ -34,7 +34,7 @@ enum {
 
 class ParseTester : public GCodeParser::EventReceiver {
 public:
-  ParseTester() {
+  ParseTester() : feedrate(-1) {
     bzero(call_count, sizeof(call_count));
     GCodeParser::Config config;
     // some arbitrary machine origins to see that they are honored.
@@ -79,11 +79,13 @@ public:
   virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_coordinated_move);
     abs_pos = axes;
+    feedrate = feed_mm_p_sec;
     return true;
   }
   virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) {
     Count(CALL_rapid_move);
     abs_pos = axes;
+    feedrate = feed_mm_p_sec;
     return true;
   }
   virtual const char *unprocessed(char letter, float value, const char *line) {
@@ -103,6 +105,7 @@ public:
   int call_count[NUM_COUNTED_CALLS];
   AxesRegister abs_pos;         // last coordinates we got from a move.
   AxesRegister parser_offset;   // current offset in the parser
+  float feedrate;
 
 private:
   void Count(int what) { call_count[what]++; }
@@ -147,6 +150,14 @@ TEST(GCodeParserTest, simple_move) {
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 10,  counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z - 20,  counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, setting_feedrate) {
+  ParseTester counter;
+
+  counter.TestParseLine("F100");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+  EXPECT_EQ(100.0f / 60.0f, counter.feedrate);
 }
 
 TEST(GCodeParserTest, ParsingCompactNumbers) {
