@@ -220,6 +220,7 @@ private:
   void InitProgramDefaults() {
     unit_to_mm_factor_ = 1.0f;        // G21
     set_all_axis_to_absolute(true);   // G90
+    set_ijk_absolute(false);          // G91.1
     reset_G92();                      // No global offset.
     set_current_offset(global_offset_g92_);
 
@@ -240,6 +241,12 @@ private:
     for (int i = 0; i < GCODE_NUM_AXES; ++i) {
       axis_is_absolute_[i] = value;
     }
+  }
+  void set_ijk_absolute(bool absolute) {
+    if (absolute) {
+      gprintf(GLOG_SEMANTIC_ERR, "TODO: We don't support absolute IJK yet\n");
+    }
+    ijk_is_absolute_ = absolute;
   }
 
   void reset_G92() {
@@ -328,6 +335,7 @@ private:
   const char *handle_home(const char *line);
   const char *handle_G10(const char *line);
   void change_coord_system(float sub_command);
+  void handle_G90_G91(float value);
   const char *handle_G92(float sub_command, const char *line);
   const char *handle_move(const char *line, bool force_change);
   const char *handle_arc(const char *line, bool is_cw);
@@ -405,6 +413,7 @@ private:
   int line_number_;
   float unit_to_mm_factor_;               // metric: 1.0; imperial 25.4
   bool axis_is_absolute_[GCODE_NUM_AXES]; // G90 or G91 active.
+  bool ijk_is_absolute_;
 
   // The axes_pos is the current absolute position of the machine
   // in the work-cube. It always is positive in the range of
@@ -1360,6 +1369,17 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   return line;
 }
 
+void GCodeParser::Impl::handle_G90_G91(float value) {
+  if (value == 90.0f)
+    set_all_axis_to_absolute(true);
+  else if (value == 91.0f)
+    set_all_axis_to_absolute(false);
+  else if (value == 90.1f)
+    set_ijk_absolute(true);
+  else if (value == 91.1f)
+    set_ijk_absolute(false);
+}
+
 void GCodeParser::Impl::change_coord_system(float sub_command) {
   int coord_system = -1;
   switch ((int)sub_command) {
@@ -1880,8 +1900,7 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
         break;
       case 70: unit_to_mm_factor_ = 25.4f; break;
       case 71: unit_to_mm_factor_ = 1.0f; break;
-      case 90: set_all_axis_to_absolute(true); break;
-      case 91: set_all_axis_to_absolute(false); break;
+      case 90: case 91: handle_G90_G91(value);  break;
       case 92: line = handle_G92(value, line); break;
       default: line = callbacks->unprocessed(letter, value, line); break;
       }
