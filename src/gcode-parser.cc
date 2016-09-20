@@ -144,39 +144,32 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   // sorted alphanumerically, which is not the same as numerically. So we
   // simply copy them to a temporary structure that sorts them numerically.
   std::map<int, float> numeric_params;
-  for (ParamMap::const_iterator it = parameters->begin();
-       it != parameters->end();
-       ++it) {
-    if (!isdigit(it->first[0]))
+  for (const auto name_value : *parameters) {
+    if (!isdigit(name_value.first[0]))
       break;
-    numeric_params[atoi(it->first.c_str())] = it->second;
+    numeric_params[atoi(name_value.first.c_str())] = name_value.second;
   }
 
-  for (std::map<int, float>::const_iterator it = numeric_params.begin();
-       it != numeric_params.end();
-       ++it) {
-    if (it->first == 0)
+  for (const auto num_value : numeric_params) {
+    if (num_value.first == 0)
       continue;  // Never write this parameter. It should always be zero
-    if (it->second != 0) {
-      fprintf(fp, "%i\t%f\n", it->first, it->second);
+    if (num_value.second != 0) {
+      fprintf(fp, "%i\t%f\n", num_value.first, num_value.second);
       ++pcount;
     }
   }
 
   // Now, all the non-numeric parmeters
   int start_alpha = pcount;
-  for (ParamMap::const_iterator it = parameters->begin();
-       it != parameters->end();
-       ++it) {
-    if (isdigit(it->first[0])) continue;  // Numeric: already written
-    if (it->first[0] != '_') continue;    // We only write global parameters
-    if (it->second != 0) {
-      if (pcount == start_alpha) {
-        fprintf(fp, "\n# Alphanumeric global parameters\n");
-      }
-      fprintf(fp, "%s\t%f\n", it->first.c_str(), it->second);
-      ++pcount;
+  for (const auto name_value : *parameters) {
+    if (isdigit(name_value.first[0])) continue;  // Numeric: already written
+    if (name_value.first[0] != '_') continue;    // Only write global parameters
+    if (name_value.second == 0) continue;        // Don't write boring zeroes.
+    if (pcount == start_alpha) {
+      fprintf(fp, "\n# Alphanumeric global parameters\n");
     }
+    fprintf(fp, "%s\t%f\n", name_value.first.c_str(), name_value.second);
+    ++pcount;
   }
   Log_debug("Saving %d parameters to %s", pcount, filename.c_str());
 

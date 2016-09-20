@@ -46,8 +46,8 @@ bool HasPrefix(const StringPiece &s, const StringPiece &prefix) {
 }
 
 static inline bool contains(const StringPiece &str, char c) {
-  for (StringPiece::iterator i = str.begin(); i != str.end(); ++i) {
-    if (*i == c) return true;
+  for (char i : str) {
+    if (i == c) return true;
   }
   return false;
 }

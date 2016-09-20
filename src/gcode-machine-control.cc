@@ -750,9 +750,8 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
 
 void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   planner_->BringPathToHalt();
-  for (std::string::const_iterator o = cfg_.home_order.begin();
-       o != cfg_.home_order.end() ; ++o) {
-    const enum GCodeParserAxis axis = gcodep_letter2axis(*o);
+  for (const char axis_letter : cfg_.home_order) {
+    const enum GCodeParserAxis axis = gcodep_letter2axis(axis_letter);
     if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
       continue;
     home_axis(axis);
