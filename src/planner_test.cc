@@ -39,10 +39,12 @@ public:
     : config_(config) {}
 
   virtual void Enqueue(const LinearSegmentSteps &segment) {
+#if 0
+    // Prepare for printing.
+
     // Let's convert the velocities into Euclidian space again.
     LinearSegmentSteps euclidian_speeds = segment;
     const float hypotenuse = FixEuclidSpeed(&euclidian_speeds);
-#if 0
     // We recognize what we call a 'rounding_glitch' for segments that
     // are very short (a few steps). These are move steps from the planner
     // that are created due to rounding of the accel/decel steps. They
