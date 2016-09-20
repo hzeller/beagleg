@@ -45,9 +45,7 @@ CFLAGS+=-Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM
 
 # We export the following variables so that the googletest library will get
 # the same variables when compiling.
-# Using old < c++11 standard as not all embedded devices have recent compilers.
-# Sigh.
-export CXXFLAGS+=-std=c++03 $(CFLAGS)
+export CXXFLAGS+=-std=c++11 $(CFLAGS)
 export CXX?=g++
 
 LDFLAGS+=-lpthread -lm
