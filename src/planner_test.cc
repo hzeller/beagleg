@@ -42,7 +42,7 @@ public:
     // Let's convert the velocities into Euclidian space again.
     LinearSegmentSteps euclidian_speeds = segment;
     const float hypotenuse = FixEuclidSpeed(&euclidian_speeds);
-#if 1
+#if 0
     // We recognize what we call a 'rounding_glitch' for segments that
     // are very short (a few steps). These are move steps from the planner
     // that are created due to rounding of the accel/decel steps. They
@@ -309,8 +309,10 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
                                                    float start_angle,
                                                    float delta_angle) {
   const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
+#if 0
   fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f)\n",
           threshold_angle, start_angle, delta_angle);
+#endif
   PlannerHarness plantest(threshold_angle);
   const float kSegmentLen = 100;
 
