@@ -663,9 +663,9 @@ TEST(GCodeParserTest, expressions) {
   EXPECT_TRUE(counter.TestParseLine("#1=sqrt[4]"));
   EXPECT_EQ(sqrt(4), counter.get_parameter(1));
 
-  // sine
+  // tan  (here, g++ generates code with rounding trouble; need FLOAT_EQ)
   EXPECT_TRUE(counter.TestParseLine("#1=tan[30]"));
-  EXPECT_EQ(tanf((30 * M_PI) / 180.0f), counter.get_parameter(1));
+  EXPECT_FLOAT_EQ(tanf((30 * M_PI) / 180.0f), counter.get_parameter(1));
 }
 
 TEST(GCodeParserTest, precedence) {
