@@ -23,12 +23,20 @@
 #include <strings.h>
 #include <string.h>
 #include <assert.h>
+#include <initializer_list>
 
 // Fixed array of POD types (that can be zeroed with bzero()).
 template <typename T, int N>
 class FixedArray {
 public:
   FixedArray() { zero(); }
+  FixedArray(const std::initializer_list<T> &in_list) {
+    zero();
+    auto it = in_list.begin();
+    for (int i = 0; i < N && it != in_list.end(); ++i, ++it) {
+      data_[i] = *it;
+    }
+  }
   FixedArray(const FixedArray<T,N> &other) { CopyFrom(other); }
 
   FixedArray<T,N> &operator= (const FixedArray<T,N> &other) {

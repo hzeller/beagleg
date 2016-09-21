@@ -540,6 +540,77 @@ TEST(GCodeParserTest, set_system_origin) {
   EXPECT_EQ(10, counter.abs_pos[AXIS_Z]);
 }
 
+class ArcTester : public ParseTester {
+public:
+  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
+    ParseTester::coordinated_move(feed_mm_p_sec, axes);
+    if (!expect_radius_)
+      return true;  // Not checking for circleness yet.
+    // Radius seen in the plane.
+    switch (normal_axis_) {
+    case AXIS_Z: {
+      const float normal_rz = hypotf(axes[AXIS_X] - center_[AXIS_X],
+                                     axes[AXIS_Y] - center_[AXIS_Y]);
+      EXPECT_NEAR(radius_, normal_rz, 0.001);
+      break;
+    }
+    case AXIS_Y: {
+      const float normal_ry = hypotf(axes[AXIS_X] - center_[AXIS_X],
+                                     axes[AXIS_Z] - center_[AXIS_Z]);
+      EXPECT_NEAR(radius_, normal_ry, 0.001);
+      break;
+    }
+    case AXIS_X: {
+      const float normal_rx = hypotf(axes[AXIS_Y] - center_[AXIS_Y],
+                                     axes[AXIS_Z] - center_[AXIS_Z]);
+      EXPECT_NEAR(radius_, normal_rx, 0.001);
+      break;
+    }
+    default:
+      break;
+    }
+    return true;
+  }
+
+  void ExpectCircle(const AxesRegister &center, GCodeParserAxis normal_axis,
+                    float r) {
+    center_ = center;
+    radius_ = r;
+    normal_axis_ = normal_axis;
+    expect_radius_ = true;
+  }
+
+private:
+  AxesRegister center_;
+  float radius_;
+  GCodeParserAxis normal_axis_;
+  bool expect_radius_ = false;
+};
+
+TEST(GCodeParserTest, arc_generation) {
+  {
+    ArcTester counter;
+    counter.TestParseLine("G17");
+    counter.TestParseLine("G1 X100 Y0");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
+    counter.TestParseLine("G2 X100 Y0 I-100 J0");
+  }
+  {
+    ArcTester counter;
+    counter.TestParseLine("G18");
+    counter.TestParseLine("G1 X100 Y0");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Y, 100.0f);
+    counter.TestParseLine("G2 X100 Y0 I-100 J0");
+  }
+  {
+    ArcTester counter;
+    counter.TestParseLine("G19");
+    counter.TestParseLine("G1 X100 Y0");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_X, 100.0f);
+    counter.TestParseLine("G2 X100 Y0 I-100 J0");
+  }
+}
+
 TEST(GCodeParserTest, expressions) {
   ParseTester counter;
 
