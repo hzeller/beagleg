@@ -45,7 +45,10 @@ CFLAGS+=-Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM
 
 # We export the following variables so that the googletest library will get
 # the same variables when compiling.
-export CXXFLAGS+=-std=c++11 $(CFLAGS)
+# We use c++11, but it looks like that even the latest
+# bone-debian-7.11-lxde-4gb-armhf-2016-06-16-4gb image has an ancient 4.6.3
+# compiler that still referred to that standard as c++0x
+export CXXFLAGS+=-std=c++0x $(CFLAGS)
 export CXX?=g++
 
 LDFLAGS+=-lpthread -lm
