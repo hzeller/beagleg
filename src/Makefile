@@ -90,7 +90,7 @@ test-out/test.html: gcode2ps test-create-html.sh testdata/*.gcode
 	./test-create-html.sh testdata/*.gcode
 
 test: $(UNITTEST_BINARIES)
-	for test_bin in $(UNITTEST_BINARIES) ; do ./$$test_bin || exit 1 ; done
+	for test_bin in $(UNITTEST_BINARIES) ; do echo ; echo $$test_bin; ./$$test_bin || exit 1 ; done
 
 valgrind-test: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
