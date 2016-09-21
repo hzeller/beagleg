@@ -27,7 +27,26 @@ The main `machine-control` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit. It can receive G-Code from a file or
 socket (you can just telnet to it for an interactive session, how cool is that?).
 
-## Build
+## Install
+### System configuration
+In order to run BeagleG on your BeagleBone you will need to be sure
+that uio_pruss kernel module has been installed and loaded in the kernel.
+You can easily test if the module it's available by running:
+
+    if sudo lsmod | grep "uio_pruss" &> /dev/null ; then echo "the kernel is BeagleG ready!"; fi
+
+then just load it using:
+
+    sudo modprobe uio_pruss
+
+or add it to /etc/modules to make it persistent:
+
+    sudo sh -c 'echo uio_pruss > /etc/modules'
+
+if the uio_pruss module is not available, you will need to
+[change your kernel version](http://elinux.org/BeagleBoardDebian#Install_Latest_Kernel_Image) to a bone prefix one.
+
+### Build
 To build, we need the BeagleG code and the PRU assembler with supporting library.
 The BeagleG repository is set up in a way that the PRU assembler is checked out via
 a git sub-module to make it simple.
