@@ -492,8 +492,6 @@ int main(int argc, char *argv[]) {
                      bind_addr, listen_port);
   }
 
-  if (paramfile) parser_cfg.SaveParams(paramfile);
-
   delete parser;
   delete machine_control;
 
@@ -508,6 +506,8 @@ int main(int argc, char *argv[]) {
   delete pru_hw_interface;
 
   free(bind_addr);
+
+  if (paramfile) parser_cfg.SaveParams(paramfile);
 
   Log_info("Shutdown.");
   return ret;
