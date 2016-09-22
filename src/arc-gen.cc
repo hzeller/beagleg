@@ -1,4 +1,4 @@
-/* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * (c) 2015 H Hartley Sweeten <hsweeten@visionengravers.com>
  *    and author who implemented Smoothieware Robot::append_arc()
  *
@@ -21,6 +21,8 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <functional>
+
 #include "arc-gen.h"
 #include "logging.h"
 
@@ -41,12 +43,11 @@
 
 // Generate an arc. Input is the
 static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
-             bool is_cw,                        // 0 CCW, 1 CW
-             AxesRegister *position_out,   // start position. Will be updated.
-             const AxesRegister &center,     // Offset to center.
-             const AxesRegister &target,     // Target position.
-             void (*segment_output)(void *, const AxesRegister&),
-             void *segment_output_user_data) {
+                    bool is_cw,                        // 0 CCW, 1 CW
+                    AxesRegister *position_out,   // start position. Will be updated.
+                    const AxesRegister &center,     // Offset to center.
+                    const AxesRegister &target,     // Target position.
+                    std::function<void(const AxesRegister&)> segment_output) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
   switch (normal_axis) {
@@ -115,14 +116,14 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
     position[plane[2]] += linear_per_segment;
 
     // Emit
-    segment_output(segment_output_user_data, position);
+    segment_output(position);
   }
 
   // Ensure last segment arrives at target location.
   for (int axis = AXIS_X; axis <= AXIS_Z; axis++) {
     position[axis] = target[axis];
   }
-  segment_output(segment_output_user_data, position);
+  segment_output(position);
 }
 
 static AxesRegister calc_bezier_point(float t,
@@ -152,8 +153,7 @@ void spline_gen(AxesRegister *position_out, // start position. Will be updated.
                 const AxesRegister &cp1,    // Offset from start to first control point.
                 const AxesRegister &cp2,    // Offset from target to second control point.
                 const AxesRegister &target, // Target position.
-                void (*segment_output)(void *, const AxesRegister &),
-                void *segment_output_user_data) {
+                std::function<void (const AxesRegister& pos)> segment_output) {
   // Alias reference for readable use with [] operator
   AxesRegister &position = *position_out;
 
@@ -168,23 +168,13 @@ void spline_gen(AxesRegister *position_out, // start position. Will be updated.
   for (float t = 0; t < 1; t += 0.01f) {
     AxesRegister p = calc_bezier_point(t, position, cp1, cp2, target);
 
-    segment_output(segment_output_user_data, p);
+    segment_output(p);
   }
 
   // Ensure last segment arrives at target location.
   position[AXIS_X] = target[AXIS_X];
   position[AXIS_Y] = target[AXIS_Y];
-  segment_output(segment_output_user_data, position);
-}
-
-struct ArcCallbackData {
-  GCodeParser::EventReceiver *callbacks;
-  float feedrate;
-};
-
-static void arc_callback(void *data, const AxesRegister &new_pos) {
-  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
-  cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
+  segment_output(position);
 }
 
 void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
@@ -194,10 +184,8 @@ void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
                                           const AxesRegister &center,
                                           const AxesRegister &end) {
   AxesRegister position = start;
-  struct ArcCallbackData cb_arc_data;
-  cb_arc_data.callbacks = this;
-  cb_arc_data.feedrate = feed_mm_p_sec;
   arc_gen(normal_axis, clockwise, &position,
-          center, end,
-          &arc_callback, &cb_arc_data);
+          center, end, [this, feed_mm_p_sec](const AxesRegister &pos) {
+            coordinated_move(feed_mm_p_sec, pos);
+          });
 }

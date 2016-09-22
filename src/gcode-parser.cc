@@ -1542,15 +1542,6 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   return line;
 }
 
-struct ArcCallbackData {
-  GCodeParser::EventReceiver *callbacks;
-  float feedrate;
-};
-static void arc_callback(void *data, const AxesRegister &new_pos) {
-  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
-  cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
-}
-
 // G5 X- Y- <I- J-> P- Q- (Cubic spline)
 //   I - X relative offset from start point to first control point
 //   J - Y relative offset from start point to first control point
@@ -1697,11 +1688,11 @@ const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line
     cp2 = _cp2;
   }
 
-  struct ArcCallbackData cb_arc_data;
-  cb_arc_data.callbacks = callbacks;
-  cb_arc_data.feedrate = -1;
-  spline_gen(&axes_pos_, cp1, cp2, target, &arc_callback, &cb_arc_data);
-
+  // TODO(hzeller): similar to arc_move(), this should call a spline_move()
+  spline_gen(&axes_pos_, cp1, cp2, target,
+             [this](const AxesRegister &pos) {
+               callbacks->coordinated_move(-1, pos);
+             });
   return line;
 }
 

@@ -19,13 +19,16 @@
 #ifndef _BEAGLEG_ARC_GEN_H
 #define _BEAGLEG_ARC_GEN_H
 
+#include <functional>
+
 #include "gcode-parser.h"
 
+// TODO(hzeller): Don't expose, but just internally implement that similar to
+// EventReceiver::arc_move()
 void spline_gen(AxesRegister *position,     // start position. Will be updated.
                 const AxesRegister &cp1,    // Offset from start to first control point.
                 const AxesRegister &cp2,    // Offset from target to second control point.
                 const AxesRegister &target, // Target position.
-                void (*segment_output)(void *, const AxesRegister &),
-                void *segment_output_user_data);
+                std::function<void (const AxesRegister& pos)> segment_output);
 
 #endif  // _BEAGLEG_ARC_GEN_H
