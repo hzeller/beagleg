@@ -54,10 +54,10 @@ extern const char *measureLinePS;
 // draws within these.
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
-  GCodePrintVisualizer(FILE *file, float scale)
-    : file_(file), segment_count_(0), pass_(1),
-      prefer_inch_display_(false),
-      scale_(scale) {
+  GCodePrintVisualizer(FILE *file, bool show_ijk, float scale)
+    : file_(file), show_ijk_(show_ijk), scale_(scale),
+      segment_count_(0), pass_(1),
+      prefer_inch_display_(false) {
   }
 
   // We have multiple passes to determine ranges first.
@@ -90,6 +90,22 @@ public:
       }
     }
     return true;
+  }
+
+  virtual void arc_move(float feed_mm_p_sec,
+                        GCodeParserAxis normal_axis, bool clockwise,
+                        const AxesRegister &start,
+                        const AxesRegister &center,
+                        const AxesRegister &end) {
+    if (pass_ == 2 && show_ijk_) {
+      fprintf(file_, "currentpoint currentpoint stroke\n"
+              "gsave\n\tmoveto [0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
+              "\t%f %f lineto %f %f lineto stroke\n"
+              "\t[] 0 setdash\ngrestore moveto %% show radius\n",
+              center[AXIS_X], center[AXIS_Y], end[AXIS_X], end[AXIS_Y]);
+    }
+    EventReceiver::arc_move(feed_mm_p_sec, normal_axis, clockwise,
+                            start, center, end);
   }
 
   virtual void gcode_command_done(char letter, float val) {
@@ -205,13 +221,15 @@ private:
     return roundf(mm / 25.4 * 72);
   }
 
+  FILE *const file_;
+  const bool show_ijk_;
+  const float scale_;
+
   AxesRegister min_;
   AxesRegister max_;
-  FILE *const file_;
   unsigned int segment_count_;
   int pass_;
   bool prefer_inch_display_;
-  float scale_;
 };
 
 // Taking the low-level motor operations and visualize them. Uses color
@@ -433,6 +451,7 @@ static int usage(const char *progname) {
           "\t-s                : Visualize speeds\n"
           "\t-D                : show dimensions\n"
           "\t-S<factor>        : Scale the output (e.g. to fit on page)\n"
+          "\t-i                : Toggle show IJK control lines\n"
           "Without config, only GCode path is shown; with config also the\n"
           "actual machine path.\n", progname);
   return 1;
@@ -461,10 +480,11 @@ int main(int argc, char *argv[]) {
   float threshold_angle = 0;
   bool show_speeds = false;
   bool range_check = false;
+  bool show_ijk = true;
   float scale = 1.0f;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:Dt:srS:")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:Dt:srS:i")) != -1) {
     switch (opt) {
     case 'o':
       output_file = fopen(optarg, "w");
@@ -486,6 +506,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'S':
       scale = atof(optarg);
+      break;
+    case 'i':
+      show_ijk = !show_ijk;
       break;
     case 'r':
       range_check = true;
@@ -514,7 +537,7 @@ int main(int argc, char *argv[]) {
   GCodeParser::Config::ParamMap parameters;  // TODO: read from file ?
   parser_cfg.parameters = &parameters;
 
-  GCodePrintVisualizer gcode_printer(output_file, scale);
+  GCodePrintVisualizer gcode_printer(output_file, show_ijk, scale);
   gcode_printer.SetPass(1);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true);
