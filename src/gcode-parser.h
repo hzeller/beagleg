@@ -120,7 +120,7 @@ public:
                             float *probed_position) { return false; }
 
     virtual void set_speed_factor(float factor) = 0;// M220 feedrate factor 0..1
-    virtual void set_fanspeed(float value) = 0;    // M106, M107: speed 0...255
+    virtual void set_fanspeed(float value) = 0;     // M106, M107: speed 0...255
     virtual void set_temperature(float degrees_c)=0; // M104, M109: Set temp. in Celsius
     virtual void wait_temperature() = 0;    // M109, M116: Wait for temp. reached.
     virtual void dwell(float time_ms) = 0;     // G4: dwell for milliseconds.
@@ -137,6 +137,24 @@ public:
                                   const AxesRegister &absolute_pos) = 0;  // G1
     virtual bool rapid_move(float feed_mm_p_sec,
                             const AxesRegister &absolute_pos) = 0;        // G0
+
+    // Arc in a circular motion from current position around the "center"
+    // coordinate to the "end" coordinate. These coordinates are absolute.
+    // The normal axis is one of AXIS_X...AXIS_Z (most common probably AXIS_Z).
+    // Movement outside the axes orthogonal to the normal axis are linearly
+    // interpolated from their current position (e.g. creating a spiral).
+    //
+    // The default implementation linearlizes it and calls coordinated_move()
+    // with small line segments.
+    //
+    // TODO(hzeller): We could probably generalize this by having a
+    //  'normal vector' instead of normal_axis + clockwise. This would allow for
+    //  arbitrarily placed arcs in space (but there is no GCode for it).
+    virtual void arc_move(float feed_mm_p_sec,
+                          GCodeParserAxis normal_axis, bool clockwise,
+                          const AxesRegister &start,
+                          const AxesRegister &center,
+                          const AxesRegister &end);
 
     // Hand out G-code command that could not be interpreted.
     // Parameters: letter + value of the command that was not understood,

@@ -34,42 +34,58 @@
 #define HIRES_TEST_CIRCLE_SEGMENT (2*M_PI/1e12)
 #define HIRES_TEST_ARC_STEP (TEST_ARC_STEP/1e12)
 
-struct TestArcAccumulator {
-  TestArcAccumulator() : total_len(0) {}
-  AxesRegister last;
-  float total_len;
+class TestArcAccumulator : public GCodeParser::EventReceiver {
+public:
+  TestArcAccumulator(const AxesRegister &start) : last_(start), total_len_(0) {}
+
+  virtual void gcode_start(GCodeParser *parser) {}
+  virtual void go_home(AxisBitmap_t axis_bitmap) {}
+  virtual void set_speed_factor(float factor) {}
+  virtual void set_fanspeed(float value) {}
+  virtual void set_temperature(float degrees_c) {}
+  virtual void wait_temperature() {}
+  virtual void dwell(float time_ms) {}
+  virtual void motors_enable(bool enable) {}
+  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &pos) {
+    total_len_ += hypotf(pos[AXIS_X] - last_[AXIS_X],
+                         pos[AXIS_Y] - last_[AXIS_Y]);
+    last_ = pos;
+    return true;
+  }
+
+  float total_len() const { return total_len_; }
+
+  virtual bool rapid_move(float feed_mm_p_sec,
+                          const AxesRegister &absolute_pos) { return true; }
+  virtual const char *unprocessed(char letter, float value,
+                                  const char *rest_of_line) { return NULL; }
+private:
+  AxesRegister last_;
+  float total_len_;
 };
-static void TestArcCallback(void *user_data, const AxesRegister& pos) {
-  TestArcAccumulator *acc = (TestArcAccumulator*) user_data;
-  acc->total_len += hypotf(pos[AXIS_X] - acc->last[AXIS_X],
-                           pos[AXIS_Y] - acc->last[AXIS_Y]);
-  acc->last = pos;
-}
 
 static void testHalfTurnAnyStartPosition(bool clockwise) {
   // We start anywhere and do a half turn, testing that we're generating
   // exactly an arc of the specified length.
   for (float start_angle = 0; start_angle < 2*M_PI; start_angle+=TEST_ARC_STEP) {
-    TestArcAccumulator collect;
-    AxesRegister start, offset, target;
+    AxesRegister start, center, target;
 
     // Generating an arc starting at (1,0) ccw (-1,0) - so half a turn.
-    
+
     start[AXIS_X] = cosf(start_angle);  // Where we start
     start[AXIS_Y] = sinf(start_angle);
 
-    offset[AXIS_X] = -start[AXIS_X]; // Center as seen from start (I, J)
-    offset[AXIS_Y] = -start[AXIS_Y];
+    center[AXIS_X] = 0;
+    center[AXIS_Y] = 0;
 
     target[AXIS_X] = cosf(start_angle + M_PI);
     target[AXIS_Y] = sinf(start_angle + M_PI);
 
-    collect.last = start;
-    arc_gen(AXIS_Z, clockwise, &start, offset, target,
-            &TestArcCallback, &collect);
+    TestArcAccumulator collect(start);
+    collect.arc_move(100, AXIS_Z, clockwise, start, center, target);
 
     // We did a half-turn, so we expect the total length to be roughly PI
-    EXPECT_NEAR(collect.total_len, M_PI, 0.002);
+    EXPECT_NEAR(collect.total_len(), M_PI, 0.002);
   }
 }
 
@@ -86,24 +102,22 @@ TEST(ArcGenerator, HalfTurnAnyStartPosition_CCW) {
 static void testArcLength(bool clockwise, double start, double step, double end) {
   // Varying arc-length.
   for (double turn_angle = start; turn_angle <= end-step; turn_angle+=step) {
-    TestArcAccumulator collect;
-    AxesRegister start, offset, target;
+    AxesRegister start, center, target;
 
     start[AXIS_X] = 1.0;
     start[AXIS_Y] = 0.0;
 
-    offset[AXIS_X] = -1.0;
-    offset[AXIS_Y] = 0;
+    center[AXIS_X] = 0;
+    center[AXIS_Y] = 0;
 
     target[AXIS_X] = cos(turn_angle);
     target[AXIS_Y] = sin(turn_angle);
 
-    collect.last = start;
-    arc_gen(AXIS_Z, clockwise, &start, offset, target,
-            &TestArcCallback, &collect);
+    TestArcAccumulator collect(start);
+    collect.arc_move(100, AXIS_Z, clockwise, start, center, target);
 
     const float expected_len = clockwise ? 2*M_PI-turn_angle : turn_angle;
-    EXPECT_NEAR(collect.total_len, expected_len, 0.003);
+    EXPECT_NEAR(collect.total_len(), expected_len, 0.003);
   }
 }
 
@@ -146,23 +160,21 @@ TEST(ArcGenerator, ArcLength_CCW_HiRes_FullCircle) {
 // Test special case: if start/end position are the same, then we expect
 // a full turn.
 static void testFullTurn(bool clockwise) {
-  TestArcAccumulator collect;
-  AxesRegister start, offset, target;
+  AxesRegister start, center, target;
 
   start[AXIS_X] = 1.0;
   start[AXIS_Y] = 0.0;
 
-  offset[AXIS_X] = -1.0;
-  offset[AXIS_Y] = 0;
+  center[AXIS_X] = 0;
+  center[AXIS_Y] = 0;
 
   target[AXIS_X] = 1.0;
   target[AXIS_Y] = 0.0;
 
-  collect.last = start;
-  arc_gen(AXIS_Z, clockwise, &start, offset, target,
-          &TestArcCallback, &collect);
+  TestArcAccumulator collect(start);
+  collect.arc_move(100, AXIS_Z, clockwise, start, center, target);
 
-  EXPECT_NEAR(collect.total_len, 2*M_PI, 0.003);
+  EXPECT_NEAR(collect.total_len(), 2*M_PI, 0.003);
 }
 
 TEST(ArcGenerator, FullTurn_CW) {

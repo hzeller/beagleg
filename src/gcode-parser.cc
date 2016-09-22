@@ -1387,16 +1387,6 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
   return line;
 }
 
-struct ArcCallbackData {
-  GCodeParser::EventReceiver *callbacks;
-  float feedrate;
-};
-
-static void arc_callback(void *data, const AxesRegister &new_pos) {
-  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
-  cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
-}
-
 // The algorithm used here is based on finding the midpoint M of the line
 // L between the current point and the end point of the arc. The center
 // of the arc lies on a line through M perpendicular to L.
@@ -1540,13 +1530,25 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
     }
   }
 
-  struct ArcCallbackData cb_arc_data;
-  cb_arc_data.callbacks = callbacks;
-  cb_arc_data.feedrate = feedrate;
-  arc_gen(arc_normal_, is_cw, &axes_pos_, offset, target,
-          &arc_callback, &cb_arc_data);
-
+  // Quick hack: we should've calculated with absolute center above.
+  // Also TODO: ijk_is_absolute_ needs to be honored.
+  AxesRegister absolute_center = axes_pos_;
+  absolute_center[AXIS_X] += offset[AXIS_X];
+  absolute_center[AXIS_Y] += offset[AXIS_Y];
+  absolute_center[AXIS_Z] += offset[AXIS_Z];
+  callbacks->arc_move(feedrate, arc_normal_, is_cw,
+                      axes_pos_, absolute_center, target);
+  axes_pos_ = target;
   return line;
+}
+
+struct ArcCallbackData {
+  GCodeParser::EventReceiver *callbacks;
+  float feedrate;
+};
+static void arc_callback(void *data, const AxesRegister &new_pos) {
+  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
+  cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
 }
 
 // G5 X- Y- <I- J-> P- Q- (Cubic spline)

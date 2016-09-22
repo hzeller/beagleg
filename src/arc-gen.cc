@@ -40,10 +40,10 @@
 #define MM_PER_ARC_SEGMENT      0.1
 
 // Generate an arc. Input is the
-void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
+static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
              bool is_cw,                        // 0 CCW, 1 CW
              AxesRegister *position_out,   // start position. Will be updated.
-             const AxesRegister &offset,     // Offset to center.
+             const AxesRegister &center,     // Offset to center.
              const AxesRegister &target,     // Target position.
              void (*segment_output)(void *, const AxesRegister&),
              void *segment_output_user_data) {
@@ -59,7 +59,10 @@ void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
 
   // Alias reference for readable use with [] operator
   AxesRegister &position = *position_out;
-
+  AxesRegister offset;
+  offset[0] = center[0] - position[0];
+  offset[1] = center[1] - position[1];
+  offset[2] = center[2] - position[2];
   const float radius = sqrtf(offset[plane[0]] * offset[plane[0]] +
                              offset[plane[1]] * offset[plane[1]]);
   const float center_0 = position[plane[0]] + offset[plane[0]];
@@ -172,4 +175,29 @@ void spline_gen(AxesRegister *position_out, // start position. Will be updated.
   position[AXIS_X] = target[AXIS_X];
   position[AXIS_Y] = target[AXIS_Y];
   segment_output(segment_output_user_data, position);
+}
+
+struct ArcCallbackData {
+  GCodeParser::EventReceiver *callbacks;
+  float feedrate;
+};
+
+static void arc_callback(void *data, const AxesRegister &new_pos) {
+  struct ArcCallbackData *cbinfo = (struct ArcCallbackData*) data;
+  cbinfo->callbacks->coordinated_move(cbinfo->feedrate, new_pos);
+}
+
+void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
+                                          GCodeParserAxis normal_axis,
+                                          bool clockwise,
+                                          const AxesRegister &start,
+                                          const AxesRegister &center,
+                                          const AxesRegister &end) {
+  AxesRegister position = start;
+  struct ArcCallbackData cb_arc_data;
+  cb_arc_data.callbacks = this;
+  cb_arc_data.feedrate = feed_mm_p_sec;
+  arc_gen(normal_axis, clockwise, &position,
+          center, end,
+          &arc_callback, &cb_arc_data);
 }

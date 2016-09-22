@@ -21,23 +21,6 @@
 
 #include "gcode-parser.h"
 
-// Generate an arc.
-//
-// Input is the current position, the desired offset to the
-// center point and the target position.
-//
-// Outputs segments to the segment_output() callback.
-//
-// After arc_gen() returns, the values in position[] are updated
-// to the new machine position.
-void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis of the arc-plane
-             bool is_cw,                   // 1 if CW, 0 if CCW
-             AxesRegister *position,       // start position. Will be updated.
-             const AxesRegister &offset,   // Offset to center.
-             const AxesRegister &target,   // Target position.
-             void (*segment_output)(void *, const AxesRegister &),
-             void *segment_output_user_data);
-
 void spline_gen(AxesRegister *position,     // start position. Will be updated.
                 const AxesRegister &cp1,    // Offset from start to first control point.
                 const AxesRegister &cp2,    // Offset from target to second control point.
