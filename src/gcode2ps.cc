@@ -108,6 +108,22 @@ public:
                             start, center, end);
   }
 
+  virtual void spline_move(float feed_mm_p_sec,
+                           const AxesRegister &start,
+                           const AxesRegister &cp1, const AxesRegister &cp2,
+                           const AxesRegister &end) {
+    if (pass_ == 2 && show_ijk_) {
+      fprintf(file_, "currentpoint stroke\n"
+              "gsave\n\t[0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
+              "\t%f %f moveto %f %f lineto stroke\n"
+              "\t%f %f moveto %f %f lineto stroke\n"
+              "\t[] 0 setdash\ngrestore moveto %% control points\n",
+              start[AXIS_X], start[AXIS_Y], cp1[AXIS_X], cp2[AXIS_Y],
+              cp2[AXIS_X], cp2[AXIS_Y], end[AXIS_X], end[AXIS_Y]);
+    }
+    EventReceiver::spline_move(feed_mm_p_sec, start, cp1, cp2, end);
+  }
+
   virtual void gcode_command_done(char letter, float val) {
     // Remember if things were set to inch or metric, so that we can
     // show dimensions in preferred units.

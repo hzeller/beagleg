@@ -39,7 +39,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "arc-gen.h"
 #include "logging.h"
 #include "string-util.h"
 #include "simple-lexer.h"
@@ -1688,11 +1687,8 @@ const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line
     cp2 = _cp2;
   }
 
-  // TODO(hzeller): similar to arc_move(), this should call a spline_move()
-  spline_gen(&axes_pos_, cp1, cp2, target,
-             [this](const AxesRegister &pos) {
-               callbacks->coordinated_move(-1, pos);
-             });
+  callbacks->spline_move(-1, axes_pos_, cp1, cp2, target);
+  axes_pos_ = target;
   return line;
 }
 

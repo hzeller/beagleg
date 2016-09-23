@@ -16,8 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#include "arc-gen.h"
+#include "gcode-parser.h"
 
 #include <math.h>
 #include <iostream>

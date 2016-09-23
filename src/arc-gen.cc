@@ -23,8 +23,8 @@
 
 #include <functional>
 
-#include "arc-gen.h"
 #include "logging.h"
+#include "gcode-parser.h"
 
 // Arc generation based on smoothieware implementation
 // https://github.com/Smoothieware/Smoothieware.git
@@ -131,11 +131,11 @@ static AxesRegister calc_bezier_point(float t,
                                       const AxesRegister &p1,
                                       const AxesRegister &p2,
                                       const AxesRegister &p3) {
-  float u = 1.0f - t;
-  float uu = u * u;
-  float tt = t * t;
-  float uuu = uu * u;
-  float ttt = tt * t;
+  const float u = 1.0f - t;
+  const float uu = u * u;
+  const float tt = t * t;
+  const float uuu = uu * u;
+  const float ttt = tt * t;
 
   AxesRegister p = p0;
   p[AXIS_X] = uuu * p0[AXIS_X];               // first term
@@ -149,14 +149,11 @@ static AxesRegister calc_bezier_point(float t,
   return p;
 }
 
-void spline_gen(AxesRegister *position_out, // start position. Will be updated.
-                const AxesRegister &cp1,    // Offset from start to first control point.
-                const AxesRegister &cp2,    // Offset from target to second control point.
-                const AxesRegister &target, // Target position.
+static void spline_gen(const AxesRegister &start,
+                       const AxesRegister &cp1,
+                       const AxesRegister &cp2,
+                       const AxesRegister &target,
                 std::function<void (const AxesRegister& pos)> segment_output) {
-  // Alias reference for readable use with [] operator
-  AxesRegister &position = *position_out;
-
 #if 0
   Log_debug("spline_gen: start:%.3f,%.3f cp1:%.3f,%.3f cp2:%.3f,%.3f end:%.3f,%.3f\n",
             position[AXIS_X], position[AXIS_Y],
@@ -166,15 +163,8 @@ void spline_gen(AxesRegister *position_out, // start position. Will be updated.
 #endif
 
   for (float t = 0; t < 1; t += 0.01f) {
-    AxesRegister p = calc_bezier_point(t, position, cp1, cp2, target);
-
-    segment_output(p);
+    segment_output(calc_bezier_point(t, start, cp1, cp2, target));
   }
-
-  // Ensure last segment arrives at target location.
-  position[AXIS_X] = target[AXIS_X];
-  position[AXIS_Y] = target[AXIS_Y];
-  segment_output(position);
 }
 
 void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
@@ -188,4 +178,16 @@ void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
           center, end, [this, feed_mm_p_sec](const AxesRegister &pos) {
             coordinated_move(feed_mm_p_sec, pos);
           });
+}
+
+void GCodeParser::EventReceiver::spline_move(float feed_mm_p_sec,
+                                             const AxesRegister &start,
+                                             const AxesRegister &cp1,
+                                             const AxesRegister &cp2,
+                                             const AxesRegister &end) {
+  spline_gen(start, cp1, cp2, end,
+             [this, feed_mm_p_sec](const AxesRegister &pos) {
+               coordinated_move(feed_mm_p_sec, pos);
+             });
+  coordinated_move(feed_mm_p_sec, end);
 }

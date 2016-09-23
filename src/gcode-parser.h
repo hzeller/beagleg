@@ -138,6 +138,7 @@ public:
     virtual bool rapid_move(float feed_mm_p_sec,
                             const AxesRegister &absolute_pos) = 0;        // G0
 
+    // G2, G3
     // Arc in a circular motion from current position around the "center"
     // coordinate to the "end" coordinate. These coordinates are absolute.
     // The normal axis is one of AXIS_X...AXIS_Z (most common probably AXIS_Z).
@@ -155,6 +156,16 @@ public:
                           const AxesRegister &start,
                           const AxesRegister &center,
                           const AxesRegister &end);
+
+    // G5, G5.1
+    // Move in a cubic spine from absolute "start" to "end" given the absolute
+    // control points "cp1" and "cp2".
+    // The default implementation linearlizes curve and calls coordinated_move()
+    // with the segments.
+    virtual void spline_move(float feed_mm_p_sec,
+                             const AxesRegister &start,
+                             const AxesRegister &cp1, const AxesRegister &cp2,
+                             const AxesRegister &end);
 
     // Hand out G-code command that could not be interpreted.
     // Parameters: letter + value of the command that was not understood,
