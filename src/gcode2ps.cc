@@ -307,12 +307,15 @@ public:
     case 1: {
       // A very short diagnoal move, quantized to steps has a speed of sqrt(2);
       // let's not include these in the min/max calculation.
-      if (abs(param.steps[AXIS_X]) == 1 && abs(param.steps[AXIS_Y]) == 1)
+      if (abs(param.steps[AXIS_X])
+          + abs(param.steps[AXIS_Y])
+          + abs(param.steps[AXIS_Z]) <= 3)
         break;  // don't include super-short segments in the MinMax
 
       const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
       const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
-      const float segment_len = hypotf(dx_mm, dy_mm);
+      const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
+      const float segment_len = sqrtf(dx_mm*dx_mm + dy_mm*dy_mm + dz_mm*dz_mm);
       // The step speed is given by the dominant axis; however the actual
       // segment speed depends on the actual travel in euclidian space.
       const float segment_speed_factor = segment_len /
@@ -338,6 +341,7 @@ public:
   virtual void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
     const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
+    const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
 
     if (show_speeds_) {
       fprintf(file_, "%% dx: %f dy: %f %s (speed: %.1f->%.1f)\n", dx_mm, dy_mm,
@@ -345,7 +349,7 @@ public:
               ((param.v0 < param.v1) ? "; accel" : "; decel"),
               param.v0/config_.steps_per_mm[dominant_axis],
               param.v1/config_.steps_per_mm[dominant_axis]);
-      const float segment_len = hypotf(dx_mm, dy_mm);
+      const float segment_len = sqrtf(dx_mm*dx_mm + dy_mm*dy_mm + dz_mm*dz_mm);
       if (segment_len == 0)
         return;  // If not in x/y plane.
       // The step speed is given by the dominant axis; however the actual
@@ -379,7 +383,8 @@ public:
         fprintf(file_, " %% %.1f mm/s [%s]", v,
                 param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
         if (i == 0)
-          fprintf(file_, " (%d,%d)", param.steps[AXIS_X], param.steps[AXIS_Y]);
+          fprintf(file_, " (%d,%d,%d)",
+                  param.steps[AXIS_X], param.steps[AXIS_Y], param.steps[AXIS_Z]);
         fprintf(file_, "\n");
       }
     } else {
