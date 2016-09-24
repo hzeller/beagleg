@@ -165,6 +165,7 @@ static void spline_gen(const AxesRegister &start,
   for (float t = 0; t < 1; t += 0.01f) {
     segment_output(calc_bezier_point(t, start, cp1, cp2, target));
   }
+  segment_output(target);
 }
 
 void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
@@ -189,5 +190,4 @@ void GCodeParser::EventReceiver::spline_move(float feed_mm_p_sec,
              [this, feed_mm_p_sec](const AxesRegister &pos) {
                coordinated_move(feed_mm_p_sec, pos);
              });
-  coordinated_move(feed_mm_p_sec, end);
 }
