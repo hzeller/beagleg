@@ -59,7 +59,7 @@ char gcodep_axis2letter(enum GCodeParserAxis axis);
 // Returns GCODE_NUM_AXES on invalid character.
 enum GCodeParserAxis gcodep_letter2axis(char letter);
 
-inline bool is_rotational_axis(int axis) {
+inline bool is_rotational_axis(GCodeParserAxis axis) {
   return axis == AXIS_A || axis == AXIS_B || axis == AXIS_C;
 }
 
