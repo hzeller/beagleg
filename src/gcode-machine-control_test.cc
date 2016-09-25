@@ -151,11 +151,11 @@ TEST(GCodeMachineControlTest, straight_segments_same_speed) {
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   AxesRegister coordinates;
-  coordinates[0] = 100;
+  coordinates[AXIS_X] = 100;
   harness.gcode_emit()->coordinated_move(100, coordinates);  // 100mm/s
 
   // second half, same speed
-  coordinates[0] = 200;
+  coordinates[AXIS_X] = 200;
   harness.gcode_emit()->coordinated_move(100, coordinates);  // also 100mm/s
 
   harness.gcode_emit()->motors_enable(false);  // finish movement.
@@ -175,8 +175,8 @@ TEST(GCodeMachineControlTest, speed_clamping) {
   Harness harness(expected);
 
   AxesRegister coordinates;
-  coordinates[0] = 2000;
-  coordinates[1] = 2400;
+  coordinates[AXIS_X] = 2000;
+  coordinates[AXIS_Y] = 2400;
 
   // We set a huge feedrate value to see if it's correctly clamped.
   harness.gcode_emit()->coordinated_move(1e10, coordinates);
@@ -201,11 +201,11 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
   AxesRegister coordinates;
-  coordinates[0] = 100;
+  coordinates[AXIS_X] = 100;
   harness.gcode_emit()->coordinated_move(100, coordinates); // 100mm/s
 
   // second half, less speed.
-  coordinates[0] = 200;
+  coordinates[AXIS_X] = 200;
   harness.gcode_emit()->coordinated_move(50, coordinates);  // 50mm/s
 
   harness.gcode_emit()->motors_enable(false);  // finish movement.

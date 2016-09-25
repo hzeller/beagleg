@@ -144,8 +144,7 @@ bool HardwareMapping::InitializeHardware() {
   // startup, which is of course an impossible mechanical state.
   // Since we don't know in which direction to move out of the way, we have to
   // bail for safety.
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    const GCodeParserAxis axis = (GCodeParserAxis) i;
+  for (GCodeParserAxis axis : AllAxes()) {
     if (TestAxisSwitch(axis, TRIGGER_MIN) && TestAxisSwitch(axis, TRIGGER_MAX)) {
       Log_error("Error: Both min and max switch for axis %c are triggered at "
                 "the same time. No way to safely proceed. Bailing out",

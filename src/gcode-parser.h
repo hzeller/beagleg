@@ -43,9 +43,10 @@ enum GCodeParserAxis {
   AXIS_U, AXIS_V, AXIS_W,
   GCODE_NUM_AXES
 };
+typedef EnumIterable<GCodeParserAxis, AXIS_X, GCODE_NUM_AXES> AllAxes;
 
 // Convenient type: a register to store machine coordinates.
-typedef FixedArray<float, GCODE_NUM_AXES> AxesRegister;
+typedef FixedArray<float, GCODE_NUM_AXES, GCodeParserAxis> AxesRegister;
 
 // Bitmap of axis bools. Test with usual (1<<AXIS_X)
 typedef uint32_t AxisBitmap_t;

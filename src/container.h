@@ -26,7 +26,7 @@
 #include <initializer_list>
 
 // Fixed array of POD types (that can be zeroed with bzero()).
-template <typename T, int N>
+template <typename T, int N, typename IDX = int>
 class FixedArray {
 public:
   FixedArray() { zero(); }
@@ -42,8 +42,8 @@ public:
   FixedArray<T,N> &operator= (const FixedArray<T,N> &other) {
     CopyFrom(other); return *this;
   }
-  T &operator[] (int i) { assert(i < N); return data_[i]; }
-  const T & operator[] (int i) const { assert(i < N); return data_[i]; }
+  T &operator[] (IDX i) { assert(i < N); return data_[i]; }
+  const T & operator[] (IDX i) const { assert(i < N); return data_[i]; }
 
   size_t size() const { return N; }
 
@@ -107,4 +107,24 @@ private:
   T buffer_[CAPACITY];
 };
 
+
+// This class provides a way to iterate over enumeration values. Assumes enum
+// values to be contiguous.
+template<typename T, T first_val, T after_last_val>
+class EnumIterable {
+public:
+  class const_iterator {
+  public:
+    const_iterator(T value) : val_(value) {}
+    T operator* () const { return val_; }
+    void operator++ () { val_ = static_cast<T>(val_ + 1); }
+    bool operator!= (const const_iterator& other) { return other.val_ != val_; }
+
+  private:
+    T val_;
+  };
+
+  const_iterator begin() const { return const_iterator(first_val); }
+  const_iterator end() const { return const_iterator(after_last_val); }
+};
 #endif  // _BEAGLEG_CONTAINER_H_

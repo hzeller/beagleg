@@ -131,8 +131,8 @@ private:
   }
 
   void set_all_axis_to_absolute(bool value) {
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      axis_is_absolute_[i] = value;
+    for (GCodeParserAxis a : AllAxes()) {
+      axis_is_absolute_[a] = value;
     }
   }
   void set_ijk_absolute(bool absolute) {
@@ -156,8 +156,8 @@ private:
 
   void inform_origin_offset_change() {
     AxesRegister visible_origin(*current_origin_);
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      visible_origin[i] += current_global_offset()[i];
+    for (GCodeParserAxis a : AllAxes()) {
+      visible_origin[a] += current_global_offset()[a];
     }
     callbacks->inform_origin_offset(visible_origin);
   }
@@ -1213,9 +1213,9 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   callbacks->go_home(homing_flags);
 
   // Now update the world position
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (homing_flags & (1 << i)) {
-      axes_pos_[i] = home_position_[i];
+  for (GCodeParserAxis a : AllAxes()) {
+    if (homing_flags & (1 << a)) {
+      axes_pos_[a] = home_position_[a];
     }
   }
 
@@ -1228,8 +1228,9 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   int l_val = -1;
   int p_val = -1;
   bool have_val[GCODE_NUM_AXES];
-  for (int i = 0; i < GCODE_NUM_AXES; ++i)
-    have_val[i] = false;
+  for (GCodeParserAxis a : AllAxes()) {
+    have_val[a] = false;
+  }
 
   char letter;
   float value;
@@ -1248,13 +1249,14 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
     line = remaining_line;
   }
   if (l_val == 2 && p_val >= 1 && p_val <= 9) {
-    for (int i = 0; i < GCODE_NUM_AXES; ++i)
-      if (!have_val[i]) coords[i] = coord_system_[p_val-1][i];
+    for (GCodeParserAxis a : AllAxes()) {
+      if (!have_val[a]) coords[a] = coord_system_[p_val-1][a];
+    }
     coord_system_[p_val-1] = coords;
     // Now update the parameters
     int offset = (p_val-1) * 20;
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      store_parameter(StringPrintf("%d", 5221 + offset + i), coords[i]);
+    for (GCodeParserAxis a : AllAxes()) {
+      store_parameter(StringPrintf("%d", 5221 + offset + a), coords[a]);
     }
   } else {
     gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L or P value\n");

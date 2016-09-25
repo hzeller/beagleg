@@ -61,9 +61,9 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
   // Alias reference for readable use with [] operator
   AxesRegister &position = *position_out;
   AxesRegister offset;
-  offset[0] = center[0] - position[0];
-  offset[1] = center[1] - position[1];
-  offset[2] = center[2] - position[2];
+  offset[AXIS_X] = center[AXIS_X] - position[AXIS_X];
+  offset[AXIS_Y] = center[AXIS_Y] - position[AXIS_Y];
+  offset[AXIS_Z] = center[AXIS_Z] - position[AXIS_Z];
   const float radius = sqrtf(offset[plane[0]] * offset[plane[0]] +
                              offset[plane[1]] * offset[plane[1]]);
   const float center_0 = position[plane[0]] + offset[plane[0]];
@@ -121,7 +121,7 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
 
   // Ensure last segment arrives at target location.
   for (int axis = AXIS_X; axis <= AXIS_Z; axis++) {
-    position[axis] = target[axis];
+    position[(GCodeParserAxis)axis] = target[(GCodeParserAxis)axis];
   }
   segment_output(position);
 }

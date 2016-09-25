@@ -208,8 +208,7 @@ static float determine_joining_speed(const struct AxisTarget *from,
   bool is_first = true;
   float from_defining_speed = from->speed;
   const int from_defining_steps = from->delta_steps[from->defining_axis];
-  for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
-    const GCodeParserAxis axis = (GCodeParserAxis) ai;
+  for (const GCodeParserAxis axis : AllAxes()) {
     const int from_delta = from->delta_steps[axis];
     const int to_delta = to->delta_steps[axis];
 
@@ -245,7 +244,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   // wherever the endswitch is for each axis.
   struct AxisTarget *init_axis = planning_buffer_.append();
   bzero(init_axis, sizeof(*init_axis));
-  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+  for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
     if (trigger == 0) {
       init_axis->position_steps[axis] = 0;
@@ -259,7 +258,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   position_known_ = true;
 
   float lowest_accel = cfg_->max_feedrate[AXIS_X] * cfg_->steps_per_mm[AXIS_X];
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+  for (const GCodeParserAxis i : AllAxes()) {
     max_axis_speed_[i] = cfg_->max_feedrate[i] * cfg_->steps_per_mm[i];
     const float accel = cfg_->acceleration[i] * cfg_->steps_per_mm[i];
     max_axis_accel_[i] = accel;
@@ -291,7 +290,7 @@ float Planner::Impl::clamp_to_limits(enum GCodeParserAxis defining_axis,
   float ratio, max_offset = 1, offset;
   const FloatAxisConfig &max_axis_speed = cfg_->max_feedrate;
   const FloatAxisConfig &steps_per_mm = cfg_->steps_per_mm;
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+  for (const GCodeParserAxis i : AllAxes()) {
     ratio = fabs(((float) axis_steps[i] * steps_per_mm[defining_axis])
             / (axis_steps[defining_axis] * steps_per_mm[i]));
     offset = ratio > 0 ? max_axis_speed[i] / (target_speed * ratio) : 1;
@@ -432,10 +431,9 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
     accel_command.v1 = target_pos->speed;    // New speed of defining axis
 
     // Now map axis steps to actual motor driver
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      const int accel_steps = round2int(accel_fraction * axis_steps[i]);
-      assign_steps_to_motors(&accel_command, (GCodeParserAxis)i,
-                             accel_steps);
+    for (const GCodeParserAxis a : AllAxes()) {
+      const int accel_steps = round2int(accel_fraction * axis_steps[a]);
+      assign_steps_to_motors(&accel_command, a, accel_steps);
     }
   } else {
     if (last_speed) target_pos->speed = last_speed; // No accel so use the last speed
@@ -451,19 +449,17 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
     target_pos->speed = next_speed;
 
     // Now map axis steps to actual motor driver
-    for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-      const int decel_steps = round2int(decel_fraction * axis_steps[i]);
-      assign_steps_to_motors(&decel_command, (GCodeParserAxis)i,
-                             decel_steps);
+    for (const GCodeParserAxis a : AllAxes()) {
+      const int decel_steps = round2int(decel_fraction * axis_steps[a]);
+      assign_steps_to_motors(&decel_command, a, decel_steps);
     }
   }
 
   // Move is everything that hasn't been covered in speed changes.
   // So we start with all steps and subtract steps done in acceleration and
   // deceleration.
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    assign_steps_to_motors(&move_command, (GCodeParserAxis)i,
-                           axis_steps[i]);
+  for (const GCodeParserAxis a : AllAxes()) {
+    assign_steps_to_motors(&move_command, a, axis_steps[a]);
   }
   subtract_steps(&move_command, accel_command);
   has_move = subtract_steps(&move_command, decel_command);
@@ -498,16 +494,16 @@ void Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   // Real world -> machine coordinates. Here, we are rounding to the next full
   // step, but we never accumulate the error, as we always use the absolute
   // position as reference.
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    new_pos->position_steps[i] = round2int(axis[i] * cfg_->steps_per_mm[i]);
-    new_pos->delta_steps[i] = new_pos->position_steps[i] - previous->position_steps[i];
+  for (const GCodeParserAxis a : AllAxes()) {
+    new_pos->position_steps[a] = round2int(axis[a] * cfg_->steps_per_mm[a]);
+    new_pos->delta_steps[a] = new_pos->position_steps[a] - previous->position_steps[a];
 
     // The defining axis is the one that has to travel the most steps. It defines
     // the frequency to go.
     // All the other axes are doing a fraction of the defining axis.
-    if (abs(new_pos->delta_steps[i]) > max_steps) {
-      max_steps = abs(new_pos->delta_steps[i]);
-      defining_axis = (enum GCodeParserAxis) i;
+    if (abs(new_pos->delta_steps[a]) > max_steps) {
+      max_steps = abs(new_pos->delta_steps[a]);
+      defining_axis = a;
     }
   }
 
@@ -546,9 +542,9 @@ void Planner::Impl::bring_path_to_halt() {
   // slow down. Enqueue.
   struct AxisTarget *previous = planning_buffer_.back();
   struct AxisTarget *new_pos = planning_buffer_.append();
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    new_pos->position_steps[i] = previous->position_steps[i];
-    new_pos->delta_steps[i] = 0;
+  for (const GCodeParserAxis a : AllAxes()) {
+    new_pos->position_steps[a] = previous->position_steps[a];
+    new_pos->delta_steps[a] = 0;
   }
   new_pos->defining_axis = AXIS_X;
   new_pos->speed = 0;
@@ -561,9 +557,9 @@ void Planner::Impl::bring_path_to_halt() {
 void Planner::Impl::GetCurrentPosition(AxesRegister *pos) {
   assert(planning_buffer_.size() > 0);  // we always should have a current pos
   const int *mpos = planning_buffer_[0]->position_steps;
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (cfg_->steps_per_mm[i] != 0) {
-      (*pos)[i] = 1.0f * mpos[i] / cfg_->steps_per_mm[i];
+  for (const GCodeParserAxis a : AllAxes()) {
+    if (cfg_->steps_per_mm[a] != 0) {
+      (*pos)[a] = 1.0f * mpos[a] / cfg_->steps_per_mm[a];
     }
   }
 }

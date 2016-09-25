@@ -175,31 +175,31 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
 bool GCodeMachineControl::Impl::Init() {
   // Always keep the steps_per_mm positive, but extract direction for
   // final assignment to motor.
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (cfg_.steps_per_mm[i] < 0) {
+  for (const GCodeParserAxis axis : AllAxes()) {
+    if (cfg_.steps_per_mm[axis] < 0) {
       Log_error("Negative number of steps per unit for Axis %c",
-                gcodep_axis2letter((GCodeParserAxis)i));
+                gcodep_axis2letter(axis));
       return false;
     }
     // Permissible hard override. We want to keep cfg_ const for most of the
     // places, so writing here in Init() is permissible.
-    const_cast<MachineControlConfig&>(cfg_).steps_per_mm[i]
-                                           = fabsf(cfg_.steps_per_mm[i]);
-    if (cfg_.max_feedrate[i] < 0) {
+    const_cast<MachineControlConfig&>(cfg_).steps_per_mm[axis]
+                                           = fabsf(cfg_.steps_per_mm[axis]);
+    if (cfg_.max_feedrate[axis] < 0) {
       Log_error("Invalid negative feedrate %.1f for axis %c\n",
-              cfg_.max_feedrate[i], gcodep_axis2letter((GCodeParserAxis)i));
+                cfg_.max_feedrate[axis], gcodep_axis2letter(axis));
       return false;
     }
-    if (cfg_.acceleration[i] < 0) {
+    if (cfg_.acceleration[axis] < 0) {
       Log_error("Invalid negative acceleration %.1f for axis %c\n",
-              cfg_.acceleration[i], gcodep_axis2letter((GCodeParserAxis)i));
+                cfg_.acceleration[axis], gcodep_axis2letter(axis));
       return false;
     }
   }
 
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
-    if (cfg_.max_feedrate[i] > g0_feedrate_mm_per_sec_) {
-      g0_feedrate_mm_per_sec_ = cfg_.max_feedrate[i];
+  for (const GCodeParserAxis axis : AllAxes()) {
+    if (cfg_.max_feedrate[axis] > g0_feedrate_mm_per_sec_) {
+      g0_feedrate_mm_per_sec_ = cfg_.max_feedrate[axis];
     }
   }
   prog_speed_factor_ = 1.0f;
@@ -207,8 +207,7 @@ bool GCodeMachineControl::Impl::Init() {
   int error_count = 0;
 
   // Check if things are plausible: we only allow one home endstop per axis.
-  for (int a = 0; a < GCODE_NUM_AXES; ++a) {
-    GCodeParserAxis axis = (GCodeParserAxis) a;
+  for (const GCodeParserAxis axis : AllAxes()) {
     const HardwareMapping::AxisTrigger homing_trigger = cfg_.homing_trigger[axis];
     if (homing_trigger == HardwareMapping::TRIGGER_NONE) {
       continue;
@@ -229,8 +228,7 @@ bool GCodeMachineControl::Impl::Init() {
 
   // Now let's see what motors are mapped to any useful output.
   Log_debug("-- Config --\n");
-  for (int ii = 0; ii < GCODE_NUM_AXES; ++ii) {
-    const GCodeParserAxis axis = (GCodeParserAxis) ii;
+  for (const GCodeParserAxis axis : AllAxes()) {
     if (cfg_.steps_per_mm[axis] > 0 && !hardware_mapping_->HasMotorFor(axis)) {
       // User didn't give a motor mapping for this one. Auto map it.
       const int new_motor = hardware_mapping_->GetFirstFreeMotor();
@@ -511,8 +509,7 @@ void GCodeMachineControl::Impl::get_current_position() {
 
 void GCodeMachineControl::Impl::get_endstop_status() {
   bool any_endstops_found = false;
-  for (int ai = 0; ai < GCODE_NUM_AXES; ++ai) {
-    const  GCodeParserAxis axis = (GCodeParserAxis) ai;
+  for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger triggers = hardware_mapping_->AvailableAxisSwitch(axis);
     if ((triggers & HardwareMapping::TRIGGER_MIN) != 0) {
       mprintf("%c_min:%s:%s ",
@@ -567,19 +564,18 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &a
   if (!cfg_.range_check)
     return true;
 
-  for (int i = 0; i < GCODE_NUM_AXES; ++i) {
+  for (const GCodeParserAxis i : AllAxes()) {
     // Min range ...
     if (axes[i] < 0) {
       // Machine cube must be in positive range.
       if (coordinate_display_origin_[i] != 0) {
         mprintf("// ERROR outside machine limit: Axis %c < min allowed "
                 "%+.1fmm in current coordinate system. Ignoring move!\n",
-                gcodep_axis2letter((GCodeParserAxis)i),
-                -coordinate_display_origin_[i]);
+                gcodep_axis2letter(i), -coordinate_display_origin_[i]);
       } else {
         // No relative G92 or similar set. Display in simpler form.
         mprintf("// ERROR outside machine limit: Axis %c < 0. "
-                "Ignoring move!\n", gcodep_axis2letter((GCodeParserAxis)i));
+                "Ignoring move!\n", gcodep_axis2letter(i));
       }
       return false;
     }
@@ -595,13 +591,13 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &a
         mprintf("// ERROR outside machine limit: Axis %c %.1fmm > max allowed %+.1fmm "
                 "in current coordinate system (=%.1fmm machine absolute). "
                 "Ignoring move!\n",
-                gcodep_axis2letter((GCodeParserAxis)i),
+                gcodep_axis2letter(i),
                 axes[i] - coordinate_display_origin_[i],
                 max_limit - coordinate_display_origin_[i], max_limit);
       } else {
         // No relative G92 or similar set. Display in simpler form.
         mprintf("// ERROR outside machine limit: Axis %c = %.1f > %.1fmm. "
-                "Ignoring move!\n", gcodep_axis2letter((GCodeParserAxis)i),
+                "Ignoring move!\n", gcodep_axis2letter(i),
                 axes[i], max_limit);
       }
       return false;
@@ -822,7 +818,7 @@ GCodeMachineControl* GCodeMachineControl::Create(
 
 void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   home_pos->zero();
-  for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+  for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = impl_->config().homing_trigger[axis];
     (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
       ? impl_->config().move_range_mm[axis] : 0;

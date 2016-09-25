@@ -591,7 +591,7 @@ int main(int argc, char *argv[]) {
     // This is not connected to any machine. Don't assume homing, but
     // at least extract the home position from the config.
     machine_config.require_homing = false;
-    for (int axis = 0; axis < GCODE_NUM_AXES; ++axis) {
+    for (const GCodeParserAxis axis : AllAxes()) {
       HardwareMapping::AxisTrigger trigger = machine_config.homing_trigger[axis];
       parser_cfg.machine_origin[axis] =
         (trigger & HardwareMapping::TRIGGER_MAX)
