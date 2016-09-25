@@ -26,9 +26,14 @@
 #include <initializer_list>
 
 // Fixed array of POD types (that can be zeroed with bzero()).
+// Allows to have the index be a specific type (typically an enum instad of int).
+// Use for compile-defined small arrays, such as for axes and motors.
 template <typename T, int N, typename IDX = int>
 class FixedArray {
 public:
+  typedef T* iterator;
+  typedef const T* const_iterator;
+
   FixedArray() { zero(); }
   FixedArray(const std::initializer_list<T> &in_list) {
     zero();
@@ -48,6 +53,12 @@ public:
   size_t size() const { return N; }
 
   void zero() { bzero(data_, sizeof(data_)); }
+
+  iterator begin() { return data_; }
+  iterator end() { return data_ + N; }
+
+  const_iterator begin() const { return data_; }
+  const_iterator end() const { return data_ + N; }
 
 private:
   void CopyFrom(const FixedArray<T,N> &other) {
