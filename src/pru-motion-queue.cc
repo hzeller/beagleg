@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <strings.h>
+#include <stdlib.h>
 
 #include "generic-gpio.h"
 #include "pwm-timer.h"
@@ -41,7 +42,8 @@
 // an endswitch fires.
 struct PRUCommunication {
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
-};
+  volatile struct QueueStatus status;
+} __attribute__((packed));
 
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e,
@@ -79,6 +81,52 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
+// Store the required informations needed to backtrack the absolute position.
+struct HistorySegment {
+  uint32_t fractions[MOTION_MOTOR_COUNT];
+  uint32_t cumulative_loops[MOTION_MOTOR_COUNT];
+  uint8_t direction_bits;
+};
+
+void PRUMotionQueue::RegisterHistorySegment(MotionSegment *element) {
+  const uint64_t max_fraction = 0xFFFFFFFF;
+  const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
+  const HistorySegment previous
+    = shadow_queue_[(last_insert_index - 1) % QUEUE_LEN];
+
+  const uint32_t total_loops
+    = element->loops_accel + element->loops_travel + element->loops_decel;
+  const uint8_t direction_bits = element->direction_bits;
+
+  HistorySegment *new_slot = &shadow_queue_[last_insert_index];
+
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    const uint32_t fraction = element->fractions[i];
+    new_slot->fractions[i] = fraction;
+    const int sign = (direction_bits >> i) & 1 ? -1 : 1;
+    uint64_t loops = (uint64_t) fraction * (uint64_t) total_loops;
+    loops /= max_fraction;
+    new_slot->cumulative_loops[i] = previous.cumulative_loops[i]
+                                    + sign * loops;
+  }
+
+  new_slot->direction_bits = element->direction_bits;
+}
+
+void PRUMotionQueue::GetMotorsLoops(int32_t *absolute_pos_loops) {
+  const uint64_t max_fraction = 0xFFFFFFFF;
+  const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
+  const HistorySegment current = shadow_queue_[status.index];
+
+  uint64_t loops;
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    const int sign = (current.direction_bits >> i) & 1 ? -1 : 1;
+    loops = (uint64_t) current.fractions[i] * (uint64_t) status.counter;
+    loops /= max_fraction;
+    absolute_pos_loops[i] = current.cumulative_loops[i] - sign * loops;
+  }
+}
+
 // Stop gap for compiler attempting to be overly clever when copying between
 // host and PRU memory.
 static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) {
@@ -107,14 +155,17 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;
+
+  // Register the last inserted motion segment in the shadow queue.
+  RegisterHistorySegment(element);
 #ifdef DEBUG_QUEUE
   DumpMotionSegment(queue_element, pru_data_);
 #endif
 }
 
 void PRUMotionQueue::WaitQueueEmpty() {
-  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
+  const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
+  while (pru_data_->ring_buffer[last_insert_index].state != STATE_EMPTY) {
     pru_interface_->WaitEvent();
   }
 }
@@ -134,6 +185,8 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
+PRUMotionQueue::~PRUMotionQueue() { delete shadow_queue_; }
+
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
                                : hardware_mapping_(hw),
                                  pru_interface_(pru) {
@@ -141,6 +194,13 @@ PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
   assert(success);
+
+  // Initialize Shadow queue
+  shadow_queue_ = new HistorySegment[QUEUE_LEN];
+  shadow_queue_[0] = (struct HistorySegment){0};
+  shadow_queue_[QUEUE_LEN - 1] = (struct HistorySegment){0};
+
+  back_shadow_queue_ = 0;
 }
 
 bool PRUMotionQueue::Init() {

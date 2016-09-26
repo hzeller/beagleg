@@ -224,8 +224,6 @@ QUEUE_READ:
 	ADD r28, r28, travel_params.loops_accel
 	ADD r28, r28, travel_params.loops_travel
 	ADD r28, r28, travel_params.loops_decel
-	;; Add one more because the first delay is pre-calculated
-	ADD r28, r28, 1
 
 	;; We store a 32-bit word at the end of the queue chunk of memory
 	MOV r0, STATUS_VALUE
