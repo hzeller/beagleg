@@ -49,6 +49,9 @@ public:
   }
   T &operator[] (IDX i) { assert(i < N); return data_[i]; }
   const T & operator[] (IDX i) const { assert(i < N); return data_[i]; }
+  bool operator== (const FixedArray<T,N> &other) const {
+    return memcmp(data_, other.data_, sizeof(data_)) == 0;
+  }
 
   size_t size() const { return N; }
 
