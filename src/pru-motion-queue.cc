@@ -41,8 +41,8 @@
 // commands to execute, but also configuration data, such as what to do when
 // an endswitch fires.
 struct PRUCommunication {
-  volatile struct MotionSegment ring_buffer[QUEUE_LEN];
   volatile struct QueueStatus status;
+  volatile struct MotionSegment ring_buffer[QUEUE_LEN];
 } __attribute__((packed));
 
 #ifdef DEBUG_QUEUE
@@ -88,42 +88,45 @@ struct HistorySegment {
   uint8_t direction_bits;
 };
 
-void PRUMotionQueue::RegisterHistorySegment(MotionSegment *element) {
+void PRUMotionQueue::RegisterHistorySegment(const MotionSegment &element) {
   const uint64_t max_fraction = 0xFFFFFFFF;
   const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
-  const HistorySegment previous
+  const struct HistorySegment &previous
     = shadow_queue_[(last_insert_index - 1) % QUEUE_LEN];
 
-  const uint32_t total_loops
-    = element->loops_accel + element->loops_travel + element->loops_decel;
-  const uint8_t direction_bits = element->direction_bits;
+  const uint64_t total_loops
+    = element.loops_accel + element.loops_travel + element.loops_decel;
+  const uint8_t direction_bits = element.direction_bits;
 
   HistorySegment *new_slot = &shadow_queue_[last_insert_index];
 
+  // TODO: Motor operations already holds this information, we should wire it
+  // until here in order to avoid this redundant operation.
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-    const uint32_t fraction = element->fractions[i];
+    const uint64_t fraction = element.fractions[i];
     new_slot->fractions[i] = fraction;
     const int sign = (direction_bits >> i) & 1 ? -1 : 1;
-    uint64_t loops = (uint64_t) fraction * (uint64_t) total_loops;
+    uint64_t loops = fraction * total_loops;
     loops /= max_fraction;
     new_slot->cumulative_loops[i] = previous.cumulative_loops[i]
                                     + sign * loops;
   }
 
-  new_slot->direction_bits = element->direction_bits;
+  new_slot->direction_bits = element.direction_bits;
 }
 
-void PRUMotionQueue::GetMotorsLoops(int32_t *absolute_pos_loops) {
+void PRUMotionQueue::GetMotorsLoops(MotorsRegister *absolute_pos_loops) {
   const uint64_t max_fraction = 0xFFFFFFFF;
   const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
-  const HistorySegment current = shadow_queue_[status.index];
+  const struct HistorySegment &current = shadow_queue_[status.index];
 
-  uint64_t loops;
+  const uint64_t counter = status.counter;
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-    const int sign = (current.direction_bits >> i) & 1 ? -1 : 1;
-    loops = (uint64_t) current.fractions[i] * (uint64_t) status.counter;
+    const int64_t sign = (current.direction_bits >> i) & 1 ? -1 : 1;
+    uint64_t loops = current.fractions[i];
+    loops *= counter;
     loops /= max_fraction;
-    absolute_pos_loops[i] = current.cumulative_loops[i] - sign * loops;
+    (*absolute_pos_loops)[i] = current.cumulative_loops[i] - sign * loops;
   }
 }
 
@@ -157,7 +160,7 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
   queue_element->state = state_to_send;
 
   // Register the last inserted motion segment in the shadow queue.
-  RegisterHistorySegment(element);
+  RegisterHistorySegment(*element);
 #ifdef DEBUG_QUEUE
   DumpMotionSegment(queue_element, pru_data_);
 #endif

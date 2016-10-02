@@ -30,7 +30,7 @@ public:
   virtual void WaitQueueEmpty() {}
   virtual void MotorEnable(bool on) {}
   virtual void Shutdown(bool flush_queue) {}
-  virtual void GetMotorsLoops(int32_t *absolute_pos_loops) {}
+  virtual void GetMotorsLoops(MotorsRegister *absolute_pos_loops) {}
 
 private:
   class Averager;

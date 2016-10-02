@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include "container.h"
 #include "logging.h"
 #include "motor-operations.h"
 #include "pru-hardware-interface.h"
@@ -21,8 +22,8 @@
 
 // PRU-side mock implementation of the ring buffer.
 struct MockPRUCommunication {
-  struct MotionSegment ring_buffer[QUEUE_LEN];
   struct QueueStatus status;
+  struct MotionSegment ring_buffer[QUEUE_LEN];
 } __attribute__((packed));
 
 class MockPRUInterface : public PruHardwareInterface {
@@ -56,15 +57,15 @@ private:
 
 // Check that on init, the initial position is 0.
 TEST(RealtimePosition, init_pos) {
-  int32_t absolute_pos_loops[MOTION_MOTOR_COUNT];
+  MotorsRegister absolute_pos_loops;
   MockPRUInterface *pru_interface = new MockPRUInterface();
   HardwareMapping *hmap = new HardwareMapping();
   PRUMotionQueue motion_backend(hmap, (PruHardwareInterface*) pru_interface);
 
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
 
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(0, 0, 0, 0, 0, 0, 0, 0));
+  const MotorsRegister expected = {0, 0, 0, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   delete pru_interface;
   delete hmap;
@@ -81,7 +82,7 @@ TEST(RealtimePosition, zero_loops_edge) {
     0 /*travel_delay_cycles*/,
     0xFFFFFFFF, 0x55555555, 0x33333333, 0, 0, 0, 0, 0/*fractions*/,
   };
-  int32_t absolute_pos_loops[MOTION_MOTOR_COUNT];
+  MotorsRegister absolute_pos_loops;
   MockPRUInterface *pru_interface = new MockPRUInterface();
   HardwareMapping *hmap = new HardwareMapping();
   PRUMotionQueue motion_backend(hmap, (PruHardwareInterface*) pru_interface);
@@ -91,16 +92,15 @@ TEST(RealtimePosition, zero_loops_edge) {
   motion_backend.Enqueue(&segment);
   pru_interface->SimRun(0, 0);
 
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
 
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(150, -50, -30, 0, 0, 0, 0, 0));
+  const MotorsRegister expected = {150, -50, -30, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   pru_interface->SimRun(1, 150);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
 
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(150, -50, -30, 0, 0, 0, 0, 0));
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   delete pru_interface;
   delete hmap;
@@ -126,7 +126,8 @@ TEST(RealtimePosition, hybrid_execution) {
     0xFFFFFFFF, 0x55555555, 0x33333333, 0, 0, 0, 0, 0/*fractions*/,
   };
 
-  int32_t absolute_pos_loops[MOTION_MOTOR_COUNT];
+  MotorsRegister absolute_pos_loops;
+  MotorsRegister expected;
   MockPRUInterface *pru_interface = new MockPRUInterface();
   HardwareMapping *hmap = new HardwareMapping();
 
@@ -134,21 +135,24 @@ TEST(RealtimePosition, hybrid_execution) {
 
   motion_backend.Enqueue(&segment1);
   pru_interface->SimRun(0, 75);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(75, -25, -15, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {75, -25, -15, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   motion_backend.Enqueue(&segment2);
 
   pru_interface->SimRun(1, 7);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(142, -47, -32, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {142, -47, -32, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   pru_interface->SimRun(1, 0);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(135, -45, -33, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {135, -45, -33, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   delete pru_interface;
   delete hmap;
@@ -175,7 +179,8 @@ TEST(RealtimePosition, queue_full) {
     0xFFFFFFFF, 0x55555555, 0x33333333, 0, 0, 0, 0, 0/*fractions*/,
   };
 
-  int32_t absolute_pos_loops[MOTION_MOTOR_COUNT];
+  MotorsRegister absolute_pos_loops;
+  MotorsRegister expected;
   MockPRUInterface *pru_interface = new MockPRUInterface();
   HardwareMapping *hmap = new HardwareMapping();
 
@@ -187,9 +192,10 @@ TEST(RealtimePosition, queue_full) {
   }
 
   pru_interface->SimRun(QUEUE_LEN - 1, 0);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(2400, -800, -480, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {2400, -800, -480, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   for (int i = 0; i < 3; ++i) {
     motion_backend.Enqueue(&segment_reverse);
@@ -197,9 +203,10 @@ TEST(RealtimePosition, queue_full) {
   }
 
   pru_interface->SimRun(2, 0);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(1950, -650, -390, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {1950, -650, -390, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   // Simulate a stop, the pru awaits for the next slot to be filled.
   pru_interface->SimRun(3, 0);
@@ -210,9 +217,10 @@ TEST(RealtimePosition, queue_full) {
   }
 
   pru_interface->SimRun(2, 0);
-  motion_backend.GetMotorsLoops(absolute_pos_loops);
-  EXPECT_THAT(absolute_pos_loops,
-              ::testing::ElementsAre(-450, 150, 90, 0, 0, 0, 0, 0));
+  motion_backend.GetMotorsLoops(&absolute_pos_loops);
+
+  expected = {-450, 150, 90, 0, 0, 0, 0, 0};
+  EXPECT_THAT(expected, ::testing::ContainerEq(absolute_pos_loops));
 
   delete pru_interface;
   delete hmap;

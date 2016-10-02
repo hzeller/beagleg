@@ -28,7 +28,7 @@
 #define CONST_PRUDRAM	   C24
 
 #define QUEUE_ELEMENT_SIZE (SIZE(QueueHeader) + SIZE(TravelParameters))
-#define STATUS_VALUE (QUEUE_LEN * QUEUE_ELEMENT_SIZE)
+#define QUEUE_OFFSET 4
 
 #define PARAM_START r7
 #define PARAM_END  r19
@@ -174,8 +174,9 @@ DONE_CALCULATE_DELAY:
 	;; Decrease the step counter
 	SUB r28, r28, 1 ; status_loops--
 	;; Push in DRAM
-	MOV r0, STATUS_VALUE
+	MOV r0, 0
 	SBCO r28, CONST_PRUDRAM, r0, 4
+	SUB r1, r1, (4 / 2) ; Subtract the loops consumed for this macro.
 .endm
 
 INIT:
@@ -184,10 +185,10 @@ INIT:
 	CLR r0, r0, 4
 	SBCO r0, C4, 4, 4
 
-	MOV r2, 0   ; Queue address in PRU memory
-	MOV r28, 0  ; Status register in PRU memory,
-	            ; r28.b3 for current queue position,
-	            ; bottom three for the remaining steps of the current slot.
+	MOV r2, QUEUE_OFFSET ; Queue address in PRU memory
+	MOV r28, 0           ; Status register in PRU memory,
+	                     ; r28.b3 for current queue position,
+	                     ; bottom three for the remaining steps of the current slot.
 QUEUE_READ:
 	;;
 	;; Read next element from ring-buffer
@@ -220,13 +221,13 @@ QUEUE_READ:
 	;; ! We are assuming that writing the 4 bytes status register is atomic
 	;; and we guarantee that the bottom three bytes are all zero so we just need
 	;; to sum up the 3 loop counters. The upper bound of this sum will always be
-	;; less than 2^18. At each loop executed this counter is decreased of one unit.
+	;; less than 2^18, thus fit in the lower 24 bits allocated for it.
+	;; At each loop executed this counter is decreased of one unit.
 	ADD r28, r28, travel_params.loops_accel
 	ADD r28, r28, travel_params.loops_travel
 	ADD r28, r28, travel_params.loops_decel
 
-	;; We store a 32-bit word at the end of the queue chunk of memory
-	MOV r0, STATUS_VALUE
+	MOV r0, 0 ; Status register address in PRU memory.
 	SBCO r28, CONST_PRUDRAM, r0, 4
 
 	;; Registers
@@ -277,7 +278,7 @@ DONE_STEP_GEN:
 	ADD r28.b3, r28.b3, 1                  ; add + 1 to the MSB byte
 	MOV r1, QUEUE_LEN * QUEUE_ELEMENT_SIZE ; end-of-queue
 	QBLT QUEUE_READ, r1, r2
-	ZERO &r2, 4
+	MOV r2, QUEUE_OFFSET
 	ZERO &r28, 4
 	JMP QUEUE_READ
 
