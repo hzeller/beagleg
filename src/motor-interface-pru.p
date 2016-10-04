@@ -259,8 +259,8 @@ STEP_GEN:
 	CALL SetSteps
 
 	CalculateDelay r1, travel_params, r3, r5, r6
-	UpdateQueueStatus
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
+	UpdateQueueStatus
 STEP_DELAY:				; Create time delay between steps.
 	SUB r1, r1, 1                   ; two cycles per loop.
 	QBNE STEP_DELAY, r1, 0
