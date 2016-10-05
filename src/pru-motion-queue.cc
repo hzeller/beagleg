@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <strings.h>
+#include <stdlib.h>
 
 #include "generic-gpio.h"
 #include "pwm-timer.h"
@@ -40,8 +41,9 @@
 // commands to execute, but also configuration data, such as what to do when
 // an endswitch fires.
 struct PRUCommunication {
+  volatile struct QueueStatus status;
   volatile struct MotionSegment ring_buffer[QUEUE_LEN];
-};
+} __attribute__((packed));
 
 #ifdef DEBUG_QUEUE
 static void DumpMotionSegment(volatile const struct MotionSegment *e,
@@ -79,6 +81,56 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
+// Store the required informations needed to backtrack the absolute position.
+struct HistorySegment {
+  HistorySegment() : fractions(), cumulative_loops(), direction_bits(0) {}
+  uint32_t fractions[MOTION_MOTOR_COUNT];
+  uint32_t cumulative_loops[MOTION_MOTOR_COUNT];
+  uint8_t direction_bits;
+};
+
+void PRUMotionQueue::RegisterHistorySegment(const MotionSegment &element) {
+  const uint64_t max_fraction = 0xFFFFFFFF;
+  const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
+  const struct HistorySegment &previous
+    = shadow_queue_[(last_insert_index - 1) % QUEUE_LEN];
+
+  const uint64_t total_loops
+    = element.loops_accel + element.loops_travel + element.loops_decel;
+  const uint8_t direction_bits = element.direction_bits;
+
+  HistorySegment *new_slot = &shadow_queue_[last_insert_index];
+
+  // TODO: Motor operations already holds this information, we should wire it
+  // until here in order to avoid this redundant operation.
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    const uint64_t fraction = element.fractions[i];
+    new_slot->fractions[i] = fraction;
+    const int sign = (direction_bits >> i) & 1 ? -1 : 1;
+    uint64_t loops = fraction * total_loops;
+    loops /= max_fraction;
+    new_slot->cumulative_loops[i] = previous.cumulative_loops[i]
+                                    + sign * loops;
+  }
+
+  new_slot->direction_bits = element.direction_bits;
+}
+
+void PRUMotionQueue::GetMotorsLoops(MotorsRegister *absolute_pos_loops) {
+  const uint64_t max_fraction = 0xFFFFFFFF;
+  const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
+  const struct HistorySegment &current = shadow_queue_[status.index];
+
+  const uint64_t counter = status.counter;
+  for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    const int64_t sign = (current.direction_bits >> i) & 1 ? -1 : 1;
+    uint64_t loops = current.fractions[i];
+    loops *= counter;
+    loops /= max_fraction;
+    (*absolute_pos_loops)[i] = current.cumulative_loops[i] - sign * loops;
+  }
+}
+
 // Stop gap for compiler attempting to be overly clever when copying between
 // host and PRU memory.
 static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) {
@@ -107,14 +159,17 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;
+
+  // Register the last inserted motion segment in the shadow queue.
+  RegisterHistorySegment(*element);
 #ifdef DEBUG_QUEUE
   DumpMotionSegment(queue_element, pru_data_);
 #endif
 }
 
 void PRUMotionQueue::WaitQueueEmpty() {
-  const unsigned int last_insert_position = (queue_pos_ - 1) % QUEUE_LEN;
-  while (pru_data_->ring_buffer[last_insert_position].state != STATE_EMPTY) {
+  const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
+  while (pru_data_->ring_buffer[last_insert_index].state != STATE_EMPTY) {
     pru_interface_->WaitEvent();
   }
 }
@@ -134,9 +189,12 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
+PRUMotionQueue::~PRUMotionQueue() { delete [] shadow_queue_; }
+
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
                                : hardware_mapping_(hw),
-                                 pru_interface_(pru) {
+                                 pru_interface_(pru),
+                                 shadow_queue_(new HistorySegment[QUEUE_LEN]) {
   const bool success = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
