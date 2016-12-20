@@ -209,6 +209,13 @@ public:
   // If "err_stream" is non-NULL, sends error messages that way.
   void ParseLine(const char *line, FILE *err_stream);
 
+  // TODO: this needs to get an fd-multiplexer and needs to register a
+  // callback for whenever there is something new.
+
+  // TODO: also - the fdmultiplexer needs to have a way to register a regular
+  // callback, so that we can simulate the idle call.
+
+  // THIS BLOCKS IT NEEDS TO BE REPLACED WITH A THING THAT REGISTERS A CALLBACK
   // Read and parse GCode from "input_fd" and call callbacks.
   // Error messages are sent to "err_stream" if non-NULL.
   // Reads until EOF (returns 0) or signal occured (returns 2).
