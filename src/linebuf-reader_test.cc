@@ -83,7 +83,7 @@ TEST(LinebufReaderTest, SmallChunkReading) {
                 potential_line);
       expected_next_sample += 1;
     } else {
-      fprintf(stderr, "Nothing yet\n");
+      fprintf(stderr, ".");  // Indicating that we have nothing yet.
     }
   }
   EXPECT_EQ(kSampleLineCount, expected_next_sample);
