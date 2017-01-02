@@ -33,7 +33,7 @@ In order to run BeagleG on your BeagleBone you will need to be sure
 that uio_pruss kernel module has been installed and loaded in the kernel.
 You can easily test if the module it's available by running:
 
-    if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready!"; fi
+    if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; fi
 
 then just load it using:
 
