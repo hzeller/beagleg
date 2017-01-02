@@ -84,69 +84,90 @@ void clr_gpio(uint32_t gpio_def) {
     gpio_port[GPIO_CLEARDATAOUT/4] = bitmask;
 }
 
-static void set_gpio_output_mask(uint32_t *output_mask, uint32_t gpio_def) {
-  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+static void set_gpio_mask(uint32_t *mask, uint32_t gpio_def) {
+  const uint32_t bitmask = 1 << (gpio_def & 0x1f);
   switch (gpio_def & 0xfffff000) {
-  case GPIO_0_BASE: output_mask[0] |= bitmask; break;
-  case GPIO_1_BASE: output_mask[1] |= bitmask; break;
-  case GPIO_2_BASE: output_mask[2] |= bitmask; break;
-  case GPIO_3_BASE: output_mask[3] |= bitmask; break;
+  case GPIO_0_BASE: mask[0] |= bitmask; break;
+  case GPIO_1_BASE: mask[1] |= bitmask; break;
+  case GPIO_2_BASE: mask[2] |= bitmask; break;
+  case GPIO_3_BASE: mask[3] |= bitmask; break;
   }
 }
 
-static void cfg_gpio_outputs() {
+static void cfg_gpio_io() {
   uint32_t output_mask[4] = { 0, 0, 0, 0 };
 
   // Motor Step signals
-  set_gpio_output_mask(output_mask, MOTOR_1_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_2_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_3_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_4_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_5_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_6_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_7_STEP_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_8_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_1_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_2_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_3_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_4_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_5_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_6_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_7_STEP_GPIO);
+  set_gpio_mask(output_mask, MOTOR_8_STEP_GPIO);
 
   // Motor Direction signals
-  set_gpio_output_mask(output_mask, MOTOR_1_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_2_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_3_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_4_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_5_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_6_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_7_DIR_GPIO);
-  set_gpio_output_mask(output_mask, MOTOR_8_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_1_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_2_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_3_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_4_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_5_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_6_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_7_DIR_GPIO);
+  set_gpio_mask(output_mask, MOTOR_8_DIR_GPIO);
 
   // Motor Enable signal and other outputs
-  set_gpio_output_mask(output_mask, MOTOR_ENABLE_GPIO);
+  set_gpio_mask(output_mask, MOTOR_ENABLE_GPIO);
 
   // Aux and PWM signals
-  set_gpio_output_mask(output_mask, AUX_1_GPIO);
-  set_gpio_output_mask(output_mask, AUX_2_GPIO);
-  set_gpio_output_mask(output_mask, AUX_3_GPIO);
-  set_gpio_output_mask(output_mask, AUX_4_GPIO);
-  set_gpio_output_mask(output_mask, AUX_5_GPIO);
-  set_gpio_output_mask(output_mask, AUX_6_GPIO);
-  set_gpio_output_mask(output_mask, AUX_7_GPIO);
-  set_gpio_output_mask(output_mask, AUX_8_GPIO);
-  set_gpio_output_mask(output_mask, AUX_9_GPIO);
-  set_gpio_output_mask(output_mask, AUX_10_GPIO);
-  set_gpio_output_mask(output_mask, AUX_11_GPIO);
-  set_gpio_output_mask(output_mask, AUX_12_GPIO);
-  set_gpio_output_mask(output_mask, AUX_13_GPIO);
-  set_gpio_output_mask(output_mask, AUX_14_GPIO);
-  set_gpio_output_mask(output_mask, AUX_15_GPIO);
-  set_gpio_output_mask(output_mask, AUX_16_GPIO);
-  set_gpio_output_mask(output_mask, PWM_1_GPIO);
-  set_gpio_output_mask(output_mask, PWM_2_GPIO);
-  set_gpio_output_mask(output_mask, PWM_3_GPIO);
-  set_gpio_output_mask(output_mask, PWM_4_GPIO);
+  set_gpio_mask(output_mask, AUX_1_GPIO);
+  set_gpio_mask(output_mask, AUX_2_GPIO);
+  set_gpio_mask(output_mask, AUX_3_GPIO);
+  set_gpio_mask(output_mask, AUX_4_GPIO);
+  set_gpio_mask(output_mask, AUX_5_GPIO);
+  set_gpio_mask(output_mask, AUX_6_GPIO);
+  set_gpio_mask(output_mask, AUX_7_GPIO);
+  set_gpio_mask(output_mask, AUX_8_GPIO);
+  set_gpio_mask(output_mask, AUX_9_GPIO);
+  set_gpio_mask(output_mask, AUX_10_GPIO);
+  set_gpio_mask(output_mask, AUX_11_GPIO);
+  set_gpio_mask(output_mask, AUX_12_GPIO);
+  set_gpio_mask(output_mask, AUX_13_GPIO);
+  set_gpio_mask(output_mask, AUX_14_GPIO);
+  set_gpio_mask(output_mask, AUX_15_GPIO);
+  set_gpio_mask(output_mask, AUX_16_GPIO);
+  set_gpio_mask(output_mask, PWM_1_GPIO);
+  set_gpio_mask(output_mask, PWM_2_GPIO);
+  set_gpio_mask(output_mask, PWM_3_GPIO);
+  set_gpio_mask(output_mask, PWM_4_GPIO);
 
-  // Set the output enable register for each GPIO bank
-  gpio_0[GPIO_OE/4] = ~output_mask[0];
-  gpio_1[GPIO_OE/4] = ~output_mask[1];
-  gpio_2[GPIO_OE/4] = ~output_mask[2];
-  gpio_3[GPIO_OE/4] = ~output_mask[3];
+  uint32_t input_mask[4] = { 0, 0, 0, 0 };
+  set_gpio_mask(input_mask, IN_1_GPIO);
+  set_gpio_mask(input_mask, IN_2_GPIO);
+  set_gpio_mask(input_mask, IN_3_GPIO);
+  set_gpio_mask(input_mask, IN_4_GPIO);
+  set_gpio_mask(input_mask, IN_5_GPIO);
+  set_gpio_mask(input_mask, IN_6_GPIO);
+  set_gpio_mask(input_mask, IN_7_GPIO);
+  set_gpio_mask(input_mask, IN_8_GPIO);
+  set_gpio_mask(input_mask, IN_9_GPIO);
+
+  // Preserve GPIO output settings that might already be set by other tasks,
+  // so we only selectively set the bits we are interested in.
+
+  // Set the output enable register for each GPIO bank.
+  // Output direction is signified with a zero.
+  gpio_0[GPIO_OE/4] &= ~output_mask[0];
+  gpio_1[GPIO_OE/4] &= ~output_mask[1];
+  gpio_2[GPIO_OE/4] &= ~output_mask[2];
+  gpio_3[GPIO_OE/4] &= ~output_mask[3];
+
+  // All the inputs we need. Inputs are signified with a one.
+  gpio_0[GPIO_OE/4] |= input_mask[0];
+  gpio_1[GPIO_OE/4] |= input_mask[1];
+  gpio_2[GPIO_OE/4] |= input_mask[2];
+  gpio_3[GPIO_OE/4] |= input_mask[3];
 }
 
 static volatile uint32_t *map_port(int fd, size_t length, off_t offset) {
@@ -200,8 +221,8 @@ bool map_gpio() {
   gpio_3 = map_port(fd, GPIO_MMAP_SIZE, GPIO_3_BASE);
   if (gpio_3 == MAP_FAILED) { perror("mmap() GPIO-3"); goto exit; }
 
-  // Prepare all the pins we need for output.
-  cfg_gpio_outputs();
+  // Set all the pins we need to the respective input/output mode.
+  cfg_gpio_io();
 
   ret = true;
 
