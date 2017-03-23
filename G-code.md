@@ -214,7 +214,7 @@ path sees the given speed in space, not each individual axis:
     G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
 
 ## API
-G-code parsing as provided by [the G-Code parse API](./gcode-parser.h) receives
+G-code parsing as provided by [the G-Code parse API](./gcode-parser/gcode-parser.h) receives
 G-code from a file-descriptor (via the `int gcodep_parse_stream()` function)
 and calls parametrized parse-callbacks representing slightly more higher-level commands.
 

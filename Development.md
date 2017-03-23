@@ -80,7 +80,7 @@ The functionality is implemented in a stack of independently usable APIs.
 Each part of the stack has some well-defined task, and possibly delegates
 action levels down.
 
-   - [gcode-parser.h](./src/gcode-parser.h) : C++-API for parsing
+   - [gcode-parser.h](./src/gcode-parser/gcode-parser.h) : C++-API for parsing
       [G-Code](./G-code.md) that calls callback parse events, while taking
       care of many internals, e.g. interpreting slightly different dialects and
       automatically translates everything into metric, absolute coordinates for
