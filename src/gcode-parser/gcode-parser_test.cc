@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-#include "string-util.h"
+#include "common/string-util.h"
 
 // 'home' position of our simulated machine. Arbitrary values.
 #define HOME_X 123

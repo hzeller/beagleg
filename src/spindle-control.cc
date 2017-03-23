@@ -26,10 +26,11 @@
 #include <time.h>
 #include <errno.h>
 
+#include "common/logging.h"
+#include "common/string-util.h"
+
 #include "config-parser.h"
 #include "hardware-mapping.h"
-#include "logging.h"
-#include "string-util.h"
 
 // Default spindle type
 static const char kType[] = "simple-pwm";

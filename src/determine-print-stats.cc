@@ -24,8 +24,9 @@
 #include <stdlib.h>
 #include <strings.h>
 
+#include "gcode-parser/gcode-parser.h"
+
 #include "gcode-machine-control.h"
-#include "gcode-parser.h"
 #include "motor-operations.h"
 #include "hardware-mapping.h"
 #include "spindle-control.h"

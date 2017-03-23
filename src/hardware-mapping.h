@@ -22,8 +22,8 @@
 
 #include <stdint.h>
 
-#include "gcode-parser.h"  // For GCodeParserAxis
-#include "string-util.h"
+#include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
+#include "common/string-util.h"
 
 class ConfigParser;
 struct LinearSegmentSteps;

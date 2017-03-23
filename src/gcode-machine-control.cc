@@ -34,17 +34,18 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "container.h"
-#include "gcode-parser.h"
+#include "common/container.h"
+#include "common/logging.h"
+#include "common/string-util.h"
+#include "gcode-parser/gcode-parser.h"
+
+#include "adc.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"
-#include "spindle-control.h"
-#include "logging.h"
 #include "motor-operations.h"
-#include "pwm-timer.h"
-#include "string-util.h"
 #include "planner.h"
-#include "adc.h"
+#include "pwm-timer.h"
+#include "spindle-control.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5

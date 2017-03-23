@@ -31,7 +31,7 @@
 #include <strings.h>
 #include <string.h>
 
-#include "logging.h"
+#include "common/logging.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"

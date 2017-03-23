@@ -26,10 +26,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "common/logging.h"
+
 #include "determine-print-stats.h"
 #include "gcode-machine-control.h"
 #include "config-parser.h"
-#include "logging.h"
 
 int usage(const char *prog) {
   fprintf(stderr, "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"

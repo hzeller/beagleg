@@ -24,8 +24,9 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+#include "common/logging.h"
+
 #include "pwm-timer.h"
-#include "logging.h"
 
 // Memory space mapped to the Clock Module registers
 #define CM_BASE                 0x44e00000

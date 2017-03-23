@@ -23,10 +23,11 @@
 
 #include <stdlib.h>
 
+#include "common/logging.h"
+#include "common/string-util.h"
+
 #include "config-parser.h"
-#include "logging.h"
 #include "motor-operations.h"
-#include "string-util.h"
 
 // Default order in which axes should be homed.
 static const char kHomeOrder[] = "ZXY";

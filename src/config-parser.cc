@@ -26,8 +26,8 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include "logging.h"
-#include "string-util.h"
+#include "common/logging.h"
+#include "common/string-util.h"
 
 bool ConfigParser::Reader::ParseString(const std::string &value,
                                        std::string *result) {
@@ -125,7 +125,7 @@ void ConfigParser::SetContent(const std::string &content) {
   content_ = content;
 }
 
-// Extract next line out of source. Takes 
+// Extract next line out of source. Takes
 // Modifies source.
 static StringPiece NextLine(StringPiece *source) {
   StringPiece result;

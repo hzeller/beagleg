@@ -14,9 +14,10 @@
 
 #include <gtest/gtest.h>
 
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
+#include "common/logging.h"
+
 #include "hardware-mapping.h"
-#include "logging.h"
 #include "motor-operations.h"
 
 #define END_SENTINEL 0x42

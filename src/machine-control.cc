@@ -35,17 +35,18 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "gcode-parser/gcode-parser.h"
+#include "common/logging.h"
+#include "common/string-util.h"
+
 #include "config-parser.h"
 #include "gcode-machine-control.h"
-#include "gcode-parser.h"
 #include "hardware-mapping.h"
-#include "logging.h"
 #include "pru-hardware-interface.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
 #include "spindle-control.h"
 #include "sim-firmware.h"
-#include "string-util.h"
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {

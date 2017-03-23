@@ -28,9 +28,10 @@
 #include <stdlib.h>
 #include <strings.h>
 
+#include "common/logging.h"
+
 #include "motor-interface-constants.h"
 #include "motion-queue.h"
-#include "logging.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2

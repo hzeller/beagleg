@@ -8,11 +8,12 @@
 
 #include <gtest/gtest.h>
 
-#include "gcode-parser.h"
-#include "hardware-mapping.h"
-#include "logging.h"
-#include "motor-operations.h"
+#include "gcode-parser/gcode-parser.h"
+#include "common/logging.h"
+
 #include "gcode-machine-control.h"
+#include "hardware-mapping.h"
+#include "motor-operations.h"
 
 // Using different steps/mm speeds results in problems right now.
 // TODO: This should work being set to 1

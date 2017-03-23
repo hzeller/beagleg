@@ -19,12 +19,13 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "common/logging.h"
+#include "common/container.h"
+
 #include "planner.h"
 #include "hardware-mapping.h"
 #include "gcode-machine-control.h"
 #include "motor-operations.h"
-#include "logging.h"
-#include "container.h"
 
 // The target position vector is essentially a position in the
 // GCODE_NUM_AXES-dimensional space.

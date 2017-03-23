@@ -22,12 +22,13 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include "common/logging.h"
+#include "common/string-util.h"
+
 #include "config-parser.h"
-#include "logging.h"
 #include "generic-gpio.h"
 #include "pwm-timer.h"
 #include "motor-operations.h"  // LinearSegmentSteps
-#include "string-util.h"
 
 HardwareMapping::HardwareMapping()
   : estop_input_(0), pause_input_(0), start_input_(0), aux_bits_(0),

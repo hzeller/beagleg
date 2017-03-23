@@ -37,10 +37,11 @@
 
 #include <algorithm>
 
+#include "common/logging.h"
+#include "gcode-parser/gcode-parser.h"
+
 #include "config-parser.h"
 #include "gcode-machine-control.h"
-#include "gcode-parser.h"
-#include "logging.h"
 #include "motor-operations.h"
 #include "spindle-control.h"
 

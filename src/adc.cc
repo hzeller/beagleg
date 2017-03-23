@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "logging.h"
+#include "common/logging.h"
 
 static const char kSysNode[] = "/sys/bus/iio/devices/iio:device0";
 

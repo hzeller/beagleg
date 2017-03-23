@@ -39,8 +39,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "logging.h"
-#include "string-util.h"
+#include "common/logging.h"
+#include "common/string-util.h"
+
 #include "simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =

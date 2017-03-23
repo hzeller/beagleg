@@ -23,9 +23,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "common/logging.h"
+
 #include "motor-interface-constants.h"
 #include "generic-gpio.h"
-#include "logging.h"
 
 // Memory space mapped to the Clock Module registers
 #define CM_BASE                 0x44e00000

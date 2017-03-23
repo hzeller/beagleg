@@ -23,7 +23,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 
-#include "logging.h"
+#include "common/logging.h"
 
 bool GCodeParser::Config::LoadParams(const std::string &filename) {
   if (parameters == NULL) {

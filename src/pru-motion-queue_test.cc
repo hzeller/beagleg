@@ -13,8 +13,9 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "container.h"
-#include "logging.h"
+#include "common/container.h"
+#include "common/logging.h"
+
 #include "motor-operations.h"
 #include "pru-hardware-interface.h"
 #include "hardware-mapping.h"

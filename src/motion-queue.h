@@ -20,8 +20,9 @@
 #define _BEAGLEG_MOTION_QUEUE_H_
 
 #include <stdint.h>
+#include "common/container.h"
+
 #include "pru-hardware-interface.h"
-#include "container.h"
 
 // Number of motors handled by motion segment.
 // TODO: this and BEAGLEG_NUM_MOTORS should be coming from the same place.

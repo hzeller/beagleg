@@ -41,47 +41,52 @@ GTEST_INCLUDE=-I$(GTEST_SOURCE)/include -I$(GMOCK_SOURCE)/include
 # environment variable.
 BEAGLEG_OPT_CFLAGS?=-O3
 
-CFLAGS+=-Wall -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"'
+CFLAGS+=-Wall -I. -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"'
 
-# We export the following variables so that the googletest library will get
-# the same variables when compiling.
 # We use c++11, but it looks like that even the latest
 # bone-debian-7.11-lxde-4gb-armhf-2016-06-16-4gb image has an ancient 4.6.3
 # compiler that still referred to that standard as c++0x
-export CXXFLAGS+=-std=c++0x $(CFLAGS)
-export CXX?=g++
+CXXFLAGS+=-std=c++0x $(CFLAGS)
+CXX?=g++
 
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
+COMMON_LIBS=common/libbeaglegbase.a gcode-parser/libgcodeparser.a
 
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
 
-GCODE_OBJECTS=gcode-parser.o gcode-machine-control.o determine-print-stats.o \
-              generic-gpio.o arc-gen.o pwm-timer.o logging.o config-parser.o \
-	      string-util.o machine-control-config.o hardware-mapping.o \
-	      spindle-control.o planner.o simple-lexer.o adc.o \
-	      gcode-parser-config.o
+
+GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
+              generic-gpio.o pwm-timer.o config-parser.o \
+	      machine-control-config.o hardware-mapping.o \
+	      spindle-control.o planner.o adc.o
 OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
-UNITTEST_BINARIES=gcode-machine-control_test gcode-parser_test config-parser_test string-util_test machine-control-config_test arc-gen_test planner_test simple-lexer_test pru-motion-queue_test
+UNITTEST_BINARIES=gcode-machine-control_test config-parser_test machine-control-config_test planner_test pru-motion-queue_test
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
 
 all : $(TARGETS)
 
-../gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS)
-	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
+common/libbeaglegbase.a:
+	$(MAKE) -C common
 
-../machine-control: machine-control.o $(OBJECTS)
-	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(PRUSS_LIBS) $(LDFLAGS)
+gcode-parser/libgcodeparser.a:
+	$(MAKE) -C gcode-parser
+
+../gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS) $(COMMON_LIBS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(LDFLAGS)
+
+../machine-control: machine-control.o $(OBJECTS) $(COMMON_LIBS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(PRUSS_LIBS) $(LDFLAGS)
 
 # While this is developed and does not have a final name yet, let's not make
 # it a toplevel tool in ../
-gcode2ps: gcode2ps.o $(GCODE_OBJECTS)
+gcode2ps: gcode2ps.o $(GCODE_OBJECTS) $(COMMON_LIBS)
 	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
 
 test-html: test-out/test.html
@@ -99,8 +104,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-%_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
+%_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) $(COMMON_LIBS) compiler-flags
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -135,6 +140,8 @@ gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
 
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS)
+	$(MAKE) -C common clean
+	$(MAKE) -C gcode-parser clean
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' > $@

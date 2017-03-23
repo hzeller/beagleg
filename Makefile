@@ -26,4 +26,6 @@ all:
 	$(MAKE) -e -C src all
 
 clean test valgrind-test:
+	$(MAKE) -C src/common $@
+	$(MAKE) -C src/gcode-parser $@
 	$(MAKE) -C src $@

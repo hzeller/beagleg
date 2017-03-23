@@ -28,9 +28,10 @@
 #include <strings.h>
 #include <stdlib.h>
 
+#include "common/logging.h"
+
 #include "generic-gpio.h"
 #include "pwm-timer.h"
-#include "logging.h"
 #include "hardware-mapping.h"
 #include "pru-hardware-interface.h"
 

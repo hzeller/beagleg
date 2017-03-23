@@ -19,8 +19,8 @@
 #ifndef _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 #define _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 
-#include "gcode-parser.h"
-#include "container.h"
+#include "gcode-parser/gcode-parser.h"
+#include "common/container.h"
 #include "hardware-mapping.h"
 
 #include <string>

@@ -19,7 +19,7 @@
 #ifndef _BEAGLEG_PLANNER_H_
 #define _BEAGLEG_PLANNER_H_
 
-#include "gcode-parser.h"  // AxesRegister
+#include "gcode-parser/gcode-parser.h"  // AxesRegister
 
 struct MachineControlConfig;
 class HardwareMapping;
