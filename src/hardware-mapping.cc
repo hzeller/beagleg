@@ -54,6 +54,8 @@ bool HardwareMapping::AddAuxMapping(LogicOutput output, int aux) {
     Log_info("Mapping '%s' to aux %d which has no hardware connector for %s"
              "; output will be ignored for this cape.",
              OutputToName(output), aux, CAPE_NAME);
+    Log_debug("(no #define AUX_%d_GPIO in hardware/%s/beagleg-pin-mapping.h)",
+              aux, CAPE_NAME);
     return true;  // This is not fatal, but no need to prepare these bits.
   }
   output_to_aux_bits_[output] |= 1 << (aux-1);
@@ -75,8 +77,10 @@ bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
   const uint32_t gpio_descriptor = get_pwm_gpio_descriptor(pwm);
   if (gpio_descriptor == GPIO_NOT_MAPPED) {
     Log_info("Mapping '%s' to pwm %d which has no hardware connector for %s"
-             " ; output will be ignored for this cape.",
+             "; output will be ignored for this cape.",
              OutputToName(output), pwm, CAPE_NAME);
+    Log_debug("(no #define PWM_%d_GPIO in hardware/%s/beagleg-pin-mapping.h)",
+              pwm, CAPE_NAME);
   }
   output_to_pwm_gpio_[output] = gpio_descriptor;
   return true;
