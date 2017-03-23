@@ -143,6 +143,9 @@ clean:
 	$(MAKE) -C common clean
 	$(MAKE) -C gcode-parser clean
 
+dist-clean: clean
+	make -C $(AM335_BASE) clean
+
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' > $@
 

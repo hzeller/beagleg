@@ -22,10 +22,20 @@ export BEAGLEG_HARDWARE_TARGET?=BUMPS
 # compiled on the Beaglebone but on a different system.
 export ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 
-all:
+PREFIX?=/usr/local
+BINDIR=$(PREFIX)/bin
+
+all machine-control:
 	$(MAKE) -e -C src all
+
+install: machine-control
+	mkdir -p $(BINDIR)
+	install -m 755 machine-control $(BINDIR)
 
 clean test valgrind-test:
 	$(MAKE) -C src/common $@
 	$(MAKE) -C src/gcode-parser $@
 	$(MAKE) -C src $@
+
+dist-clean:
+	$(MAKE) -C src dist-clean
