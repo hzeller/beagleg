@@ -1858,16 +1858,16 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
 // It is usually good to shut down gracefully, otherwise the PRU keeps running.
 // So we're intercepting signals and exit gcode_machine_control_from_stream()
 // cleanly.
-static volatile bool caught_signal = false;
+static volatile sig_atomic_t caught_signal = 0;
 static void receive_signal(int signo) {
   static char msg[] = "Caught signal. Shutting down ASAP.\n";
   if (!caught_signal) {
     write(STDERR_FILENO, msg, sizeof(msg));
   }
-  caught_signal = true;
+  caught_signal = 1;
 }
 static void arm_signal_handler() {
-  caught_signal = false;
+  caught_signal = 0;
   struct sigaction sa = {};
   sa.sa_handler = receive_signal;
   sa.sa_flags = SA_RESETHAND;  // oneshot, no restart
