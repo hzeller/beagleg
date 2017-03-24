@@ -108,7 +108,11 @@ static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
   case PIN_P8_9:  timer = &timers[1]; break; // TIMER5
   case PIN_P8_10: timer = &timers[2]; break; // TIMER6
   case PIN_P8_8:  timer = &timers[3]; break; // TIMER7
-  default:        return NULL;               // unsupported pin
+  case GPIO_NOT_MAPPED:  return NULL;  // Explicitly not mapped.
+  default:
+    Log_info("Unsupported PWM pin mapped. "
+             "Only Timer PIN_P8_{7,8,9,10} supported");
+    return NULL;               // unsupported pin
   }
   if (!timer->regs) return NULL;             // unmapped timer
   return timer;
