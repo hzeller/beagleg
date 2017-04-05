@@ -1,6 +1,7 @@
 *~
 *.o
 *.d
+*.a
 machine-control
 gcode-print-stats
 gcode2ps
