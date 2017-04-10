@@ -110,6 +110,7 @@ public:
 
   virtual void MotorEnable(bool on) {}
   virtual void WaitQueueEmpty() {}
+  virtual void GetRealtimeStatus(RealtimeStatus *status) {}
 
 private:
   BeagleGPrintStats *const print_stats_;
