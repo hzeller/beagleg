@@ -107,6 +107,7 @@ public:
 
   // Return the number of motion segments enqueued after
   // the one currently executing and its already executed loops.
+  // buffer_size will never be 0 except if nothing has been yet enqueued.
   virtual void Status(uint32_t *executed_loops, unsigned int *buffer_size) = 0;
 };
 

@@ -53,7 +53,7 @@ struct RealtimeStatus {
   int pos_steps[BEAGLEG_NUM_MOTORS];
   // Auxes status
   unsigned short aux_bits;
-  // Tag? It may be useful to add a tag to map back
+  // A Tag? It may be useful to add a tag to map back
   // execution with GCode
 };
 
