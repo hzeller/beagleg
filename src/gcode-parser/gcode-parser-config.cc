@@ -68,11 +68,13 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   FILE *fp = fopen(tmp_name.c_str(), "w");
   if (!fp) {
     const int err = errno;
-    Log_error("Unable to write param file %s (%s)", tmp_name.c_str(),
+    Log_error("Unable to write tmporary param file %s (%s)", tmp_name.c_str(),
               strerror(err));
     if (err == EACCES) {
-      Log_error("Permission problem: maybe because we run as uid=%d, gid=%d ?",
-                getuid(), getgid());
+      const std::string dir = filename.substr(0, filename.find_last_of('/'));
+      Log_error("Params-file permission problem: Need write access to %s/ "
+                "(FYI we run as uid=%d, gid=%d)",
+                dir.c_str(), getuid(), getgid());
     }
     return false;
   }

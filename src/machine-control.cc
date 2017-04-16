@@ -229,12 +229,21 @@ static int run_server(int listen_socket,
   return process_result;
 }
 
+// Create an absolute filename from a path, without the file not needed
+// to exist (so works where realpath() doesn't)
+static std::string MakeAbsoluteFile(const char *in) {
+  if (!in || in[0] == '\0') return "";
+  if (in[0] == '/') return in;
+  char buf[1024];
+  return std::string(getcwd(buf, sizeof(buf))) + "/" + in;
+}
+
 int main(int argc, char *argv[]) {
   MachineControlConfig config;
   bool dry_run = false;
   bool simulation_output = false;
   const char *logfile = NULL;
-  const char *paramfile = NULL;
+  std::string paramfile;
   const char *config_file = NULL;
   bool as_daemon = false;
   const char *privs = "daemon:daemon";
@@ -334,13 +343,15 @@ int main(int argc, char *argv[]) {
       logfile = strdup(optarg);
       break;
     case OPT_PARAM_FILE:
-      paramfile = strdup(optarg);
+      paramfile = MakeAbsoluteFile(optarg);
       break;
     case 'd':
       as_daemon = true;
       break;
     case 'c':
-      config_file = strdup(optarg);
+      config_file = realpath(optarg, NULL); // realpath() -> abs path if exists
+      if (!config_file)
+        config_file = strdup(optarg);  // Not existing. Report issue later.
       break;
     case OPT_PRIVS:
       privs = strdup(optarg);
@@ -379,6 +390,8 @@ int main(int argc, char *argv[]) {
   if (!config_file) {
     Log_error("Expected config file -c <config>");
     return 1;
+  } else {
+    Log_info("Reading config %s", config_file);
   }
 
   ConfigParser config_parser;
@@ -461,7 +474,7 @@ int main(int argc, char *argv[]) {
       return 1;
     }
   }
-  Log_info("Running with PID %d", getpid());
+  Log_info("BeagleG running with PID %d", getpid());
 
   MotionQueueMotorOperations motor_operations(motion_backend);
 
@@ -476,7 +489,7 @@ int main(int argc, char *argv[]) {
   GCodeParser::Config parser_cfg;
   GCodeParser::Config::ParamMap parameters;
   parser_cfg.parameters = &parameters;
-  if (paramfile) parser_cfg.LoadParams(paramfile);
+  if (!paramfile.empty()) parser_cfg.LoadParams(paramfile);
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
@@ -508,7 +521,7 @@ int main(int argc, char *argv[]) {
 
   free(bind_addr);
 
-  if (paramfile) parser_cfg.SaveParams(paramfile);
+  if (!paramfile.empty()) parser_cfg.SaveParams(paramfile);
 
   Log_info("Shutdown.");
   return ret;
