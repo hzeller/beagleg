@@ -48,7 +48,7 @@ struct LinearSegmentSteps {
 
 // Struct used to return data about the currently executed steps
 // and the status of the auxes.
-struct RealtimeStatus {
+struct PhysicalStatus {
   // Absolute position in steps
   int pos_steps[BEAGLEG_NUM_MOTORS];
   // Auxes status
@@ -77,10 +77,9 @@ public:
 
   // Get the absolute position and auxes status currently
   // executed by the backend.
-  virtual void GetRealtimeStatus(RealtimeStatus *status) = 0;
+  virtual void GetRealtimeStatus(PhysicalStatus *status) = 0;
 };
 
-struct HistorySegment;
 class MotionQueueMotorOperations : public MotorOperations {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
@@ -90,7 +89,7 @@ public:
   virtual void Enqueue(const LinearSegmentSteps &segment);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
-  virtual void GetRealtimeStatus(RealtimeStatus *status);
+  virtual void GetRealtimeStatus(PhysicalStatus *status);
 
 private:
   void EnqueueInternal(const LinearSegmentSteps &param,
@@ -98,7 +97,7 @@ private:
 
   MotionQueue *backend_;
 
-
+  struct HistorySegment;
   std::deque<struct HistorySegment> *shadow_queue_;
 };
 

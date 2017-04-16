@@ -90,18 +90,19 @@ typedef struct HistoryPositionInfo {
   HistoryPositionInfo () : position_steps(0), sign(1) {}
   int position_steps;
   uint32_t fraction;
-  short sign;
+  char sign;
 } HistoryPositionInfo;
 
 // Store the required informations needed to backtrack the absolute position.
-struct HistorySegment {
+struct MotionQueueMotorOperations::HistorySegment {
   HistoryPositionInfo pos_info[MOTION_MOTOR_COUNT];
   unsigned short aux_bits;
 };
 
-MotionQueueMotorOperations::MotionQueueMotorOperations(MotionQueue *backend)
-                                                       : backend_(backend) {
-  shadow_queue_ = new std::deque<struct HistorySegment>();
+MotionQueueMotorOperations::
+  MotionQueueMotorOperations(MotionQueue *backend)
+  : backend_(backend),
+    shadow_queue_(new std::deque<struct HistorySegment>()) {
   // Initialize the history queue.
   struct HistorySegment new_hs = {};
   shadow_queue_->push_front(new_hs);
@@ -192,20 +193,20 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   // TODO: We need to find a way to get the maximum number of elements
   // of the shadow queue (ie backend_->GetQueueStats()?)
   unsigned int buffer_size;
-  backend_->Status(NULL, &buffer_size);
+  backend_->GetExecutionProgress(NULL, &buffer_size);
   shadow_queue_->resize(buffer_size);
 }
 
-void MotionQueueMotorOperations::GetRealtimeStatus(RealtimeStatus *status) {
+void MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
   // Shrink the queue
   unsigned int buffer_size;
   uint32_t loops;
-  backend_->Status(&loops, &buffer_size);
+  backend_->GetExecutionProgress(&loops, &buffer_size);
   assert(buffer_size <= shadow_queue_->size());
   if (shadow_queue_->size() > 1) shadow_queue_->resize(buffer_size);
 
   // Get the last element
-  const HistorySegment hs = shadow_queue_->back();
+  const HistorySegment &hs = shadow_queue_->back();
   const uint64_t max_fraction = 0xFFFFFFFF / LOOPS_PER_STEP;
 
   // NOTE: Assuming MOTION_MOTOR_COUNT == BEAGLEG_NUM_MOTORS

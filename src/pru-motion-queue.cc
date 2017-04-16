@@ -82,18 +82,21 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
-void PRUMotionQueue::Status(uint32_t *executed_loops,
-                            unsigned int *buffer_size) {
+void PRUMotionQueue::GetExecutionProgress(
+  uint32_t *loop_progress_working_segment, unsigned int *queue_len) {
   // Get data from the PRU
   const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
-  if (executed_loops) *executed_loops = status.counter;
-  // Nothing has been pushed yet.
-  if (status.index == 0xff) {
-    *buffer_size = 0;
+  const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
+  if (loop_progress_working_segment)
+    *loop_progress_working_segment = status.counter;
+
+  if (pru_data_->ring_buffer[last_insert_index].state == STATE_EMPTY) {
+    *queue_len = 0;
     return;
   }
-  *buffer_size = (queue_pos_ - status.index) % QUEUE_LEN;
-  *buffer_size += !(*buffer_size) * QUEUE_LEN;
+
+  *queue_len = (QUEUE_LEN + queue_pos_ - status.index) % QUEUE_LEN;
+  *queue_len += *queue_len ? 0 : QUEUE_LEN;
 }
 
 // Stop gap for compiler attempting to be overly clever when copying between
@@ -177,10 +180,5 @@ bool PRUMotionQueue::Init() {
   }
   queue_pos_ = 0;
 
-  // The MSB 8 bits of the status register shoud represent the index
-  // of the last executed motion segment. If no motion segments has been
-  // yet pushed in the queue, the index should represent the index before
-  // the slow we would push, in this case -1.
-  pru_data_->status.index = 0xff;
   return pru_interface_->StartExecution();
 }

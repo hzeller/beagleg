@@ -108,7 +108,8 @@ public:
   // Return the number of motion segments enqueued after
   // the one currently executing and its already executed loops.
   // buffer_size will never be 0 except if nothing has been yet enqueued.
-  virtual void Status(uint32_t *executed_loops, unsigned int *buffer_size) = 0;
+  virtual void GetExecutionProgress(uint32_t *loop_progress_working_segment,
+                                    unsigned int *queue_len) = 0;
 };
 
 // Standard implementation.
@@ -127,7 +128,8 @@ public:
   void WaitQueueEmpty();
   void MotorEnable(bool on);
   void Shutdown(bool flush_queue);
-  void Status(uint32_t *executed_loops, unsigned int *buffer_size);
+  void GetExecutionProgress(uint32_t *loop_progress_working_segment,
+                            unsigned int *queue_len);
 
 private:
   bool Init();
@@ -147,7 +149,8 @@ public:
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
-  void Status(uint32_t *executed_loops, unsigned int *buffer_size) {}
+  void GetExecutionProgress(uint32_t *loop_progress_working_segment,
+                            unsigned int *queue_len) {}
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_

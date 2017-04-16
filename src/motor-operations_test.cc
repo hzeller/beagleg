@@ -31,9 +31,11 @@ public:
   void WaitQueueEmpty() {};
   void MotorEnable(bool on) {};
   void Shutdown(bool flush_queue) {};
-  void Status(uint32_t *executed_loops, unsigned int *buffer_size) {
-      if (executed_loops) *executed_loops = remaining_loops_;
-      *buffer_size = queue_size_;
+  void GetExecutionProgress(uint32_t *loop_progress_working_segment,
+                            unsigned int *queue_len) {
+      if (loop_progress_working_segment)
+        *loop_progress_working_segment = remaining_loops_;
+      *queue_len = queue_size_;
   }
 
   void SimRun(const uint32_t executed_loops, const unsigned int buffer_size) {
@@ -54,7 +56,7 @@ TEST(RealtimePosition, init_pos) {
   MockMotionQueue motion_backend = MockMotionQueue();
   MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
 
-  RealtimeStatus status;
+  PhysicalStatus status;
   motor_operations.GetRealtimeStatus(&status);
   const int expected[BEAGLEG_NUM_MOTORS] = {0, 0, 0, 0, 0, 0, 0, 0};
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
@@ -79,7 +81,7 @@ TEST(RealtimePosition, sample_pos) {
 
 
   motion_backend.SimRun(20, 2);
-  RealtimeStatus status;
+  PhysicalStatus status;
   motor_operations.GetRealtimeStatus(&status);
   {
     const int expected[BEAGLEG_NUM_MOTORS] =
@@ -116,7 +118,7 @@ TEST(RealtimePosition, zero_loops_edge) {
   motor_operations.Enqueue(segment);
   motion_backend.SimRun(0, 2);
 
-  RealtimeStatus status;
+  PhysicalStatus status;
   motor_operations.GetRealtimeStatus(&status);
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 

@@ -66,7 +66,7 @@ private:
 static void check_buffer_value(PRUMotionQueue *motion_backend,
                                const unsigned size) {
   unsigned int buffer;
-  motion_backend->Status(NULL, &buffer);
+  motion_backend->GetExecutionProgress(NULL, &buffer);
   EXPECT_EQ(buffer, size);
 }
 
@@ -89,6 +89,19 @@ TEST(PruMotionQueue, single_exec) {
   motion_backend.Enqueue(&segment);
   pru_interface.SimRun(1, 0);
   check_buffer_value(&motion_backend, 1);
+}
+
+TEST(PruMotionQueue, full_exec) {
+  MotorsRegister absolute_pos_loops;
+  MockPRUInterface pru_interface = MockPRUInterface();
+  HardwareMapping hmap = HardwareMapping();
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+
+  static struct MotionSegment segment = {0};
+  segment.state = STATE_FILLED;
+  motion_backend.Enqueue(&segment);
+  pru_interface.SimRun(1, 0, false);
+  check_buffer_value(&motion_backend, 0);
 }
 
 TEST(PruMotionQueue, single_exec_some_loops) {
@@ -125,6 +138,29 @@ TEST(PruMotionQueue, one_round_queue) {
     motion_backend.Enqueue(&segment);
   }
   check_buffer_value(&motion_backend, QUEUE_LEN);
+}
+
+TEST(PruMotionQueue, exec_index_lt_queue_pos) {
+  MotorsRegister absolute_pos_loops;
+  MockPRUInterface pru_interface = MockPRUInterface();
+  HardwareMapping hmap = HardwareMapping();
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+
+  static struct MotionSegment segment = {0};
+  for (int i = 0; i < QUEUE_LEN; ++i) {
+    segment.state = STATE_FILLED;
+    motion_backend.Enqueue(&segment);
+  }
+
+  pru_interface.SimRun(QUEUE_LEN, 0);
+  check_buffer_value(&motion_backend, 1);
+
+  for (int i = 0; i < 1; ++i) {
+    segment.state = STATE_FILLED;
+    motion_backend.Enqueue(&segment);
+  }
+
+  check_buffer_value(&motion_backend, 2);
 }
 
 int main(int argc, char *argv[]) {
