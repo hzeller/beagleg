@@ -68,7 +68,7 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) {
   FILE *fp = fopen(tmp_name.c_str(), "w");
   if (!fp) {
     const int err = errno;
-    Log_error("Unable to write tmporary param file %s (%s)", tmp_name.c_str(),
+    Log_error("Unable to write temporary param file %s (%s)", tmp_name.c_str(),
               strerror(err));
     if (err == EACCES) {
       const std::string dir = filename.substr(0, filename.find_last_of('/'));
