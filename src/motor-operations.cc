@@ -90,7 +90,7 @@ typedef struct HistoryPositionInfo {
   HistoryPositionInfo () : position_steps(0), sign(1) {}
   int position_steps;
   uint32_t fraction;
-  char sign;
+  signed char sign;
 } HistoryPositionInfo;
 
 // Store the required informations needed to backtrack the absolute position.
@@ -193,7 +193,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   // TODO: We need to find a way to get the maximum number of elements
   // of the shadow queue (ie backend_->GetQueueStats()?)
   unsigned int buffer_size;
-  backend_->GetExecutionProgress(NULL, &buffer_size);
+  backend_->GetPendingElements(NULL, &buffer_size);
   shadow_queue_->resize(buffer_size);
 }
 
@@ -201,7 +201,7 @@ void MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
   // Shrink the queue
   unsigned int buffer_size;
   uint32_t loops;
-  backend_->GetExecutionProgress(&loops, &buffer_size);
+  backend_->GetPendingElements(&loops, &buffer_size);
   assert(buffer_size <= shadow_queue_->size());
   if (shadow_queue_->size() > 1) shadow_queue_->resize(buffer_size);
 

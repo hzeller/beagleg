@@ -31,10 +31,10 @@ public:
   void WaitQueueEmpty() {};
   void MotorEnable(bool on) {};
   void Shutdown(bool flush_queue) {};
-  void GetExecutionProgress(uint32_t *loop_progress_working_segment,
-                            unsigned int *queue_len) {
-      if (loop_progress_working_segment)
-        *loop_progress_working_segment = remaining_loops_;
+  void GetPendingElements(uint32_t *head_item_progress,
+                          unsigned int *queue_len) {
+      if (head_item_progress)
+        *head_item_progress = remaining_loops_;
       *queue_len = queue_size_;
   }
 
