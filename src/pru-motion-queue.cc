@@ -82,8 +82,7 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
-void PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress,
-                                        unsigned int *queue_len) {
+unsigned int PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
   // Get data from the PRU
   const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
   const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;
@@ -91,12 +90,12 @@ void PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress,
     *head_item_progress = status.counter;
 
   if (pru_data_->ring_buffer[last_insert_index].state == STATE_EMPTY) {
-    *queue_len = 0;
-    return;
+    return 0;
   }
 
-  *queue_len = (QUEUE_LEN + queue_pos_ - status.index) % QUEUE_LEN;
-  *queue_len += *queue_len ? 0 : QUEUE_LEN;
+  unsigned int queue_len = (QUEUE_LEN + queue_pos_ - status.index) % QUEUE_LEN;
+  queue_len += queue_len ? 0 : QUEUE_LEN;
+  return queue_len;
 }
 
 // Stop gap for compiler attempting to be overly clever when copying between

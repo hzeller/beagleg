@@ -192,16 +192,15 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   // Shrink the queue
   // TODO: We need to find a way to get the maximum number of elements
   // of the shadow queue (ie backend_->GetQueueStats()?)
-  unsigned int buffer_size;
-  backend_->GetPendingElements(NULL, &buffer_size);
+  const unsigned int buffer_size = backend_->GetPendingElements(NULL);
   shadow_queue_->resize(buffer_size);
 }
 
 void MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
   // Shrink the queue
-  unsigned int buffer_size;
+
   uint32_t loops;
-  backend_->GetPendingElements(&loops, &buffer_size);
+  const unsigned int buffer_size = backend_->GetPendingElements(&loops);
   assert(buffer_size <= shadow_queue_->size());
   if (shadow_queue_->size() > 1) shadow_queue_->resize(buffer_size);
 

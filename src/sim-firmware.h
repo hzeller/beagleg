@@ -30,8 +30,9 @@ public:
   virtual void WaitQueueEmpty() {}
   virtual void MotorEnable(bool on) {}
   virtual void Shutdown(bool flush_queue) {}
-  virtual void GetPendingElements(uint32_t *head_item_progress,
-                                  unsigned int *queue_len) {}
+  virtual unsigned int GetPendingElements(uint32_t *head_item_progress) {
+    return 0;
+  }
 
 private:
   class Averager;

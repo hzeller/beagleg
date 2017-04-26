@@ -65,8 +65,7 @@ private:
 
 static void check_buffer_value(PRUMotionQueue *motion_backend,
                                const unsigned size) {
-  unsigned int buffer;
-  motion_backend->GetPendingElements(NULL, &buffer);
+  const unsigned int buffer = motion_backend->GetPendingElements(NULL);
   EXPECT_EQ(buffer, size);
 }
 

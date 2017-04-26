@@ -31,11 +31,10 @@ public:
   void WaitQueueEmpty() {};
   void MotorEnable(bool on) {};
   void Shutdown(bool flush_queue) {};
-  void GetPendingElements(uint32_t *head_item_progress,
-                          unsigned int *queue_len) {
+  unsigned int GetPendingElements(uint32_t *head_item_progress) {
       if (head_item_progress)
         *head_item_progress = remaining_loops_;
-      *queue_len = queue_size_;
+      return queue_size_;
   }
 
   void SimRun(const uint32_t executed_loops, const unsigned int buffer_size) {
