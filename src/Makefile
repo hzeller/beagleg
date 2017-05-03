@@ -72,10 +72,10 @@ DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
 
 all : $(TARGETS)
 
-common/libbeaglegbase.a:
+common/libbeaglegbase.a: FORCE
 	$(MAKE) -C common
 
-gcode-parser/libgcodeparser.a:
+gcode-parser/libgcodeparser.a: FORCE
 	$(MAKE) -C gcode-parser
 
 ../gcode-print-stats: gcode-print-stats.o $(GCODE_OBJECTS) $(COMMON_LIBS)
