@@ -131,6 +131,8 @@ private:
     callbacks->set_temperature(0);
   }
 
+  void InitCoordSystems();
+
   void set_all_axis_to_absolute(bool value) {
     for (GCodeParserAxis a : AllAxes()) {
       axis_is_absolute_[a] = value;
@@ -382,6 +384,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
   assert(callbacks);  // otherwise, this is not very useful.
   reset_G92();
   InitProgramDefaults();
+  InitCoordSystems();
   op_parse_.AddKeyword("+",  PLUS);
   op_parse_.AddKeyword("-",  MINUS);
   op_parse_.AddKeyword("/",  DIVIDED_BY);
@@ -1221,6 +1224,52 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   }
 
   return line;
+}
+
+// Initialize the coordiate systems from the loaded parameters
+void GCodeParser::Impl::InitCoordSystems() {
+  float value;
+  for (int i = 0; i < 9; ++i) {
+    bool set = false;
+    int offset = i * 20;
+    value = 0.0;
+    std::string coords = "";
+    for (GCodeParserAxis axis : AllAxes()) {
+      read_parameter(StringPrintf("%d", 5221 + offset + axis), &value);
+      coord_system_[i][axis] = value;
+      if (axis <= AXIS_Y || value)
+        coords += StringPrintf(" %c:%.3f", gcodep_axis2letter(axis), value);
+      if (value) set = true;
+    }
+    Log_debug("%s offset%s\n",
+              (i == 0) ? "G54" :
+              (i == 1) ? "G55" :
+              (i == 2) ? "G56" :
+              (i == 3) ? "G57" :
+              (i == 4) ? "G58" :
+              (i == 5) ? "G59" :
+              (i == 6) ? "G59.1" :
+              (i == 7) ? "G59.2" : "G59.3",
+              set ? coords.c_str() : " undefined");
+  }
+  read_parameter("5220", &value);
+  int coord_system = (int)value;
+  if (value >= 1 && value <= 9) {
+    current_origin_ = &coord_system_[coord_system-1];
+    inform_origin_offset_change();
+    Log_debug("Using Coordinate System %s\n",
+              (value == 1) ? "G54" :
+              (value == 2) ? "G55" :
+              (value == 3) ? "G56" :
+              (value == 4) ? "G57" :
+              (value == 5) ? "G58" :
+              (value == 6) ? "G59" :
+              (value == 7) ? "G59.1" :
+              (value == 8) ? "G59.2" : "G59.3");
+  } else {
+    Log_debug("Invalid Coordinate System in parameters file: 5220=%d\n",
+              coord_system);
+  }
 }
 
 // Set coordinate system data
