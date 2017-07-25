@@ -20,6 +20,7 @@ P9.30 low     # DIR1 output low, direct to Pololu
 P9.12 low     # DIR2 output low, direct to Pololu
 P9.25 low     # DIR3 output low, direct to Pololu
 P9.15 low     # DIR4 output low, direct to Pololu
+P9.31 low     # SPINDLE_ON output low, to 2N7002 which enables P-FET
 
 # input signals
 P8.17 in      # ESTOP input, 4K7 pu, LO = ok
@@ -41,4 +42,3 @@ P8.14 in      # IN5 input, from 74AC14 shmitt trigger inverter
 #P9.26        # UART1_RXD
 #P9.28        # SPI1_CS0
 #P9.29        # SPI1_D0
-#P9.31        # SPI1_SCLK

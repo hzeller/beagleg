@@ -48,7 +48,7 @@
 #define AUX_11_GPIO        PIN_P9_26  // not routed (UART1_RXD)
 #define AUX_12_GPIO        PIN_P9_28  // not routed (SPI1_CS0)
 #define AUX_13_GPIO        PIN_P9_29  // not routed (SPI1_DO)
-#define AUX_14_GPIO        PIN_P9_31  // not routed (SPI1_SCLK)
+#define AUX_14_GPIO        PIN_P9_31  // SPINDLE_ON
 #define AUX_16_GPIO        PIN_P8_26  // LED
 
 #define PWM_1_GPIO         AUX_1_GPIO // OUT0 - TIMER PWM
