@@ -101,6 +101,7 @@ public:
     OUT_FAN,               // M106 Sn (set pwm or on if n > 0); M107 = off
     OUT_HOTEND,
     OUT_HEATEDBED,
+    OUT_POINTER,           // M64 Px = on; M65 Px = off
     OUT_LED,               // toggles on/off with M42 while waiting for start switch
     OUT_ATX_POWER,         // M80 = on; M81 = off
     OUT_ESTOP,             // M0 = on; M999 = off
