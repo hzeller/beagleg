@@ -52,6 +52,7 @@ CXX?=g++
 LDFLAGS+=-lpthread -lm
 PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
 COMMON_LIBS=common/libbeaglegbase.a gcode-parser/libgcodeparser.a
+SUBDIRS=common gcode-parser
 
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
@@ -94,11 +95,17 @@ test-html: test-out/test.html
 test-out/test.html: gcode2ps test-create-html.sh testdata/*.gcode
 	./test-create-html.sh testdata/*.gcode
 
-test: $(UNITTEST_BINARIES)
+local-tests: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do echo ; echo $$test_bin; ./$$test_bin || exit 1 ; done
 
-valgrind-test: $(UNITTEST_BINARIES)
+local-valgrind-tests: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
+
+test: local-tests
+	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test ; done
+
+valgrind-test: local-valgrind-tests
+	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test ; done
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
