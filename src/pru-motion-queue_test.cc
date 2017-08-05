@@ -63,18 +63,13 @@ private:
   unsigned int execution_index_;
 };
 
-static void check_buffer_value(PRUMotionQueue *motion_backend,
-                               const unsigned size) {
-  const unsigned int buffer = motion_backend->GetPendingElements(NULL);
-  EXPECT_EQ(buffer, size);
-}
-
 TEST(PruMotionQueue, status_init) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
-  check_buffer_value(&motion_backend, 0);
+
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
 
 TEST(PruMotionQueue, single_exec) {
@@ -83,11 +78,11 @@ TEST(PruMotionQueue, single_exec) {
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
 
-  static struct MotionSegment segment = {0};
+  struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   pru_interface.SimRun(1, 0);
-  check_buffer_value(&motion_backend, 1);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 1);
 }
 
 TEST(PruMotionQueue, full_exec) {
@@ -96,11 +91,11 @@ TEST(PruMotionQueue, full_exec) {
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
 
-  static struct MotionSegment segment = {0};
+  struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   pru_interface.SimRun(1, 0, false);
-  check_buffer_value(&motion_backend, 0);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
 
 TEST(PruMotionQueue, single_exec_some_loops) {
@@ -109,13 +104,13 @@ TEST(PruMotionQueue, single_exec_some_loops) {
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
 
-  static struct MotionSegment segment = {0};
+  struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   pru_interface.SimRun(2, 10);
-  check_buffer_value(&motion_backend, 1);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 1);
 }
 
 TEST(PruMotionQueue, one_round_queue) {
@@ -124,19 +119,19 @@ TEST(PruMotionQueue, one_round_queue) {
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
 
-  static struct MotionSegment segment = {0};
+  struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   segment.state = STATE_FILLED;
   motion_backend.Enqueue(&segment);
   pru_interface.SimRun(2, 0);
-  check_buffer_value(&motion_backend, 1);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 1);
 
   for (int i = 0; i < QUEUE_LEN - 1; ++i) {
     segment.state = STATE_FILLED;
     motion_backend.Enqueue(&segment);
   }
-  check_buffer_value(&motion_backend, QUEUE_LEN);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), QUEUE_LEN);
 }
 
 TEST(PruMotionQueue, exec_index_lt_queue_pos) {
@@ -145,21 +140,21 @@ TEST(PruMotionQueue, exec_index_lt_queue_pos) {
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
 
-  static struct MotionSegment segment = {0};
+  struct MotionSegment segment = {};
   for (int i = 0; i < QUEUE_LEN; ++i) {
     segment.state = STATE_FILLED;
     motion_backend.Enqueue(&segment);
   }
 
   pru_interface.SimRun(QUEUE_LEN, 0);
-  check_buffer_value(&motion_backend, 1);
+    EXPECT_EQ(motion_backend.GetPendingElements(NULL), 1);
 
   for (int i = 0; i < 1; ++i) {
     segment.state = STATE_FILLED;
     motion_backend.Enqueue(&segment);
   }
 
-  check_buffer_value(&motion_backend, 2);
+    EXPECT_EQ(motion_backend.GetPendingElements(NULL), 2);
 }
 
 int main(int argc, char *argv[]) {

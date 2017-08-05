@@ -31,7 +31,7 @@ public:
   void WaitQueueEmpty() {};
   void MotorEnable(bool on) {};
   void Shutdown(bool flush_queue) {};
-  unsigned int GetPendingElements(uint32_t *head_item_progress) {
+  size_t GetPendingElements(uint32_t *head_item_progress) {
       if (head_item_progress)
         *head_item_progress = remaining_loops_;
       return queue_size_;

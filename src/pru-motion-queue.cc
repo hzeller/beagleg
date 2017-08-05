@@ -82,7 +82,7 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
 }
 #endif
 
-unsigned int PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
+size_t PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
   // Get data from the PRU
   const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
   const unsigned int last_insert_index = (queue_pos_ - 1) % QUEUE_LEN;

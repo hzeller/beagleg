@@ -105,10 +105,10 @@ public:
   // Shutdown. If !flush_queue: immediate, even if motors are still moving.
   virtual void Shutdown(bool flush_queue) = 0;
 
-  // Return the number of motion segments enqueued after
-  // the one currently executing and its already executed loops.
-  // buffer_size will never be 0 except if nothing has been yet enqueued.
-  virtual unsigned int GetPendingElements(uint32_t *head_item_progress) = 0;
+  // Returns the number of motion segments enqueued after
+  // the one currently executing. The parameter head_item_progress is filled
+  // with the already executed loops.
+  virtual size_t GetPendingElements(uint32_t *head_item_progress) = 0;
 };
 
 // Standard implementation.
@@ -127,7 +127,7 @@ public:
   void WaitQueueEmpty();
   void MotorEnable(bool on);
   void Shutdown(bool flush_queue);
-  unsigned int GetPendingElements(uint32_t *head_item_progress);
+  size_t GetPendingElements(uint32_t *head_item_progress);
 
 private:
   bool Init();
@@ -147,7 +147,7 @@ public:
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
-  unsigned int GetPendingElements(uint32_t *head_item_progress) { return 0; }
+  size_t GetPendingElements(uint32_t *head_item_progress) { return 0; }
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_

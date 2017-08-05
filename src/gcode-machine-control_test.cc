@@ -55,7 +55,7 @@ public:
 
   virtual void MotorEnable(bool on) {}
   virtual void WaitQueueEmpty() {}
-  virtual void GetRealtimeStatus(PhysicalStatus *status) {}
+  virtual bool GetRealtimeStatus(PhysicalStatus *status) { return false; }
 
 private:
   // Helpers to compare and print MotorMovements.

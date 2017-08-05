@@ -49,12 +49,10 @@ struct LinearSegmentSteps {
 // Struct used to return data about the currently executed steps
 // and the status of the auxes.
 struct PhysicalStatus {
-  // Absolute position in steps
+  // Absolute position in steps since BeagleG started.
   int pos_steps[BEAGLEG_NUM_MOTORS];
   // Auxes status
   unsigned short aux_bits;
-  // A Tag? It may be useful to add a tag to map back
-  // execution with GCode
 };
 
 class MotorOperations {  // Rename SegmentQueue ?
@@ -77,7 +75,8 @@ public:
 
   // Get the absolute position and auxes status currently
   // executed by the backend.
-  virtual void GetRealtimeStatus(PhysicalStatus *status) = 0;
+  // If status is not updated, false is returned.
+  virtual bool GetRealtimeStatus(PhysicalStatus *status) = 0;
 };
 
 class MotionQueueMotorOperations : public MotorOperations {
@@ -89,7 +88,7 @@ public:
   virtual void Enqueue(const LinearSegmentSteps &segment);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
-  virtual void GetRealtimeStatus(PhysicalStatus *status);
+  virtual bool GetRealtimeStatus(PhysicalStatus *status);
 
 private:
   void EnqueueInternal(const LinearSegmentSteps &param,

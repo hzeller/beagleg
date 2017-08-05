@@ -86,11 +86,13 @@ static char test_acceleration_ok(float acceleration) {
 }
 #endif
 
+// Used to keep track of useful attributes of a motion segment's target move.
 typedef struct HistoryPositionInfo {
   HistoryPositionInfo () : position_steps(0), sign(1) {}
-  int position_steps;
-  uint32_t fraction;
-  signed char sign;
+  int position_steps; // Absolute position at the end of the move.
+  uint32_t fraction;  // 1/0xffffffff-th of the difference between the previous
+                      // step and now.
+  signed char sign;   // Sense of the move.
 } HistoryPositionInfo;
 
 // Store the required informations needed to backtrack the absolute position.
@@ -104,8 +106,7 @@ MotionQueueMotorOperations::
   : backend_(backend),
     shadow_queue_(new std::deque<struct HistorySegment>()) {
   // Initialize the history queue.
-  struct HistorySegment new_hs = {};
-  shadow_queue_->push_front(new_hs);
+  shadow_queue_->push_front({});
 }
 
 MotionQueueMotorOperations::~MotionQueueMotorOperations() {
@@ -117,7 +118,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   struct MotionSegment new_element = {};
   new_element.direction_bits = 0;
 
-  // Get the last history segment pushed
+  // The new segment is based on the previous position.
   struct HistorySegment history_segment = shadow_queue_->front();
 
   // The defining_axis_steps is the number of steps of the axis that requires
@@ -196,9 +197,8 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   shadow_queue_->resize(buffer_size);
 }
 
-void MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
+bool MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
   // Shrink the queue
-
   uint32_t loops;
   const unsigned int buffer_size = backend_->GetPendingElements(&loops);
   assert(buffer_size <= shadow_queue_->size());
@@ -220,6 +220,7 @@ void MotionQueueMotorOperations::GetRealtimeStatus(PhysicalStatus *status) {
     status->pos_steps[i] = pos_info.position_steps - pos_info.sign * (int) steps;
   }
   status->aux_bits = hs.aux_bits;
+  return true;
 }
 
 static int get_defining_axis_steps(const LinearSegmentSteps &param) {
