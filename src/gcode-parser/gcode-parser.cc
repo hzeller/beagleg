@@ -971,7 +971,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
       endptr = gcodep_value(line, &value);
       if (endptr == NULL) {
         gprintf(GLOG_SYNTAX_ERR,
-                "gcodep_set_parameter: expected value after '#%d=[%d] ? ' got '%s'\n",
+                "gcodep_set_parameter: expected value after '#%s=[%d] ? ' got '%s'\n",
                 log_name, line, condition);
         return NULL;
       }
@@ -983,7 +983,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
         endptr = gcodep_value(line, &value);
         if (endptr == NULL) {
           gprintf(GLOG_SYNTAX_ERR,
-                  "gcodep_set_parameter: expected value after '#%d=[%d] ? %f :' got '%s'\n",
+                  "gcodep_set_parameter: expected value after '#%s=[%d] ? %f :' got '%s'\n",
                   log_name, line, condition, true_value);
           return NULL;
         }
@@ -993,7 +993,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
           value = true_value;
       } else {
         gprintf(GLOG_SYNTAX_ERR,
-                "gcodep_set_parameter: expected ':' after '#%d=[%d] ? %f' got '%s'\n",
+                "gcodep_set_parameter: expected ':' after '#%s=[%d] ? %f' got '%s'\n",
                 log_name, line, condition, true_value);
         return NULL;
       }
@@ -1002,7 +1002,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
 
   store_parameter(param_name, value);
 
-  gprintf(GLOG_EXPRESSION, "#%d=%f\n", log_name, value);
+  gprintf(GLOG_EXPRESSION, "#%s=%f\n", log_name, value);
 
   return line;
 }
