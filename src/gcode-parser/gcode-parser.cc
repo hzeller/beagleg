@@ -939,9 +939,15 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   } else if (*line == '=') {
     line = skip_white(line+1);
   } else {
-    gprintf(GLOG_SYNTAX_ERR,
-            "gcodep_set_parameter: expected '=' after '#%s' got '%s'\n",
-            log_name, line);
+    if (*line == '\0') {
+      value = 0.0;
+      read_parameter(param_name, &value);
+      gprintf(GLOG_INFO, "#%s = %f\n", log_name, value);
+    } else {
+      gprintf(GLOG_SYNTAX_ERR,
+              "gcodep_set_parameter: expected '=' after '#%s' got '%s'\n",
+              log_name, line);
+    }
     return NULL;
   }
 
