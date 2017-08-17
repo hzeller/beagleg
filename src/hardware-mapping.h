@@ -213,6 +213,9 @@ public:
   // Returns true if the start input is active (or it's not available)
   bool TestStartSwitch();
 
+  // Returns true if the probe input is active (or it's not available)
+  bool TestProbeSwitch();
+
   // other input switches.
   // inputs: analog inputs needed.
 
@@ -259,6 +262,7 @@ private:
   int estop_input_;
   int pause_input_;
   int start_input_;
+  int probe_input_;
 
   AuxBitmap aux_bits_;       // Set via M42 or various other settings.
 

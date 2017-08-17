@@ -31,7 +31,8 @@
 #include "motor-operations.h"  // LinearSegmentSteps
 
 HardwareMapping::HardwareMapping()
-  : estop_input_(0), pause_input_(0), start_input_(0), aux_bits_(0),
+  : estop_input_(0), pause_input_(0), start_input_(0), probe_input_(0),
+    aux_bits_(0),
     is_hardware_initialized_(false) {
 }
 
@@ -279,6 +280,10 @@ bool HardwareMapping::TestStartSwitch() {
   return TestSwitch(start_input_, true);
 }
 
+bool HardwareMapping::TestProbeSwitch() {
+  return TestSwitch(probe_input_, true);
+}
+
 class HardwareMapping::ConfigReader : public ConfigParser::Reader {
 public:
   ConfigReader(HardwareMapping *config) : config_(config){}
@@ -420,6 +425,9 @@ private:
       }
       else if (option == "start") {
         config_->start_input_ = switch_number;
+      }
+      else if (option == "probe") {
+        config_->probe_input_ = switch_number;
       }
       else if (option.length() == 5) {
         const GCodeParserAxis axis = gcodep_letter2axis(option[4]);
