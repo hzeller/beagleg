@@ -357,6 +357,8 @@ public:
   }
 
   void On(bool ccw, int rpm) {
+    if (fd_ == -1) return;
+
     if (is_off_) {
       set_output_flags(HardwareMapping::OUT_SPINDLE, true);
       if (pwr_delay_ms_) sleep_ms(pwr_delay_ms_);
@@ -383,6 +385,8 @@ public:
   }
 
   void Off() {
+    if (fd_ == -1) return;
+
     const unsigned char command = CMD_STOP_MOTOR;
     send(&command, 1);
 

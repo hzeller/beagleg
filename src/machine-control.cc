@@ -415,10 +415,8 @@ int main(int argc, char *argv[]) {
     Log_error("Exiting. Parse error in configuration file '%s'", config_file);
     return 1;
   }
-  if (!spindle.Init(&hardware_mapping)) {
-    Log_error("Exiting. Unable to initialize spindle");
-    return 1;
-  }
+  if (!spindle.Init(&hardware_mapping))
+    Log_error("Unable to initialize spindle");
 
   // ... other configurations that read from that file.
 
