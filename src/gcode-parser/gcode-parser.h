@@ -186,7 +186,7 @@ public:
     Config() : parameters(NULL) {}
 
     bool LoadParams(const std::string &filename);
-    bool SaveParams(const std::string &filename);
+    bool SaveParams(const std::string &filename) const;
 
     // The machine origin. This is where the end-switches are. Typically,
     // for CNC machines, that might have Z at the highest point for instance,

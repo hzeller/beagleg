@@ -58,7 +58,7 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
   return true;
 }
 
-bool GCodeParser::Config::SaveParams(const std::string &filename) {
+bool GCodeParser::Config::SaveParams(const std::string &filename) const {
   if (parameters == NULL) {
     Log_error("No parameters to save.");
     return false;
