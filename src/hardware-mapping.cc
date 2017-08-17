@@ -250,52 +250,33 @@ HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis
   return (AxisTrigger) result;  // Safe to cast: all within range.
 }
 
+bool HardwareMapping::TestSwitch(const int switch_number, bool def_result) {
+  if (!is_hardware_initialized_) return def_result;
+  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
+  if (gpio_def != GPIO_NOT_MAPPED)
+    return (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
+  return def_result;
+}
+
 bool HardwareMapping::TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger) {
-  if (!is_hardware_initialized_) return false;
   bool result = false;
-  GPIODefinition gpio_def;
-  if (requested_trigger & TRIGGER_MIN) {
-    const int switch_number = axis_to_min_endstop_[axis];
-    gpio_def = get_endstop_gpio_descriptor(switch_number);
-    if (gpio_def != GPIO_NOT_MAPPED)
-      result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  }
-  if (requested_trigger & TRIGGER_MAX) {
-    const int switch_number = axis_to_max_endstop_[axis];
-    gpio_def = get_endstop_gpio_descriptor(switch_number);
-    if (gpio_def != GPIO_NOT_MAPPED)
-      result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  }
+  if (requested_trigger & TRIGGER_MIN)
+    result |= TestSwitch(axis_to_min_endstop_[axis], false);
+  if (requested_trigger & TRIGGER_MAX)
+    result |= TestSwitch(axis_to_max_endstop_[axis], false);
   return result;
 }
 
 bool HardwareMapping::TestEStopSwitch() {
-  if (!is_hardware_initialized_) return false;
-  bool result = false;
-  const int switch_number = estop_input_;
-  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
-  if (gpio_def != GPIO_NOT_MAPPED)
-    result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  return result;
+  return TestSwitch(estop_input_, false);
 }
 
 bool HardwareMapping::TestPauseSwitch() {
-  if (!is_hardware_initialized_) return false;
-  bool result = false;
-  const int switch_number = pause_input_;
-  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
-  if (gpio_def != GPIO_NOT_MAPPED)
-    result |= (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  return result;
+  return TestSwitch(pause_input_, false);
 }
 
 bool HardwareMapping::TestStartSwitch() {
-  if (!is_hardware_initialized_) return true;
-  const int switch_number = start_input_;
-  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
-  if (gpio_def != GPIO_NOT_MAPPED)
-    return (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  return true;
+  return TestSwitch(start_input_, true);
 }
 
 class HardwareMapping::ConfigReader : public ConfigParser::Reader {

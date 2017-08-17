@@ -236,6 +236,10 @@ private:
   static GPIODefinition get_pwm_gpio_descriptor(int pwm_number);
   static GPIODefinition get_endstop_gpio_descriptor(int switch_num);
 
+  // Test current state of given switch number; if not configured, return
+  // default result.
+  bool TestSwitch(const int switch_number, bool default_result);
+
   void ResetHardware();  // Initialize to a safe state.
 
   // Mapping of logical outputs to hardware outputs.
