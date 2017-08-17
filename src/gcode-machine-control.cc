@@ -261,8 +261,12 @@ bool GCodeMachineControl::Impl::Init() {
     }
     if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MIN) != 0) {
       line += StringPrintf("|<-HOME@min; ");
+      if (hardware_mapping_->HasProbeSwitch(axis))
+        line += "PROBE@max->|; ";
     }
     else if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MAX) != 0) {
+      if (hardware_mapping_->HasProbeSwitch(axis))
+        line += "|<-PROBE@min; ";
       line += StringPrintf("HOME@max->|; ");
     }
 
