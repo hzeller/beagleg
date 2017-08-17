@@ -216,6 +216,11 @@ public:
   // Returns true if the probe input is active (or it's not available)
   bool TestProbeSwitch();
 
+  bool HasProbeSwitch(LogicAxis axis) const {
+    if (axis == AXIS_Z) return probe_input_ != 0;
+    return false;
+  }
+
   // other input switches.
   // inputs: analog inputs needed.
 

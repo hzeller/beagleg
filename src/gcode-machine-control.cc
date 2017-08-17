@@ -118,8 +118,9 @@ private:
   float acceleration_for_move(const int *axis_steps,
                               enum GCodeParserAxis defining_axis);
   int move_to_endstop(enum GCodeParserAxis axis,
-                      float feedrate, bool backoff,
-                      HardwareMapping::AxisTrigger trigger, int max_steps=0);
+                      float feedrate, HardwareMapping::AxisTrigger trigger);
+  int move_to_probe(enum GCodeParserAxis axis, float feedrate, const int dir,
+                    int max_steps);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
   void handle_M105();
@@ -687,16 +688,12 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
 
 // Moves to endstop and returns how many steps it moved in the process.
 int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
-                                               float feedrate, bool backoff,
-                                               HardwareMapping::AxisTrigger trigger,
-                                               int max_steps) {
-  if (hardware_mapping_->IsHardwareSimulated()) {
+                                               float feedrate,
+                                               HardwareMapping::AxisTrigger trigger) {
+  if (hardware_mapping_->IsHardwareSimulated())
     return 0;  // There are no switches to trigger, so pretend we stopped.
-  }
 
-  // This is a G30 probe if there is no backoff, use a smaller move for the
-  // probe to increase accuracy.
-  const float kHomingMM = (backoff) ? 0.5 : 0.05; // TODO: make configurable?
+  const float kHomingMM = 0.5;                    // TODO: make configurable?
   const float kBackoffMM = kHomingMM / 10.0;      // TODO: make configurable?
 
   int total_movement = 0;
@@ -706,15 +703,33 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
   while (!hardware_mapping_->TestAxisSwitch(axis, trigger)) {
     total_movement += planner_->DirectDrive(axis, dir * kHomingMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.
-    if (max_steps && abs(total_movement) > max_steps) {
-      mprintf("// G30: max probe reached\n");
-      return total_movement;
-    }
   }
 
-  if (backoff) {   // Go back until switch is not triggered anymore.
-    while (hardware_mapping_->TestAxisSwitch(axis, trigger)) {
-      total_movement += planner_->DirectDrive(axis, -dir * kBackoffMM, v0, v1);
+  // Go back until switch is not triggered anymore.
+  while (hardware_mapping_->TestAxisSwitch(axis, trigger)) {
+    total_movement += planner_->DirectDrive(axis, -dir * kBackoffMM, v0, v1);
+  }
+
+  return total_movement;
+}
+
+int GCodeMachineControl::Impl::move_to_probe(enum GCodeParserAxis axis,
+                                             float feedrate, const int dir,
+                                             int max_steps) {
+  if (hardware_mapping_->IsHardwareSimulated())
+    return 0;  // There are no switches to trigger, so pretend we stopped.
+
+  const float kProbeMM = 0.05;                   // TODO: make configurable?
+
+  int total_movement = 0;
+  float v0 = 0;
+  float v1 = feedrate;
+  while (!hardware_mapping_->TestProbeSwitch()) {
+    total_movement += planner_->DirectDrive(axis, dir * kProbeMM, v0, v1);
+    v0 = v1;  // TODO: possibly acceleration over multiple segments.
+    if (abs(total_movement) > max_steps) {
+      mprintf("// G30: max probe reached\n");
+      return total_movement;
     }
   }
 
@@ -740,7 +755,7 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
     planner_->Enqueue(current, kHomingSpeed);
     planner_->BringPathToHalt();
   } else {
-    move_to_endstop(axis, kHomingSpeed, true, trigger);
+    move_to_endstop(axis, kHomingSpeed, trigger);
     planner_->SetExternalPosition(axis, home_pos);
   }
 }
@@ -764,29 +779,23 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
 
   planner_->BringPathToHalt();
 
-  // -- somewhat hackish
-
-  // We try to find the axis that is _not_ used for homing.
-  // this is not yet 100% the way it should be. We should actually
-  // define the probe-'endstops' somewhat differently.
-  // For now, we just do the simple thing
-  HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
-  HardwareMapping::AxisTrigger probe_trigger;
-  if (home_trigger == HardwareMapping::TRIGGER_MIN) {
-    probe_trigger = HardwareMapping::TRIGGER_MAX;
-  } else {
-    probe_trigger = HardwareMapping::TRIGGER_MIN;
-  }
-  if ((hardware_mapping_->AvailableAxisSwitch(axis) & probe_trigger) == 0) {
-    mprintf("// BeagleG: No probe - axis %c does not have a travel endstop\n",
+  if (!hardware_mapping_->HasProbeSwitch(axis)) {
+    mprintf("// BeagleG: No probe - axis %c does not have a probe switch\n",
             gcodep_axis2letter(axis));
     return false;
   }
 
+  // -- somewhat hackish
+
+  // The probe endstop should be in the direction that is _not_ used for homing.
+  HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
+  const int dir = home_trigger == HardwareMapping::TRIGGER_MIN ? 1 : -1;
+
   if (feedrate <= 0) feedrate = 20;
   int max_steps = abs(cfg_.move_range_mm[axis] * cfg_.steps_per_mm[axis]);
-  int total_steps = move_to_endstop(axis, feedrate, false, probe_trigger, max_steps);
+  int total_steps = move_to_probe(axis, feedrate, dir, max_steps);
   float distance_moved = total_steps / cfg_.steps_per_mm[axis];
+
   AxesRegister machine_pos;
   planner_->GetCurrentPosition(&machine_pos);
   const float new_pos = machine_pos[axis] + distance_moved;
