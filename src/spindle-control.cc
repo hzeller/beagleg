@@ -138,8 +138,9 @@ public:
   virtual void On(bool ccw, int rpm) = 0;
   virtual void Off() = 0;
 
-  void set_output_flags(HardwareMapping::LogicOutput out, bool is_on) {
+  void set_output(HardwareMapping::LogicOutput out, bool is_on) {
     hardware_mapping_->UpdateAuxBitmap(out, is_on);
+    hardware_mapping_->SetAuxOutputs();
   }
 
 protected:
@@ -170,7 +171,7 @@ public:
   void On(bool ccw, int rpm) {
     // turn on spindle power if necessary
     if (is_off_) {
-      set_output_flags(HardwareMapping::OUT_SPINDLE, true);
+      set_output(HardwareMapping::OUT_SPINDLE, true);
       if (pwr_delay_ms_) sleep_ms(pwr_delay_ms_);
     }
 
@@ -178,7 +179,7 @@ public:
     if (ccw != is_ccw_) ramp_down();
 
     // set the spindle direction
-    set_output_flags(HardwareMapping::OUT_SPINDLE_DIRECTION, ccw);
+    set_output(HardwareMapping::OUT_SPINDLE_DIRECTION, ccw);
     is_ccw_ = ccw;
 
     // ramp the spindle to the target speed
@@ -207,7 +208,7 @@ public:
   void Off() {
     ramp_down();
     if (off_delay_ms_) sleep_ms(off_delay_ms_);
-    set_output_flags(HardwareMapping::OUT_SPINDLE, false);
+    set_output(HardwareMapping::OUT_SPINDLE, false);
     is_off_ = true;
     Log_debug("PWMSpindle: off");
   }
@@ -360,7 +361,7 @@ public:
     if (fd_ == -1) return;
 
     if (is_off_) {
-      set_output_flags(HardwareMapping::OUT_SPINDLE, true);
+      set_output(HardwareMapping::OUT_SPINDLE, true);
       if (pwr_delay_ms_) sleep_ms(pwr_delay_ms_);
       exit_safe_start();
     }
@@ -391,7 +392,7 @@ public:
     send(&command, 1);
 
     if (off_delay_ms_) sleep_ms(off_delay_ms_);
-    set_output_flags(HardwareMapping::OUT_SPINDLE, false);
+    set_output(HardwareMapping::OUT_SPINDLE, false);
     is_off_ = true;
     Log_debug("PololuSMCSpindle: off");
   }

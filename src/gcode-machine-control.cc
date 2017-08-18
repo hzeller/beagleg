@@ -124,6 +124,9 @@ private:
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
   void handle_M105();
+  // Parse GCode spindle M3/M4 block.
+  const char *set_spindle_on(bool is_ccw, const char *);
+  void set_spindle_off();
 
   // Print to msg_stream.
   void mprintf(const char *format, ...);
@@ -354,6 +357,32 @@ void GCodeMachineControl::Impl::handle_M105() {
   mprintf("T-300\n");
 }
 
+const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
+                                                      const char *remaining) {
+  int spindle_rpm = -1;
+  const char* after_pair;
+  char letter;
+  float value;
+
+  // Ensure that the PRU queue is flushed before turning on the spindle.
+  planner_->BringPathToHalt();
+  for (;;) {
+    after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
+    if (after_pair == NULL) break;
+    else if (letter == 'S') spindle_rpm = round2int(value);
+    else break;
+    remaining = after_pair;
+  }
+  if (spindle_rpm >= 0) spindle_->On(is_ccw, spindle_rpm);
+  return remaining;
+}
+
+void GCodeMachineControl::Impl::set_spindle_off() {
+  // Ensure that the PRU queue is flushed before turning off the spindle.
+  planner_->BringPathToHalt();
+  spindle_->Off();
+}
+
 const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
                                                    const char *remaining) {
   return special_commands(letter, value, remaining);
@@ -410,22 +439,11 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
                                                         const char *remaining) {
   const int m_code = (int)value;
   const char* after_pair;
-  int spindle_rpm = -1;
 
   switch (m_code) {
-  case 3: case 4:
-    for (;;) {
-      after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
-      if (after_pair == NULL) break;
-      else if (letter == 'S') spindle_rpm = round2int(value);
-      else break;
-      remaining = after_pair;
-    }
-    if (spindle_rpm >= 0) spindle_->On(m_code == 4, spindle_rpm);
-    break;
-  case 5:
-    spindle_->Off();
-    break;
+  case 3: remaining = set_spindle_on(false, remaining); break;  // CW
+  case 4: remaining = set_spindle_on(true, remaining); break;   // CCW
+  case 5: set_spindle_off(); break;
   case 7: set_output_flags(HardwareMapping::OUT_MIST, true); break;
   case 8: set_output_flags(HardwareMapping::OUT_FLOOD, true); break;
   case 9:
@@ -551,11 +569,10 @@ void GCodeMachineControl::Impl::gcode_start(GCodeParser *parser) {
 
 void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
   planner_->BringPathToHalt();
-  spindle_->Off();
+  set_spindle_off();
   if (end_of_stream && cfg_.auto_motor_disable_seconds > 0)
     motors_enable(false);
 }
-
 
 bool GCodeMachineControl::Impl::test_homing_status_ok() {
   if (!cfg_.require_homing)
