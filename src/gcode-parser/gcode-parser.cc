@@ -291,7 +291,7 @@ private:
   static AxesRegister kZeroOffset;
 
   GCodeParser::EventReceiver *const callbacks;
-  const GCodeParser::Config config;
+  GCodeParser::Config config;
 
   SimpleLexer<Operation> op_parse_;
 
@@ -1875,6 +1875,8 @@ void GCodeParser::Impl::ParseLine(GCodeParser *owner,
         line = set_param('S', &GCodeParser::EventReceiver::set_speed_factor,
                          0.01f, line);
         break;
+      case 500: config.SaveParams(); break;
+      case 501: config.LoadParams(); break;
       default: line = callbacks->unprocessed(letter, value, line); break;
       }
     }

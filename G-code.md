@@ -165,6 +165,8 @@ M106 Snnn        | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
 M111 Snnn        | -                     | Set debug level.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
+M500             | `save_params()`       | Save parameters.
+M501             | `load_params()`       | Load parameters.
 
 ### M Codes dealt with by gcode-machine-control
 The standard M-Code are directly handled by the G-code parser and result
