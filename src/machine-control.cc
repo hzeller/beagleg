@@ -484,10 +484,10 @@ int main(int argc, char *argv[]) {
     Log_error("Exiting. Cannot initialize machine control.");
     return 1;
   }
-  GCodeParser::Config parser_cfg;
+  GCodeParser::Config parser_cfg(paramfile);
   GCodeParser::Config::ParamMap parameters;
   parser_cfg.parameters = &parameters;
-  if (!paramfile.empty()) parser_cfg.LoadParams(paramfile);
+  parser_cfg.LoadParams();
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
@@ -519,7 +519,7 @@ int main(int argc, char *argv[]) {
 
   free(bind_addr);
 
-  if (!paramfile.empty()) parser_cfg.SaveParams(paramfile);
+  parser_cfg.SaveParams();
 
   Log_info("Shutdown.");
   return ret;

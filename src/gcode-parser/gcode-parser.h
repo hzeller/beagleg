@@ -184,9 +184,10 @@ public:
   struct Config {
     typedef std::map<std::string, float> ParamMap;
     Config() : parameters(NULL) {}
+    Config(const std::string &filename) : parameters(NULL), paramfile(filename) {}
 
-    bool LoadParams(const std::string &filename);
-    bool SaveParams(const std::string &filename) const;
+    bool LoadParams();
+    bool SaveParams() const;
 
     // The machine origin. This is where the end-switches are. Typically,
     // for CNC machines, that might have Z at the highest point for instance,
@@ -197,6 +198,9 @@ public:
     // This maps the name to the value of the parameter. The original RS274
     // only supports integer variables, but we allow arbitrary variable names.
     ParamMap *parameters;
+
+  private:
+    const std::string paramfile;
   };
 
 public:

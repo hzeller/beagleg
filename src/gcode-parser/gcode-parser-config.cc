@@ -25,7 +25,9 @@
 
 #include "common/logging.h"
 
-bool GCodeParser::Config::LoadParams(const std::string &filename) {
+bool GCodeParser::Config::LoadParams() {
+  if (paramfile.empty())
+    return false;
   if (parameters == NULL) {
     Log_error("No parameters to load into.");
     return false;
@@ -33,10 +35,10 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
 
   (*parameters)["5220"] = 1.0f;  // Only non-zero default.
 
-  FILE *fp = fopen(filename.c_str(), "r");
+  FILE *fp = fopen(paramfile.c_str(), "r");
   if (!fp) {
     Log_error("Unable to read param file %s (%s)",
-              filename.c_str(), strerror(errno));
+              paramfile.c_str(), strerror(errno));
     return false;
   }
 
@@ -53,17 +55,20 @@ bool GCodeParser::Config::LoadParams(const std::string &filename) {
       ++pcount;
     }
   }
-  Log_debug("Loaded %d parameters from %s", pcount, filename.c_str());
+  Log_debug("Loaded %d parameters from %s", pcount, paramfile.c_str());
   fclose(fp);
   return true;
 }
 
-bool GCodeParser::Config::SaveParams(const std::string &filename) const {
+bool GCodeParser::Config::SaveParams() const {
+  if (paramfile.empty())
+    return false;
   if (parameters == NULL) {
     Log_error("No parameters to save.");
     return false;
   }
-  const std::string tmp_name = filename + ".tmp";
+
+  const std::string tmp_name = paramfile + ".tmp";
   // create new param file
   FILE *fp = fopen(tmp_name.c_str(), "w");
   if (!fp) {
@@ -71,7 +76,7 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) const {
     Log_error("Unable to write temporary param file %s (%s)", tmp_name.c_str(),
               strerror(err));
     if (err == EACCES) {
-      const std::string dir = filename.substr(0, filename.find_last_of('/'));
+      const std::string dir = paramfile.substr(0, paramfile.find_last_of('/'));
       Log_error("Params-file permission problem: Need write access to %s/ "
                 "(FYI we run as uid=%d, gid=%d)",
                 dir.c_str(), getuid(), getgid());
@@ -114,14 +119,14 @@ bool GCodeParser::Config::SaveParams(const std::string &filename) const {
     fprintf(fp, "%s\t%f\n", name_value.first.c_str(), name_value.second);
     ++pcount;
   }
-  Log_debug("Saving %d parameters to %s", pcount, filename.c_str());
+  Log_debug("Saving %d parameters to %s", pcount, paramfile.c_str());
 
   if (fflush(fp) == 0 && fdatasync(fileno(fp)) == 0 && fclose(fp) == 0) {
-    rename(filename.c_str(), (filename + ".bak").c_str());
-    if (rename(tmp_name.c_str(), filename.c_str()) == 0)
+    rename(paramfile.c_str(), (paramfile + ".bak").c_str());
+    if (rename(tmp_name.c_str(), paramfile.c_str()) == 0)
       return true;
   }
-  Log_error("Trouble writing parameter file %s (%s)", filename.c_str(),
+  Log_error("Trouble writing parameter file %s (%s)", paramfile.c_str(),
             strerror(errno));
   return false;
 }
