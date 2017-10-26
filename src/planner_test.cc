@@ -371,10 +371,12 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
     // A shallow move just plows through the middle, so we expect all the
     // joint speeds to be larger than zero.
     for (size_t i = 0; i < segments.size(); ++i) {
-      if (i > 0)
+      if (i > 0) {
         EXPECT_GT(segments[i].v0, 0) << "At angle " << angle;
-      if (i < segments.size()-1)
+      }
+      if (i < segments.size()-1) {
         EXPECT_GT(segments[i].v1, 0) << "At angle " << angle;
+      }
     }
   }
 }
