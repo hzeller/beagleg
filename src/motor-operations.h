@@ -20,6 +20,7 @@
 #define _BEAGLEG_MOTOR_OPERATIONS_H_
 
 #include <stdio.h>
+#include <deque>
 
 class MotionQueue;
 
@@ -45,6 +46,13 @@ struct LinearSegmentSteps {
   int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
 };
 
+// Struct used to return data about the currently executed steps
+// and the status of the auxes.
+struct PhysicalStatus {
+  int pos_steps[BEAGLEG_NUM_MOTORS];  // Absolute position in steps.
+  unsigned short aux_bits;            // Auxes status
+};
+
 class MotorOperations {  // Rename SegmentQueue ?
 public:
   virtual ~MotorOperations() {}
@@ -62,22 +70,32 @@ public:
 
   // Wait, until all elements in the ring-buffer are consumed.
   virtual void WaitQueueEmpty() = 0;
+
+  // Get the absolute position and auxes status the motors currently
+  // in, and the end of the exeuction queue.
+  // Returns 'true' if the status was available and is updated.
+  virtual bool GetPhysicalStatus(PhysicalStatus *status) = 0;
 };
 
 class MotionQueueMotorOperations : public MotorOperations {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
-  MotionQueueMotorOperations(MotionQueue *backend) : backend_(backend) {}
+  MotionQueueMotorOperations(MotionQueue *backend);
+  virtual ~MotionQueueMotorOperations();
 
   virtual void Enqueue(const LinearSegmentSteps &segment);
   virtual void MotorEnable(bool on);
   virtual void WaitQueueEmpty();
+  virtual bool GetPhysicalStatus(PhysicalStatus *status);
 
 private:
   void EnqueueInternal(const LinearSegmentSteps &param,
                        int defining_axis_steps);
 
   MotionQueue *backend_;
+
+  struct HistorySegment;
+  std::deque<struct HistorySegment> *shadow_queue_;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

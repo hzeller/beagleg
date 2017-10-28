@@ -75,14 +75,17 @@ struct MotionSegment {
 #endif
 } __attribute__((packed));
 
+namespace internal {
 // Layout of the status register
 // Assuming atomicity of 32 bit boundaries
 // This 32 bit value will be a copy of the R28 register of the PRU.
 // First 0-23 bits are assigned to the counter, top 24-31 bits to the index.
+// This is an internal implementation detail of the PRUMotionQueue.
 struct QueueStatus {
   uint32_t counter : 24; // remaining number of cycles to be performed
   uint32_t index : 8;    // represent the executing slot [0 to QUEUE_LEN - 1]
 };
+}
 
 typedef FixedArray<int, MOTION_MOTOR_COUNT> MotorsRegister;
 
@@ -105,9 +108,13 @@ public:
   // Shutdown. If !flush_queue: immediate, even if motors are still moving.
   virtual void Shutdown(bool flush_queue) = 0;
 
-  // Fill the argument with the current absolute position in loops
-  // for each motor.
-  virtual void GetMotorsLoops(MotorsRegister *absolute_pos_loops) = 0;
+  // Returns the number of motion segments that are pending in the queue
+  // behind the one currently executing. So if we are currently executing
+  // the last element or are idle after the last element, this will return
+  // zero.
+  // The return parameter head_item_progress is set to the number
+  // of already executed loops in the item currenly being executed.
+  virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
 };
 
 // Standard implementation.
@@ -117,7 +124,6 @@ public:
 // called.
 class HardwareMapping;
 struct PRUCommunication;
-struct HistorySegment;
 class PRUMotionQueue : public MotionQueue {
 public:
   PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
@@ -127,7 +133,7 @@ public:
   void WaitQueueEmpty();
   void MotorEnable(bool on);
   void Shutdown(bool flush_queue);
-  void GetMotorsLoops(MotorsRegister *absolute_pos_loops);
+  int GetPendingElements(uint32_t *head_item_progress);
 
 private:
   bool Init();
@@ -137,11 +143,6 @@ private:
 
   volatile struct PRUCommunication *pru_data_;
   unsigned int queue_pos_;
-
-  // Shadow Queue
-  void RegisterHistorySegment(const MotionSegment &element);
-
-  struct HistorySegment *const shadow_queue_;
 };
 
 
@@ -152,7 +153,7 @@ public:
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
-  void GetMotorsLoops(MotorsRegister *absolute_pos_loops) {}
+  int GetPendingElements(uint32_t *head_item_progress) { return 0; }
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_
