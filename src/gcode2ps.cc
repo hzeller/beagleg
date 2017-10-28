@@ -399,6 +399,7 @@ public:
 
   virtual void MotorEnable(bool on) {}
   virtual void WaitQueueEmpty() {}
+  virtual bool GetRealtimeStatus(PhysicalStatus *status) { return false; }
 
   void PrintColorLegend(float x, float y, float width) {
     if (min_color_range_ >= max_color_range_)

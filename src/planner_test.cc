@@ -82,6 +82,7 @@ public:
 
   virtual void MotorEnable(bool on)  {}
   virtual void WaitQueueEmpty() {}
+  virtual bool GetRealtimeStatus(PhysicalStatus *status) { return false; }
 
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }
 

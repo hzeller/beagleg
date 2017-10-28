@@ -105,9 +105,10 @@ public:
   // Shutdown. If !flush_queue: immediate, even if motors are still moving.
   virtual void Shutdown(bool flush_queue) = 0;
 
-  // Fill the argument with the current absolute position in loops
-  // for each motor.
-  virtual void GetMotorsLoops(MotorsRegister *absolute_pos_loops) = 0;
+  // Returns the number of motion segments enqueued after
+  // the one currently executing. The parameter head_item_progress is filled
+  // with the already executed loops.
+  virtual size_t GetPendingElements(uint32_t *head_item_progress) = 0;
 };
 
 // Standard implementation.
@@ -117,7 +118,6 @@ public:
 // called.
 class HardwareMapping;
 struct PRUCommunication;
-struct HistorySegment;
 class PRUMotionQueue : public MotionQueue {
 public:
   PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
@@ -127,7 +127,7 @@ public:
   void WaitQueueEmpty();
   void MotorEnable(bool on);
   void Shutdown(bool flush_queue);
-  void GetMotorsLoops(MotorsRegister *absolute_pos_loops);
+  size_t GetPendingElements(uint32_t *head_item_progress);
 
 private:
   bool Init();
@@ -137,11 +137,6 @@ private:
 
   volatile struct PRUCommunication *pru_data_;
   unsigned int queue_pos_;
-
-  // Shadow Queue
-  void RegisterHistorySegment(const MotionSegment &element);
-
-  struct HistorySegment *const shadow_queue_;
 };
 
 
@@ -152,7 +147,7 @@ public:
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
-  void GetMotorsLoops(MotorsRegister *absolute_pos_loops) {}
+  size_t GetPendingElements(uint32_t *head_item_progress) { return 0; }
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_
