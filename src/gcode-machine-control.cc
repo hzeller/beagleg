@@ -332,14 +332,23 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
 }
 
 void GCodeMachineControl::Impl::wait_for_start() {
-  int flash_usec = 100 * 1000;
-  while (!hardware_mapping_->TestStartSwitch()) {
-    set_output_flags(HardwareMapping::OUT_LED, true);
-    hardware_mapping_->SetAuxOutputs();
-    usleep(flash_usec);
-    set_output_flags(HardwareMapping::OUT_LED, false);
-    hardware_mapping_->SetAuxOutputs();
-    usleep(flash_usec);
+  // Interlock: can't start while wait is still active.
+  if (pause_enabled_ && check_for_pause()) {
+    mprintf("// BeagleG: pause switch active\n");
+    while (check_for_pause()) usleep(1000);
+    mprintf("// BeagleG: pause switch cleared\n");
+  }
+  if (!hardware_mapping_->TestStartSwitch()) {
+    mprintf("// BeagleG: waiting for start switch\n");
+    const int flash_usec = 100 * 1000;
+    while (!hardware_mapping_->TestStartSwitch()) {
+      set_output_flags(HardwareMapping::OUT_LED, true);
+      hardware_mapping_->SetAuxOutputs();
+      usleep(flash_usec);
+      set_output_flags(HardwareMapping::OUT_LED, false);
+      hardware_mapping_->SetAuxOutputs();
+      usleep(flash_usec);
+    }
   }
 }
 
