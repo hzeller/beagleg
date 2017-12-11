@@ -189,6 +189,11 @@ public:
   // motors in the LinearSegmentSteps
   void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
 
+  // Given the logical axis and an array containing all the motors steps
+  // it returns true if the axis is mapped to a motor and axis_steps
+  // is filled with the corresponding number of steps.
+  bool AssignAxisSteps(LogicAxis axis, int *motors_steps, int *axis_steps);
+
   // -- Switch access
 
   // Returns which endstop trigger are available. Possible values are
