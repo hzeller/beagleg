@@ -331,11 +331,23 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_FAN, duty_cycle);
 }
 
+// number of checks to ensure the pause switch is inactive
+#define PAUSE_ACTIVE_DETECT	2
+
 void GCodeMachineControl::Impl::wait_for_start() {
   // Interlock: can't start while wait is still active.
   if (pause_enabled_ && check_for_pause()) {
     mprintf("// BeagleG: pause switch active\n");
-    while (check_for_pause()) usleep(1000);
+    int pause_active = PAUSE_ACTIVE_DETECT;
+    while (pause_active) {
+      usleep(1000);
+      // TODO: we should probably have de-bouncing logic rather in the
+      // hardware mapping. E.g. something like TestPauseSwitch(2000).
+      if (check_for_pause())
+	pause_active = PAUSE_ACTIVE_DETECT;
+      else
+	pause_active--;
+    }
     mprintf("// BeagleG: pause switch cleared\n");
   }
   if (!hardware_mapping_->TestStartSwitch()) {
