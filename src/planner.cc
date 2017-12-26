@@ -558,14 +558,10 @@ void Planner::Impl::bring_path_to_halt() {
 void Planner::Impl::GetCurrentPosition(AxesRegister *pos) {
   PhysicalStatus physical_status;
   motor_ops_->GetPhysicalStatus(&physical_status);
-  int axis_steps;
+  pos->zero();
   for (const GCodeParserAxis a : AllAxes()) {
-    const bool axis_mapped =
-      hardware_mapping_->AssignAxisSteps(a, physical_status.pos_steps, &axis_steps);
-    if (axis_mapped && cfg_->steps_per_mm[a] != 0) {
-      (*pos)[a] = axis_steps / cfg_->steps_per_mm[a];
-    } else {
-      (*pos)[a] = 0;
+    if (cfg_->steps_per_mm[a] != 0) {
+      (*pos)[a] = hardware_mapping_->GetAxisSteps(a, physical_status) / cfg_->steps_per_mm[a];
     }
   }
 }

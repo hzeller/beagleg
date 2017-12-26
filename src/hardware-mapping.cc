@@ -250,8 +250,7 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
   }
 }
 
-bool HardwareMapping::AssignAxisSteps(LogicAxis axis, int *motors_steps,
-                                      int *axis_steps) {
+int HardwareMapping::GetAxisSteps(LogicAxis axis, const PhysicalStatus &status) {
   uint8_t mask = axis_to_driver_[axis];
   int m = 0;
   while (((mask & 0x01) != 0x01) && m < NUM_MOTORS) {
@@ -261,9 +260,8 @@ bool HardwareMapping::AssignAxisSteps(LogicAxis axis, int *motors_steps,
   }
 
   // Maybe this axis is not mapped to any motor.
-  if (m == NUM_MOTORS) return false;
-  *axis_steps = driver_flip_[m] * motors_steps[m];
-  return true;
+  if (m == NUM_MOTORS) return 0;
+  return driver_flip_[m] * status.pos_steps[m];
 }
 
 HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis) {
