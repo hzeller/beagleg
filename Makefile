@@ -14,6 +14,9 @@
 # Currently supported BUMPS, CRAMPS, and VGEN5
 export BEAGLEG_HARDWARE_TARGET?=BUMPS
 
+# Disable PWM timers. See README.md.
+#export CONFIG_FLAGS?=-D_DISABLE_PWM_TIMERS
+
 # In case you cross compile this on a different architecture, uncomment this
 # and set the prefix of the compiler binary.
 #export CROSS_COMPILE?=arm-arago-linux-gnueabi-
