@@ -9,6 +9,10 @@
 # Currently supported BUMPS, CRAMPS, and VGEN5
 BEAGLEG_HARDWARE_TARGET?=BUMPS
 
+# Additional macros, for example to disable the pwm support simply add
+# -D_DISABLE_PWM_TIMERS
+CONFIG_FLAGS?=
+
 # In case you cross compile this on a different architecture, uncomment this
 # and set the prefix. Or simply set the environment variable.
 #CROSS_COMPILE?=arm-arago-linux-gnueabi-
@@ -46,7 +50,7 @@ CFLAGS+=-Wall -I. -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $
 # We use c++11, but it looks like that even the latest
 # bone-debian-7.11-lxde-4gb-armhf-2016-06-16-4gb image has an ancient 4.6.3
 # compiler that still referred to that standard as c++0x
-CXXFLAGS+=-std=c++0x $(CFLAGS)
+CXXFLAGS+=-std=c++0x $(CFLAGS) $(CONFIG_FLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm

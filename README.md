@@ -29,6 +29,7 @@ socket (you can just telnet to it for an interactive session, how cool is that?)
 
 ## Install
 ### System configuration
+
 In order to run BeagleG on your BeagleBone you will need to be sure
 that uio_pruss kernel module has been installed and loaded in the kernel.
 You can easily test if the module it's available by running:
@@ -52,6 +53,28 @@ yet. You can see that if you ask `uname -r` returns something like
 
 In that case, you will need to
 [change your kernel version](http://elinux.org/BeagleBoardDebian#Install_Latest_Kernel_Image) to a bone prefix one (e.g. `4.4.14-bone`).
+
+#### Newer kernels
+Newest beagleboard kernels support both remoteproc and uio_pruss modules.
+In order to use the uio_pruss one simply follow the directives that you can find inside `/boot/uEnv.txt`:
+
+```
+###PRUSS OPTIONS
+###pru_rproc (4.4.x-ti kernel)
+#uboot_overlay_pru=/lib/firmware/AM335X-PRU-RPROC-4-4-TI-00A0.dtbo
+###pru_uio (4.4.x-ti & mainline/bone kernel)
+uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
+```
+
+Some 4.4 linux kernel versions do not have the timers drivers not enabled.
+In order to be able to use the PWM you would need to recompile the kernel with
+CONFIG_OMAP_DM_TIMER=y.
+
+In order to use BeagleG **without** the PWM TIMERS support, you can compile beagleg with:
+```
+CONFIG_FLAGS=-D_DISABLE_PWM_TIMERS make
+```
+
 
 ### Build
 To build, we need the BeagleG code and the PRU assembler with supporting library.
