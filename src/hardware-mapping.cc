@@ -120,10 +120,15 @@ bool HardwareMapping::InitializeHardware() {
     Log_error("Couldn't mmap() GPIO ranges.\n");
     return false;
   }
+
+#ifdef _DISABLE_PWM_TIMERS
+  Log_info("PWM timers are disabled.\n");
+#else
   if (!pwm_timers_map()) {
     Log_error("Couldn't mmap() TIMER ranges.\n");
     return false;
   }
+
 
   // The PWM_*_GPIO pins can produce PWM signals if they are mapped to one
   // of the TIMER pins and the dts set the pins to the correct mode (0x02).
@@ -141,6 +146,7 @@ bool HardwareMapping::InitializeHardware() {
   pwm_timer_set_freq(PWM_2_GPIO, 0);
   pwm_timer_set_freq(PWM_3_GPIO, 0);
   pwm_timer_set_freq(PWM_4_GPIO, 0);
+#endif
 
   is_hardware_initialized_ = true;
   ResetHardware();
@@ -207,6 +213,9 @@ void HardwareMapping::SetAuxOutputs() {
 }
 
 void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
+#ifdef _DISABLE_PWM_TIMERS
+  return;
+#else
   if (!is_hardware_initialized_) return;
   const uint32_t gpio = output_to_pwm_gpio_[type];
   if (value <= 0.0) {
@@ -215,6 +224,7 @@ void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
     pwm_timer_set_duty(gpio, value);
     pwm_timer_start(gpio, true);
   }
+#endif
 }
 
 std::string HardwareMapping::DebugMotorString(LogicAxis axis) {
