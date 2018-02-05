@@ -99,7 +99,7 @@
 // PocketBeagle definitions (TODO: incomplete)
 #define PIN_P1_29  (GPIO_3_BASE | 21)
 #define PIN_P1_31  (GPIO_3_BASE | 18)
-#define PIN_P1_33  (GPIO_3_BASE | 14)
+#define PIN_P1_33  (GPIO_3_BASE | 15)
 #define PIN_P1_34  (GPIO_3_BASE | 19)
 
 #define PIN_P2_05  (GPIO_0_BASE | 30)
