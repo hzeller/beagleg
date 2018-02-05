@@ -113,7 +113,7 @@ public:
   // the last element or are idle after the last element, this will return
   // zero.
   // The return parameter head_item_progress is set to the number
-  // of not yet executed loops in the item currenly being executed.
+  // of already executed loops in the item currenly being executed.
   virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
 };
 
@@ -153,11 +153,7 @@ public:
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
-  int GetPendingElements(uint32_t *head_item_progress) {
-    if (head_item_progress)
-      *head_item_progress = 0;
-    return 1;
-  }
+  int GetPendingElements(uint32_t *head_item_progress) { return 0; }
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_

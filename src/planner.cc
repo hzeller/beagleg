@@ -556,12 +556,13 @@ void Planner::Impl::bring_path_to_halt() {
 }
 
 void Planner::Impl::GetCurrentPosition(AxesRegister *pos) {
-  PhysicalStatus physical_status;
-  motor_ops_->GetPhysicalStatus(&physical_status);
-  pos->zero();
+  // TODO: this should use the MotorOperations::GetPhysicalStatus to get
+  // the very last postition where we are in.
+  assert(planning_buffer_.size() > 0);  // we always should have a current pos
+  const int *mpos = planning_buffer_[0]->position_steps;
   for (const GCodeParserAxis a : AllAxes()) {
     if (cfg_->steps_per_mm[a] != 0) {
-      (*pos)[a] = hardware_mapping_->GetAxisSteps(a, physical_status) / cfg_->steps_per_mm[a];
+      (*pos)[a] = 1.0f * mpos[a] / cfg_->steps_per_mm[a];
     }
   }
 }
