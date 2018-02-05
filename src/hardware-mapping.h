@@ -24,6 +24,8 @@
 
 #include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "common/string-util.h"
+#include "motor-operations.h"
+
 
 class ConfigParser;
 struct LinearSegmentSteps;
@@ -188,6 +190,10 @@ public:
   // Given the logic axis and number of steps, assign these steps to the mapped
   // motors in the LinearSegmentSteps
   void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
+
+  // Returns the number of step for the requested logic axis from the physical status,
+  // or 0 if it is not mapped
+  int GetAxisSteps(LogicAxis axis, const PhysicalStatus &status);
 
   // -- Switch access
 
