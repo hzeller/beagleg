@@ -7,8 +7,7 @@ P1.33 out	# Step 2
 P1.34 out	# Step 3
 
 # Direction bits
-# Dir 0 does not work yet: https://github.com/beagleboard/linux/issues/144
-# P2.24 out	# Dir 0
+P2.24 out	# Dir 0
 P2.33 out	# Dir 1
 P2.22 out	# Dir 2
 P2.18 out	# Dir 3

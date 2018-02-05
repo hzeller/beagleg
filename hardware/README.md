@@ -11,17 +11,21 @@ This directory contains sub-directories with the name of the particular hardware
 contains the necessary hardware description used by BeagleG. You need to enable the hardware
 you intend to use in the toplevel Makefile.
 
-   * [BUMPS/](./BUMPS) From the maker of BeagleG, there comes the [BUMPS] board.
-     It is designed to get the best possible performance by making sure that related
-     pins (e.g. all the step outputs) are all on one GPIO port to be able to minimize the number
-     of IO operations needed (native implementation).
-
-   * [CRAMPS/](./CRAMPS) The [CRAMPS] board by Charles Steinkuehler is a popular cape.
+   * [BUMPS/](./BUMPS) The [BUMPS] board was initially developed for BeagleG
+     before there were any other boards available.
+   * [CRAMPS/](./CRAMPS) The [CRAMPS] board by Charles Steinkuehler is a
+     popular cape.
+   * [Pockegotion](./Pockegotion) Work in progress for a cape for the
+     [PocketBeagle].
 
 (If you have access to other boards and run them with BeagleG, consider adding the support and
 send a pull request)
 
 ## Load cape device tree
+
+*The following was true Kernel 3.8.x type distributions, this is
+simplified for 4.x. TODO: update documentation for 4.x*
+
 In each hardware subdirectgory directory, named after the cape, there is a device tree overlay
 file that you need to install for your hardware (or just use the one that comes with your board).
 
@@ -93,4 +97,4 @@ consider sending a patch.
 [BeagleBone-Black]: http://beagleboard.org/BLACK
 [BUMPS]: http://github.com/hzeller/bumps
 [CRAMPS]: http://reprap.org/wiki/CRAMPS
-
+[PocketBeagle]: https://beagleboard.org/pocket
