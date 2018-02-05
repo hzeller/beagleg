@@ -1,0 +1,20 @@
+P2.10 out     # Motor ~Enable
+
+# Step signals
+P1.29 out	# Step 0
+P1.31 out	# Step 1
+P1.33 out	# Step 2
+P1.34 out	# Step 3
+
+# Direction bits
+# Dir 0 does not work yet: https://github.com/beagleboard/linux/issues/144
+# P2.24 out	# Dir 0
+P2.33 out	# Dir 1
+P2.22 out	# Dir 2
+P2.18 out	# Dir 3
+
+# Switch inputs.
+P2.05 in	# Switch 0
+P2.07 in	# Switch 1
+P2.09 in	# Switch 2
+P2.11 in	# Switch 3

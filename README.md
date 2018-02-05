@@ -34,7 +34,7 @@ In order to run BeagleG on your BeagleBone you will need to be sure
 that uio_pruss kernel module has been installed and loaded in the kernel.
 You can easily test if the module it's available by running:
 
-    if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; fi
+    if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; else echo "Need uio_pruss module"; fi
 
 then just load it using:
 
@@ -42,7 +42,7 @@ then just load it using:
 
 or add it to /etc/modules to make it persistent:
 
-    sudo sh -c 'echo uio_pruss > /etc/modules'
+    sudo sh -c 'echo uio_pruss >> /etc/modules'
 
 if the uio_pruss module is not available, you might be running a 4.x kernel
 from TI; they are experimenting with a new way to connect to the PRU (remoteproc)

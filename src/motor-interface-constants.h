@@ -56,6 +56,7 @@
 // the generic pin-mapping in BeagleG
 //
 
+// Mappings for Beaglebone Black or Green
 #define PIN_P9_11  (GPIO_0_BASE | 30)  // UART4_RXD
 #define PIN_P9_12  (GPIO_1_BASE | 28)
 #define PIN_P9_13  (GPIO_0_BASE | 31)  // UART4_TXD
@@ -94,6 +95,22 @@
 #define PIN_P8_18  (GPIO_2_BASE |  1)
 #define PIN_P8_19  (GPIO_0_BASE | 22)  // EHRPWM2A
 #define PIN_P8_26  (GPIO_1_BASE | 29)
+
+// PocketBeagle definitions (TODO: incomplete)
+#define PIN_P1_29  (GPIO_3_BASE | 21)
+#define PIN_P1_31  (GPIO_3_BASE | 18)
+#define PIN_P1_33  (GPIO_3_BASE | 14)
+#define PIN_P1_34  (GPIO_3_BASE | 19)
+
+#define PIN_P2_05  (GPIO_0_BASE | 30)
+#define PIN_P2_07  (GPIO_0_BASE | 31)
+#define PIN_P2_09  (GPIO_0_BASE | 15)
+#define PIN_P2_10  (GPIO_1_BASE | 20)
+#define PIN_P2_11  (GPIO_0_BASE | 14)
+#define PIN_P2_18  (GPIO_1_BASE | 15)
+#define PIN_P2_22  (GPIO_1_BASE | 14)
+#define PIN_P2_24  (GPIO_1_BASE | 12)
+#define PIN_P2_33  (GPIO_1_BASE | 13)
 
 #define GPIO_NOT_MAPPED  0
 
