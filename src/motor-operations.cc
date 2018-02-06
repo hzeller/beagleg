@@ -132,7 +132,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
     if (param.steps[i] < 0) {
       new_element.direction_bits |= (1 << i);
       history_segment.pos_info[i].sign = -1;
-    }
+    } else history_segment.pos_info[i].sign = 1;
     history_segment.pos_info[i].position_steps += param.steps[i];
     const uint64_t delta = abs(param.steps[i]);
     new_element.fractions[i] = delta * max_fraction / defining_axis_steps;
@@ -195,15 +195,16 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   // TODO: We need to find a way to get the maximum number of elements
   // of the shadow queue (ie backend_->GetQueueStats()?)
   const int buffer_size = backend_->GetPendingElements(NULL);
-  shadow_queue_->resize(buffer_size);
+  const int new_size = buffer_size > 0 ? buffer_size : 1;
+  shadow_queue_->resize(new_size);
 }
 
 bool MotionQueueMotorOperations::GetPhysicalStatus(PhysicalStatus *status) {
   // Shrink the queue
   uint32_t loops;
   const int buffer_size = backend_->GetPendingElements(&loops);
-  assert(buffer_size <= (int)shadow_queue_->size());
-  if (shadow_queue_->size() > 1) shadow_queue_->resize(buffer_size);
+  const int new_size = buffer_size > 0 ? buffer_size : 1;
+  shadow_queue_->resize(new_size);
 
   // Get the last element
   const HistorySegment &hs = shadow_queue_->back();
