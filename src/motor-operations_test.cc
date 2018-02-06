@@ -62,6 +62,48 @@ TEST(RealtimePosition, init_pos) {
 }
 
 // Enqueue a bunch of LinearSegmentSteps and retrieve the position.
+TEST(RealtimePosition, back_and_forth) {
+  MockMotionQueue motion_backend = MockMotionQueue();
+  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+
+  // Enqueue a segment
+  const LinearSegmentSteps kSegment1 = {
+    0 /* v0 */, 0 /* v1 */, 0 /* aux */,
+    {1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
+  };
+  // Enqueue a segment
+  const LinearSegmentSteps kSegment2 = {
+    0 /* v0 */, 0 /* v1 */, 0 /* aux */,
+    {-1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
+  };
+
+  PhysicalStatus status;
+  motor_operations.Enqueue(kSegment1);
+
+  motion_backend.SimRun(0, 0);
+  motor_operations.GetPhysicalStatus(&status);
+
+  {
+    const int expected[BEAGLEG_NUM_MOTORS] =
+      {1000, 0, 0, 0, 0, 0, 0, 0};
+    EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+  }
+
+
+  motor_operations.Enqueue(kSegment2);
+  motor_operations.Enqueue(kSegment1);
+
+  motion_backend.SimRun(0, 0);
+  motor_operations.GetPhysicalStatus(&status);
+
+  {
+    const int expected[BEAGLEG_NUM_MOTORS] =
+      {1000, 0, 0, 0, 0, 0, 0, 0};
+    EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+  }
+}
+
+// Enqueue a bunch of LinearSegmentSteps and retrieve the position.
 TEST(RealtimePosition, sample_pos) {
   MockMotionQueue motion_backend = MockMotionQueue();
   MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
@@ -98,7 +140,6 @@ TEST(RealtimePosition, sample_pos) {
     EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
   }
 }
-
 
 // Check that SimRun(0, x) produce the same absolute position as
 // SimRun(MAX_SEGMENT_STEPS, x + 1).
