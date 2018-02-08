@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
   // As daemon, we use whatever the use chose as logfile
   // (including nothing->syslog). Interactive, nothing means stderr.
   Log_init(as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
-  Log_info("Startup.");
+  Log_info("BeagleG startup; " CAPE_NAME " hardware interface.");
 
   // If reading from file: don't print 'ok' for every line.
   config.acknowledge_lines = !has_filename;
