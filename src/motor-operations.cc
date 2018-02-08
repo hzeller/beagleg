@@ -132,7 +132,9 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
     if (param.steps[i] < 0) {
       new_element.direction_bits |= (1 << i);
       history_segment.pos_info[i].sign = -1;
-    } else history_segment.pos_info[i].sign = 1;
+    } else {
+      history_segment.pos_info[i].sign = 1;
+    }
     history_segment.pos_info[i].position_steps += param.steps[i];
     const uint64_t delta = abs(param.steps[i]);
     new_element.fractions[i] = delta * max_fraction / defining_axis_steps;
