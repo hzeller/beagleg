@@ -191,14 +191,6 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   new_element.state = STATE_FILLED;
   backend_->MotorEnable(true);
   backend_->Enqueue(&new_element);
-
-  // Shrink the queue and remove the elements that we are not interested
-  // in anymore.
-  // TODO: We need to find a way to get the maximum number of elements
-  // of the shadow queue (ie backend_->GetQueueStats()?)
-  const int buffer_size = backend_->GetPendingElements(NULL);
-  const int new_size = buffer_size > 0 ? buffer_size : 1;
-  shadow_queue_->resize(new_size);
 }
 
 bool MotionQueueMotorOperations::GetPhysicalStatus(PhysicalStatus *status) {
@@ -241,10 +233,17 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
   const int defining_axis_steps = get_defining_axis_steps(param);
 
   if (defining_axis_steps == 0) {
+    // The new segment is based on the previous position.
+    struct HistorySegment history_segment = shadow_queue_->front();
+
     // No move, but we still have to set the bits.
     struct MotionSegment empty_element = {};
     empty_element.aux = param.aux_bits;
     empty_element.state = STATE_FILLED;
+
+    history_segment.aux_bits = param.aux_bits;
+    shadow_queue_->push_front(history_segment);
+
     backend_->Enqueue(&empty_element);
   }
   else if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
@@ -288,6 +287,13 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
   } else {
     EnqueueInternal(param, defining_axis_steps);
   }
+  // Shrink the queue and remove the elements that we are not interested
+  // in anymore.
+  // TODO: We need to find a way to get the maximum number of elements
+  // of the shadow queue (ie backend_->GetQueueStats()?)
+  const int buffer_size = backend_->GetPendingElements(NULL);
+  const int new_size = buffer_size > 0 ? buffer_size : 1;
+  shadow_queue_->resize(new_size);
 }
 
 void MotionQueueMotorOperations::MotorEnable(bool on) {

@@ -61,7 +61,8 @@ TEST(RealtimePosition, init_pos) {
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 }
 
-// Enqueue a bunch of LinearSegmentSteps and retrieve the position.
+// Check that the steps are correctly evaluated from the shadow queue
+// with the correct sign.
 TEST(RealtimePosition, back_and_forth) {
   MockMotionQueue motion_backend = MockMotionQueue();
   MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
@@ -99,6 +100,36 @@ TEST(RealtimePosition, back_and_forth) {
   {
     const int expected[BEAGLEG_NUM_MOTORS] =
       {1000, 0, 0, 0, 0, 0, 0, 0};
+    EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+  }
+}
+
+// Enqueue an empty element. We need to be sure that also empty elements
+// are taken into account into the shadow queue since they are sent to the
+// motion queue.
+TEST(RealtimePosition, empty_element) {
+  MockMotionQueue motion_backend = MockMotionQueue();
+  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+
+  // Enqueue a segment
+  const LinearSegmentSteps kSegment1 = {
+    0 /* v0 */, 0 /* v1 */, 0xff /* aux */,
+    {0, 0, 0, 0, 0, 0, 0, 0} /* steps */
+  };
+  const LinearSegmentSteps kSegment2 = {
+    0 /* v0 */, 0 /* v1 */, 0 /* aux */,
+    {100, 0, 0, 0, 0, 0, 0, 0} /* steps */
+  };
+
+  motor_operations.Enqueue(kSegment2);
+  motor_operations.Enqueue(kSegment1);
+
+  motion_backend.SimRun(0, 2);
+  PhysicalStatus status;
+  motor_operations.GetPhysicalStatus(&status);
+  {
+    const int expected[BEAGLEG_NUM_MOTORS] =
+      {100, 0, 0, 0, 0, 0, 0, 0};
     EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
   }
 }
