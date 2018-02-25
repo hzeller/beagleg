@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
     return usage(argv[0], "--loop only makes sense with a filename.");
   }
 
-  // As daemon, we use whatever the use chose as logfile
+  // As daemon, we use whatever the user chose as logfile
   // (including nothing->syslog). Interactive, nothing means stderr.
   Log_init(as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
   Log_info("BeagleG startup; " CAPE_NAME " hardware interface.");
