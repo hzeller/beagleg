@@ -90,12 +90,11 @@ int GCodeStreamer::ReadData() {
     if (recv(connection_fd_, &buffer,
              sizeof(buffer), MSG_PEEK | MSG_DONTWAIT) == 0) {
       Log_info("Client disconnected.");
-      // Closing the connection
-      CloseStream();
-      return 0;
+    } else {
+      Log_info("Reached EOF.");
     }
-    Log_error("Line too long.");
-    return -1;
+    CloseStream();
+    return 0;
   }
 
   // Let's first check that it has at least one line.
