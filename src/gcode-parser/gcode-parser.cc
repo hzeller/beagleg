@@ -253,13 +253,19 @@ private:
   const char *read_param_name(const char *line, std::string *result);
 
   // Read parameter. Do range check.
-  bool read_parameter(StringPiece param_name, float *result) {
+  bool read_parameter(StringPiece param_name, float *result) const {
     if (config.parameters == NULL)
       return false;
     param_name = TrimWhitespace(param_name);
-    // TODO: should we provide an error if a value is not assigned yet ?
-    *result = (*config.parameters)[ToLower(param_name)];
-    return true;
+    Config::ParamMap::const_iterator found
+      = config.parameters->find(ToLower(param_name));
+    if (found != config.parameters->end()) {
+      *result = found->second;
+      return true;
+    } else {
+      *result = 0;
+      return false;
+    }
   }
 
   // Read parameter. Do range check.
@@ -1235,6 +1241,8 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
 // Initialize the coordiate systems from the loaded parameters
 void GCodeParser::Impl::InitCoordSystems() {
   float value;
+  const char *kCoordinateSystemNames[9] = {"G54", "G55", "G56", "G57", "G58",
+                                           "G59", "G59.1", "G59.2", "G59.3"};
   for (int i = 0; i < 9; ++i) {
     bool set = false;
     int offset = i * 20;
@@ -1247,34 +1255,22 @@ void GCodeParser::Impl::InitCoordSystems() {
         coords += StringPrintf(" %c:%.3f", gcodep_axis2letter(axis), value);
       if (value) set = true;
     }
-    Log_debug("%s offset%s\n",
-              (i == 0) ? "G54" :
-              (i == 1) ? "G55" :
-              (i == 2) ? "G56" :
-              (i == 3) ? "G57" :
-              (i == 4) ? "G58" :
-              (i == 5) ? "G59" :
-              (i == 6) ? "G59.1" :
-              (i == 7) ? "G59.2" : "G59.3",
-              set ? coords.c_str() : " undefined");
+    if (set) {  // "undefined" message is pretty noisy, only print if set.
+      Log_debug("%s offset%s", kCoordinateSystemNames[i],
+                set ? coords.c_str() : " undefined");
+    }
   }
-  read_parameter("5220", &value);
-  int coord_system = (int)value;
-  if (value >= 1 && value <= 9) {
-    current_origin_ = &coord_system_[coord_system-1];
-    inform_origin_offset_change();
-    Log_debug("Using Coordinate System %s\n",
-              (value == 1) ? "G54" :
-              (value == 2) ? "G55" :
-              (value == 3) ? "G56" :
-              (value == 4) ? "G57" :
-              (value == 5) ? "G58" :
-              (value == 6) ? "G59" :
-              (value == 7) ? "G59.1" :
-              (value == 8) ? "G59.2" : "G59.3");
-  } else {
-    Log_debug("Invalid Coordinate System in parameters file: 5220=%d\n",
-              coord_system);
+  if (read_parameter("5220", &value)) {
+    const int coord_system = (int)value;
+    if (value >= 1 && value <= 9) {
+      current_origin_ = &coord_system_[coord_system-1];
+      inform_origin_offset_change();
+      Log_debug("Using Coordinate System %s",
+                kCoordinateSystemNames[coord_system]);
+    } else {
+      Log_debug("Invalid Coordinate System in parameters file: 5220=%d\n",
+                coord_system);
+    }
   }
 }
 
