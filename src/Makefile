@@ -64,7 +64,7 @@ SUBDIRS=common gcode-parser
 PRU_BIN=motor-interface-pru_bin.h
 
 
-GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
+GCODE_OBJECTS=gcode-machine-control.o gcode-streamer.o determine-print-stats.o \
               generic-gpio.o pwm-timer.o config-parser.o \
 	      machine-control-config.o hardware-mapping.o \
 	      spindle-control.o planner.o adc.o
