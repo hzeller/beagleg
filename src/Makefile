@@ -73,7 +73,7 @@ MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
-UNITTEST_BINARIES=gcode-machine-control_test config-parser_test machine-control-config_test planner_test motor-operations_test pru-motion-queue_test
+UNITTEST_BINARIES=gcode-machine-control_test gcode-streamer_test config-parser_test machine-control-config_test planner_test motor-operations_test pru-motion-queue_test
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
 

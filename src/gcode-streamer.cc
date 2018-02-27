@@ -56,6 +56,9 @@ bool GCodeStreamer::ParseStream(int fd, FILE *msg_stream) {
     return Timeout();
   });
 
+  // Cleanup any potentially remaining gcode from previous connections.
+  reader_.Flush();
+
 exit:
   if (!ret) {
     CloseStream();
