@@ -62,83 +62,98 @@ void FDMultiplexer::ScheduleDelete(int fd) {
   }
 }
 
-int FDMultiplexer::Loop() {
+void FDMultiplexer::RunOnTimeout(const Handler &handler) {
+  t_handlers_.push_back(handler);
+}
+
+bool FDMultiplexer::Cycle(unsigned int timeout_ms) {
   fd_set read_fds;
   fd_set write_fds;
+
   struct timeval timeout;
+  timeout.tv_sec = timeout_ms / 1000;
+  timeout.tv_usec = (timeout_ms % 1000) * 1000;
+
+  int maxfd = -1;
+  FD_ZERO(&read_fds);
+  FD_ZERO(&write_fds);
+
+  // Readers
+  for (const auto &it : r_handlers_) {
+    if (it.first >= maxfd) maxfd = it.first + 1;
+    FD_SET(it.first, &read_fds);
+  }
+
+  // Writers
+  for (const auto &it : w_handlers_) {
+    if (it.first >= maxfd) maxfd = it.first + 1;
+    FD_SET(it.first, &write_fds);
+  }
+
+  if (maxfd < 0) {
+    // file descriptors only can be registred from within handlers
+    // or before running the Loop(). If no filedesctiptors are left,
+    // there is no chance for any to re-appear, so we can exit.
+    fprintf(stderr, "No filedescriptor registered. Exiting loop()");
+    return false;
+  }
+
+  int fds_ready = select(maxfd, &read_fds, &write_fds, nullptr, &timeout);
+  if (fds_ready < 0) {
+    if (!caught_signal)
+      perror("select() failed");
+    return false;
+  }
+
+  if (fds_ready == 0) {
+    // Timeout situation.
+    for (int i = t_handlers_.size() - 1; i >= 0; --i) {
+      if (!t_handlers_[i]()) {
+        t_handlers_[i] = t_handlers_.back();
+        t_handlers_.pop_back();
+      }
+    }
+    return true;
+  }
+
+  // Handle reads
+  for (const auto &it : r_handlers_) {
+    if (FD_ISSET(it.first, &read_fds)) {
+      const bool retrigger = it.second();
+      if (!retrigger)
+        to_delete_r_.push_back(it.first);
+      if (--fds_ready == 0)
+        break;
+    }
+  }
+  for (int i : to_delete_r_) {
+    r_handlers_.erase(i);
+  }
+
+  // Handle writes
+  for (const auto &it : w_handlers_) {
+    if (FD_ISSET(it.first, &write_fds)) {
+      const bool retrigger = it.second();
+      if (!retrigger)
+        to_delete_w_.push_back(it.first);
+      if (--fds_ready == 0)
+        break;
+    }
+  }
+  for (int i : to_delete_w_) {
+    w_handlers_.erase(i);
+  }
+
+  to_delete_r_.clear();
+  to_delete_w_.clear();
+
+  return true;
+}
+
+int FDMultiplexer::Loop() {
 
   arm_signal_handler();
-  while (!caught_signal) {
-    int maxfd = -1;
-    FD_ZERO(&read_fds);
-    FD_ZERO(&write_fds);
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 5e4;
-
-    // Readers
-    for (const auto &it : r_handlers_) {
-      if (it.first >= maxfd) maxfd = it.first+1;
-      FD_SET(it.first, &read_fds);
-    }
-
-    // Writers
-    for (const auto &it : w_handlers_) {
-      if (it.first >= maxfd) maxfd = it.first+1;
-      FD_SET(it.first, &write_fds);
-    }
-
-    if (maxfd < 0) {
-      // file descriptors only can be registred from within handlers
-      // or before running the Loop(). If no filedesctiptors are left,
-      // there is no chance for any to re-appear, so we can exit.
-      fprintf(stderr, "No filedescriptor registered. Exiting loop()");
-      break;
-    }
-
-    int fds_ready = select(maxfd, &read_fds, &write_fds, nullptr, &timeout);
-    if (fds_ready < 0) {
-      if (!caught_signal)
-        perror("select() failed");
-      break;
-    }
-
-    if (fds_ready == 0) {
-      // Timeout situation. We are not registering timeout handlers
-      // currently.
-      continue;
-    }
-
-    // Handle reads
-    for (const auto &it : r_handlers_) {
-      if (FD_ISSET(it.first, &read_fds)) {
-        const bool retrigger = it.second();
-        if (!retrigger)
-          to_delete_r_.push_back(it.first);
-        if (--fds_ready == 0)
-          break;
-      }
-    }
-    for (int i : to_delete_r_) {
-      r_handlers_.erase(i);
-    }
-
-    // Handle writes
-    for (const auto &it : w_handlers_) {
-      if (FD_ISSET(it.first, &write_fds)) {
-        const bool retrigger = it.second();
-        if (!retrigger)
-          to_delete_w_.push_back(it.first);
-        if (--fds_ready == 0)
-          break;
-      }
-    }
-    for (int i : to_delete_w_) {
-      w_handlers_.erase(i);
-    }
-
-    to_delete_r_.clear();
-    to_delete_w_.clear();
-  }
+  while (Cycle(10)) {}
   disarm_signal_handler();
 
   if (caught_signal)

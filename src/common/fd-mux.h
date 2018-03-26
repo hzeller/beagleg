@@ -32,24 +32,33 @@ public:
   // or '0' if we wish to be taken out of the multiplexer.
   // '-1' Can be used to exit the multiplexer with an error, for example
   // if one of our tasklets has an error.
-  typedef std::function<int()> Handler;
+  typedef std::function<bool()> Handler;
 
   // These can only be set before Loop() is called or from a
   // running handler itself.
   // Returns false if that filedescriptor is already registered.
   bool RunOnReadable(int fd, const Handler &handler);
   bool RunOnWritable(int fd, const Handler &handler);
+  void RunOnTimeout(const Handler &handler);
+
+  // Schedules the delete of an fd,callback pair for the next loop cycle.
   void ScheduleDelete(int fd);
 
   // Run the main loop. Blocks while there is still a filedescriptor
   // registered (return 0) or until a signal is triggered (return 2).
   int Loop();
 
+protected:
+  bool Cycle(unsigned timeout_ms = 50);
+
 private:
+
   std::map<int, Handler> r_handlers_;
   std::map<int, Handler> w_handlers_;
+  std::vector<Handler> t_handlers_;
   std::vector<int> to_delete_r_;
   std::vector<int> to_delete_w_;
+
 };
 
 #endif // FD_MUX_H_
