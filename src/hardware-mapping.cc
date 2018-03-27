@@ -261,7 +261,7 @@ int HardwareMapping::GetAxisSteps(LogicAxis axis, const PhysicalStatus &status) 
 
   // Maybe this axis is not mapped to any motor.
   if (m == NUM_MOTORS) return 0;
-  return driver_flip_[m] * status.pos_steps[m];
+  return status.pos_steps[m];
 }
 
 HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis) {
