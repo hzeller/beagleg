@@ -45,22 +45,23 @@
 #include "simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =
-  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z)| (1 << AXIS_E)
-   | (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C)
-   | (1 << AXIS_U) | (1 << AXIS_V) | (1 << AXIS_W));
+  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z) |
+   (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C) |
+   (1 << AXIS_U) | (1 << AXIS_V) | (1 << AXIS_W) |
+   (1 << AXIS_E));
 
 char gcodep_axis2letter(enum GCodeParserAxis axis) {
   switch (axis) {
   case AXIS_X: return 'X';
   case AXIS_Y: return 'Y';
   case AXIS_Z: return 'Z';
-  case AXIS_E: return 'E';
   case AXIS_A: return 'A';
   case AXIS_B: return 'B';
   case AXIS_C: return 'C';
   case AXIS_U: return 'U';
   case AXIS_V: return 'V';
   case AXIS_W: return 'W';
+  case AXIS_E: return 'E';
   case GCODE_NUM_AXES: return '?';
     // no default to have compiler warn about new values.
   }
@@ -73,13 +74,13 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   case 'X': case 'x': return AXIS_X;
   case 'Y': case 'y': return AXIS_Y;
   case 'Z': case 'z': return AXIS_Z;
-  case 'E': case 'e': return AXIS_E;
   case 'A': case 'a': return AXIS_A;
   case 'B': case 'b': return AXIS_B;
   case 'C': case 'c': return AXIS_C;
   case 'U': case 'u': return AXIS_U;
   case 'V': case 'v': return AXIS_V;
   case 'W': case 'w': return AXIS_W;
+  case 'E': case 'e': return AXIS_E;
   }
   return GCODE_NUM_AXES;
 }
