@@ -18,7 +18,7 @@ GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
   });
 }
 
-bool GCodeStreamer::ParseStream(int fd, FILE *msg_stream) {
+bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
 
   bool ret = true;
 

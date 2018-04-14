@@ -11,7 +11,7 @@ public:
   GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
                 GCodeParser::EventReceiver *parse_events);
 
-  bool ParseStream(int fd, FILE *msg_stream);
+  bool ConnectStream(int fd, FILE *msg_stream);
 
   bool IsStreaming() { return is_streaming_; }
   ~GCodeStreamer() {}

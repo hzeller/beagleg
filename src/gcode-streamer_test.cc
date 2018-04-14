@@ -50,20 +50,27 @@ public:
     GCodeParser::Config config;
     parser_ = new GCodeParser(config, this, false);
     streamer_ = new GCodeStreamer(&event_server_, parser_, this);
+    stream_mock_ = NULL;
   }
 
   ~StreamTester() {
     delete parser_;
     delete streamer_;
+    delete stream_mock_;
   }
 
   bool OpenStream() {
-    return streamer_->ParseStream(stream_mock_.ClientConnect(), NULL);
+    assert(stream_mock_ == NULL);
+    stream_mock_ = new MockStream();
+    return streamer_->ConnectStream(stream_mock_->ClientConnect(), NULL);
   }
 
-  void CloseStream() { stream_mock_.ClientDisconnect(); }
+  void CloseStream() {
+    stream_mock_->ClientDisconnect();
+    stream_mock_ = NULL;
+  }
   void ReceiveString(const char *line) {
-    stream_mock_.NewData(line);
+    stream_mock_->NewData(line);
   }
   void Cycle() {
     event_server_.Cycle(0);
@@ -97,7 +104,7 @@ private:
   MockFDMultiplexer event_server_;
   GCodeParser *parser_;
   GCodeStreamer *streamer_;
-  MockStream stream_mock_;
+  MockStream *stream_mock_;
 };
 
 using namespace ::testing;
@@ -106,19 +113,33 @@ using namespace ::testing;
 // has not completed the last line, we should drop it
 // NOTE: Broken
 TEST(Streaming, no_newline_no_parsing) {
-  // StreamTester tester;
-  //
-  // // Connect
-  // // Write incomplete move command
-  // // Close the stream
-  // {
-  //   EXPECT_CALL(tester, gcode_start(_)).Times(0);
-  //   EXPECT_CALL(tester, coordinated_move(_, _)).Times(0);
-  // }
-  // tester.OpenStream();
-  // tester.ReceiveString("G1X200F1000");
-  // tester.CloseStream();
-  // tester.Cycle();
+  StreamTester tester;
+
+  // Connect
+  // Write incomplete move command
+  // Close the stream
+  {
+    EXPECT_CALL(tester, gcode_start(_)).Times(0);
+    EXPECT_CALL(tester, coordinated_move(_, _)).Times(0);
+  }
+  tester.OpenStream();
+  tester.ReceiveString("G1X200F1000");
+  tester.CloseStream();
+  tester.Cycle();
+
+  {
+    EXPECT_CALL(tester, gcode_finished(_)).Times(1);
+  }
+
+  tester.Cycle();
+  {
+    EXPECT_CALL(tester, gcode_start(_)).Times(1);
+    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+  }
+  tester.OpenStream();
+  tester.ReceiveString("G1X200F1000\n");
+  tester.Cycle();
+  tester.CloseStream();
 }
 
 TEST(Streaming, big_line) {
@@ -161,6 +182,7 @@ TEST(Streaming, basic_stream) {
     EXPECT_CALL(tester, input_idle(true)).Times(1);
   }
   tester.ReceiveString("G1X200F1000");
+  tester.Cycle();
   tester.Cycle();
 
   // Second idle timeout
