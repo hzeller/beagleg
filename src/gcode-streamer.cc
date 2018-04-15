@@ -22,6 +22,12 @@ GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
 bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
 
   bool ret = true;
+  const int flags = fcntl(fd, F_GETFL, 0);
+  if (flags < 0) {
+    Log_error("fcntl(): %s", strerror(errno));
+    ret = false;
+    goto exit;
+  }
 
   if (is_streaming_) {
     ret = false;
@@ -39,7 +45,7 @@ bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
   // We need to set the fd to non blocking in order to avoid
   // blocking reads caused by spurious situations in Linux.
   // http://man7.org/linux/man-pages/man2/select.2.html#BUGS
-  if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) < 0) {
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
     Log_error("fcntl(): %s", strerror(errno));
     ret = false;
     goto exit;

@@ -130,7 +130,7 @@ TEST(Streaming, no_newline_no_parsing) {
   // Loop to close
   tester.Cycle();
 
-  }
+  {
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);

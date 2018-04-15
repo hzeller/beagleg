@@ -137,7 +137,7 @@ static int send_file_to_machine(FDMultiplexer *event_server,
   machine->SetMsgOut(stderr);
   while (loop_count < 0 || loop_count-- > 0) {
     int fd = open(gcode_filename, O_RDONLY);
-    streamer->ParseStream(fd, stderr);
+    streamer->ConnectStream(fd, stderr);
     ret = event_server->Loop();
     if (ret != 0)
       break;
@@ -229,7 +229,7 @@ static int run_server(int listen_socket, FDMultiplexer *event_server,
 
     FILE *msg_stream = fdopen(connection, "w");
     machine->SetMsgOut(msg_stream);
-    streamer->ParseStream(connection, msg_stream);
+    streamer->ConnectStream(connection, msg_stream);
     return true;
   });
 
