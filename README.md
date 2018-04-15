@@ -83,14 +83,27 @@ a git sub-module to make it simple.
 
 Clone the BeagleG repository with the `--recursive` flag to get this sub-module
 
-     git clone --recursive https://github.com/hzeller/beagleg.git
+```
+git clone --recursive https://github.com/hzeller/beagleg.git
+```
 
 (If you are a github user, you might want to use the git protocol).
 
 Then just
 
-     cd beagleg
-     make
+```
+cd beagleg
+make
+```
+
+If you have an older debian wheezy with a gcc 4.6 as default compiler, you need
+to install a g++ 4.7 first to be able to compile; then set the CXX variable
+to this compiler when running make:
+
+```
+sudo apt-get install g++-4.7
+CXX=g++-4.7 make
+```
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
