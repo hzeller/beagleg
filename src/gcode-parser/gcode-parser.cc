@@ -1014,6 +1014,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   }
 
   store_parameter(param_name, value);
+  callbacks->gcode_command_done('#', value);
 
   gprintf(GLOG_EXPRESSION, "#%s=%f\n", log_name, value);
 
