@@ -114,38 +114,37 @@ using namespace ::testing;
 // NOTE: Broken
 TEST(Streaming, no_newline_no_parsing) {
   StreamTester tester;
-
-  // Connect
-  // Write incomplete move command
-  // Close the stream
   {
     EXPECT_CALL(tester, gcode_start(_)).Times(0);
     EXPECT_CALL(tester, coordinated_move(_, _)).Times(0);
-  }
-  tester.OpenStream();
-  tester.ReceiveString("G1X200F1000");
-  tester.CloseStream();
-  tester.Cycle();
-
-  {
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
-
+  // Connect
+  tester.OpenStream();
+  // Write incomplete move command
+  tester.ReceiveString("G1X200F1000");
+  // Close the stream
+  tester.CloseStream();
+  // Loop to read
   tester.Cycle();
-  {
+  // Loop to close
+  tester.Cycle();
+
+  }
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+    EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
+  // Re open the stream
   tester.OpenStream();
+  // Receive a complete string
   tester.ReceiveString("G1X200F1000\n");
-  tester.Cycle();
+  // Close the stream
   tester.CloseStream();
-}
-
-TEST(Streaming, big_line) {
-  // Stream a line bigger than the LinebufReader buffer.
-  // Loop
-  // Assert that the line is truncated.
+  // Loop to read
+  tester.Cycle();
+  // Loop to close
+  tester.Cycle();
 }
 
 // Generic check that during stream, all the necessary callbacks are called in
@@ -153,11 +152,6 @@ TEST(Streaming, big_line) {
 TEST(Streaming, basic_stream) {
   StreamTester tester;
 
-  // Connect
-  // Write one line
-  // Loop, without reaching the idle timeout
-  // ASSERT that the idle timeout has not been called
-  // ASSERT ParseLine has been called two times
   {
     InSequence s;
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
@@ -165,38 +159,44 @@ TEST(Streaming, basic_stream) {
     EXPECT_CALL(tester, input_idle(_)).Times(0);
     EXPECT_CALL(tester, gcode_finished(_)).Times(0);
   }
+  // Connect, register the fd
   tester.OpenStream();
+  // Write one line
   tester.ReceiveString("G1X200F1000\nG1X200F1000\n");
+  // First loop reads the lines
   tester.Cycle();
 
-  // One cycle, no input idle
   {
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, input_idle(_)).Times(0);
   }
+  // Send another line
   tester.ReceiveString("G1X200F1000\n");
+  // Loop and read
   tester.Cycle();
 
-  // One cycle without new gcode lines
   {
     EXPECT_CALL(tester, input_idle(true)).Times(1);
   }
+  // Send not complete line
   tester.ReceiveString("G1X200F1000");
+  // First loop reads, but since it's not a line, we are not parsing anything
   tester.Cycle();
+  // Timeout, input idle
   tester.Cycle();
 
-  // Second idle timeout
   {
     EXPECT_CALL(tester, input_idle(false)).Times(1);
   }
+  // Second idle timeout
   tester.Cycle();
 
-  // Close the stream
-  // ASSERT gcode_finished is called
   {
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
+  // Close the stream
   tester.CloseStream();
+  // Wait the stream to close
   tester.Cycle();
 }
 
