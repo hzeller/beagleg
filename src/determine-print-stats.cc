@@ -78,12 +78,16 @@ public:
   }
 
 private:
+  static inline void set_min_max(float value, float *min, float *max) {
+    if (value < *min) *min = value;
+    if (value > *max) *max = value;
+  }
   void update_coordinate_stats(const AxesRegister &axis) {
-    stats_->last_x = axis[AXIS_X];
-    stats_->last_y = axis[AXIS_Y];
-    stats_->last_z = axis[AXIS_Z];
+    set_min_max(axis[AXIS_X], &stats_->x_min, &stats_->x_max);
+    set_min_max(axis[AXIS_Y], &stats_->y_min, &stats_->y_max);
+    set_min_max(axis[AXIS_Z], &stats_->z_min, &stats_->z_max);
     if (axis[AXIS_E] > stats_->filament_len) {
-      stats_->last_z_extruding = stats_->last_z;
+      stats_->last_z_extruding = axis[AXIS_Z];
     }
     stats_->filament_len = axis[AXIS_E];
   }
@@ -122,7 +126,9 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
                            FILE *msg_out,
                            struct BeagleGPrintStats *result) {
   bzero(result, sizeof(*result));
-
+  result->x_min = 1e7;
+  result->y_min = 1e7;
+  result->y_min = 1e7;
   HardwareMapping hardware;  // We never initialize, just sim mode.
   Spindle spindle;
 

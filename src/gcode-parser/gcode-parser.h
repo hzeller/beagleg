@@ -206,7 +206,8 @@ public:
 public:
   // Create a parser with the given config, emitting parse events
   // to "parse_events".
-  GCodeParser(const Config &config, EventReceiver *parse_events, bool allow_m111);
+  GCodeParser(const Config &config, EventReceiver *parse_events,
+              bool allow_m111);
   ~GCodeParser();
 
   // Main workhorse: Parse a gcode line, call callbacks if needed.

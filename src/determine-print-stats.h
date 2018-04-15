@@ -25,7 +25,9 @@ struct MachineControlConfig;   // gcode-machine-control.h
 
 struct BeagleGPrintStats {
   float total_time_seconds;      // Total time real execution would take.
-  float last_x, last_y, last_z;  // last coordinate.
+  float x_min, x_max;            // coordinate ranges.
+  float y_min, y_max;
+  float z_min, z_max;
   float last_z_extruding;        // Last z with extrusion = printed height.
   float filament_len;            // total filament length
 

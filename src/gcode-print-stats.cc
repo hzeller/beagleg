@@ -49,9 +49,13 @@ static void print_file_stats(const char *filename, int indentation,
   int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
   if (determine_print_stats(fd, config, msg_out, &result)) {
     // Filament length looks a bit high, is this input or extruded ?
-    printf("%-*s %10.0f %12.1f %14.1f",
+    printf("%-*s %10.0f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f",
            indentation, filename,
-           result.total_time_seconds, result.last_z_extruding,
+           result.total_time_seconds,
+           result.x_min, result.x_max,
+           result.y_min, result.y_max,
+           result.z_min, result.z_max,
+           result.last_z_extruding,
            result.filament_len);
     printf("\n");
   } else {
@@ -120,9 +124,10 @@ int main(int argc, char *argv[]) {
     if (len > longest_filename) longest_filename = len;
   }
   if (print_header) {
-    printf("%-*s %10s %12s %14s\n", longest_filename,
-           "#[filename]", "[time{s}]", "[height{mm}]",
-           "[filament{mm}]");
+    printf("%-*s %10s %7s %7s %7s %7s %7s %7s %7s %7s\n", longest_filename,
+           "#[filename]", "time",
+           "min_x", "max_x", "min_y", "max_y", "min_z", "max_z",
+           "z-last", "filament-mm");
   }
   for (int i = optind; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, msg_out, config);
