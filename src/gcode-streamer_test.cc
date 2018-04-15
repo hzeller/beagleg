@@ -21,7 +21,7 @@
 class MockStream {
 public:
 
-  MockStream() {}
+  MockStream() : fd_{-1, -1} {}
   ~MockStream() { ClientDisconnect(); }
 
   int ClientConnect() {
@@ -67,6 +67,7 @@ public:
 
   void CloseStream() {
     stream_mock_->ClientDisconnect();
+    delete stream_mock_;
     stream_mock_ = NULL;
   }
   void ReceiveString(const char *line) {
