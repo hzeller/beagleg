@@ -37,15 +37,15 @@ class TestArcAccumulator : public GCodeParser::EventReceiver {
 public:
   TestArcAccumulator(const AxesRegister &start) : last_(start), total_len_(0) {}
 
-  virtual void gcode_start(GCodeParser *parser) {}
-  virtual void go_home(AxisBitmap_t axis_bitmap) {}
-  virtual void set_speed_factor(float factor) {}
-  virtual void set_fanspeed(float value) {}
-  virtual void set_temperature(float degrees_c) {}
-  virtual void wait_temperature() {}
-  virtual void dwell(float time_ms) {}
-  virtual void motors_enable(bool enable) {}
-  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &pos) {
+  void gcode_start(GCodeParser *parser) final {}
+  void go_home(AxisBitmap_t axis_bitmap) final {}
+  void set_speed_factor(float factor) final {}
+  void set_fanspeed(float value) final {}
+  void set_temperature(float degrees_c) final {}
+  void wait_temperature() final {}
+  void dwell(float time_ms) final {}
+  void motors_enable(bool enable) final {}
+  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &pos) final {
     total_len_ += hypotf(pos[AXIS_X] - last_[AXIS_X],
                          pos[AXIS_Y] - last_[AXIS_Y]);
     last_ = pos;
@@ -54,10 +54,12 @@ public:
 
   float total_len() const { return total_len_; }
 
-  virtual bool rapid_move(float feed_mm_p_sec,
-                          const AxesRegister &absolute_pos) { return true; }
-  virtual const char *unprocessed(char letter, float value,
-                                  const char *rest_of_line) { return NULL; }
+  bool rapid_move(float feed_mm_p_sec,
+                  const AxesRegister &absolute_pos) final { return true; }
+  const char *unprocessed(char letter, float value,
+                                  const char *rest_of_line) final {
+    return nullptr;
+  }
 private:
   AxesRegister last_;
   float total_len_;

@@ -312,7 +312,7 @@ class HardwareMapping::ConfigReader : public ConfigParser::Reader {
 public:
   ConfigReader(HardwareMapping *config) : config_(config){}
 
-  virtual bool SeenSection(int line_no, const std::string &section_name) {
+  bool SeenSection(int line_no, const std::string &section_name) final {
     current_section_ = section_name;
     return (section_name == "aux-mapping" ||
             section_name == "pwm-mapping" ||
@@ -320,10 +320,9 @@ public:
             section_name == "motor-mapping");
   }
 
-  virtual bool SeenNameValue(int line_no,
-                             const std::string &name,
-                             const std::string &value) {
-
+  bool SeenNameValue(int line_no,
+                     const std::string &name,
+                     const std::string &value) final {
     if (current_section_ == "aux-mapping") {
       for (int i = 1; i <= NUM_BOOL_OUTPUTS; ++i) {
         if (name == StringPrintf("aux_%d", i)) {
@@ -360,7 +359,7 @@ public:
     return false;
   }
 
-  virtual void ReportError(int line_no, const std::string &msg) {
+  void ReportError(int line_no, const std::string &msg) final {
     Log_error("Line %d: %s", line_no, msg.c_str());
   }
 

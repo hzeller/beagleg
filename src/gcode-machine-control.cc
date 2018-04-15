@@ -85,26 +85,26 @@ public:
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
 
   // -- GCodeParser::Events interface implementation --
-  virtual void gcode_start(GCodeParser *parser);
-  virtual void gcode_finished(bool end_of_stream);  // End of program or stream.
+  void gcode_start(GCodeParser *parser) final;
+  void gcode_finished(bool end_of_stream) final;  // End of program or stream.
 
-  virtual void inform_origin_offset(const AxesRegister &origin);
+  void inform_origin_offset(const AxesRegister &origin) final;
 
-  virtual void gcode_command_done(char letter, float val);
-  virtual void input_idle(bool is_first);
-  virtual void wait_for_start();
-  virtual void go_home(AxisBitmap_t axis_bitmap);
-  virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
-                          float *probed_position);
-  virtual void set_speed_factor(float factor);    // M220 feedrate factor 0..1
-  virtual void set_fanspeed(float value);         // M106, M107: speed 0...255
-  virtual void set_temperature(float degrees_c);  // M104, M109: Set temp. in Celsius.
-  virtual void wait_temperature();                // M109, M116: Wait for temp. reached.
-  virtual void dwell(float time_ms);              // G4: dwell for milliseconds.
-  virtual void motors_enable(bool enable);        // M17,M84,M18: Switch on/off motors
-  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target);
-  virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &target);
-  virtual const char *unprocessed(char letter, float value, const char *);
+  void gcode_command_done(char letter, float val) final;
+  void input_idle(bool is_first) final;
+  void wait_for_start() final;
+  void go_home(AxisBitmap_t axis_bitmap) final;
+  bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
+                          float *probed_position) final;
+  void set_speed_factor(float factor) final;    // M220 feedrate factor 0..1
+  void set_fanspeed(float value) final;         // M106, M107: speed 0...255
+  void set_temperature(float degrees_c) final;  // M104, M109: Set temp. in Celsius.
+  void wait_temperature() final;                // M109, M116: Wait for temp. reached.
+  void dwell(float time_ms) final;              // G4: dwell for milliseconds.
+  void motors_enable(bool enable) final;        // M17,M84,M18: Switch on/off motors
+  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target) final;
+  bool rapid_move(float feed_mm_p_sec, const AxesRegister &target) final;
+  const char *unprocessed(char letter, float value, const char *) final;
 
 private:
   bool check_for_pause();

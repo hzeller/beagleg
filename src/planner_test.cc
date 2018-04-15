@@ -39,7 +39,7 @@ public:
   FakeMotorOperations(const MachineControlConfig &config)
     : config_(config) {}
 
-  virtual void Enqueue(const LinearSegmentSteps &segment) {
+  void Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
     // Prepare for printing.
 
@@ -80,9 +80,9 @@ public:
     collected_.push_back(segment);
   }
 
-  virtual void MotorEnable(bool on)  {}
-  virtual void WaitQueueEmpty() {}
-  virtual bool GetPhysicalStatus(PhysicalStatus *status) { return false; }
+  void MotorEnable(bool on) final {}
+  void WaitQueueEmpty() final {}
+  bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
 
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }
 

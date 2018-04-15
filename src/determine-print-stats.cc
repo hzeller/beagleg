@@ -42,37 +42,38 @@ public:
     : stats_(stats), delegatee_(delegatee) {
   }
 
-  virtual void gcode_start(GCodeParser *p) { delegatee_->gcode_start(p); }
-  virtual void gcode_finished(bool eos) { delegatee_->gcode_finished(eos); }
+  // GCodeParser::EventReceiver callbacks
+   void gcode_start(GCodeParser *p) final { delegatee_->gcode_start(p); }
+   void gcode_finished(bool eos) final { delegatee_->gcode_finished(eos); }
 
   // GCode parser event receivers, that forward calls to the delegate
   // but also determine relevant height information.
-  virtual void set_speed_factor(float f) { delegatee_->set_speed_factor(f);  }
-  virtual void set_temperature(float f) { delegatee_->set_temperature(f); }
-  virtual void set_fanspeed(float speed) { delegatee_->set_fanspeed(speed);  }
-  virtual void wait_temperature() { delegatee_->wait_temperature(); }
-  virtual void motors_enable(bool b) { delegatee_->motors_enable(b); }
-  virtual void go_home(AxisBitmap_t axes) { /* ignore */ }
-  virtual void inform_origin_offset(const AxesRegister& axes) {
+  void set_speed_factor(float f) final { delegatee_->set_speed_factor(f);  }
+  void set_temperature(float f) final { delegatee_->set_temperature(f); }
+  void set_fanspeed(float speed) final { delegatee_->set_fanspeed(speed);  }
+  void wait_temperature() final { delegatee_->wait_temperature(); }
+  void motors_enable(bool b) final { delegatee_->motors_enable(b); }
+  void go_home(AxisBitmap_t axes) final { /* ignore */ }
+  void inform_origin_offset(const AxesRegister& axes) final {
     delegatee_->inform_origin_offset(axes);
   }
 
-  virtual void dwell(float value) {
+  void dwell(float value) final {
     stats_->total_time_seconds += value / 1000.0f;
     // We call the original dell() with zero time as we don't want to spend _real_ time.
     delegatee_->dwell(0);
   }
 
-  virtual bool rapid_move(float feed, const AxesRegister &axes) {
+  bool rapid_move(float feed, const AxesRegister &axes) final {
     update_coordinate_stats(axes);
     return delegatee_->rapid_move(feed, axes);
   }
-  virtual bool coordinated_move(float feed, const AxesRegister &axes) {
+  bool coordinated_move(float feed, const AxesRegister &axes) final {
     update_coordinate_stats(axes);
     return delegatee_->coordinated_move(feed, axes);
   }
 
-  virtual const char *unprocessed(char letter, float value, const char *remain) {
+  const char *unprocessed(char letter, float value, const char *remain) final {
     return delegatee_->unprocessed(letter, value, remain);
   }
 
@@ -95,7 +96,7 @@ class StatsMotorOperations : public MotorOperations {
 public:
   StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
-  virtual void Enqueue(const LinearSegmentSteps &param) {
+  void Enqueue(const LinearSegmentSteps &param) final {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       int steps = abs(param.steps[i]);
@@ -108,9 +109,9 @@ public:
     //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param.v0, param.v1, max_steps);
   }
 
-  virtual void MotorEnable(bool on) {}
-  virtual void WaitQueueEmpty() {}
-  virtual bool GetPhysicalStatus(PhysicalStatus *status) { return false; }
+  void MotorEnable(bool on) final {}
+  void WaitQueueEmpty() final {}
+  bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
 
 private:
   BeagleGPrintStats *const print_stats_;

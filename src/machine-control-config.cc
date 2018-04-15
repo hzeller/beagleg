@@ -54,7 +54,7 @@ public:
   MachineControlConfigReader(MachineControlConfig *config)
     : config_(config) {}
 
-  virtual bool SeenSection(int line_no, const std::string &section_name) {
+  bool SeenSection(int line_no, const std::string &section_name) final {
     current_section_ = section_name;
     if (section_name == "general")
       return true;
@@ -70,9 +70,9 @@ public:
     return false;
   }
 
-  virtual bool SeenNameValue(int line_no,
-                             const std::string &name,
-                             const std::string &value) {
+  bool SeenNameValue(int line_no,
+                     const std::string &name,
+                     const std::string &value) final {
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
 #define ACCEPT_EXPR(n, result) if (name != n) {} else return ParseFloatExpr(value, result)
 
@@ -111,7 +111,7 @@ public:
     return false;
   }
 
-  virtual void ReportError(int line_no, const std::string &msg) {
+  void ReportError(int line_no, const std::string &msg) final {
     Log_error("Line %d: %s", line_no, msg.c_str());
   }
 

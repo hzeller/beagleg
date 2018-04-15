@@ -24,13 +24,13 @@
 class SimFirmwareQueue : public MotionQueue {
 public:
   SimFirmwareQueue(FILE *out, int relevant_motors = MOTION_MOTOR_COUNT);
-  virtual ~SimFirmwareQueue();
+  ~SimFirmwareQueue() override;
 
-  virtual void Enqueue(MotionSegment *segment);
-  virtual void WaitQueueEmpty() {}
-  virtual void MotorEnable(bool on) {}
-  virtual void Shutdown(bool flush_queue) {}
-  virtual int GetPendingElements(uint32_t *head_item_progress) {
+  void Enqueue(MotionSegment *segment) final;
+  void WaitQueueEmpty() final {}
+  void MotorEnable(bool on) final {}
+  void Shutdown(bool flush_queue) final {}
+  int GetPendingElements(uint32_t *head_item_progress) final {
     if (head_item_progress)
       *head_item_progress = 0;
     return 1;

@@ -76,14 +76,14 @@ class Spindle::ConfigReader : public ConfigParser::Reader {
 public:
   ConfigReader(Spindle *config) : config_(config) {}
 
-  virtual bool SeenSection(int line_no, const std::string &section_name) {
+  bool SeenSection(int line_no, const std::string &section_name) final {
     current_section_ = section_name;
     return (section_name == "spindle");
   }
 
-  virtual bool SeenNameValue(int line_no,
-                             const std::string &name,
-                             const std::string &value) {
+  bool SeenNameValue(int line_no,
+                     const std::string &name,
+                     const std::string &value) final {
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
     if (current_section_ == "spindle") {
       ACCEPT_VALUE("type",           String, &config_->type_);
@@ -103,7 +103,7 @@ public:
     return false;
   }
 
-  virtual void ReportError(int line_no, const std::string &msg) {
+  void ReportError(int line_no, const std::string &msg) final {
     Log_error("Line %d: %s", line_no, msg.c_str());
   }
 
@@ -168,7 +168,7 @@ public:
     Log_debug("  off_delay_ms : %d", off_delay_ms);
   }
 
-  void On(bool ccw, int rpm) {
+  void On(bool ccw, int rpm) final {
     // turn on spindle power if necessary
     if (is_off_) {
       set_output(HardwareMapping::OUT_SPINDLE, true);
@@ -205,7 +205,7 @@ public:
               ccw ? "ccw" : "cw", (int)(max_rpm_ * duty_cycle_), duty_cycle_);
   }
 
-  void Off() {
+  void Off() final {
     ramp_down();
     if (off_delay_ms_) sleep_ms(off_delay_ms_);
     set_output(HardwareMapping::OUT_SPINDLE, false);

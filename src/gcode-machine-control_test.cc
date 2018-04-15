@@ -46,16 +46,16 @@ public:
     EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
   }
 
-  virtual void Enqueue(const LinearSegmentSteps &param) {
+  void Enqueue(const LinearSegmentSteps &param) final {
     const int number = (int)(current_ - expect_);
     EXPECT_NE(END_SENTINEL, current_->aux_bits);
     ExpectEq(current_, param, number);
     ++current_;
   }
 
-  virtual void MotorEnable(bool on) {}
-  virtual void WaitQueueEmpty() {}
-  virtual bool GetPhysicalStatus(PhysicalStatus *status) { return false; }
+  void MotorEnable(bool on) final {}
+  void WaitQueueEmpty() final {}
+  bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
 
 private:
   // Helpers to compare and print MotorMovements.

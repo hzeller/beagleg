@@ -45,7 +45,7 @@ public:
     parser_ = new GCodeParser(config, this, false);
     EXPECT_EQ(0, parser_->error_count());
   }
-  virtual ~ParseTester() { delete parser_; }
+  ~ParseTester() override { delete parser_; }
 
   float get_parameter(int num) {
     return parameters_[StringPrintf("%d", num)];
@@ -62,43 +62,44 @@ public:
     return parser_->error_count() == errors_before;
   }
 
-  virtual void gcode_start(GCodeParser *)     { Count(CALL_gcode_start); }
-  virtual void gcode_finished(bool)  { Count(CALL_gcode_finished); }
-  virtual void inform_origin_offset(const AxesRegister &offset) {
+  // -- gcode parser callbacks
+  void gcode_start(GCodeParser *) final { Count(CALL_gcode_start); }
+  void gcode_finished(bool) final { Count(CALL_gcode_finished); }
+  void inform_origin_offset(const AxesRegister &offset) final {
     parser_offset = offset;
   }
-  virtual void go_home(AxisBitmap_t axis_bitmap) { Count(CALL_go_home); }
-  virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
-                          float *probed_position) {
+  void go_home(AxisBitmap_t axis_bitmap) final { Count(CALL_go_home); }
+  bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
+                  float *probed_position) final {
     Count(CALL_probe_axis);
     *probed_position = PROBE_POSITION;
     return true;
   }
 
-  virtual void motors_enable(bool enable) { Count(CALL_motors_enable); }
-  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
+  void motors_enable(bool enable) final { Count(CALL_motors_enable); }
+  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) override {
     Count(CALL_coordinated_move);
     abs_pos = axes;
     feedrate = feed_mm_p_sec;
     return true;
   }
-  virtual bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) {
+  bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) final {
     Count(CALL_rapid_move);
     abs_pos = axes;
     feedrate = feed_mm_p_sec;
     return true;
   }
-  virtual const char *unprocessed(char letter, float value, const char *line) {
+  const char *unprocessed(char letter, float value, const char *line) final {
     Count(CALL_unprocessed);
     return NULL;
   }
 
   // Not interested.
-  virtual void set_speed_factor(float factor) {}
-  virtual void set_fanspeed(float value) {}
-  virtual void set_temperature(float degrees_c) {}
-  virtual void wait_temperature() {}
-  virtual void dwell(float ms) {}
+  void set_speed_factor(float factor) final {}
+  void set_fanspeed(float value) final {}
+  void set_temperature(float degrees_c) final {}
+  void wait_temperature() final {}
+  void dwell(float ms) final {}
 
 public:
   // public counters.
@@ -445,7 +446,7 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
 
   // If there is the <> delimiter, things can be squished together again.
   EXPECT_TRUE(counter.TestParseLine(
-                 "G1 #foo=160#bar=260#baz=360X#<foo>Y#<bar>Z#<baz>"));
+                "G1 #foo=160#bar=260#baz=360X#<foo>Y#<bar>Z#<baz>"));
   EXPECT_EQ(HOME_X + 160, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 260, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 360, counter.abs_pos[AXIS_Z]);
@@ -542,7 +543,7 @@ TEST(GCodeParserTest, set_system_origin) {
 
 class ArcTester : public ParseTester {
 public:
-  virtual bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) {
+  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) final {
     ParseTester::coordinated_move(feed_mm_p_sec, axes);
     if (!expect_radius_)
       return true;  // Not checking for circleness yet.

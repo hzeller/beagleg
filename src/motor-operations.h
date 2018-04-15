@@ -81,12 +81,12 @@ class MotionQueueMotorOperations : public MotorOperations {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
   MotionQueueMotorOperations(MotionQueue *backend);
-  virtual ~MotionQueueMotorOperations();
+  ~MotionQueueMotorOperations() override;
 
-  virtual void Enqueue(const LinearSegmentSteps &segment);
-  virtual void MotorEnable(bool on);
-  virtual void WaitQueueEmpty();
-  virtual bool GetPhysicalStatus(PhysicalStatus *status);
+  void Enqueue(const LinearSegmentSteps &segment) final;
+  void MotorEnable(bool on) final;
+  void WaitQueueEmpty() final;
+  bool GetPhysicalStatus(PhysicalStatus *status) final;
 
 private:
   void EnqueueInternal(const LinearSegmentSteps &param,

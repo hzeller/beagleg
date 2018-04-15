@@ -65,21 +65,21 @@ public:
   // Pass 1 - preparation, pass 2 - writing.
   void SetPass(int p) { pass_ = p; }
 
-  virtual void set_speed_factor(float f) {}
-  virtual void set_temperature(float f) {}
-  virtual void set_fanspeed(float speed) {}
-  virtual void wait_temperature() {}
-  virtual void motors_enable(bool b) {}
-  virtual void go_home(AxisBitmap_t axes) {
+  void set_speed_factor(float f) final {}
+  void set_temperature(float f) final {}
+  void set_fanspeed(float speed) final {}
+  void wait_temperature() final {}
+  void motors_enable(bool b) final {}
+  void go_home(AxisBitmap_t axes) final {
     // TODO: this might actually be a different corner of machine.
     if (pass_ == 2) fprintf(file_, "stroke 0 0 moveto  %% G28\n");
   }
-  virtual void inform_origin_offset(const AxesRegister& axes) {}
-  virtual void dwell(float value) { }
-  virtual bool rapid_move(float feed, const AxesRegister &axes) {
+  void inform_origin_offset(const AxesRegister& axes) final {}
+  void dwell(float value) final { }
+  bool rapid_move(float feed, const AxesRegister &axes) final {
     return coordinated_move(feed, axes);
   }
-  virtual bool coordinated_move(float feed, const AxesRegister &axes) {
+  bool coordinated_move(float feed, const AxesRegister &axes) final {
     if (pass_ == 1) {
       RememberMinMax(axes);
     } else {
@@ -93,11 +93,11 @@ public:
     return true;
   }
 
-  virtual void arc_move(float feed_mm_p_sec,
-                        GCodeParserAxis normal_axis, bool clockwise,
-                        const AxesRegister &start,
-                        const AxesRegister &center,
-                        const AxesRegister &end) {
+  void arc_move(float feed_mm_p_sec,
+                GCodeParserAxis normal_axis, bool clockwise,
+                const AxesRegister &start,
+                const AxesRegister &center,
+                const AxesRegister &end) final {
     if (pass_ == 2 && show_ijk_) {
       fprintf(file_, "currentpoint currentpoint stroke\n"
               "gsave\n\tmoveto [0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
@@ -109,10 +109,10 @@ public:
                             start, center, end);
   }
 
-  virtual void spline_move(float feed_mm_p_sec,
-                           const AxesRegister &start,
-                           const AxesRegister &cp1, const AxesRegister &cp2,
-                           const AxesRegister &end) {
+  void spline_move(float feed_mm_p_sec,
+                   const AxesRegister &start,
+                   const AxesRegister &cp1, const AxesRegister &cp2,
+                   const AxesRegister &end) final {
     if (pass_ == 2 && show_ijk_) {
       fprintf(file_, "currentpoint stroke\n"
               "gsave\n\t[0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
@@ -125,7 +125,7 @@ public:
     EventReceiver::spline_move(feed_mm_p_sec, start, cp1, cp2, end);
   }
 
-  virtual void gcode_command_done(char letter, float val) {
+  void gcode_command_done(char letter, float val) final {
     // Remember if things were set to inch or metric, so that we can
     // show dimensions in preferred units.
     if (letter == 'G') {
@@ -137,18 +137,18 @@ public:
     }
   }
 
-  virtual const char *unprocessed(char letter, float value, const char *remain) {
+  const char *unprocessed(char letter, float value, const char *remain) final {
     return NULL;
   }
 
-  virtual void gcode_start(GCodeParser *parser) {
+  void gcode_start(GCodeParser *parser) final {
     if (pass_ == 2) {
       fprintf(file_, "\n%% -- Path generated from GCode.\n");
       fprintf(file_, "0.1 setlinewidth 0 0 0 setrgbcolor\n0 0 moveto\n");
     }
   }
 
-  virtual void gcode_finished(bool end_of_stream) {
+  void gcode_finished(bool end_of_stream) final {
     if (pass_ == 2 && end_of_stream) {
       fprintf(file_, "stroke\n");
     }
@@ -293,7 +293,7 @@ public:
     if (v < min_v_) min_v_ = v;
   }
 
-  virtual void Enqueue(const LinearSegmentSteps &param) {
+  void Enqueue(const LinearSegmentSteps &param) final {
     int dominant_axis = 0;
     for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
       if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
@@ -339,7 +339,7 @@ public:
     color_segment_length_ = length;
   }
 
-  virtual void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
+  void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
     const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
@@ -397,9 +397,9 @@ public:
     }
   }
 
-  virtual void MotorEnable(bool on) {}
-  virtual void WaitQueueEmpty() {}
-  virtual bool GetPhysicalStatus(PhysicalStatus *status) { return false; }
+  void MotorEnable(bool on) final {}
+  void WaitQueueEmpty() final {}
+  bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
 
   void PrintColorLegend(float x, float y, float width) {
     if (min_color_range_ >= max_color_range_)
