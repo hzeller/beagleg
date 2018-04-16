@@ -205,12 +205,25 @@ static int run_server(int listen_socket, FDMultiplexer *event_server,
     sa.sa_flags = SA_RESETHAND | SA_NODEFER;  // oneshot, no restart
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-    int connection = accept4(listen_socket, (struct sockaddr*) &client,
-                             &socklen, SOCK_NONBLOCK);
+    int connection = accept(listen_socket, (struct sockaddr*) &client, &socklen);
     if (connection < 0) {
       Log_error("accept(): %s", strerror(errno));
       return true;
     }
+
+    // We need to set the fd to non blocking in order to avoid
+    // blocking reads caused by spurious situations in Linux.
+    // http://man7.org/linux/man-pages/man2/select.2.html#BUGS
+    const int flags = fcntl(connection, F_GETFL, 0);
+    if (flags < 0) {
+      Log_error("fcntl(): %s", strerror(errno));
+      return true;
+    }
+    if (fcntl(connection, F_SETFL, flags | O_NONBLOCK) < 0) {
+      Log_error("fcntl(): %s", strerror(errno));
+      return true;
+    }
+
     if (streamer->IsStreaming()) {
       // For now, only one. Though we could have multiple.
       dprintf(connection, "// Sorry, can only handle one connection at a time."

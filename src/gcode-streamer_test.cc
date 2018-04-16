@@ -21,24 +21,23 @@
 class MockStream {
 public:
 
-  MockStream() : fd_{-1, -1} {}
-  ~MockStream() { ClientDisconnect(); }
-
-  int ClientConnect() {
-    ClientDisconnect();
+  MockStream() : fd_{-1, -1} {
     if (pipe(fd_) < 0) {
       perror("pipe()");
       exit(1);
     }
-    return fd_[0];
   }
+  ~MockStream() { CloseSender(); }
 
-  int NewData(const char *data) {
+  enum { RECEIVING_FD, SENDING_FD };
+
+  int GetReaderFd() { return fd_[RECEIVING_FD]; }
+  int SendData(const char *data) {
     // Feed data in the pipe
-    return write(fd_[1], data, strlen(data));
+    return write(fd_[SENDING_FD], data, strlen(data));
   }
 
-  void ClientDisconnect() { close(fd_[1]); }
+  void CloseSender() { close(fd_[SENDING_FD]); }
 
 private:
   int fd_[2];
@@ -62,16 +61,16 @@ public:
   bool OpenStream() {
     assert(stream_mock_ == NULL);
     stream_mock_ = new MockStream();
-    return streamer_->ConnectStream(stream_mock_->ClientConnect(), NULL);
+    return streamer_->ConnectStream(stream_mock_->GetReaderFd(), NULL);
   }
 
   void CloseStream() {
-    stream_mock_->ClientDisconnect();
+    stream_mock_->CloseSender();
     delete stream_mock_;
     stream_mock_ = NULL;
   }
-  void ReceiveString(const char *line) {
-    stream_mock_->NewData(line);
+  void SendString(const char *line) {
+    stream_mock_->SendData(line);
   }
   void Cycle() {
     event_server_.Cycle(0);
@@ -96,7 +95,6 @@ public:
                                   const char *rest_of_line) { return NULL; }
 
 private:
-
   class MockFDMultiplexer : public FDMultiplexer {
   public:
     friend class StreamTester;
@@ -120,32 +118,24 @@ TEST(Streaming, no_newline_no_parsing) {
     EXPECT_CALL(tester, coordinated_move(_, _)).Times(0);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
-  // Connect
+
   tester.OpenStream();
-  // Write incomplete move command
-  tester.ReceiveString("G1X200F1000");
-  // Close the stream
+  tester.SendString("G1X200F1000"); // Write incomplete move command
   tester.CloseStream();
-  // Loop to read
-  tester.Cycle();
-  // Loop to close
-  tester.Cycle();
+  tester.Cycle(); // Loop to read
+  tester.Cycle(); // Loop to close
 
   {
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
-  // Re open the stream
-  tester.OpenStream();
-  // Receive a complete string
-  tester.ReceiveString("G1X200F1000\n");
-  // Close the stream
+
+  tester.OpenStream(); // Re open the stream
+  tester.SendString("G1X200F1000\n"); // Receive a complete string
   tester.CloseStream();
-  // Loop to read
-  tester.Cycle();
-  // Loop to close
-  tester.Cycle();
+  tester.Cycle(); // Loop to read
+  tester.Cycle(); // Loop to close
 }
 
 // Generic check that during stream, all the necessary callbacks are called in
@@ -160,45 +150,37 @@ TEST(Streaming, basic_stream) {
     EXPECT_CALL(tester, input_idle(_)).Times(0);
     EXPECT_CALL(tester, gcode_finished(_)).Times(0);
   }
-  // Connect, register the fd
   tester.OpenStream();
-  // Write one line
-  tester.ReceiveString("G1X200F1000\nG1X200F1000\n");
-  // First loop reads the lines
-  tester.Cycle();
+  tester.SendString("G1X200F1000\nG1X200F1000\n");
+  tester.Cycle(); // First loop reads the lines
 
   {
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, input_idle(_)).Times(0);
   }
-  // Send another line
-  tester.ReceiveString("G1X200F1000\n");
-  // Loop and read
-  tester.Cycle();
+  tester.SendString("G1X200F1000\n");
+  tester.Cycle(); // Loop and read another line
 
   {
     EXPECT_CALL(tester, input_idle(true)).Times(1);
   }
-  // Send not complete line
-  tester.ReceiveString("G1X200F1000");
-  // First loop reads, but since it's not a line, we are not parsing anything
-  tester.Cycle();
-  // Timeout, input idle
-  tester.Cycle();
+
+  tester.SendString("G1X200F1000");   // Send incomplete line
+  tester.Cycle(); // First loop reads, but since it's not a line,
+                  // we are not parsing anything
+
+  tester.Cycle(); // Timeout, input idle
 
   {
     EXPECT_CALL(tester, input_idle(false)).Times(1);
   }
-  // Second idle timeout
-  tester.Cycle();
+  tester.Cycle(); // Second idle timeout
 
   {
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
-  // Close the stream
   tester.CloseStream();
-  // Wait the stream to close
-  tester.Cycle();
+  tester.Cycle(); // Wait the stream to close
 }
 
 int main(int argc, char *argv[]) {
