@@ -31,7 +31,7 @@ public:
 
   enum { RECEIVING_FD, SENDING_FD };
 
-  int GetReaderFd() { return fd_[RECEIVING_FD]; }
+  int GetReceiverFiledescriptor() { return fd_[RECEIVING_FD]; }
   int SendData(const char *data) {
     // Feed data in the pipe
     return write(fd_[SENDING_FD], data, strlen(data));
@@ -61,7 +61,7 @@ public:
   bool OpenStream() {
     assert(stream_mock_ == NULL);
     stream_mock_ = new MockStream();
-    return streamer_->ConnectStream(stream_mock_->GetReaderFd(), NULL);
+    return streamer_->ConnectStream(stream_mock_->GetReceiverFiledescriptor(), NULL);
   }
 
   void CloseStream() {
