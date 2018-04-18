@@ -11,9 +11,7 @@ BEAGLEG_HARDWARE_TARGET?=BUMPS
 
 # Additional macros, for example to disable the pwm support simply add
 # -D_DISABLE_PWM_TIMERS.
-# By default, disable final/override keywords as they are only available
-# for gcc > 4.7
-CONFIG_FLAGS?=-Dfinal='' -Doverride=''
+CONFIG_FLAGS?=
 
 # In case you cross compile this on a different architecture, uncomment this
 # and set the prefix. Or simply set the environment variable.
