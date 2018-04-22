@@ -60,7 +60,6 @@ private:
   std::vector<Handler> t_handlers_;
   std::vector<int> to_delete_r_;
   std::vector<int> to_delete_w_;
-
 };
 
 #endif // FD_MUX_H_
