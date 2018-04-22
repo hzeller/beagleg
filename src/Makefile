@@ -112,7 +112,7 @@ test: local-tests
 
 coverage:
 	LDFLAGS="-fprofile-arcs -ftest-coverage" BEAGLEG_OPT_CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" make test
-	gcovr -r . --html --html-details -e ".*_test.cc" -p -o gcov-html.html
+	gcovr -r . --html --html-details -e ".*_test.cc" -p -o coverage.html
 
 valgrind-test: local-valgrind-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test ; done

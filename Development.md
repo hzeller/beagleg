@@ -40,6 +40,24 @@ for which there are typically already packages available:
  make valgrind-test
  ```
 
+### Coverage
+To see if there is code that has not been covered in tests yet, there is
+a target `make coverage`, that creates a `src/coverage.html` report with
+links to individual files that show which lines have been visited.
+
+You also need to have gcovr installed. Run this in the `src/` directory.
+
+```
+ sudo apt-get install gcovr
+ make coverage
+```
+
+Note as always with coverage: if everything is green, it doesn't mean that the
+code is sufficiently covered as it only reports if a line has been executed,
+not if you have tested all the paths that you can reach a particular line.
+But if a line is red it definitely means that none of the unit tests even
+touched that piece of code.
+
 ### gcode2ps
 Manual inspection is also useful. A little tool to visually inspect the planner
 output is `src/gcode2ps`. It is a tool that reads gcode and outputs the raw
