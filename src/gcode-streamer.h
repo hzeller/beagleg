@@ -24,6 +24,7 @@
 
 class GCodeStreamer {
 public:
+  // GCodeStreamer needs to outlive FDMultiplexer.
   GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
                 GCodeParser::EventReceiver *parse_events);
 

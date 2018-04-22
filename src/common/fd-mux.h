@@ -29,8 +29,8 @@ class FDMultiplexer {
 public:
   FDMultiplexer(unsigned timeout_ms = 50) : timeout_ms_(timeout_ms) {}
 
-  // Handler for connections. Returns true if we want to continue reading
-  // or false if we wish to be taken out of the multiplexer.
+  // Handlers for events from this multiplexer. Returns true if we want to continue
+  // to be called in the future or false if we wish to be taken out of the multiplexer.
   typedef std::function<bool()> Handler;
 
   // These can only be set before Loop() is called or from a
@@ -47,16 +47,19 @@ public:
   int Loop();
 
 protected:
-  // Useful for testing to control the loop.
+  // Run a single cycle resulting in exactly one call of a handler function.
+  // This means either the next file descriptor became ready and its Handler is called or
+  // we encountered a timeout and the idle-Handler has been called.
+  // This is broken out to make it simple to test steps in unit tests.
   bool SingleCycle(unsigned timeout_ms);
 
 private:
   const unsigned timeout_ms_;
-  std::map<int, Handler> r_handlers_;
-  std::map<int, Handler> w_handlers_;
-  std::vector<Handler> t_handlers_;
-  std::vector<int> to_delete_r_;
-  std::vector<int> to_delete_w_;
+  std::map<int, Handler> read_handlers_;
+  std::map<int, Handler> write_handlers_;
+  std::vector<Handler> idle_handlers_;
+  std::vector<int> to_delete_read_;
+  std::vector<int> to_delete_write_;
 };
 
 #endif // FD_MUX_H_

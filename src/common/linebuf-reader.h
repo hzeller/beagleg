@@ -25,7 +25,7 @@
 
 // A reader to be used in conjunction with file descriptor event management
 // such as select() or poll(). Whenever a file descriptor is readable, it can
-// be used to udpate this LinebufReader. Subsequent calls to
+// be used to udpate this LinebufReader.
 class LinebufReader {
 public:
   // A function to read from some data source. Similar to read(2), it gets

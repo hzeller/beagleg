@@ -65,15 +65,15 @@ static void disarm_signal_handler() {
 }
 
 bool FDMultiplexer::RunOnReadable(int fd, const Handler &handler) {
-  return r_handlers_.insert({ fd, handler }).second;
+  return read_handlers_.insert({ fd, handler }).second;
 }
 
 bool FDMultiplexer::RunOnWritable(int fd, const Handler &handler) {
-  return w_handlers_.insert({ fd, handler }).second;
+  return write_handlers_.insert({ fd, handler }).second;
 }
 
 void FDMultiplexer::RunOnIdle(const Handler &handler) {
-  t_handlers_.push_back(handler);
+  idle_handlers_.push_back(handler);
 }
 
 bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
@@ -89,13 +89,13 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   FD_ZERO(&write_fds);
 
   // Readers
-  for (const auto &it : r_handlers_) {
+  for (const auto &it : read_handlers_) {
     if (it.first >= maxfd) maxfd = it.first + 1;
     FD_SET(it.first, &read_fds);
   }
 
   // Writers
-  for (const auto &it : w_handlers_) {
+  for (const auto &it : write_handlers_) {
     if (it.first >= maxfd) maxfd = it.first + 1;
     FD_SET(it.first, &write_fds);
   }
@@ -117,45 +117,45 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
 
   if (fds_ready == 0) {
     // Timeout situation.
-    for (int i = t_handlers_.size() - 1; i >= 0; --i) {
-      if (!t_handlers_[i]()) {
-        t_handlers_[i] = t_handlers_.back();
-        t_handlers_.pop_back();
+    for (int i = idle_handlers_.size() - 1; i >= 0; --i) {
+      if (!idle_handlers_[i]()) {
+        idle_handlers_[i] = idle_handlers_.back();
+        idle_handlers_.pop_back();
       }
     }
     return true;
   }
 
   // Handle reads
-  for (const auto &it : r_handlers_) {
+  for (const auto &it : read_handlers_) {
     if (FD_ISSET(it.first, &read_fds)) {
       const bool retrigger = it.second();
       if (!retrigger)
-        to_delete_r_.push_back(it.first);
+        to_delete_read_.push_back(it.first);
       if (--fds_ready == 0)
         break;
     }
   }
-  for (int i : to_delete_r_) {
-    r_handlers_.erase(i);
+  for (int i : to_delete_read_) {
+    read_handlers_.erase(i);
   }
 
   // Handle writes
-  for (const auto &it : w_handlers_) {
+  for (const auto &it : write_handlers_) {
     if (FD_ISSET(it.first, &write_fds)) {
       const bool retrigger = it.second();
       if (!retrigger)
-        to_delete_w_.push_back(it.first);
+        to_delete_write_.push_back(it.first);
       if (--fds_ready == 0)
         break;
     }
   }
-  for (int i : to_delete_w_) {
-    w_handlers_.erase(i);
+  for (int i : to_delete_write_) {
+    write_handlers_.erase(i);
   }
 
-  to_delete_r_.clear();
-  to_delete_w_.clear();
+  to_delete_read_.clear();
+  to_delete_write_.clear();
 
   return true;
 }
