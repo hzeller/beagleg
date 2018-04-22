@@ -32,7 +32,6 @@ public:
     //close(fd_[RECEIVING_FD]);
   }
 
-  enum { RECEIVING_FD, SENDING_FD };
 
   int GetReceiverFiledescriptor() { return fd_[RECEIVING_FD]; }
   int SendData(const char *data) {
@@ -43,6 +42,7 @@ public:
   void CloseSender() { close(fd_[SENDING_FD]); }
 
 private:
+  enum { RECEIVING_FD, SENDING_FD };
   int fd_[2];
 };
 

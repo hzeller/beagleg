@@ -526,12 +526,13 @@ int main(int argc, char *argv[]) {
   } else {
     ret = run_server(listen_socket, &event_server, machine_control, streamer,
                      bind_addr, listen_port);
+    if (listen_socket >= 0) {
+      close(listen_socket);
+    }
   }
 
-  if (listen_socket >= 0) {
-    close(listen_socket);
-    Log_error("Exiting server");
-  }
+  Log_info("Exiting server");
+
   delete streamer;
   delete parser;
   delete machine_control;
