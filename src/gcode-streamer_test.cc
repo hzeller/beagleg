@@ -85,17 +85,17 @@ public:
   MOCK_METHOD2(coordinated_move,
                bool(float feed_mm_p_sec, const AxesRegister &absolute_pos));
 
-  virtual void go_home(AxisBitmap_t axis_bitmap) {}
-  virtual void set_speed_factor(float factor) {}
-  virtual void set_fanspeed(float value) {}
-  virtual void set_temperature(float degrees_c) {}
-  virtual void wait_temperature() {}
-  virtual void dwell(float time_ms) {}
-  virtual void motors_enable(bool enable) {}
-  virtual bool rapid_move(float feed_mm_p_sec,
-                          const AxesRegister &axes) { return true;}
-  virtual const char *unprocessed(char letter, float value,
-                                  const char *rest_of_line) { return NULL; }
+  void go_home(AxisBitmap_t axis_bitmap) override {}
+  void set_speed_factor(float factor) override {}
+  void set_fanspeed(float value) override {}
+  void set_temperature(float degrees_c) override {}
+  void wait_temperature() override {}
+  void dwell(float time_ms) override {}
+  void motors_enable(bool enable) override {}
+  bool rapid_move(float feed_mm_p_sec,
+                  const AxesRegister &axes) override { return true;}
+  const char *unprocessed(char letter, float value,
+                          const char *rest_of_line) override { return NULL; }
 
 private:
   class MockFDMultiplexer : public FDMultiplexer {
