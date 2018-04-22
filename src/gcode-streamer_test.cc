@@ -1,8 +1,7 @@
 /* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
- * Test for pru motion queue.
+ * Test for the GCodeStreamer class.
  *
- * We simulate the pru hardware and test if the absolute position is correctly
- * retrieved.
+ * We manually cycle the event loop and simulate an incoming gcode stream.
  *
  */
 #include "motion-queue.h"
