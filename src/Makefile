@@ -110,6 +110,10 @@ local-valgrind-tests: $(UNITTEST_BINARIES)
 test: local-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test ; done
 
+coverage:
+	LDFLAGS="-fprofile-arcs -ftest-coverage" BEAGLEG_OPT_CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" make test
+	gcovr -r . --html --html-details -e ".*_test.cc" -p -o gcov-html.html
+
 valgrind-test: local-valgrind-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test ; done
 
@@ -152,7 +156,7 @@ gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GMOCK_SOURCE) -I$(GMOCK_SOURCE)/include -c  $< -o $@
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS)
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) *.gcda *.gcov *.gcno *.cc.html *.h.html
 	$(MAKE) -C common clean
 	$(MAKE) -C gcode-parser clean
 
