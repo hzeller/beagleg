@@ -26,12 +26,7 @@ public:
       exit(1);
     }
   }
-  ~MockStream() {
-    CloseSender();
-    // Cannot do this
-    //close(fd_[RECEIVING_FD]);
-  }
-
+  ~MockStream() {}
 
   int GetReceiverFiledescriptor() { return fd_[RECEIVING_FD]; }
   int SendData(const char *data) {
@@ -48,18 +43,10 @@ private:
 
 class StreamTester : public GCodeParser::EventReceiver {
 public:
-  StreamTester() {
-    GCodeParser::Config config;
-    parser_ = new GCodeParser(config, this, false);
-    streamer_ = new GCodeStreamer(&event_server_, parser_, this);
-    stream_mock_ = NULL;
-  }
-
-  ~StreamTester() {
-    delete parser_;
-    delete streamer_;
-    delete stream_mock_;
-  }
+  StreamTester()
+    : parser_(new GCodeParser(GCodeParser::Config(), this, false)),
+      streamer_(new GCodeStreamer(&event_server_, parser_.get(), this)),
+      stream_mock_(NULL) {}
 
   bool OpenStream() {
     assert(stream_mock_ == NULL);
@@ -104,8 +91,8 @@ private:
   };
 
   MockFDMultiplexer event_server_;
-  GCodeParser *parser_;
-  GCodeStreamer *streamer_;
+  std::unique_ptr<GCodeParser> parser_;
+  std::unique_ptr<GCodeStreamer> streamer_;
   MockStream *stream_mock_;
 };
 
