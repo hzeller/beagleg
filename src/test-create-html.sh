@@ -6,6 +6,7 @@ if [ $# -lt 1 ] ; then
     exit 1
 fi
 
+OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
 IMAGE_SIZE="24%"
 THRESHOLD_ANGLE="-t16"
 
@@ -27,9 +28,12 @@ rm -f $OUT_HTML
 while [ $# -ne 0 ] ; do
     GCODE_FILE=$1
     BASENAME=$(basename $GCODE_FILE .gcode)
-    $GCODE2PS $THRESHOLD_ANGLE -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
-    if [ $? -ne 0 ] ; then
-	ERRMSG="<span style='color:#ff0000; font-weight:bold;'>Got gcode errors</span>"
+    $OPTIONAL_VALGRIND $GCODE2PS $THRESHOLD_ANGLE -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 5 ] ; then
+	ERRMSG="<span style='color:#ffff00; font-weight:bold; background-color:#ff0000'> Got valgrind errors </span>"
+    elif [ $EXIT_CODE -ne 0 ]; then
+	ERRMSG="<span style='color:#ffff00; font-weight:bold; background-color:#ff0000'> Got execution errors; exit=$EXIT_CODE </span>"
     else
 	ERRMSG=""
     fi
