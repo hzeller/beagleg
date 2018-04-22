@@ -27,11 +27,10 @@
 // This needs a better name.
 class FDMultiplexer {
 public:
+  FDMultiplexer(unsigned timeout_ms = 50) : timeout_ms_(timeout_ms) {}
 
-  // Handler for connections. Returns '1' if we want to continue reading
-  // or '0' if we wish to be taken out of the multiplexer.
-  // '-1' Can be used to exit the multiplexer with an error, for example
-  // if one of our tasklets has an error.
+  // Handler for connections. Returns true if we want to continue reading
+  // or false if we wish to be taken out of the multiplexer.
   typedef std::function<bool()> Handler;
 
   // These can only be set before Loop() is called or from a
@@ -39,20 +38,23 @@ public:
   // Returns false if that filedescriptor is already registered.
   bool RunOnReadable(int fd, const Handler &handler);
   bool RunOnWritable(int fd, const Handler &handler);
-  void RunOnTimeout(const Handler &handler);
+
+  // Handlers run in case there's nothing to do.
+  void RunOnIdle(const Handler &handler);
 
   // Schedules the delete of an fd,callback pair for the next loop cycle.
   void ScheduleDelete(int fd);
 
   // Run the main loop. Blocks while there is still a filedescriptor
-  // registered (return 0) or until a signal is triggered (return 2).
+  // registered (return 0) or until a signal is triggered (return 1).
   int Loop();
 
 protected:
-  bool Cycle(unsigned timeout_ms = 50);
+  // Useful for testing to control the loop.
+  bool SingleCycle(unsigned timeout_ms);
 
 private:
-
+  const unsigned timeout_ms_;
   std::map<int, Handler> r_handlers_;
   std::map<int, Handler> w_handlers_;
   std::vector<Handler> t_handlers_;

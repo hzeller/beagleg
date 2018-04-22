@@ -27,7 +27,11 @@ public:
       exit(1);
     }
   }
-  ~MockStream() { CloseSender(); }
+  ~MockStream() {
+    CloseSender();
+    // Cannot do this
+    //close(fd_[RECEIVING_FD]);
+  }
 
   enum { RECEIVING_FD, SENDING_FD };
 
@@ -73,7 +77,7 @@ public:
     stream_mock_->SendData(line);
   }
   void Cycle() {
-    event_server_.Cycle(0);
+    event_server_.SingleCycle(0);
   }
 
   MOCK_METHOD1(gcode_start, void(GCodeParser *parser));
@@ -114,8 +118,8 @@ using namespace ::testing;
 TEST(Streaming, no_newline_no_parsing) {
   StreamTester tester;
   {
-    EXPECT_CALL(tester, gcode_start(_)).Times(0);
-    EXPECT_CALL(tester, coordinated_move(_, _)).Times(0);
+    EXPECT_CALL(tester, gcode_start(_)).Times(1);
+    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
 
@@ -126,7 +130,7 @@ TEST(Streaming, no_newline_no_parsing) {
   tester.Cycle(); // Loop to close
 
   {
-    EXPECT_CALL(tester, gcode_start(_)).Times(1);
+    EXPECT_CALL(tester, gcode_start(_)).Times(0);
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
@@ -177,6 +181,7 @@ TEST(Streaming, basic_stream) {
   tester.Cycle(); // Second idle timeout
 
   {
+    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
     EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   }
   tester.CloseStream();

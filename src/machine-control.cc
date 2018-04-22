@@ -536,7 +536,7 @@ int main(int argc, char *argv[]) {
   delete parser;
   delete machine_control;
 
-  const bool caught_signal = (ret == 2);
+  const bool caught_signal = (ret == 1);
   if (caught_signal) {
     Log_info("Caught signal: immediate exit. "
              "Skipping potential remaining queue.");

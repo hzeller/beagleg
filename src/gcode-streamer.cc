@@ -14,7 +14,7 @@ GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
   : event_server_(event_server), parser_(parser), parse_events_(parse_events),
     reader_(), is_streaming_(false), is_processing_(false), connection_fd_(-1) {
   // Let's start the input idle tasklet
-  event_server_->RunOnTimeout([this](){
+  event_server_->RunOnIdle([this](){
     return Timeout();
   });
 }
@@ -40,9 +40,6 @@ bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
   event_server_->RunOnReadable(connection_fd_, [this](){
     return ReadData();
   });
-
-  // Cleanup any potentially remaining gcode from previous connections.
-  reader_.Flush();
 
 exit:
   if (!ret) {
@@ -70,6 +67,12 @@ bool GCodeStreamer::ReadData() {
       Log_info("Client disconnected.");
     } else {
       Log_info("Reached EOF.");
+    }
+
+    // Parse any potentially remaining gcode from previous connections.
+    const char *line = reader_.IncompleteLine();
+    if (line) {
+      parser_->ParseLine(line, msg_stream_);
     }
 
     // always call gcode_finished() to disable motors at end of stream

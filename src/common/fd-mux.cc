@@ -1,4 +1,22 @@
-// -*- mode: c++; c-basic-offset: 4; indent-tabs-mode: nil; -*-
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
+ * (c) 2018 Henner Zeller <h.zeller@acm.org>
+ *          Leonardo Romor <leonardo.romor@gmail.com>
+ *
+ * This file is part of BeagleG. http://github.com/hzeller/beagleg
+ *
+ * BeagleG is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * BeagleG is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "fd-mux.h"
 #include "logging.h"
@@ -62,11 +80,11 @@ void FDMultiplexer::ScheduleDelete(int fd) {
   }
 }
 
-void FDMultiplexer::RunOnTimeout(const Handler &handler) {
+void FDMultiplexer::RunOnIdle(const Handler &handler) {
   t_handlers_.push_back(handler);
 }
 
-bool FDMultiplexer::Cycle(unsigned int timeout_ms) {
+bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   fd_set read_fds;
   fd_set write_fds;
 
@@ -151,12 +169,12 @@ bool FDMultiplexer::Cycle(unsigned int timeout_ms) {
 }
 
 int FDMultiplexer::Loop() {
-
+  const unsigned timeout = timeout_ms_;
   arm_signal_handler();
-  while (Cycle(10)) {}
+  while (SingleCycle(timeout)) {}
   disarm_signal_handler();
 
   if (caught_signal)
-    return 2;
+    return 1;
   return 0;
 }
