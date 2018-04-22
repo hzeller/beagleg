@@ -75,7 +75,8 @@ bool FDMultiplexer::RunOnWritable(int fd, const Handler &handler) {
 void FDMultiplexer::ScheduleDelete(int fd) {
   if (r_handlers_.find(fd) != r_handlers_.end()) {
     to_delete_r_.push_back(fd);
-  } else if (w_handlers_.find(fd) != w_handlers_.end()) {
+  }
+  if (w_handlers_.find(fd) != w_handlers_.end()) {
     to_delete_w_.push_back(fd);
   }
 }
