@@ -27,6 +27,7 @@
   Bounding box: should be switchable: range of machine or size of object.
 */
 
+#include <assert.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -50,20 +51,25 @@ extern const char *viridis_colors[];
 extern const char *measureLinePS;
 }
 
+// Our classes generally work in two phases. Use some symbolic names here for
+// readability.
+enum class ProcessingStep {
+  Init,
+  Preprocess,
+  GenerateOutput
+};
+
 // Simple gcode visualizer. Takes the gcode and shows its range.
 // Takes two passes: first determines the bounding box to show axes, second
 // draws within these.
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
   GCodePrintVisualizer(FILE *file, bool show_ijk, float scale)
-    : file_(file), show_ijk_(show_ijk), scale_(scale),
-      segment_count_(0), pass_(1),
-      prefer_inch_display_(false) {
-  }
+    : file_(file), show_ijk_(show_ijk), scale_(scale) {}
 
   // We have multiple passes to determine ranges first.
   // Pass 1 - preparation, pass 2 - writing.
-  void SetPass(int p) { pass_ = p; }
+  void SetPass(ProcessingStep p) { pass_ = p; }
 
   void set_speed_factor(float f) final {}
   void set_temperature(float f) final {}
@@ -72,7 +78,9 @@ public:
   void motors_enable(bool b) final {}
   void go_home(AxisBitmap_t axes) final {
     // TODO: this might actually be a different corner of machine.
-    if (pass_ == 2) fprintf(file_, "stroke 0 0 moveto  %% G28\n");
+    if (pass_ == ProcessingStep::GenerateOutput) {
+      fprintf(file_, "stroke 0 0 moveto  %% G28\n");
+    }
   }
   void inform_origin_offset(const AxesRegister& axes) final {}
   void dwell(float value) final { }
@@ -80,7 +88,7 @@ public:
     return coordinated_move(feed, axes);
   }
   bool coordinated_move(float feed, const AxesRegister &axes) final {
-    if (pass_ == 1) {
+    if (pass_ == ProcessingStep::Preprocess) {
       RememberMinMax(axes);
     } else {
       ++segment_count_;
@@ -98,7 +106,7 @@ public:
                 const AxesRegister &start,
                 const AxesRegister &center,
                 const AxesRegister &end) final {
-    if (pass_ == 2 && show_ijk_) {
+    if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
       fprintf(file_, "currentpoint currentpoint stroke\n"
               "gsave\n\tmoveto [0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
               "\t%f %f lineto %f %f lineto stroke\n"
@@ -113,7 +121,7 @@ public:
                    const AxesRegister &start,
                    const AxesRegister &cp1, const AxesRegister &cp2,
                    const AxesRegister &end) final {
-    if (pass_ == 2 && show_ijk_) {
+    if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
       fprintf(file_, "currentpoint stroke\n"
               "gsave\n\t[0.5] 0 setdash 0.1 setlinewidth 0 0 0.9 setrgbcolor\n"
               "\t%f %f moveto %f %f lineto stroke\n"
@@ -142,14 +150,14 @@ public:
   }
 
   void gcode_start(GCodeParser *parser) final {
-    if (pass_ == 2) {
+    if (pass_ == ProcessingStep::GenerateOutput) {
       fprintf(file_, "\n%% -- Path generated from GCode.\n");
       fprintf(file_, "0.1 setlinewidth 0 0 0 setrgbcolor\n0 0 moveto\n");
     }
   }
 
   void gcode_finished(bool end_of_stream) final {
-    if (pass_ == 2 && end_of_stream) {
+    if (pass_ == ProcessingStep::GenerateOutput && end_of_stream) {
       fprintf(file_, "stroke\n");
     }
   }
@@ -244,9 +252,9 @@ private:
 
   AxesRegister min_;
   AxesRegister max_;
-  unsigned int segment_count_;
-  int pass_;
-  bool prefer_inch_display_;
+  unsigned int segment_count_ = 0;
+  ProcessingStep pass_ = ProcessingStep::Init;
+  bool prefer_inch_display_ = false;
 };
 
 // Taking the low-level motor operations and visualize them. Uses color
@@ -258,9 +266,7 @@ class MotorOperationsPrinter : public MotorOperations {
 public:
   MotorOperationsPrinter(FILE *file, const MachineControlConfig &config,
                          float tool_dia, bool show_speeds)
-    : file_(file), config_(config), show_speeds_(show_speeds), segment_count_(0),
-      min_v_(1e6), max_v_(-1e6), pass_(0), color_segment_length_(1),
-      last_color_index_(-1) {
+    : file_(file), config_(config), show_speeds_(show_speeds) {
     fprintf(file_, "\n%% -- Machine path. %s\n",
             show_speeds ? "Visualizing travel speeds" : "Simple.");
     fprintf(file_, "%% Note, larger tool diameters slow down "
@@ -278,9 +284,9 @@ public:
     fprintf(file_, "stroke %% Finished Machine Pathstroke\n");
   }
 
-  void SetPass(int p) {
+  void SetPass(ProcessingStep p) {
     pass_ = p;
-    if (pass_ == 2) {
+    if (pass_ == ProcessingStep::GenerateOutput) {
       min_color_range_ = min_v_ + 0.1 * (max_v_ - min_v_);
       max_color_range_ = max_v_ - 0.1 * (max_v_ - min_v_);
       fprintf(stderr, "Speed: [%.2f..%.2f]; Coloring span [%.2f..%.2f]\n",
@@ -305,7 +311,8 @@ public:
     }
 
     switch (pass_) {
-    case 1: {
+    case ProcessingStep::Init: assert(false); break;
+    case ProcessingStep::Preprocess: {
       // A very short diagnoal move, quantized to steps has a speed of sqrt(2);
       // let's not include these in the min/max calculation.
       if (abs(param.steps[AXIS_X])
@@ -328,7 +335,7 @@ public:
                      (param.v1 / config_.steps_per_mm[dominant_axis]));
     }
       break;
-    case 2:
+    case ProcessingStep::GenerateOutput:
       PrintSegment(param, dominant_axis);
       break;
     }
@@ -340,6 +347,7 @@ public:
   }
 
   void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
+    assert(pass_ == ProcessingStep::GenerateOutput);
     const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
@@ -402,6 +410,7 @@ public:
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
 
   void PrintColorLegend(float x, float y, float width) {
+    assert(pass_ == ProcessingStep::GenerateOutput);
     if (min_color_range_ >= max_color_range_)
       return;
     const float barheight = std::min(8.0, 0.05 * width);
@@ -454,12 +463,16 @@ private:
   FILE *const file_;
   const MachineControlConfig &config_;
   const bool show_speeds_;
-  unsigned segment_count_;
-  float min_v_, max_v_;
-  float min_color_range_, max_color_range_;
-  int pass_;
-  float color_segment_length_;
-  int last_color_index_;
+
+  unsigned segment_count_ = 0;
+  float min_v_ = 1e10;
+  float max_v_ = -1e10;
+  ProcessingStep pass_ = ProcessingStep::Init;
+  float color_segment_length_ = 1;
+  int last_color_index_ = -1;
+
+  float min_color_range_;   // These are set in pass==2
+  float max_color_range_;
 
   MotorOperationsPrinter(const MotorOperationsPrinter &);
 };
@@ -561,7 +574,7 @@ int main(int argc, char *argv[]) {
   parser_cfg.parameters = &parameters;
 
   GCodePrintVisualizer gcode_printer(output_file, show_ijk, scale);
-  gcode_printer.SetPass(1);
+  gcode_printer.SetPass(ProcessingStep::Preprocess);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true);
 
@@ -624,7 +637,7 @@ int main(int argc, char *argv[]) {
                                   &hardware, &spindle, stderr);
     } else {
       machine_control->SetMsgOut(NULL);
-      motor_printer.SetPass(1);
+      motor_printer.SetPass(ProcessingStep::Preprocess);
       GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver(),
                          false);
       ParseFile(&parser, filename, true);
@@ -634,7 +647,7 @@ int main(int argc, char *argv[]) {
       // unnecessarily small but somehow relate it to the maximum size of the
       // result.
       motor_printer.SetColorSegmentLength(gcode_printer.GetDiagonalLength()/100);
-      motor_printer.SetPass(2);
+      motor_printer.SetPass(ProcessingStep::GenerateOutput);
       ParseFile(&parser, filename, false);
 
       if (show_speeds) {
@@ -648,7 +661,7 @@ int main(int argc, char *argv[]) {
 
   gcode_printer.ShowHomePos();  // On top of machine path to be visible.
   // We print the gcode on top of the colored machine visualization.
-  gcode_printer.SetPass(2);
+  gcode_printer.SetPass(ProcessingStep::GenerateOutput);
   ParseFile(&gcode_viz_parser, filename, false);
 
   fprintf(output_file, "\nshowpage\n");
