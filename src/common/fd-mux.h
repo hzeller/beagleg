@@ -42,9 +42,6 @@ public:
   // Handlers run in case there's nothing to do.
   void RunOnIdle(const Handler &handler);
 
-  // Schedules the delete of an fd,callback pair for the next loop cycle.
-  void ScheduleDelete(int fd);
-
   // Run the main loop. Blocks while there is still a filedescriptor
   // registered (return 0) or until a signal is triggered (return 1).
   int Loop();

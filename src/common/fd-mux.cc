@@ -72,15 +72,6 @@ bool FDMultiplexer::RunOnWritable(int fd, const Handler &handler) {
   return w_handlers_.insert({ fd, handler }).second;
 }
 
-void FDMultiplexer::ScheduleDelete(int fd) {
-  if (r_handlers_.find(fd) != r_handlers_.end()) {
-    to_delete_r_.push_back(fd);
-  }
-  if (w_handlers_.find(fd) != w_handlers_.end()) {
-    to_delete_w_.push_back(fd);
-  }
-}
-
 void FDMultiplexer::RunOnIdle(const Handler &handler) {
   t_handlers_.push_back(handler);
 }

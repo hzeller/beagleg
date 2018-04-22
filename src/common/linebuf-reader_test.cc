@@ -44,6 +44,7 @@ public:
   }
 
   // Read from this inputStream Simulator.
+  // This has the signature required by LinebufReader::ReadFun.
   ssize_t Read(char *buf, size_t size) {
     size_t read_size = std::min(size, chunk_size_);
     read_size = std::min(read_size, buffer_.length() - read_pos_);

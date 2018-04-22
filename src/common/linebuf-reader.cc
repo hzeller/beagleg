@@ -47,13 +47,6 @@ const char* LinebufReader::IncompleteLine() {
   return ReadLine();
 }
 
-const bool LinebufReader::HasMoreLines() {
-  for (char *i = content_start_; i < content_end_; ++i) {
-    if (*i == '\n' || *i == '\r') return true;
-  }
-  return false;
-}
-
 const char* LinebufReader::ReadLine() {
   for (char *i = content_start_; i < content_end_; ++i) {
     if (*i == '\n' || *i == '\r') {

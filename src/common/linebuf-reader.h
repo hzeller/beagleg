@@ -58,12 +58,10 @@ public:
 
   // Return a current line if it is available. The line is a nul terminated
   // c-string.
-  // If there is no current line pending, returns NULL.
+  // If there is no current line pending, or it is incomplete, returns NULL.
   // It is a good idea to call this after a call to Update() in a loop until
   // you reach NULL to empty the buffer before the next Update() comes in.
   const char* ReadLine();
-
-  const bool HasMoreLines();
 
   // TODO(hzeller): maybe a function to get the remaining buffer when we
   // are closing the connection ? There might be some incomplete line in there.

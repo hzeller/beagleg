@@ -1,9 +1,21 @@
 /* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
- * Test for the GCodeStreamer class.
- *
- * We manually cycle the event loop and simulate an incoming gcode stream.
- *
- */
+* (c) 2018 Leonardo Romor <leonardo.romor@gmail.com>
+*
+* This file is part of BeagleG. http://github.com/hzeller/beagleg
+*
+* BeagleG is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* BeagleG is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+*/
 #include "motion-queue.h"
 
 #include <stdio.h>
@@ -59,9 +71,11 @@ public:
     delete stream_mock_;
     stream_mock_ = NULL;
   }
+
   void SendString(const char *line) {
     stream_mock_->SendData(line);
   }
+
   void Cycle() {
     event_server_.SingleCycle(0);
   }
@@ -99,28 +113,24 @@ private:
 using namespace ::testing;
 
 // The new line is the "send" character. If we disconnect and the linebuffer
-// has not completed the last line, we should drop it
-// NOTE: Broken
-TEST(Streaming, no_newline_no_parsing) {
+// has not completed the last line, we should parse it anyway.
+TEST(Streaming, two_consecutive_connections) {
   StreamTester tester;
-  {
-    EXPECT_CALL(tester, gcode_start(_)).Times(1);
-    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
-    EXPECT_CALL(tester, gcode_finished(_)).Times(1);
-  }
 
+  // First connection
+  EXPECT_CALL(tester, gcode_start(_)).Times(1);
+  EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+  EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   tester.OpenStream();
   tester.SendString("G1X200F1000"); // Write incomplete move command
   tester.CloseStream();
   tester.Cycle(); // Loop to read
   tester.Cycle(); // Loop to close
 
-  {
-    EXPECT_CALL(tester, gcode_start(_)).Times(0);
-    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
-    EXPECT_CALL(tester, gcode_finished(_)).Times(1);
-  }
-
+  // Second connection
+  EXPECT_CALL(tester, gcode_start(_)).Times(0);
+  EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+  EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   tester.OpenStream(); // Re open the stream
   tester.SendString("G1X200F1000\n"); // Receive a complete string
   tester.CloseStream();
@@ -132,7 +142,6 @@ TEST(Streaming, no_newline_no_parsing) {
 // the correct order.
 TEST(Streaming, basic_stream) {
   StreamTester tester;
-
   {
     InSequence s;
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
@@ -144,32 +153,22 @@ TEST(Streaming, basic_stream) {
   tester.SendString("G1X200F1000\nG1X200F1000\n");
   tester.Cycle(); // First loop reads the lines
 
-  {
-    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
-    EXPECT_CALL(tester, input_idle(_)).Times(0);
-  }
+  EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+  EXPECT_CALL(tester, input_idle(_)).Times(0);
   tester.SendString("G1X200F1000\n");
   tester.Cycle(); // Loop and read another line
 
-  {
-    EXPECT_CALL(tester, input_idle(true)).Times(1);
-  }
-
+  EXPECT_CALL(tester, input_idle(true)).Times(1);
   tester.SendString("G1X200F1000");   // Send incomplete line
   tester.Cycle(); // First loop reads, but since it's not a line,
                   // we are not parsing anything
-
   tester.Cycle(); // Timeout, input idle
 
-  {
-    EXPECT_CALL(tester, input_idle(false)).Times(1);
-  }
+  EXPECT_CALL(tester, input_idle(false)).Times(1);
   tester.Cycle(); // Second idle timeout
 
-  {
-    EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
-    EXPECT_CALL(tester, gcode_finished(_)).Times(1);
-  }
+  EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
+  EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   tester.CloseStream();
   tester.Cycle(); // Wait the stream to close
 }
