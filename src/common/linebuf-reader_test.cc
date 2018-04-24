@@ -33,11 +33,11 @@ const char *kSampleLines[kSampleLineCount + 1] = {
 
 class InputStreamSimulator {
 public:
-  InputStreamSimulator(size_t chunk_size)
+  InputStreamSimulator(size_t chunk_size, const char *endline)
     : chunk_size_(chunk_size), longest_line_len_(0), read_pos_(0) {
     for (const char *line : kSampleLines) {
       if (line == NULL) break;
-      buffer_.append(line).append("\n");
+      buffer_.append(line).append(endline);
       if (strlen(line) > longest_line_len_)
         longest_line_len_ = strlen(line);
     }
@@ -63,9 +63,13 @@ private:
   size_t read_pos_;
 };
 
-TEST(LinebufReaderTest, LargeChunkReading) {
+// Parametrize tests with different end line characters
+class LinebufReaderTest : public ::testing::TestWithParam<const char*> {
+};
+
+TEST_P(LinebufReaderTest, LargeChunkReading) {
   LinebufReader reader;
-  InputStreamSimulator input(10000);  // reading large chunks of data.
+  InputStreamSimulator input(10000, GetParam());  // reading large chunks of data.
   // Here, we expect that everything essentially shows up with the first
   // read. Also we assume that everything fits into the reader buffer.
 
@@ -81,9 +85,9 @@ TEST(LinebufReaderTest, LargeChunkReading) {
   EXPECT_EQ(NULL, reader.ReadLine());
 }
 
-TEST(LinebufReaderTest, SmallChunkReading) {
+TEST_P(LinebufReaderTest, SmallChunkReading) {
   LinebufReader reader;
-  InputStreamSimulator input(1);  // One byte at a time.
+  InputStreamSimulator input(1, GetParam());  // One byte at a time.
   int expected_next_sample = 0;
 
   while (input.remaining() > 0) {
@@ -105,11 +109,11 @@ TEST(LinebufReaderTest, SmallChunkReading) {
   EXPECT_EQ(kSampleLineCount, expected_next_sample);
 }
 
-TEST(LinebufReaderTest, TightBufferReading) {
-  InputStreamSimulator input(1);  // One byte at a time.
+TEST_P(LinebufReaderTest, TightBufferReading) {
+  InputStreamSimulator input(1, GetParam());  // One byte at a time.
   // We allocate a reader whose entire buffer just fits a line. This should
   // still work.
-  LinebufReader reader(input.longest_line_len() + 1);
+  LinebufReader reader(input.longest_line_len() + strlen(GetParam()));
   int expected_next_sample = 0;
 
   while (input.remaining() > 0) {
@@ -128,6 +132,9 @@ TEST(LinebufReaderTest, TightBufferReading) {
   EXPECT_EQ(kSampleLineCount, expected_next_sample);
 }
 
+INSTANTIATE_TEST_CASE_P(PortableEndLineTests,
+                        LinebufReaderTest,
+                        ::testing::Values("\n", "\r", "\r\n"));
 
 // TODO(hzeller): more testing
 //   - what happens if we have \r\n at the end. Ideally, we would like to see

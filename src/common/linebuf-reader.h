@@ -81,6 +81,8 @@ private:
   const char *const buffer_end_;
   char *content_start_;
   char *content_end_;
+
+  enum CH_STATE { IN_LINE, CR_SEEN, LF_SEEN } ch_state_;
 };
 
 #endif  // _BEAGLEG_LINEBUF_READER_H

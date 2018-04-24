@@ -22,7 +22,8 @@
 LinebufReader::LinebufReader(size_t buf_size)
   : len_(buf_size),
     buffer_start_(new char [len_]), buffer_end_(buffer_start_ + len_),
-    content_start_(buffer_start_), content_end_(buffer_start_) {
+    content_start_(buffer_start_), content_end_(buffer_start_),
+    ch_state_(IN_LINE) {
 }
 LinebufReader::~LinebufReader() { delete [] buffer_start_; }
 
@@ -49,11 +50,25 @@ const char* LinebufReader::IncompleteLine() {
 
 const char* LinebufReader::ReadLine() {
   for (char *i = content_start_; i < content_end_; ++i) {
-    if (*i == '\n' || *i == '\r') {
-      *i = '\0';
-      const char *line = content_start_;
-      content_start_ = i + 1;
-      return line;
+    switch (ch_state_) {
+      case LF_SEEN: {
+        // Silently ignore newline
+        if (*i == '\n') {
+          ch_state_ = CR_SEEN;
+          content_start_ = i + 1;
+          continue;
+        }
+      }
+      case CR_SEEN: case IN_LINE: {
+        if (*i == '\r' || *i == '\n') {
+          ch_state_ = (*i == '\r') ? LF_SEEN : CR_SEEN;
+          *i = '\0';
+          const char *line = content_start_;
+          content_start_ = i + 1;
+          return line;
+        }
+        break;
+      }
     }
   }
   return NULL;
