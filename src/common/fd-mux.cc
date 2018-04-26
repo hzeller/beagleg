@@ -90,13 +90,13 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
 
   // Readers
   for (const auto &it : read_handlers_) {
-    if (it.first >= maxfd) maxfd = it.first + 1;
+    maxfd = std::max(maxfd, it.first);
     FD_SET(it.first, &read_fds);
   }
 
   // Writers
   for (const auto &it : write_handlers_) {
-    if (it.first >= maxfd) maxfd = it.first + 1;
+    maxfd = std::max(maxfd, it.first);
     FD_SET(it.first, &write_fds);
   }
 
@@ -108,7 +108,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
     return false;
   }
 
-  int fds_ready = select(maxfd, &read_fds, &write_fds, nullptr, &timeout);
+  int fds_ready = select(maxfd + 1, &read_fds, &write_fds, nullptr, &timeout);
   if (fds_ready < 0) {
     if (!caught_signal)
       perror("select() failed");

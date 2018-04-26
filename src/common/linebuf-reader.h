@@ -82,7 +82,7 @@ private:
   char *content_start_;
   char *content_end_;
 
-  enum CH_STATE { IN_LINE, CR_SEEN, LF_SEEN } ch_state_;
+  bool cr_seen_;
 };
 
 #endif  // _BEAGLEG_LINEBUF_READER_H
