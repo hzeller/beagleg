@@ -20,14 +20,16 @@
 #include "linebuf-reader.h"
 
 #include <string>
+#include <memory>
 #include <gtest/gtest.h>
 
 // Raw lines that we use as samples.
-constexpr int kSampleLineCount = 3;
+constexpr int kSampleLineCount = 4;
 const char *kSampleLines[kSampleLineCount + 1] = {
   "This is a short line",
   "This is another, longer line",
   "",   // Emtpy line
+  "",
   NULL
 };
 
@@ -82,6 +84,7 @@ TEST_P(LinebufReaderTest, LargeChunkReading) {
   EXPECT_EQ(std::string(kSampleLines[0]), reader.ReadLine());
   EXPECT_EQ(std::string(kSampleLines[1]), reader.ReadLine());
   EXPECT_EQ(std::string(kSampleLines[2]), reader.ReadLine());
+  EXPECT_EQ(std::string(kSampleLines[3]), reader.ReadLine());
   EXPECT_EQ(NULL, reader.ReadLine());
 }
 
@@ -137,9 +140,6 @@ INSTANTIATE_TEST_CASE_P(PortableEndLineTests,
                         ::testing::Values("\n", "\r", "\r\n"));
 
 // TODO(hzeller): more testing
-//   - what happens if we have \r\n at the end. Ideally, we would like to see
-//     that only as one line ending, but right now that would be considered
-//     two lines.
 //   - Implementation of a more graceful handling if our buffer is too small
 //     to hold a full line.
 int main(int argc, char *argv[]) {
