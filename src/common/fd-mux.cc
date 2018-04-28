@@ -104,7 +104,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
     // file descriptors only can be registred from within handlers
     // or before running the Loop(). If no filedesctiptors are left,
     // there is no chance for any to re-appear, so we can exit.
-    fprintf(stderr, "No filedescriptor registered. Exiting loop()");
+    Log_info("Exiting loop() after last file descriptor is gone.");
     return false;
   }
 
