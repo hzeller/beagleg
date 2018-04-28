@@ -17,17 +17,17 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "fd-mux.h"
-#include "logging.h"
 
-#include <unistd.h>
-#include <signal.h>
-#include <vector>
-#include <algorithm>
-#include <sys/select.h>
 #include <errno.h>
+#include <signal.h>
 #include <string.h>
+#include <sys/select.h>
+#include <unistd.h>
+
+#include <algorithm>
+
+#include "logging.h"
 
 static volatile sig_atomic_t caught_signal = 0;
 
@@ -76,6 +76,18 @@ void FDMultiplexer::RunOnIdle(const Handler &handler) {
   idle_handlers_.push_back(handler);
 }
 
+void FDMultiplexer::CallHandlers(fd_set *to_call_fd_set, int *available_fds,
+                                 HandlerMap *handlers) {
+  for (auto it = handlers->begin(); *available_fds && it != handlers->end(); ) {
+    bool keep_handler = true;
+    if (FD_ISSET(it->first, to_call_fd_set)) {
+      --*available_fds;
+      keep_handler = it->second();
+    }
+    it = keep_handler ? std::next(it) : handlers->erase(it);
+  }
+}
+
 bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   fd_set read_fds;
   fd_set write_fds;
@@ -102,7 +114,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
 
   if (maxfd < 0) {
     // file descriptors only can be registred from within handlers
-    // or before running the Loop(). If no filedesctiptors are left,
+    // or before running the Loop(). So if no filedesctiptors are left,
     // there is no chance for any to re-appear, so we can exit.
     Log_info("Exiting loop() after last file descriptor is gone.");
     return false;
@@ -115,58 +127,26 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
     return false;
   }
 
-  if (fds_ready == 0) {
-    // Timeout situation.
-    for (int i = idle_handlers_.size() - 1; i >= 0; --i) {
-      if (!idle_handlers_[i]()) {
-        idle_handlers_[i] = idle_handlers_.back();
-        idle_handlers_.pop_back();
-      }
+  if (fds_ready == 0) {             // No FDs ready: timeout situation.
+    for (auto it = idle_handlers_.begin(); it != idle_handlers_.end(); /**/) {
+      const bool keep_handler = (*it)();
+      it = keep_handler ? std::next(it) : idle_handlers_.erase(it);
     }
     return true;
   }
 
-  // Handle reads
-  for (const auto &it : read_handlers_) {
-    if (FD_ISSET(it.first, &read_fds)) {
-      const bool retrigger = it.second();
-      if (!retrigger)
-        to_delete_read_.push_back(it.first);
-      if (--fds_ready == 0)
-        break;
-    }
-  }
-  for (int i : to_delete_read_) {
-    read_handlers_.erase(i);
-  }
-
-  // Handle writes
-  for (const auto &it : write_handlers_) {
-    if (FD_ISSET(it.first, &write_fds)) {
-      const bool retrigger = it.second();
-      if (!retrigger)
-        to_delete_write_.push_back(it.first);
-      if (--fds_ready == 0)
-        break;
-    }
-  }
-  for (int i : to_delete_write_) {
-    write_handlers_.erase(i);
-  }
-
-  to_delete_read_.clear();
-  to_delete_write_.clear();
+  CallHandlers(&read_fds, &fds_ready, &read_handlers_);
+  CallHandlers(&write_fds, &fds_ready, &write_handlers_);
 
   return true;
 }
 
 int FDMultiplexer::Loop() {
-  const unsigned timeout = timeout_ms_;
+  const unsigned timeout = idle_ms_;
+
   arm_signal_handler();
   while (SingleCycle(timeout)) {}
   disarm_signal_handler();
 
-  if (caught_signal)
-    return 1;
-  return 0;
+  return caught_signal ? 1 : 0;
 }
