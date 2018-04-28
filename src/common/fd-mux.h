@@ -24,6 +24,8 @@
 #include <functional>
 #include <list>
 
+#include <sys/select.h>
+
 // This needs a better name.
 class FDMultiplexer {
 public:

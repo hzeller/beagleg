@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <memory>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
