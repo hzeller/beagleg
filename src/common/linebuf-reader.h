@@ -57,7 +57,7 @@ public:
   }
 
   // Return a current line if it is available. The line is a nul terminated
-  // c-string.
+  // c-string without the newline character(s).
   // If there is no current line pending, or it is incomplete, returns NULL.
   // It is a good idea to call this after a call to Update() in a loop until
   // you reach NULL to empty the buffer before the next Update() comes in.
