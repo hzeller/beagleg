@@ -230,8 +230,8 @@ public:
   // line they received.
   //
   // Parses "line". If a pair could be parsed, returns non-NULL value and
-  // fills in variables pointed to by "letter" and "value". "letter" is guaranteed
-  // to be upper-case.
+  // fills in variables pointed to by "letter" and "value". "letter" is
+  // guaranteed to be upper-case.
   //
   // Returns the remainder of the line or NULL if no pair has been found and the
   // end-of-string has been reached.

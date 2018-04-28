@@ -29,10 +29,11 @@ LDFLAGS+=-lpthread -lm
 
 COMMON_LIBS=../common/libbeaglegbase.a
 
-OBJECTS=gcode-parser.o arc-gen.o simple-lexer.o gcode-parser-config.o
+OBJECTS=gcode-parser.o gcode-streamer.o arc-gen.o simple-lexer.o \
+        gcode-parser-config.o
 GENLIB=libgcodeparser.a
 
-UNITTEST_BINARIES=gcode-parser_test arc-gen_test
+UNITTEST_BINARIES=gcode-parser_test gcode-streamer_test arc-gen_test
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)

@@ -34,20 +34,19 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "gcode-parser/gcode-parser.h"
 #include "common/fd-mux.h"
 #include "common/logging.h"
 #include "common/string-util.h"
-
 #include "config-parser.h"
 #include "gcode-machine-control.h"
-#include "gcode-streamer.h"
+#include "gcode-parser/gcode-parser.h"
+#include "gcode-parser/gcode-streamer.h"
 #include "hardware-mapping.h"
-#include "pru-hardware-interface.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
-#include "spindle-control.h"
+#include "pru-hardware-interface.h"
 #include "sim-firmware.h"
+#include "spindle-control.h"
 
 static int usage(const char *prog, const char *msg) {
   if (msg) {
@@ -228,10 +227,6 @@ static int run_server(int listen_socket, FDMultiplexer *event_server,
     Log_info("Accepting new connection from %s\n", print_ip);
 
     FILE *msg_stream = fdopen(connection, "w");
-    // Stuff written to msg-stream needs to be unbuffered, otherwise
-    // they'll never make it.
-    if (msg_stream) setvbuf(msg_stream, NULL, _IONBF, 0);
-
     machine->SetMsgOut(msg_stream);
     streamer->ConnectStream(connection, msg_stream);
     return true;
