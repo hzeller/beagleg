@@ -25,7 +25,6 @@
 #include <math.h>
 #include <netinet/in.h>
 #include <pwd.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -177,8 +176,6 @@ static int open_server(const char *bind_addr, int port) {
   return s;
 }
 
-//static void eatsignal(int sig) {}
-
 // Accept connections and receive GCode.
 // Only one connection can be active at a time.
 // Socket must already be opened by open_server(). "bind_addr" and "port"
@@ -186,8 +183,6 @@ static int open_server(const char *bind_addr, int port) {
 static int run_server(int listen_socket, FDMultiplexer *event_server,
                       GCodeMachineControl *machine, GCodeStreamer *streamer,
                       const char *bind_addr, int port) {
-  //signal(SIGPIPE, SIG_IGN);  // Pesky clients, closing connections...
-
   if (listen(listen_socket, 2) < 0) {
     Log_error("listen() failed: %s", strerror(errno));
     return 1;
