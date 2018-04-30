@@ -83,6 +83,7 @@ public:
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
+  void GetCurrentPosition(AxesRegister *pos);
 
   // -- GCodeParser::Events interface implementation --
   void gcode_start(GCodeParser *parser) final;
@@ -111,8 +112,8 @@ private:
   void issue_motor_move_if_possible();
   bool test_homing_status_ok();
   bool test_within_machine_limits(const AxesRegister &axes);
-  void get_endstop_status();
-  void get_current_position();
+  void mprint_endstop_status();
+  void mprint_current_position();
   const char *aux_bit_commands(char letter, float value, const char *);
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
@@ -438,13 +439,13 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     hardware_mapping_->SetAuxOutputs();
     break;
   case 105: handle_M105(); break;
-  case 114: get_current_position(); break;
+  case 114: mprint_current_position(); break;
   case 115: mprintf("%s\n", VERSION_STRING); break;
   case 117:
     mprintf("// Msg: %s\n", remaining); // TODO: different output ?
     remaining = NULL;  // consume the full line.
     break;
-  case 119: get_endstop_status(); break;
+  case 119: mprint_endstop_status(); break;
   case 120: pause_enabled_ = true; break;
   case 121: pause_enabled_ = false; break;
   default:
@@ -528,7 +529,14 @@ void GCodeMachineControl::Impl::set_output_flags(HardwareMapping::LogicOutput ou
   hardware_mapping_->UpdateAuxBitmap(out, is_on);
 }
 
-void GCodeMachineControl::Impl::get_current_position() {
+void GCodeMachineControl::Impl::GetCurrentPosition(AxesRegister *pos) {
+  planner_->GetCurrentPosition(pos);
+  for (const GCodeParserAxis axis : AllAxes()) {
+    (*pos)[axis] -= coordinate_display_origin_[axis];
+  }
+}
+
+void GCodeMachineControl::Impl::mprint_current_position() {
   AxesRegister current_pos;
   planner_->GetCurrentPosition(&current_pos);
   const AxesRegister &origin = coordinate_display_origin_;
@@ -552,7 +560,7 @@ void GCodeMachineControl::Impl::get_current_position() {
   }
 }
 
-void GCodeMachineControl::Impl::get_endstop_status() {
+void GCodeMachineControl::Impl::mprint_endstop_status() {
   bool any_endstops_found = false;
   for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger triggers = hardware_mapping_->AvailableAxisSwitch(axis);
@@ -875,6 +883,10 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
     (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
       ? impl_->config().move_range_mm[axis] : 0;
   }
+}
+
+void GCodeMachineControl::GetCurrentPosition(AxesRegister *pos) {
+  impl_->GetCurrentPosition(pos);
 }
 
 GCodeParser::EventReceiver *GCodeMachineControl::ParseEventReceiver() {

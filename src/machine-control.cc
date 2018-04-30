@@ -69,7 +69,6 @@ static int usage(const char *prog, const char *msg) {
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
           "  -P                         : Verbose: Show some more debug output (Default: off).\n"
           "  -S                         : Synchronous: don't queue (Default: off).\n"
-          "      --loop[=count]         : Loop file number of times (no value: forever; equal sign with value important.)\n"
           "      --allow-m111           : Allow changing the debug level with M111 (Default: off).\n"
           // --threshold-angle specifies threshold angle used for arc segment acceleration.
           "\nConfiguration file overrides:\n"
@@ -127,20 +126,12 @@ static bool drop_privileges(StringPiece privs) {
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
 // If "loop_count" is >= 0, repeats this number after the first execution.
-static int send_file_to_machine(FDMultiplexer *event_server,
-                                GCodeMachineControl *machine,
-                                GCodeStreamer *streamer,
-                                const char *gcode_filename, int loop_count) {
-  int ret;
+static void send_file_to_machine(GCodeMachineControl *machine,
+                                 GCodeStreamer *streamer,
+                                 const char *gcode_filename) {
   machine->SetMsgOut(stderr);
-  while (loop_count < 0 || loop_count-- > 0) {
-    int fd = open(gcode_filename, O_RDONLY);
-    streamer->ConnectStream(fd, stderr);
-    ret = event_server->Loop();
-    if (ret != 0)
-      break;
-  }
-  return ret;
+  int fd = open(gcode_filename, O_RDONLY);
+  streamer->ConnectStream(fd, stderr);
 }
 
 // Open server. Return file-descriptor or -1 if listen fails.
@@ -179,12 +170,13 @@ static int open_server(const char *bind_addr, int port) {
 // Only one connection can be active at a time.
 // Socket must already be opened by open_server(). "bind_addr" and "port"
 // are just FYI information for nicer log-messages.
-static int run_server(int listen_socket, FDMultiplexer *event_server,
-                      GCodeMachineControl *machine, GCodeStreamer *streamer,
-                      const char *bind_addr, int port) {
+static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
+                             GCodeMachineControl *machine,
+                             GCodeStreamer *streamer,
+                             const char *bind_addr, int port) {
   if (listen(listen_socket, 2) < 0) {
-    Log_error("listen() failed: %s", strerror(errno));
-    return 1;
+    Log_error("listen(fd=%d) failed: %s", listen_socket, strerror(errno));
+    return;
   }
 
   Log_info("Ready to accept GCode-connections on %s:%d",
@@ -231,8 +223,46 @@ static int run_server(int listen_socket, FDMultiplexer *event_server,
     streamer->ConnectStream(connection, msg_stream);
     return true;
   });
+}
 
-  return event_server->Loop();
+// THIS IS A SAMPLE ONLY at this point. We need to come up with a proper
+// definition first what we want from a status server.
+// At this point: whenever it receives the character 'p' it prints the
+// position as json.
+static void run_status_server(int listen_socket, FDMultiplexer *event_server,
+                              GCodeMachineControl *machine) {
+  if (listen(listen_socket, 2) < 0) {
+    Log_error("listen(fd=%d) failed: %s", listen_socket, strerror(errno));
+    return;
+  }
+
+  Log_info("Starting experimental status server");
+
+  event_server->RunOnReadable(
+    listen_socket, [listen_socket, machine, event_server]() {
+      struct sockaddr_in client;
+      socklen_t socklen = sizeof(client);
+      int conn = accept(listen_socket, (struct sockaddr*) &client, &socklen);
+      if (conn < 0) {
+        Log_error("accept(): %s", strerror(errno));
+        return true;
+      }
+
+      event_server->RunOnReadable(conn, [conn, machine]() {
+          char query;
+          if (read(conn, &query, 1) < 0)
+            return false;
+          if (query == 'p') {
+            AxesRegister pos;
+            machine->GetCurrentPosition(&pos);
+            dprintf(conn, "{\"x_axis\":%.3f, \"y_axis\":%.3f, "
+                    "\"z_axis\":%.3f, \"note\":\"experimental\"}\n",
+                    pos[AXIS_X], pos[AXIS_Y], pos[AXIS_Z]);
+          }
+          return true;
+        });
+      return true;
+    });
 }
 
 // Create an absolute filename from a path, without the file not needed
@@ -265,6 +295,7 @@ int main(int argc, char *argv[]) {
     OPT_PRIVS,
     OPT_ENABLE_M111,
     OPT_PARAM_FILE,
+    OPT_STATUS_SERVER
   };
 
   static struct option long_options[] = {
@@ -287,6 +318,7 @@ int main(int argc, char *argv[]) {
     { "daemon",             no_argument,       NULL, 'd'},
     { "priv",               required_argument, NULL, OPT_PRIVS },
     { "allow-m111",         no_argument,       NULL, OPT_ENABLE_M111 },
+    { "status-server",      required_argument, NULL, OPT_STATUS_SERVER },
 
     // possibly deprecated soon.
     { "threshold-angle",    required_argument, NULL, OPT_SET_THRESHOLD_ANGLE },
@@ -295,7 +327,7 @@ int main(int argc, char *argv[]) {
   };
 
   int listen_port = -1;
-  int file_loop_count = 1;
+  int status_server_port = -1;
   char *bind_addr = NULL;
   bool require_homing = false;
   bool dont_require_homing = false;
@@ -337,10 +369,14 @@ int main(int argc, char *argv[]) {
       config.synchronous = true;
       break;
     case OPT_LOOP:
-      file_loop_count = (optarg) ? atoi(optarg) : -1;
+      Log_error("--loop has been removed. Did you use it ? "
+                "Let beagleg-dev@googlegroups.com know");
       break;
     case 'p':
       listen_port = atoi(optarg);
+      break;
+    case OPT_STATUS_SERVER:
+      status_server_port = atoi(optarg);
       break;
     case 'b':
       bind_addr = strdup(optarg);
@@ -380,9 +416,6 @@ int main(int argc, char *argv[]) {
   const bool has_filename = (optind < argc);
   if (! (has_filename ^ (listen_port > 0))) {
     return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
-  }
-  if (!has_filename && file_loop_count != 1) {
-    return usage(argv[0], "--loop only makes sense with a filename.");
   }
 
   // As daemon, we use whatever the user chose as logfile
@@ -507,17 +540,19 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
-    ret = send_file_to_machine(&event_server, machine_control, streamer,
-                               filename, file_loop_count);
+    send_file_to_machine(machine_control, streamer, filename);
   } else {
-    ret = run_server(listen_socket, &event_server, machine_control, streamer,
-                     bind_addr, listen_port);
-    if (listen_socket >= 0) {
-      close(listen_socket);
-    }
+    run_gcode_server(listen_socket, &event_server, machine_control,
+                     streamer,  bind_addr, listen_port);
   }
 
-  Log_info("Exiting server");
+  if (status_server_port) {
+    run_status_server(open_server(bind_addr, status_server_port),
+                      &event_server, machine_control);
+  }
+
+  event_server.Loop();  // Run service until Ctrl-C or all sockets closed.
+  Log_info("Exiting.");
 
   delete streamer;
   delete parser;
