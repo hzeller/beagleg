@@ -250,8 +250,10 @@ static void run_status_server(int listen_socket, FDMultiplexer *event_server,
 
       event_server->RunOnReadable(conn, [conn, machine]() {
           char query;
-          if (read(conn, &query, 1) < 0)
+          if (read(conn, &query, 1) <= 0) {
+            close(conn);
             return false;
+          }
           if (query == 'p') {
             AxesRegister pos;
             machine->GetCurrentPosition(&pos);
