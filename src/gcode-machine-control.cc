@@ -540,12 +540,22 @@ void GCodeMachineControl::Impl::mprint_current_position() {
   AxesRegister current_pos;
   planner_->GetCurrentPosition(&current_pos);
   const AxesRegister &origin = coordinate_display_origin_;
-  mprintf("X:%.3f Y:%.3f Z:%.3f E:%.3f",
+  mprintf(
+#if M114_DEBUG
+    "X:%.6f Y:%.6f Z:%.6f E:%.6f",
+#else
+    "X:%.3f Y:%.3f Z:%.3f E:%.3f",
+#endif
           current_pos[AXIS_X] - origin[AXIS_X],
           current_pos[AXIS_Y] - origin[AXIS_Y],
           current_pos[AXIS_Z] - origin[AXIS_Z],
           current_pos[AXIS_E] - origin[AXIS_E]);
-  mprintf(" [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
+  mprintf(
+#if M114_DEBUG
+    " [ABS. MACHINE CUBE X:%.6f Y:%.6f Z:%.6f]",
+#else
+    " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
+#endif
           current_pos[AXIS_X], current_pos[AXIS_Y], current_pos[AXIS_Z]);
   switch (homing_state_) {
   case HOMING_STATE_NEVER_HOMED:

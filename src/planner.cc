@@ -561,6 +561,10 @@ void Planner::Impl::GetCurrentPosition(AxesRegister *pos) {
   if (!motor_ops_->GetPhysicalStatus(&physical_status))
     return;   // Should we return boolean to indicate that not supported ?
   for (const GCodeParserAxis a : AllAxes()) {
+#if M114_DEBUG
+    Log_debug("Machine steps Axis %c : %8d\n", gcodep_axis2letter(a),
+              hardware_mapping_->GetAxisSteps(a, physical_status));
+#endif
     if (cfg_->steps_per_mm[a] != 0) {
       (*pos)[a] = hardware_mapping_->GetAxisSteps(a, physical_status) / cfg_->steps_per_mm[a];
     }
