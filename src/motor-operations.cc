@@ -219,6 +219,25 @@ bool MotionQueueMotorOperations::GetPhysicalStatus(PhysicalStatus *status) {
   return true;
 }
 
+void MotionQueueMotorOperations::SetExternalPosition(int axis, int steps) {
+  struct HistorySegment history_segment = shadow_queue_->front();
+  if (steps < 0) {
+    history_segment.pos_info[axis].sign = -1;
+    history_segment.pos_info[axis].position_steps = -steps;
+  } else {
+    history_segment.pos_info[axis].sign = 1;
+    history_segment.pos_info[axis].position_steps = steps;
+  }
+  shadow_queue_->push_front(history_segment);
+  // Shrink the queue and remove the elements that we are not interested
+  // in anymore.
+  // TODO: We need to find a way to get the maximum number of elements
+  // of the shadow queue (ie backend_->GetQueueStats()?)
+  const int buffer_size = backend_->GetPendingElements(NULL);
+  const int new_size = buffer_size > 0 ? buffer_size : 1;
+  shadow_queue_->resize(new_size);
+}
+
 static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   int defining_axis_steps = abs(param.steps[0]);
   for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {

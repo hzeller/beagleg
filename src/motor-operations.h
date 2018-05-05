@@ -75,6 +75,8 @@ public:
   // in, and the end of the exeuction queue.
   // Returns 'true' if the status was available and is updated.
   virtual bool GetPhysicalStatus(PhysicalStatus *status) = 0;
+
+  virtual void SetExternalPosition(int axis, int steps) = 0;
 };
 
 class MotionQueueMotorOperations : public MotorOperations {
@@ -87,6 +89,7 @@ public:
   void MotorEnable(bool on) final;
   void WaitQueueEmpty() final;
   bool GetPhysicalStatus(PhysicalStatus *status) final;
+  void SetExternalPosition(int axis, int pos) final;
 
 private:
   void EnqueueInternal(const LinearSegmentSteps &param,

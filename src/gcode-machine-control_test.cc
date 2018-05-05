@@ -56,6 +56,7 @@ public:
   void MotorEnable(bool on) final {}
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
+  void SetExternalPosition(int axis, int steps) final { }
 
 private:
   // Helpers to compare and print MotorMovements.

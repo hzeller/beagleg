@@ -247,14 +247,9 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   bzero(init_axis, sizeof(*init_axis));
   for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
-    if (trigger == 0) {
-      init_axis->position_steps[axis] = 0;
-    }
-    else {
-      const float home_pos = trigger == HardwareMapping::TRIGGER_MIN
-        ? 0 : cfg_->move_range_mm[axis];
-      init_axis->position_steps[axis] = round2int(home_pos * cfg_->steps_per_mm[axis]);
-    }
+    const float home_pos = trigger == HardwareMapping::TRIGGER_MAX
+        ? cfg_->move_range_mm[axis] : 0;
+    SetExternalPosition(axis, home_pos);
   }
   position_known_ = true;
 
@@ -605,6 +600,12 @@ void Planner::Impl::SetExternalPosition(GCodeParserAxis axis, float pos) {
   const int motor_position = pos * cfg_->steps_per_mm[axis];
   planning_buffer_.back()->position_steps[axis] = motor_position;
   planning_buffer_[0]->position_steps[axis] = motor_position;
+
+  const uint8_t motormap_for_axis = hardware_mapping_->GetMotorMap(axis);
+  for (int motor = 0; motor < BEAGLEG_NUM_MOTORS; ++motor) {
+    if (motormap_for_axis & (1 << motor))
+      motor_ops_->SetExternalPosition(motor, motor_position);
+  }
 }
 
 // -- public interface

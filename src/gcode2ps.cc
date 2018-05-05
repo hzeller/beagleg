@@ -408,6 +408,7 @@ public:
   void MotorEnable(bool on) final {}
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
+  void SetExternalPosition(int axis, int pos) final {}
 
   void PrintColorLegend(float x, float y, float width) {
     assert(pass_ == ProcessingStep::GenerateOutput);

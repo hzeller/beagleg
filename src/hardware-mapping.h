@@ -187,6 +187,9 @@ public:
 
   // -- Motor outputs
 
+  // Given the logic axis, return a mask of the physical output drivers.
+  const uint8_t GetMotorMap(LogicAxis axis) { return axis_to_driver_[axis]; }
+
   // Given the logic axis and number of steps, assign these steps to the mapped
   // motors in the LinearSegmentSteps
   void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
