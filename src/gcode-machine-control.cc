@@ -816,8 +816,8 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
     planner_->BringPathToHalt();
   } else {
     move_to_endstop(axis, kHomingSpeed, trigger);
-    planner_->SetExternalPosition(axis, home_pos);
   }
+  planner_->SetExternalPosition(axis, home_pos);
 }
 
 void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
