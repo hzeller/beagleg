@@ -4,7 +4,7 @@
 G19
 F[150 * 60]
 G1 X0 Y#r Z0
-G2 Y#r Z#r I0 K[-#r] X25
-G2 Y#r Z#r I0 K[-#r] X50
-G2 Y#r Z#r I0 K[-#r] X75
-G2 Y#r Z#r I0 K[-#r] X100
+G2 Y#r Z0 I0 K#r X25
+G2 Y#r Z0 I0 K#r X50
+G2 Y#r Z0 I0 K#r X75
+G2 Y#r Z0 I0 K#r X100
