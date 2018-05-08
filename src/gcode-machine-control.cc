@@ -847,6 +847,9 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
 
   // -- somewhat hackish
 
+  AxesRegister machine_pos;
+  planner_->GetCurrentPosition(&machine_pos);
+
   // The probe endstop should be in the direction that is _not_ used for homing.
   HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
   const int dir = home_trigger == HardwareMapping::TRIGGER_MIN ? 1 : -1;
@@ -856,8 +859,6 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   int total_steps = move_to_probe(axis, feedrate, dir, max_steps);
   float distance_moved = total_steps / cfg_.steps_per_mm[axis];
 
-  AxesRegister machine_pos;
-  planner_->GetCurrentPosition(&machine_pos);
   const float new_pos = machine_pos[axis] + distance_moved;
   planner_->SetExternalPosition(axis, new_pos);
   *probe_result = new_pos;
