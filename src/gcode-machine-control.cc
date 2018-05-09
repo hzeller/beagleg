@@ -807,16 +807,7 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   const float kHomingSpeed = 15; // mm/sec  (make configurable ?)
 
   planner_->BringPathToHalt();
-  if (hardware_mapping_->IsHardwareSimulated()) {
-    // In that case, just issue a regular move to where we think home is.
-    AxesRegister current;
-    planner_->GetCurrentPosition(&current);
-    current[axis] = home_pos;
-    planner_->Enqueue(current, kHomingSpeed);
-    planner_->BringPathToHalt();
-  } else {
-    move_to_endstop(axis, kHomingSpeed, trigger);
-  }
+  move_to_endstop(axis, kHomingSpeed, trigger);
   planner_->SetExternalPosition(axis, home_pos);
 }
 
