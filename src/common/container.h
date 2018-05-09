@@ -42,14 +42,14 @@ public:
       data_[i] = *it;
     }
   }
-  FixedArray(const FixedArray<T,N> &other) { CopyFrom(other); }
+  FixedArray(const FixedArray<T,N,IDX> &other) { CopyFrom(other); }
 
-  FixedArray<T,N> &operator= (const FixedArray<T,N> &other) {
+  FixedArray<T,N,IDX> &operator= (const FixedArray<T,N,IDX> &other) {
     CopyFrom(other); return *this;
   }
   T &operator[] (IDX i) { assert(i < N); return data_[i]; }
   const T & operator[] (IDX i) const { assert(i < N); return data_[i]; }
-  bool operator== (const FixedArray<T,N> &other) const {
+  bool operator== (const FixedArray<T,N,IDX> &other) const {
     return memcmp(data_, other.data_, sizeof(data_)) == 0;
   }
 
@@ -64,7 +64,7 @@ public:
   const_iterator end() const { return data_ + N; }
 
 private:
-  void CopyFrom(const FixedArray<T,N> &other) {
+  void CopyFrom(const FixedArray<T,N,IDX> &other) {
     if (data_ != other.data_)
       memcpy(data_, other.data_, sizeof(data_));
   }
