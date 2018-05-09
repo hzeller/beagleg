@@ -295,7 +295,7 @@ private:
   };
   void gprintf(enum GCodePrintLevel level, const char *format, ...);
 
-  static AxesRegister kZeroOffset;
+  static const AxesRegister kZeroOffset;
 
   GCodeParser::EventReceiver *const callbacks;
   GCodeParser::Config config;
@@ -365,7 +365,7 @@ private:
   int error_count_;
 };
 
-AxesRegister GCodeParser::Impl::kZeroOffset;
+const AxesRegister GCodeParser::Impl::kZeroOffset;
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
                         GCodeParser::EventReceiver *parse_events,
@@ -383,7 +383,12 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     // incoming config.
     axes_pos_(config.machine_origin),
     home_position_(config.machine_origin),
-    current_origin_(&home_position_), current_global_offset_(&kZeroOffset),
+    // The current origin is the same as the home position (where the home
+    // switches are) That means for CNC machines with machine origins e.g.
+    // on the top right, that all valid coordinates to stay within the
+    // machine cube are negative.
+    current_origin_(&home_position_),
+    current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
     while_err_stream_(NULL), do_while_(false),
     debug_level_(DEBUG_NONE), allow_m111_(allow_m111), error_count_(0)
