@@ -15,7 +15,7 @@
 
 #include "common/container.h"
 #include "common/logging.h"
-
+#include "hardware-mapping.h"
 #include "motor-operations.h"
 
 class MockMotionQueue : public MotionQueue {
@@ -52,8 +52,9 @@ private:
 
 // Check that on init, the initial position is 0.
 TEST(RealtimePosition, init_pos) {
+  HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
-  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   PhysicalStatus status;
   motor_operations.GetPhysicalStatus(&status);
@@ -64,8 +65,9 @@ TEST(RealtimePosition, init_pos) {
 // Check that the steps are correctly evaluated from the shadow queue
 // with the correct sign.
 TEST(RealtimePosition, back_and_forth) {
+  HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
-  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
@@ -108,8 +110,9 @@ TEST(RealtimePosition, back_and_forth) {
 // are taken into account into the shadow queue since they are sent to the
 // motion queue.
 TEST(RealtimePosition, empty_element) {
+  HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
-  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
@@ -136,8 +139,9 @@ TEST(RealtimePosition, empty_element) {
 
 // Enqueue a bunch of LinearSegmentSteps and retrieve the position.
 TEST(RealtimePosition, sample_pos) {
+  HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
-  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
@@ -175,8 +179,9 @@ TEST(RealtimePosition, sample_pos) {
 // Check that SimRun(0, x) produce the same absolute position as
 // SimRun(MAX_SEGMENT_STEPS, x + 1).
 TEST(RealtimePosition, zero_loops_edge) {
+  HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
-  MotionQueueMotorOperations motor_operations((MotionQueue*) &motion_backend);
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
   LinearSegmentSteps segment = {

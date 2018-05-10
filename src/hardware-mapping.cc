@@ -111,6 +111,10 @@ int HardwareMapping::GetFirstFreeMotor() {
   return 0;
 }
 
+bool HardwareMapping::IsMotorFlipped(int motor) {
+  return driver_flip_[motor] == -1;
+}
+
 bool HardwareMapping::InitializeHardware() {
   if (geteuid() != 0) {
     Log_error("Need to run as root to access GPIO pins.");
@@ -245,7 +249,7 @@ void HardwareMapping::AssignMotorSteps(LogicAxis axis, int steps,
   const MotorBitmap motormap_for_axis = axis_to_driver_[axis];
   for (int motor = 0; motor < NUM_MOTORS; ++motor) {
     if (motormap_for_axis & (1 << motor)) {
-      out->steps[motor] = driver_flip_[motor] * steps;
+      out->steps[motor] = steps;
     }
   }
 }

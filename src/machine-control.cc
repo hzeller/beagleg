@@ -517,7 +517,7 @@ int main(int argc, char *argv[]) {
   }
   Log_info("BeagleG running with PID %d", getpid());
 
-  MotionQueueMotorOperations motor_operations(motion_backend);
+  MotionQueueMotorOperations motor_operations(&hardware_mapping, motion_backend);
 
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &motor_operations,

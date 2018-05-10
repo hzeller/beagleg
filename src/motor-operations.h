@@ -79,10 +79,11 @@ public:
   virtual void SetExternalPosition(int axis, int steps) = 0;
 };
 
+class HardwareMapping;
 class MotionQueueMotorOperations : public MotorOperations {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
-  MotionQueueMotorOperations(MotionQueue *backend);
+  MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend);
   ~MotionQueueMotorOperations() override;
 
   void Enqueue(const LinearSegmentSteps &segment) final;
@@ -95,6 +96,7 @@ private:
   void EnqueueInternal(const LinearSegmentSteps &param,
                        int defining_axis_steps);
 
+  HardwareMapping *const hardware_mapping_;
   MotionQueue *backend_;
 
   struct HistorySegment;

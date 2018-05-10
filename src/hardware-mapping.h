@@ -144,6 +144,9 @@ public:
   // Useful for auto-configuration.
   int GetFirstFreeMotor();
 
+  // Return true if the motor turns in the opposite direction.
+  bool IsMotorFlipped(int motor);
+
   /*
    * If not used as a simulated machine, InitializeHardware() is needed.
    */

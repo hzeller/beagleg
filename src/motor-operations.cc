@@ -33,6 +33,7 @@
 
 #include "motor-interface-constants.h"
 #include "motion-queue.h"
+#include "hardware-mapping.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2
@@ -102,8 +103,9 @@ struct MotionQueueMotorOperations::HistorySegment {
 };
 
 MotionQueueMotorOperations::
-MotionQueueMotorOperations(MotionQueue *backend)
-  : backend_(backend),
+MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend)
+  : hardware_mapping_(hw),
+    backend_(backend),
     shadow_queue_(new std::deque<struct HistorySegment>()) {
   // Initialize the history queue.
   shadow_queue_->push_front({});
@@ -129,10 +131,12 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   // and 1 bit that overflows and toggles for the steps we want to generate.
   const uint64_t max_fraction = 0xFFFFFFFF / LOOPS_PER_STEP;
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
+    bool flip = hardware_mapping_->IsMotorFlipped(i);
     if (param.steps[i] < 0) {
-      new_element.direction_bits |= (1 << i);
+      if (!flip) new_element.direction_bits |= (1 << i);
       history_segment.pos_info[i].sign = -1;
     } else {
+      if (flip) new_element.direction_bits |= (1 << i);
       history_segment.pos_info[i].sign = 1;
     }
     history_segment.pos_info[i].position_steps += param.steps[i];
