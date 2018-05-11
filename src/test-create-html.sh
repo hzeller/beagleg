@@ -6,7 +6,7 @@ if [ $# -lt 1 ] ; then
     exit 1
 fi
 
-OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
+#OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
 IMAGE_SIZE="24%"
 THRESHOLD_ANGLE="-t16"
 
