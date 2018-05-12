@@ -49,10 +49,12 @@ GIT_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/n
 
 CFLAGS+=-Wall -I. -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"' -DBEAGLEG_VERSION='"$(GIT_VERSION)"'
 
-# We use c++11, but it looks like that even the latest
-# bone-debian-7.11-lxde-4gb-armhf-2016-06-16-4gb image has an ancient 4.6.3
-# compiler that still referred to that standard as c++0x
-CXXFLAGS+=-std=c++0x $(CFLAGS) $(CONFIG_FLAGS)
+# We use c++11 and require at least gcc-4.7.
+# Note: older beaglebone wheezy images have even older compilers, but you can
+# install a 4.7 easily:
+#   sudo apt-get install g++-4.7
+#   CXX=g++-4.7 make
+CXXFLAGS+=-std=c++11 $(CFLAGS) $(CONFIG_FLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm

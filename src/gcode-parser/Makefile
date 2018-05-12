@@ -19,10 +19,8 @@ BEAGLEG_OPT_CFLAGS?=-O3
 
 CFLAGS+=-Wall -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -I../
 
-# We use c++11, but it looks like that even the latest
-# bone-debian-7.11-lxde-4gb-armhf-2016-06-16-4gb image has an ancient 4.6.3
-# compiler that still referred to that standard as c++0x
-CXXFLAGS+=-std=c++0x $(CFLAGS)
+# See toplevel Makefile comment
+CXXFLAGS+=-std=c++11 $(CFLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm
