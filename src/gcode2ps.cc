@@ -172,7 +172,7 @@ public:
       const bool not_show_after_home = just_homed_ && !include_home;
       fprintf(file_, "%.3f %.3f %.3f %s\n",
               axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
-              not_show_after_home ? "moveto3d % post-G28" : "lineto3d stroke");
+              not_show_after_home ? "moveto3d % post-G28" : "lineto3d");
       if (output_js_vertices)
         fprintf(stdout, "[%.3f, %.3f, %.3f],\n",   // ThreeJS
                 axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z]);
@@ -189,10 +189,12 @@ public:
     if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
       const float line_size = GetDiagonalLength() / 500.0;
       fprintf(file_,
-              "gsave\n\tpush-currentpoint3d "
+              "stroke currentpoint3d\n"  // remember for after the place
+              "currentpoint3d gsave moveto3d\n\t "   // save restore
               "[%.3f] 0 setdash %.3f setlinewidth 0.8 0.8 1 setrgbcolor\n"
               "\t%f %f %f lineto3d %f %f %f lineto3d stroke\n"
-              "\t[] 0 setdash pop-currentpoint3d\ngrestore%% show radius\n",
+              "\tgrestore %% end show radius\n"
+              "moveto3d %% go back to last currentpoint3d\n",
               5 * line_size, line_size,
               center[AXIS_X], center[AXIS_Y], center[AXIS_Z],
               end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
@@ -209,11 +211,13 @@ public:
     if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
       const float line_size = GetDiagonalLength() / 500.0;
       fprintf(file_,
-              "gsave\n\tpush-currentpoint3d "
+              "stroke currentpoint3d\n"  // remember for after the place
+              "currentpoint3d gsave moveto3d\n\t "   // save restore
               "[%.3f] 0 setdash %.3f setlinewidth 0.8 0.8 1 setrgbcolor\n"
               "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
               "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
-              "\t[] 0 setdash pop-currentpoint3d\ngrestore%% control points\n",
+              "\tgrestore %% end show control points\n"
+              "moveto3d %% going back to last currentpoint3d\n",
               5 * line_size, line_size,
               start[AXIS_X], start[AXIS_Y], start[AXIS_Z],
               // TODO(hzeller): are these points actually only 2D ?
@@ -262,6 +266,7 @@ public:
       if (min_[AXIS_Z] > max_[AXIS_Z]) min_[AXIS_Z] = max_[AXIS_Z] = 0;
     }
     if (pass_ == ProcessingStep::GenerateOutput && end_of_stream) {
+      fprintf(file_, "stroke\n");
       fprintf(file_, "%% -- Finished GCode Path.\n");
 
       if (output_js_vertices) fprintf(stdout, "];\n"); // ThreeJS
@@ -372,35 +377,35 @@ public:
 
     // bottom plane, remaining.
     fprintf(file_, "0.6 setgray [1] 0 setdash\n");
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             max_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
 
     // upper plane
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z],
             min_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             max_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z],
             max_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             min_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
 
     // corners
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z],
             min_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             max_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
             max_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
 
@@ -436,17 +441,17 @@ public:
                size, 0.3*size, TextAlign::kLeft, size*0.7, x_xy_draw);
       fprintf(file_, "stroke\n");
     }
-    fprintf(file_, "0.8 0 0 setrgbcolor\n");
+    fprintf(file_, "0.8 0 0 setrgbcolor               %% X-axis\n");
     MeasureLine(min_[AXIS_X], max_[AXIS_X], size, !prefer_inch_, x_xy_draw);
-    fprintf(file_, "stroke 0 0.8 0 setrgbcolor\n");
+    fprintf(file_, "stroke 0 0.8 0 setrgbcolor        %% Y-Axis\n");
     MeasureLine(min_[AXIS_Y], max_[AXIS_Y], size, !prefer_inch_, y_xy_draw);
-    fprintf(file_, "stroke 0 0 0.8 setrgbcolor\n");
+    fprintf(file_, "stroke 0 0 0.8 setrgbcolor        %% Z-Axis\n");
     MeasureLine(min_[AXIS_Z], max_[AXIS_Z], size, !prefer_inch_, z_yz_draw);
     fprintf(file_, "stroke 0 0 0 setrgbcolor\n");
   }
 
   void ShowHomePos(const AxesRegister &origin) {
-    fprintf(file_, "\n%% Visualize home pos\n");
+    fprintf(file_, "\n%% -- Visualize home pos\n");
     float size = GetDiagonalLength() / 200;  // 0.5%
     fprintf(file_, "0 1 1 setrgbcolor %.3f setlinewidth\n", size);
     fprintf(file_,
@@ -525,10 +530,11 @@ public:
     if (!show_speeds_) {
       fprintf(file_, "%s setrgbcolor\n", kMachineMoveColor);
     }
+    fprintf(file_, "1 setlinejoin\n");
   }
 
   ~MotorOperationsPrinter() {
-    fprintf(file_, "%% -- Finished Machine Path.\n");
+    fprintf(file_, "stroke\n%% -- Finished Machine Path.\n");
   }
 
   void SetPass(ProcessingStep p) {
@@ -645,6 +651,8 @@ public:
         float v = param.v0 + i * (param.v1 - param.v0)/segments;
         v /= config_.steps_per_mm[dominant_axis];
         v *= segment_speed_factor;
+
+        const char *new_color = nullptr;
         if (is_valid_position) {
           int col_idx;
           if (v < min_color_range_) col_idx = 0;
@@ -655,13 +663,16 @@ public:
           }
           assert(col_idx >= 0 && col_idx < 256);
           if (col_idx != last_color_index_) {
-            fprintf(file_, "%s setrgbcolor ", viridis_colors[col_idx]);
+            new_color = viridis_colors[col_idx];
             last_color_index_ = col_idx;
           }
         } else {
-          fprintf(file_, "%s setrgbcolor ", kOutOfRangeColor);
+          new_color = kOutOfRangeColor;
         }
-        fprintf(file_, "%f %f %f rlineto3d stroke",
+        if (new_color) {
+          fprintf(file_, "stroke %s setrgbcolor moveto3d-last ", new_color);
+        }
+        fprintf(file_, "%f %f %f rlineto3d",
                 dx_mm/segments, dy_mm/segments, dz_mm/segments);
         fprintf(file_, " %% %.1f mm/s [%s]", v,
                 param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
@@ -677,10 +688,11 @@ public:
                 is_valid_position ? kMachineMoveColor : kOutOfRangeColor);
         last_outside_machine_cube = is_valid_position;
       }
-      fprintf(file_, "%f %f %f lineto3d stroke\n",
+      fprintf(file_, "%f %f %f lineto3d %% %d %d %d\n",
               current_pos_[AXIS_X] / config_.steps_per_mm[AXIS_X],
               current_pos_[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-              current_pos_[AXIS_Z] / config_.steps_per_mm[AXIS_Z]);
+              current_pos_[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
+              current_pos_[AXIS_X], current_pos_[AXIS_Y], current_pos_[AXIS_Z]);
     }
   }
 
@@ -1469,26 +1481,22 @@ const char *kPSHeader = R"(
     last_x last_y last_z project2d moveto
  } def
 
-/push-currentpoint3d {
+/currentpoint3d {
   last_x last_y last_z
 } def
 
-/pop-currentpoint3d {
- /last_z exch def
- /last_y exch def
- /last_x exch def
-} def
-
 /lineto3d {
-   last_x last_y last_z project2d moveto
   /last_z exch def
   /last_y exch def
   /last_x exch def
   last_x last_y last_z project2d lineto
  } def
 
-/rlineto3d {
+/moveto3d-last {
    last_x last_y last_z project2d moveto
+} def
+
+/rlineto3d {
    last_z add /last_z exch def
    last_y add /last_y exch def
    last_x add /last_x exch def
