@@ -93,7 +93,7 @@ gcode-parser/libgcodeparser.a: FORCE
 
 # While this is developed and does not have a final name yet, let's not make
 # it a toplevel tool in ../
-gcode2ps: gcode2ps.o $(GCODE_OBJECTS) $(COMMON_LIBS)
+gcode2ps: gcode2ps.o hershey.o $(GCODE_OBJECTS) $(COMMON_LIBS)
 	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(LDFLAGS)
 
 test-html: test-out/test.html

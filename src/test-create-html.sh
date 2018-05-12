@@ -8,7 +8,7 @@ fi
 
 #OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
 IMAGE_SIZE="24%"
-THRESHOLD_ANGLE="-t16"
+PARAMS="-t16 -Viso"
 
 # For now, let's use the configuration in which each axis has the same steps/mm.
 # The step-speed-different.config _should_ look the same in the output, but
@@ -28,7 +28,7 @@ rm -f $OUT_HTML
 while [ $# -ne 0 ] ; do
     GCODE_FILE=$1
     BASENAME=$(basename $GCODE_FILE .gcode)
-    $OPTIONAL_VALGRIND $GCODE2PS $THRESHOLD_ANGLE -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
+    $OPTIONAL_VALGRIND $GCODE2PS $PARAMS -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 5 ] ; then
 	ERRMSG="<span style='color:#ffff00; font-weight:bold; background-color:#ff0000'> Got valgrind errors </span>"
