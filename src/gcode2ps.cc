@@ -81,7 +81,7 @@ static bool include_origin = false;
 static bool output_js_vertices = false;
 static bool show_out_of_range = false;
 static float fixed_size = 200;
-static bool show_beagleg = false;
+static bool show_beagleg = true;
 
 static constexpr char kOutOfRangeColor[] = "1 0.5 0.5";
 static constexpr char kMachineMoveColor[] = "0.6 0.6 0.6";
@@ -353,7 +353,7 @@ public:
 
   void PrintModelFrame() {
     fprintf(file_, "\n%% -- Solid X/Y/Z; dotted box around item\n");
-    float size = GetDiagonalLength() / 30;
+    const float size = GetDiagonalLength() / 30;
 
     // The dash corresponds to 1mm in real coordinates only if flat projected.
     // Maybe we want to adapt that for the projection ?
@@ -409,8 +409,12 @@ public:
             max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
 
     fprintf(file_, "stroke grestore\n");
+  }
 
-    fprintf(file_, "0 0 0 setrgbcolor %.1f setlinewidth\n", size/20);
+  void ShowMesaureLines() {
+    fprintf(file_, "\n%% -- Measurement lines\n");
+    const float size = GetDiagonalLength() / 30;
+    fprintf(file_, "%.1f setlinewidth\n", size/20);
 
     // Various functions to draw into directon of the axis on given
     // plane.
@@ -809,7 +813,7 @@ static int usage(const char *progname) {
           "\t-T <tool-diameter>: Tool diameter in mm.\n"
           "\t-t <threshold-angle> : Threshold angle for accleration opt\n"
           "\t-s                : Visualize movement speeds\n"
-          //          "\t-D                : show dimensions\n"
+          "\t-D                : Don't show dimensions\n"
           "\t-i                : Toggle show IJK control lines\n"
           "\t[---- Visualization ---- ]\n"
           "\t-S<factor>        : Scale the output (e.g. to fit on page)\n"
@@ -909,7 +913,7 @@ int main(int argc, char *argv[]) {
   FILE *output_file = stdout;
   std::string out_filename;
   float tool_diameter_mm = -1;
-  //bool show_dimensions = true;
+  bool show_dimensions = true;
   float threshold_angle = 0;
   bool show_speeds = false;
   bool range_check = false;
@@ -933,8 +937,7 @@ int main(int argc, char *argv[]) {
       config_file = strdup(optarg);
       break;
     case 'D':
-      //show_dimensions = true;
-      fprintf(stderr, "Dimensions currently disabled\n");
+      show_dimensions = false;
       break;
     case 'T':
       tool_diameter_mm = atof(optarg);
@@ -1049,6 +1052,7 @@ int main(int argc, char *argv[]) {
   }
 
   gcode_printer.PrintModelFrame();
+  if (show_dimensions) gcode_printer.ShowMesaureLines();
 
   if (config_file) {
     machine_config.threshold_angle = threshold_angle;
