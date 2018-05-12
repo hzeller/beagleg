@@ -38,7 +38,6 @@
   Auto view: if things ever are only in 2D or with only minimal deviation,
     only show that.
   rotation anim: not overall yaw, but first yaw, then rest of rot.
-  Get rid of rlineto3d
   Put all data in one or more arrays to be able to execute more, and maybe
     be a bit more efficient in doing so.
   Put look-up table for color gradient in program to keep rest more compact.
@@ -610,26 +609,30 @@ public:
     return true;
   }
 
-  bool isCurrentPosWithinMachineCube() const {
+  bool isWithinMachineCube(const MotorsRegister &m) const {
     if (!show_out_of_range) return true;
-    return inRange(current_pos_[AXIS_X], AXIS_X)
-      && inRange(current_pos_[AXIS_Y], AXIS_Y)
-      && inRange(current_pos_[AXIS_Z], AXIS_Z);
+    return inRange(m[AXIS_X], AXIS_X)
+      && inRange(m[AXIS_Y], AXIS_Y)
+      && inRange(m[AXIS_Z], AXIS_Z);
   }
 
   void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
     assert(pass_ == ProcessingStep::GenerateOutput);
-    current_pos_[AXIS_X] += param.steps[AXIS_X];
-    current_pos_[AXIS_Y] += param.steps[AXIS_Y];
-    current_pos_[AXIS_Z] += param.steps[AXIS_Z];
-    const bool is_valid_position = isCurrentPosWithinMachineCube();
+    if (!param.steps[AXIS_X] && !param.steps[AXIS_Y] && !param.steps[AXIS_Z])
+      return;
+    MotorsRegister new_pos(current_pos_);
+    new_pos[AXIS_X] += param.steps[AXIS_X];
+    new_pos[AXIS_Y] += param.steps[AXIS_Y];
+    new_pos[AXIS_Z] += param.steps[AXIS_Z];
+    const bool is_valid_position = isWithinMachineCube(new_pos);
     const float dx_mm = param.steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
 
     if (show_speeds_) {
 #if SHOW_SPEED_DETAILS
-      fprintf(file_, "%% dx: %f dy: %f %s (speed: %.1f->%.1f)\n", dx_mm, dy_mm,
+      fprintf(file_, "%% dx:%f dy:%f dz:%f %s (speed: %.1f->%.1f)\n",
+              dx_mm, dy_mm, dz_mm,
               param.v0 == param.v1 ? "; steady move" :
               ((param.v0 < param.v1) ? "; accel" : "; decel"),
               param.v0/config_.steps_per_mm[dominant_axis],
@@ -637,7 +640,7 @@ public:
 #endif
       const float segment_len = sqrtf(dx_mm*dx_mm + dy_mm*dy_mm + dz_mm*dz_mm);
       if (segment_len == 0)
-        return;  // If not in x/y plane.
+        return;  // If no movement in x/y/z (should've been caught earlier)
       // The step speed is given by the dominant axis; however the actual
       // physical speed depends on the actual travel in euclidian space.
       const float segment_speed_factor = segment_len /
@@ -672,8 +675,13 @@ public:
         if (new_color) {
           fprintf(file_, "stroke %s setrgbcolor moveto3d-last ", new_color);
         }
-        fprintf(file_, "%f %f %f rlineto3d",
-                dx_mm/segments, dy_mm/segments, dz_mm/segments);
+#define TO_ABS_AXIS(a) (float(current_pos_[a]) + \
+              float((i+1)*param.steps[a])/segments) / config_.steps_per_mm[a]
+
+        fprintf(file_, "%f %f %f lineto3d",
+                TO_ABS_AXIS(AXIS_X), TO_ABS_AXIS(AXIS_Y), TO_ABS_AXIS(AXIS_Z));
+#undef TO_ABS_AXIS
+
         fprintf(file_, " %% %.1f mm/s [%s]", v,
                 param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
         if (i == 0)
@@ -689,11 +697,13 @@ public:
         last_outside_machine_cube = is_valid_position;
       }
       fprintf(file_, "%f %f %f lineto3d %% %d %d %d\n",
-              current_pos_[AXIS_X] / config_.steps_per_mm[AXIS_X],
-              current_pos_[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-              current_pos_[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
-              current_pos_[AXIS_X], current_pos_[AXIS_Y], current_pos_[AXIS_Z]);
+              new_pos[AXIS_X] / config_.steps_per_mm[AXIS_X],
+              new_pos[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
+              new_pos[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
+              new_pos[AXIS_X], new_pos[AXIS_Y], new_pos[AXIS_Z]);
     }
+
+    current_pos_ = new_pos;
   }
 
   void MotorEnable(bool on) final {}
@@ -1494,13 +1504,6 @@ const char *kPSHeader = R"(
 
 /moveto3d-last {
    last_x last_y last_z project2d moveto
-} def
-
-/rlineto3d {
-   last_z add /last_z exch def
-   last_y add /last_y exch def
-   last_x add /last_x exch def
-   last_x last_y last_z project2d lineto
 } def
 
 % All lines should match smootly together.
