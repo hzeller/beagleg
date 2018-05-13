@@ -43,8 +43,8 @@ public:
   }
 
   // GCodeParser::EventReceiver callbacks
-   void gcode_start(GCodeParser *p) final { delegatee_->gcode_start(p); }
-   void gcode_finished(bool eos) final { delegatee_->gcode_finished(eos); }
+  void gcode_start(GCodeParser *p) final { delegatee_->gcode_start(p); }
+  void gcode_finished(bool eos) final { delegatee_->gcode_finished(eos); }
 
   // GCode parser event receivers, that forward calls to the delegate
   // but also determine relevant height information.

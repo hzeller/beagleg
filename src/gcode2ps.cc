@@ -194,7 +194,7 @@ public:
               "\t%f %f %f lineto3d %f %f %f lineto3d stroke\n"
               "\tgrestore %% end show radius\n"
               "moveto3d %% go back to last currentpoint3d\n",
-              5 * line_size, line_size,
+              2 * line_size, line_size,
               center[AXIS_X], center[AXIS_Y], center[AXIS_Z],
               end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
     }
@@ -217,7 +217,7 @@ public:
               "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
               "\tgrestore %% end show control points\n"
               "moveto3d %% going back to last currentpoint3d\n",
-              5 * line_size, line_size,
+              2 * line_size, line_size,
               start[AXIS_X], start[AXIS_Y], start[AXIS_Z],
               // TODO(hzeller): are these points actually only 2D ?
               cp1[AXIS_X], cp1[AXIS_Y], start[AXIS_Z],
@@ -299,11 +299,11 @@ public:
     draw(false, width, -size); draw(true, width, size);  // second tick.
     const char *fmt = show_metric ? "%.2fmm" : "%.3f\"";
     std::string measure = StringPrintf(fmt, show_metric ? width : width / 25.4);
-    DrawText(measure.c_str(), width/2, -size, TextAlign::kCenter, size, draw);
+    DrawText(measure, width/2, -size, TextAlign::kCenter, size, draw);
     // For the small start/end markers, don't include the unit for compatness.
     fmt = show_metric ? "%.2f" : "%.3f";
     measure = StringPrintf(fmt, show_metric ? min : min / 25.4);
-    DrawText(measure, 0, 0, TextAlign::kCenter, size * 0.6,
+    DrawText(measure, 0, size/10, TextAlign::kCenter, size * 0.6,
                [draw, size](bool d, float x, float y) {
                 draw(d, -y, x);
               });
@@ -343,37 +343,17 @@ public:
     }
 
     fprintf(file_, "%s", kPSHeader);
-
-    fprintf(file_, "\n0 0 0.8 setrgbcolor 0.2 setlinewidth\n");
-
-    // Font-size dependent on overall drawing size.
-    fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
-            std::max(1.0f, 0.015f * GetDiagonalLength()));
   }
 
   void PrintModelFrame() {
-    fprintf(file_, "\n%% -- Solid X/Y/Z; dotted box around item\n");
     const float size = GetDiagonalLength() / 30;
 
     // The dash corresponds to 1mm in real coordinates only if flat projected.
     // Maybe we want to adapt that for the projection ?
-    fprintf(file_, "gsave %.1f setlinewidth\n", size/20);
+    fprintf(file_, "gsave %.2f setlinewidth\n", size/25);
 
     // -- this should be a loop
-    // Primary axes.
-    fprintf(file_, "0.4 1 0.4 setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
-            min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_, "1 0.4 0.4 setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
-            max_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_, "0.4 0.4 1 setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
-            min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
-
+    fprintf(file_, "\n%% -- Dotted box around item\n");
     // bottom plane, remaining.
     fprintf(file_, "0.6 setgray [1] 0 setdash\n");
     fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n",
@@ -408,7 +388,25 @@ public:
             max_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
 
-    fprintf(file_, "stroke grestore\n");
+    // Slightly thicker solid lines
+    fprintf(file_, "stroke [] 0 setdash %.2f setlinewidth\n", size/20);
+
+    // Primary axes.
+    fprintf(file_, "\n%% -- Solid X/Y/Z marking min-axes...\n");
+    fprintf(file_, "0.4 1 0.4 setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
+            min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
+    fprintf(file_, "1 0.4 0.4 setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
+            max_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z]);
+    fprintf(file_, "0.4 0.4 1 setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
+            min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
+
+    fprintf(file_, "grestore\n");
   }
 
   void ShowMesaureLines() {
@@ -455,7 +453,7 @@ public:
 
   void ShowHomePos(const AxesRegister &origin) {
     fprintf(file_, "\n%% -- Visualize home pos\n");
-    float size = GetDiagonalLength() / 200;  // 0.5%
+    const float size = GetDiagonalLength() / 200;  // 0.5%
     fprintf(file_, "0 1 1 setrgbcolor %.3f setlinewidth\n", size);
     fprintf(file_,
             "%f %f %f moveto3d %f %f %f project2d %.3f 0 360 arc closepath "
@@ -677,12 +675,12 @@ public:
           new_color = kOutOfRangeColor;
         }
         if (new_color) {
-          fprintf(file_, "stroke %s setrgbcolor moveto3d-last ", new_color);
+          fprintf(file_, "%s switch-color ", new_color);
         }
 #define TO_ABS_AXIS(a) (float(current_pos_[a]) + \
               float((i+1)*param.steps[a])/segments) / config_.steps_per_mm[a]
 
-        fprintf(file_, "%f %f %f lineto3d",
+        fprintf(file_, "%.3f %.3f %.3f lineto3d",
                 TO_ABS_AXIS(AXIS_X), TO_ABS_AXIS(AXIS_Y), TO_ABS_AXIS(AXIS_Z));
 #undef TO_ABS_AXIS
 
@@ -814,6 +812,7 @@ static int usage(const char *progname) {
           "\t-t <threshold-angle> : Threshold angle for accleration opt\n"
           "\t-s                : Visualize movement speeds\n"
           "\t-D                : Don't show dimensions\n"
+          "\t-M                : Don't show machine path, only GCode path\n"
           "\t-i                : Toggle show IJK control lines\n"
           "\t[---- Visualization ---- ]\n"
           "\t-S<factor>        : Scale the output (e.g. to fit on page)\n"
@@ -914,6 +913,7 @@ int main(int argc, char *argv[]) {
   std::string out_filename;
   float tool_diameter_mm = -1;
   bool show_dimensions = true;
+  bool show_machine_path = true;
   float threshold_angle = 0;
   bool show_speeds = false;
   bool range_check = false;
@@ -924,7 +924,7 @@ int main(int argc, char *argv[]) {
   int animation_frames = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:Dt:srS:iR:P:Y:V:e:a:")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -938,6 +938,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'D':
       show_dimensions = false;
+      break;
+    case 'M':
+      show_machine_path = false;
       break;
     case 'T':
       tool_diameter_mm = atof(optarg);
@@ -994,6 +997,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Could not create output file.\n");
     return 1;
   }
+
+  show_speeds &= (show_machine_path);
 
   if (show_speeds && !config_file) {
     fprintf(stderr, "Need machine-control config (-c) to show speeds (-s)\n");
@@ -1054,7 +1059,7 @@ int main(int argc, char *argv[]) {
   gcode_printer.PrintModelFrame();
   if (show_dimensions) gcode_printer.ShowMesaureLines();
 
-  if (config_file) {
+  if (config_file && show_machine_path) {
     machine_config.threshold_angle = threshold_angle;
     machine_config.acknowledge_lines = false;
     machine_config.range_check = range_check;
@@ -1127,7 +1132,7 @@ int main(int argc, char *argv[]) {
 
   if (animation_frames > 0 && !out_filename.empty()) {
     const char *const f = out_filename.c_str();
-    int antialias_factor = 4;
+    int antialias_factor = 2;
     fprintf(stderr,
             "\n\n-- Convert the PostScript file to an animation with --\n"
             "gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m "
@@ -1480,7 +1485,7 @@ const char *kPSHeader = R"(
           matrix3d 6 get x mul matrix3d 7 get y mul matrix3d 8 get z mul add add
           sub div def
     } {
-     /pf 1 def
+      /pf 1 def
     } ifelse
     matrix3d 0 get x mul matrix3d 1 get y mul matrix3d 2 get z mul add add pf mul
     matrix3d 3 get x mul matrix3d 4 get y mul matrix3d 5 get z mul add add pf mul
@@ -1506,8 +1511,13 @@ const char *kPSHeader = R"(
   last_x last_y last_z project2d lineto
  } def
 
-/moveto3d-last {
+/moveto3d-last {  % Useful after a stroke without having to push currentpoint3d
    last_x last_y last_z project2d moveto
+} def
+
+% r g b -
+/switch-color {
+   stroke setrgbcolor moveto3d-last
 } def
 
 % All lines should match smootly together.

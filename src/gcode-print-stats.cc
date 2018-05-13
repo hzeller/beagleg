@@ -69,9 +69,10 @@ int main(int argc, char *argv[]) {
   float factor = 1.0;        // print speed factor.
   char print_header = 1;
   const char *config_file = NULL;
+  const char *msg_out_file = "/dev/null";
 
   int opt;
-  while ((opt = getopt(argc, argv, "c:f:H")) != -1) {
+  while ((opt = getopt(argc, argv, "c:f:Hv")) != -1) {
     switch (opt) {
     case 'c':
       config_file = strdup(optarg);
@@ -82,6 +83,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'H':
       print_header = !print_header;
+      break;
+    case 'v':
+      msg_out_file = "/dev/stderr";
       break;
     default:
       return usage(argv[0]);
@@ -96,7 +100,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  FILE *msg_out = fopen("/dev/null", "w");
+  FILE *msg_out = fopen(msg_out_file, "w");
   Log_init("/dev/null");
 
   ConfigParser config_parser;
