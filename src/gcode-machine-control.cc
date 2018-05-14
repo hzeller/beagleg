@@ -705,7 +705,17 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
 void GCodeMachineControl::Impl::dwell(float value) {
   planner_->BringPathToHalt();
   motor_ops_->WaitQueueEmpty();
-  usleep((int) (value * 1000));
+  if (hardware_mapping_->IsHardwareSimulated()) {
+    if (value > 999.0) {
+      // Let some interactive user know that they can't expect dwell time here.
+      mprintf("// FYI: hardware simulated. All dwelling is immediate.\n", value);
+    }
+  } else {
+    // TODO: this needs to wait in the event multiplexer.
+    // Since we might need pretty high precision (see rpt2pnp), this can't
+    // just be quantized to 50ms.
+    usleep((int) (value * 1000));
+  }
 
   if (pause_enabled_ && check_for_pause()) {
     Log_debug("Pause input detected, waiting for Start");
