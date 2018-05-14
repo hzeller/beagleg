@@ -142,7 +142,7 @@ $(PASM):
 
 # Useful to convert gcode2ps output.
 %.png : %.ps
-	gs -q -r144 -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$@ $<
+	gs -q -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$@ $<
 
 # Explicit dependencies
 uio-pruss-interface.o : $(PRU_BIN)

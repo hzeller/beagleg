@@ -8,7 +8,7 @@ fi
 
 #OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
 IMAGE_SIZE="24%"
-PARAMS="-t16 -Viso"
+PARAMS="-q -w1200 -t16 -Viso"
 
 # For now, let's use the configuration in which each axis has the same steps/mm.
 # The step-speed-different.config _should_ look the same in the output, but
@@ -38,7 +38,7 @@ while [ $# -ne 0 ] ; do
 	ERRMSG=""
     fi
     # create PNG
-    gs -q -r144 -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$TEST_OUT_DIR/${BASENAME}.png $TEST_OUT_DIR/${BASENAME}.ps
+    gs -q -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -dBATCH -dNOPAUSE -sDEVICE=png16m -sOutputFile=$TEST_OUT_DIR/${BASENAME}.png $TEST_OUT_DIR/${BASENAME}.ps
 
     cat <<EOF >> $OUT_HTML
 <div style="width:${IMAGE_SIZE}; float:left; border:1px solid #ccc; margin:2px; background-color:#ccc;">

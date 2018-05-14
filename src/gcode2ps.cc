@@ -75,16 +75,27 @@
 // This is mostly only really useful for debugging stuff.
 #define SHOW_SPEED_DETAILS 0
 
-// right now experimental. These should be options.
-static bool include_home = false;
-static bool include_origin = false;
+// Experimental options right now. Should be command-line flags once they
+// 'graduate'
+static bool include_home = true;    // for part bounding box
+static bool include_origin = false; // for part bounding box (0,0,0)
 static bool output_js_vertices = false;
-static bool show_out_of_range = false;
-static float fixed_size = 200;
+static bool show_out_of_range = false;  // show out of range in red.
 static bool show_beagleg = true;
 
+// G-code rendering
+static constexpr char kGcodeMoveColor[] = "0 0 0";
+static constexpr char kGcodeRapidMoveColor[] = "0.7 0.7 0.7";
+
+// Machine movement rendering.
 static constexpr char kOutOfRangeColor[] = "1 0.5 0.5";
 static constexpr char kMachineMoveColor[] = "0.6 0.6 0.6";
+
+static constexpr char kInchFormat[] = "%.3f";        // w/o unit
+static constexpr char kInchUnitFormat[] = "%.3f\"";  // w/ unit
+
+static constexpr char kMillimeterFormat[] = "%.2f";         // w/o unit
+static constexpr char kMillimeterUnitFormat[] = "%.2fmm";   // w/ unit
 
 static const std::map<std::string, const char *> kNamedViews = {
   { "top",       "" }, // Nothing to do: default.
@@ -155,10 +166,14 @@ public:
   }
   void dwell(float value) final { }
   bool rapid_move(float feed, const AxesRegister &axes) final {
-    return coordinated_move(feed, axes);
+    return do_move(true, feed, axes);
   }
 
   bool coordinated_move(float feed, const AxesRegister &axes) final {
+    return do_move(false, feed, axes);
+  }
+
+  bool do_move(bool rapid, float feed, const AxesRegister &axes) {
     // It is possible to just say G1 F100 without any coordinates. But that
     // causes a call to coordinated move. So if this happens right after a G28
     // we would still include that coordinate even though we don't mean to.
@@ -168,13 +183,21 @@ public:
     if (pass_ == ProcessingStep::Preprocess) {
       RememberMinMax(axes);
     } else {
+      if (rapid != last_move_rapid_) {
+        fprintf(file_, "%s switch-color %.3f setlinewidth %% %s move\n",
+                rapid ? kGcodeRapidMoveColor : kGcodeMoveColor,
+                rapid ? 0.0 : GetDiagonalLength() / 1000.0,
+                rapid ? "G0 rapid" : "G1 coordinated");
+        last_move_rapid_ = rapid;
+      }
       const bool not_show_after_home = just_homed_ && !include_home;
       fprintf(file_, "%.3f %.3f %.3f %s\n",
               axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
               not_show_after_home ? "moveto3d % post-G28" : "lineto3d");
       if (output_js_vertices)
-        fprintf(stdout, "[%.3f, %.3f, %.3f],\n",   // ThreeJS
-                axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z]);
+        fprintf(stdout, " [%.3f, %.3f, %.3f, %s],\n",   // ThreeJS
+                axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
+                rapid ? "true":"false");
     }
     just_homed_ = false;
     return true;
@@ -246,7 +269,8 @@ public:
   void gcode_start(GCodeParser *parser) final {
     if (pass_ == ProcessingStep::GenerateOutput) {
       fprintf(file_, "\n%% -- Path generated from GCode.\n");
-      fprintf(file_, "0 setlinewidth 0 0 0 setrgbcolor\n");
+      fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n",
+              GetDiagonalLength() / 1000.0);
 
       if (include_home) {
         fprintf(file_, "%f %f %f moveto3d  %% Machine origin but not homed.\n",
@@ -254,7 +278,9 @@ public:
                 machine_origin_[AXIS_Z]);
       }
 
-      if (output_js_vertices) fprintf(stdout, "var vertices = [\n");  // ThreeJS
+      if (output_js_vertices) {
+        fprintf(stdout, "\n// x, y, z, is_rapid\nvar vertices = [\n");
+      }
     }
   }
 
@@ -297,11 +323,11 @@ public:
     draw(false, 0, -size); draw(true, 0, size);  // first tick.
     draw(false, 0, 0); draw(true, width, 0);     // full length
     draw(false, width, -size); draw(true, width, size);  // second tick.
-    const char *fmt = show_metric ? "%.2fmm" : "%.3f\"";
+    const char *fmt = show_metric ? kMillimeterUnitFormat : kInchUnitFormat;
     std::string measure = StringPrintf(fmt, show_metric ? width : width / 25.4);
     DrawText(measure, width/2, -size, TextAlign::kCenter, size, draw);
     // For the small start/end markers, don't include the unit for compatness.
-    fmt = show_metric ? "%.2f" : "%.3f";
+    fmt = show_metric ? kMillimeterFormat : kInchFormat;
     measure = StringPrintf(fmt, show_metric ? min : min / 25.4);
     DrawText(measure, 0, size/10, TextAlign::kCenter, size * 0.6,
                [draw, size](bool d, float x, float y) {
@@ -322,7 +348,6 @@ public:
             (max_[AXIS_Y] + min_[AXIS_Y])/2, min_[AXIS_Y], max_[AXIS_Y]);
     fprintf(file_, "/center-z %.3f def %% [%.1f %.1f]\n",
             (max_[AXIS_Z] + min_[AXIS_Z])/2, min_[AXIS_Z], max_[AXIS_Z]);
-
     // TODO(hzeller): this certainly needs to take scale and such into
     // account.
     fprintf(file_, "\n%% If larger than zero, shows perspective\n");
@@ -407,6 +432,14 @@ public:
             min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
 
     fprintf(file_, "grestore\n");
+
+    if (output_js_vertices) {
+      fprintf(stdout, "var item_cube = [");
+      fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
+              min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
+              max_[AXIS_X], max_[AXIS_Y], max_[AXIS_Z]);
+    }
+
   }
 
   void ShowMesaureLines() {
@@ -467,18 +500,18 @@ public:
   }
 
   void PrintPostscriptBoundingBox(float margin_x, float margin_y, float scale,
-                                  int *bounding_w, int *bounding_h) {
+                                  float boundingbox_width) {
     // gs is notoriously bad in dealing with negative origin of the bounding
     // box, so move everything up with the translation box.
     const float range = 1.05 * GetDiagonalLength();
-    if (fixed_size > 0) {
-      scale *= fixed_size / range;
+    if (boundingbox_width > 0) {
+      scale = boundingbox_width / (range+margin_x);
     }
-    *bounding_w = ToPoint(scale * (range+margin_x));
-    *bounding_h = ToPoint(scale * (range+margin_y));
+    const int bb_width = ToPoint(scale * (range+margin_x));
+    const int bb_height = ToPoint(scale * (range+margin_y));
     fprintf(file_, "%%!PS-Adobe-3.0 EPSF-3.0\n"
             "%%%%BoundingBox: %d %d %d %d\n", 0, 0,
-            *bounding_w, *bounding_h);
+            bb_width, bb_height);
     fprintf(file_, "/per-page-setup {%.3f %.3f translate "
             "72 25.4 div dup scale %.3f dup scale} def\n",
             ToPoint(scale * (range+margin_x)/2),
@@ -503,6 +536,7 @@ private:
   const AxesRegister machine_origin_;
   const bool show_ijk_;
 
+  bool last_move_rapid_ = false;
   bool just_homed_ = true;
   AxesRegister min_;
   AxesRegister max_;
@@ -532,6 +566,15 @@ public:
       fprintf(file_, "%s setrgbcolor\n", kMachineMoveColor);
     }
     fprintf(file_, "1 setlinejoin\n");
+
+    if (output_js_vertices) {
+      // TODO: this is wrong if the homing is on max.
+      fprintf(stdout, "var machine_cube = [");
+      fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
+              0.0, 0.0, 0.0,
+              config_.move_range_mm[AXIS_X],
+              config_.move_range_mm[AXIS_Y],config_.move_range_mm[AXIS_Z]);
+    }
   }
 
   ~MotorOperationsPrinter() {
@@ -797,48 +840,56 @@ private:
   MotorOperationsPrinter(const MotorOperationsPrinter &);
 };
 
-static int usage(const char *progname) {
+static int usage(const char *progname, bool description = false) {
   std::string view_names;
   for (auto it : kNamedViews) {
     if (!view_names.empty()) view_names.append(", ");
     view_names.append(it.first);
   }
 
+  if (description) {
+    fprintf(stderr,
+            "Utility to visualize the GCode path and the resulting machine\n"
+            "movement with speed colorization, dependent on configuration.\n"
+            "(Without config, only GCode path is shown)\n\n");
+  }
+
   fprintf(stderr, "Usage: %s [options] <gcode-file>\n"
           "Options:\n"
           "\t-o <output-file>  : Name of output file; stdout default.\n"
-          "\t-c <config>       : Machine config\n"
+          "\t-c <config>       : BeagleG machine config.\n"
           "\t-T <tool-diameter>: Tool diameter in mm.\n"
-          "\t-t <threshold-angle> : Threshold angle for accleration opt\n"
-          "\t-s                : Visualize movement speeds\n"
-          "\t-D                : Don't show dimensions\n"
-          "\t-M                : Don't show machine path, only GCode path\n"
-          "\t-i                : Toggle show IJK control lines\n"
-          "\t[---- Visualization ---- ]\n"
-          "\t-S<factor>        : Scale the output (e.g. to fit on page)\n"
+          "\t-t <threshold-angle> : Threshold angle for accleration opt.\n"
+          "\t-q                : Quiet.\n"
+          "\t-s                : Visualize movement speeds.\n"
+          "\t-D                : Don't show dimensions.\n"
+          "\t-M                : Don't show machine path, only GCode path.\n"
+          "\t-i                : Toggle show IJK control lines.\n"
+          "[---- Visualization ---- ]\n"
+          "\t-w<width>         : Width in point (no unit) or mm (if appended)\n"
           "\t-e<distance>      : Eye distance in mm to show perspective.\n"
           "\t-a<frames>        : animation: create these number of frames "
-          "showing rotation around vertical axis\n"
-          "\t[---- Rotation. Multiple can be applied in sequence ----]\n"
+          "showing rotation around vertical.\n"
+          "[---- Rotation. Multiple can be applied in sequence ----]\n"
           "\t-R<roll>          : Roll: Rotate around axis pointing towards and through canvas\n"
           "\t-P<roll>          : Pitch: Rotate around horizontal axis.\n"
           "\t-Y<roll>          : Yaw: Rotate around vertical axis.\n"
-          "\t-V<view>          : Shortcut: view. One of {%s}\n"
-          "Without config, only GCode path is shown; with config also the\n"
-          "actual machine path.\n", progname, view_names.c_str());
+          "\t-V<view>          : Shortcut: view. One of {%s}\n",
+          progname, view_names.c_str());
   return 1;
 }
 
-static bool ParseFile(GCodeParser *parser, const char *filename, bool do_reset) {
+static bool ParseFile(GCodeParser *parser, const char *filename,
+                      bool do_reset, FILE *msg_stream) {
   const int fd = open(filename, O_RDONLY);
   if (fd < 0) {
     fprintf(stderr, "Cannot open %s\n", filename);
     return false;
   }
 
-  parser->ParseStream(fd, stderr);
+  parser->ParseStream(fd, msg_stream);
   // Make sure to reset parser properly.
-  if (do_reset) parser->ParseLine("G28 M02", stderr);  // M02 needs to be last.
+  if (do_reset) parser->ParseLine("G28 M02", msg_stream); // M02 needs to be last.
 
   close(fd);
   return true;
@@ -919,16 +970,21 @@ int main(int argc, char *argv[]) {
   bool range_check = false;
   bool show_ijk = true;
   float scale = 1.0f;
+  float bounding_box_width_mm = -1;
   std::vector<std::string> rotate_ops;
   float eye_distance = -1;
   int animation_frames = -1;
+  bool quiet = false;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:q")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
       output_file = fopen(out_filename.c_str(), "w");
+      break;
+    case 'q':
+      quiet = true;
       break;
     case 't':
       threshold_angle = (float)atof(optarg);
@@ -950,6 +1006,12 @@ int main(int argc, char *argv[]) {
       break;
     case 'S':
       scale = atof(optarg);
+      break;
+    case 'w':
+      bounding_box_width_mm = atof(optarg);
+      if (strstr(optarg, "mm") == nullptr) {  // no mm ? Then back to pt.
+        bounding_box_width_mm = bounding_box_width_mm / 72 * 25.4;
+      }
       break;
     case 'e':
       eye_distance = atof(optarg);
@@ -991,7 +1053,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (optind >= argc)
-    return usage(argv[0]);
+    return usage(argv[0], true);
 
   if (output_file == NULL) {
     fprintf(stderr, "Could not create output file.\n");
@@ -1024,6 +1086,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  FILE *const msg_stream = quiet ? fopen("/dev/null", "w") : stderr;
+
   GCodeParser::Config::ParamMap parameters;  // TODO: read from file ?
   parser_cfg.parameters = &parameters;
 
@@ -1031,12 +1095,11 @@ int main(int argc, char *argv[]) {
                                      show_ijk);
   gcode_printer.SetPass(ProcessingStep::Preprocess);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
-  ParseFile(&gcode_viz_parser, filename, true);
+  ParseFile(&gcode_viz_parser, filename, true, msg_stream);
 
-  int bbox_w, bbox_h;
   gcode_printer.PrintPostscriptBoundingBox(printMargin,
                                            printMargin + (show_speeds ? 15 : 0),
-                                           scale, &bbox_w, &bbox_h);
+                                           scale, bounding_box_width_mm);
 
   gcode_printer.PrintHeader(printMargin, eye_distance, animation_frames);
 
@@ -1074,7 +1137,7 @@ int main(int argc, char *argv[]) {
       output_file, machine_config, tool_diameter_mm, show_speeds);
     GCodeMachineControl *machine_control
       = GCodeMachineControl::Create(machine_config, &motor_operations_printer,
-                                    &hardware, &spindle, stderr);
+                                    &hardware, &spindle, msg_stream);
     if (!machine_control) {
       // Ups, let's do it again with logging enabled to human-readably
       // print anything that might hint what the problem is.
@@ -1087,16 +1150,16 @@ int main(int argc, char *argv[]) {
       motor_operations_printer.SetPass(ProcessingStep::Preprocess);
       GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver(),
                          false);
-      ParseFile(&parser, filename, true);
+      ParseFile(&parser, filename, true, msg_stream);
 
-      machine_control->SetMsgOut(stderr);
+      machine_control->SetMsgOut(msg_stream);
       // The moves are segmented into colored segments. Don't make segments
       // unnecessarily small but somehow relate it to the maximum size of the
       // result.
       motor_operations_printer.SetColorSegmentLength(
         gcode_printer.GetDiagonalLength()/100);
       motor_operations_printer.SetPass(ProcessingStep::GenerateOutput);
-      ParseFile(&parser, filename, false);
+      ParseFile(&parser, filename, false, msg_stream);
 
       if (show_speeds) {
         float x, y, w, h;
@@ -1110,7 +1173,7 @@ int main(int argc, char *argv[]) {
   gcode_printer.ShowHomePos(parser_cfg.machine_origin);
   // We print the gcode on top of the colored machine visualization.
   gcode_printer.SetPass(ProcessingStep::GenerateOutput);
-  ParseFile(&gcode_viz_parser, filename, false);
+  ParseFile(&gcode_viz_parser, filename, false, msg_stream);
 
   if (animation_frames > 0) {
     fprintf(output_file, "} def\n");
@@ -1130,18 +1193,25 @@ int main(int argc, char *argv[]) {
 
   fclose(output_file);
 
-  if (animation_frames > 0 && !out_filename.empty()) {
+  if (!out_filename.empty() && !quiet) {
     const char *const f = out_filename.c_str();
-    int antialias_factor = 2;
-    fprintf(stderr,
-            "\n\n-- Convert the PostScript file to an animation with --\n"
-            "gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m "
-            "-sOutputFile=%s-anim-tmp-%%04d.png -r%dx%d -g%dx%d %s && "
-            "convert -scale %dx%d %s-anim-tmp-????.png %s.gif && "
-            "rm -f %s-anim-tmp-????.png\n",
-            f, antialias_factor*72, antialias_factor*72,
-            antialias_factor*bbox_w, antialias_factor*bbox_h, f,
-            bbox_w, bbox_h, f, f, f);
+    if (animation_frames > 0) {
+      fprintf(stderr,
+              "\n\n-- Convert the PostScript file to %s.gif animation with --\n"
+              "gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m "
+              "-dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop "
+              "-sOutputFile=%s-anim-tmp-%%04d.png %s && "
+              "convert %s-anim-tmp-????.png %s.gif && "
+              //"ffmpeg -i %s-anim-tmp-%%04d.png -r 20 %s.mp4 && "
+              "rm -f %s-anim-tmp-????.png\n", f, f, f, f, f, f);
+    } else {
+      fprintf(stderr,
+              "\n\n-- Convert to image %s.png with --\n"
+              "gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m "
+              "-dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop "
+              "-sOutputFile=%s.png %s\n", f, f, f);
+
+    }
   }
 
   return gcode_viz_parser.error_count() == 0 ? 0 : 1;

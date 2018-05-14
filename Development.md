@@ -61,22 +61,80 @@ touched that piece of code.
 ### gcode2ps
 Manual inspection is also useful. A little tool to visually inspect the planner
 output is `src/gcode2ps`. It is a tool that reads gcode and outputs the raw
-gcode path and the machine path that it generates as a printable PostScript file.
-With the `-s` option, it is possible to visualize the speed, so you can see
-where the tool-path is accelerated and decelerated. For easier
-handling (or sending examples to the mailing list), you might want to convert
-the result into a PNG image:
+gcode path and the actual machine path with speed annotations. Generates
+a printable PostScript file.
 
-```bash
-$ src/gcode2ps -o /tmp/hello.ps -c machine.config -s somegcode.gcode
-$ make -C src /tmp/hello.png   # create a PNG image out of it if needed.
+```
+$ src/gcode2ps
+Utility to visualize the GCode path and the resulting machine
+movement with speed colorization, dependent on configuration.
+(Without config, only GCode path is shown)
+
+Usage: ./gcode2ps [options] <gcode-file>
+Options:
+        -o <output-file>  : Name of output file; stdout default.
+        -c <config>       : BeagleG machine config.
+        -T <tool-diameter>: Tool diameter in mm.
+        -t <threshold-angle> : Threshold angle for accleration opt.
+        -s                : Visualize movement speeds.
+        -D                : Don't show dimensions.
+        -M                : Don't show machine path, only GCode path.
+        -i                : Toggle show IJK control lines.
+[---- Visualization ---- ]
+        -w<width>         : Width in point (no unit) or mm (if appended)
+        -e<distance>      : Eye distance in mm to show perspective.
+        -a<frames>        : animation: create these number of frames showing rotation around vertical.
+[---- Rotation. Multiple can be applied in sequence ----]
+        -R<roll>          : Roll: Rotate around axis pointing towards and through canvas
+        -P<roll>          : Pitch: Rotate around horizontal axis.
+        -Y<roll>          : Yaw: Rotate around vertical axis.
+        -V<view>          : Shortcut: view. One of {front, isometric, left, right, top}
 ```
 
-<img src="./img/sample-gcode2ps.png" width="200"/>
-<img src="./img/sample-gcode2ps-2.png" width="200"/>
+With the `-s` option, it is possible to visualize the speed, so you can see
+where the tool-path is accelerated and decelerated (this is directly taken
+out of the planner output, so it is _exactly_ what BeagleG would do with
+a real amchine. This is why it is invaluable as debugging tool).
 
-This is used for the visual end2end output creating a HTML page with images
-of a set of testing `*.gcode` files.
+For easier handling (or sending examples to the mailing list), you might want
+to convert the result into a PNG image. The tool prints out how you'd call
+ghostscript to do the conversion:
+
+```bash
+$ src/gcode2ps -w800 -o /tmp/hello.ps -c machine.config -s somegcode.gcode
+-- Convert to image /tmp/hello.ps.png with --
+gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -sOutputFile=/tmp/hello.ps.png /tmp/hello.ps
+```
+
+<img src="./img/sample-gcode2ps.png" width="200"/><img src="./img/sample-gcode2ps-2.png" width="200"/>
+
+If you don't give a machine-configuration (`-c`) or give the `-M` option, only
+the gcode path is displayed (note that helper lines such as the radius
+indication of the `G3` call or the spline control-point vectors in the
+second example are shown in dotted lightblue; you can switch
+that off with `-i`). Rapid moves (`G0`) are light-gray, regular moves (`G1`)
+black:
+
+<img src="./img/sample-gcode2ps-gcode.png" width="280"/><img src="./img/sample-gcode2ps-gcode-1.png" width="280"/>
+
+By default, the output shows a top view of the X/Y axis, but you can
+choose a view with `-V` or choose rotation. In this example, the same 3D path
+shown with `-Vtop` (which is also the default) vs. `-Visometric`
+(you can abbreviate these views, e.g. `-Vt` and `-Vi` would work as well).
+
+<img src="./img/sample-gcode2ps-topview.png" width="220"/><img src="./img/sample-gcode2ps-isometric.png" width="220"/>
+
+The default view is orthogonal, but with `-e<eye-distance>`, you can add
+perspective. Note: the 3D projection is calculated in the PostScript itself,
+so you can edit the file and modify the projection angles there.
+
+As a, wait for it, _silly twist_, you can also generate animations; enable
+with the `-a` option. Here `-e150 -a36`, generating 36 frames.
+
+<img src="./img/sample-gcode2ps-anim.gif"/>
+
+This tool is used for the visual end2end output creating a HTML page with
+images of a set of testing `*.gcode` files:
 
 ```
 make -C src test-html
