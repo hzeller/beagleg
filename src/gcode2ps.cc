@@ -86,6 +86,8 @@ static bool show_beagleg = true;
 // G-code rendering
 static constexpr char kGcodeMoveColor[] = "0 0 0";
 static constexpr char kGcodeRapidMoveColor[] = "0.7 0.7 0.7";
+static constexpr char kGcodeOriginMarkColor[] = "0.5 0.5 0.8";
+static constexpr char kGcodeOriginTextColor[] = "0 0 0";
 
 // Machine movement rendering.
 static constexpr char kOutOfRangeColor[] = "1 0.5 0.5";
@@ -157,7 +159,10 @@ public:
     if (include_home) RememberMinMax(machine_origin_);
     just_homed_ = true;
   }
-  void inform_origin_offset(const AxesRegister& axes) final {
+  void inform_origin_offset(const AxesRegister& axes, const char *n) final {
+    if (pass_ == ProcessingStep::GenerateOutput) {
+      ShowNamedOrigin(axes, n);
+    }
 #if 0
     // Should we print an origin marker here ?
     fprintf(stderr, "Got origin [%f,%f,%f]\n",
@@ -484,19 +489,48 @@ public:
     fprintf(file_, "stroke 0 0 0 setrgbcolor\n");
   }
 
+  void ShowNamedOrigin(const AxesRegister &origin, const char *named) {
+    fprintf(file_, "\n%% -- Origin %s\n", named);
+    const float size = GetDiagonalLength() / 70;
+    fprintf(file_, "currentpoint3d stroke gsave "
+            "%s setrgbcolor 0 setlinewidth ",
+            kGcodeOriginTextColor);
+    DrawText(named, size/4, size/4, TextAlign::kLeft, 1.5*size,
+             [this, origin](bool d, float x, float y) {
+               fprintf(file_, "%.3f %.3f %.3f %s\n",
+                       origin[AXIS_X] + x, origin[AXIS_Y] + y, origin[AXIS_Z],
+                       d ? "lineto3d" : "moveto3d");
+             });
+    fprintf(file_, "stroke %s setrgbcolor\n", kGcodeOriginMarkColor);
+    fprintf(file_, "%.3f %.3f %.3f moveto3d\n",
+            origin[AXIS_X] - size, origin[AXIS_Y], origin[AXIS_Z]);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
+            origin[AXIS_X], origin[AXIS_Y] + size, origin[AXIS_Z]);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
+            origin[AXIS_X], origin[AXIS_Y] - size, origin[AXIS_Z]);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
+            origin[AXIS_X] + size, origin[AXIS_Y], origin[AXIS_Z]);
+
+    fprintf(file_, "closepath fill grestore moveto3d\n");
+  }
+
   void ShowHomePos(const AxesRegister &origin) {
-    fprintf(file_, "\n%% -- Visualize home pos\n");
+    fprintf(file_, "\n%% -- Machine home\n");
     const float size = GetDiagonalLength() / 200;  // 0.5%
-    fprintf(file_, "0 1 1 setrgbcolor %.3f setlinewidth\n", size);
-    fprintf(file_,
-            "%f %f %f moveto3d %f %f %f project2d %.3f 0 360 arc closepath "
-            "gsave 0 setgray fill grestore stroke %% This is the home pos.\n",
-            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
-            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
-            size);
-    fprintf(file_, "1 0 0 setrgbcolor 0 0 0 moveto3d %f 0 0 lineto3d stroke %% X-origin\n", 10*size);
-    fprintf(file_, "0 1 0 setrgbcolor 0 0 0 moveto3d 0 %f 0 lineto3d stroke %% Y-origin\n", 10*size);
-    fprintf(file_, "0 0 1 setrgbcolor 0 0 0 moveto3d 0 0 %f lineto3d stroke %% Z-origin\n", 10*size);
+    fprintf(file_, "currentpoint3d stroke gsave "
+            "%s setrgbcolor %.3f setlinewidth ",
+            kGcodeOriginMarkColor, size);
+    fprintf(file_, "1 0 0 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% X\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
+            origin[AXIS_X] + 10*size, origin[AXIS_Y], origin[AXIS_Z]);
+    fprintf(file_, "0 1 0 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% Y\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
+            origin[AXIS_X], origin[AXIS_Y] + 10*size, origin[AXIS_Z]);
+    fprintf(file_, "0 0 1 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% Z\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
+            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z] + 10*size);
+
+    fprintf(file_, "grestore moveto3d\n");
   }
 
   void PrintPostscriptBoundingBox(float margin_x, float margin_y, float scale,

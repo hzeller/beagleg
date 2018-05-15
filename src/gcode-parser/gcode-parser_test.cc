@@ -65,7 +65,7 @@ public:
   // -- gcode parser callbacks
   void gcode_start(GCodeParser *) final { Count(CALL_gcode_start); }
   void gcode_finished(bool) final { Count(CALL_gcode_finished); }
-  void inform_origin_offset(const AxesRegister &offset) final {
+  void inform_origin_offset(const AxesRegister &offset, const char *n) final {
     parser_offset = offset;
   }
   void go_home(AxisBitmap_t axis_bitmap) final { Count(CALL_go_home); }

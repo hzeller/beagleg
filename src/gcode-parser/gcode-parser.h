@@ -90,7 +90,8 @@ public:
     // machine cube.
     // If needed after the callback returns, the receiver needs to make a copy
     // of the register.
-    virtual void inform_origin_offset(const AxesRegister& offset) {}
+    virtual void inform_origin_offset(const AxesRegister &offset,
+                                      const char *named_offset) {}
 
     // "gcode_command_done" is always executed when a command is completed,
     // which is after internally executed ones (such as G21) or commands that

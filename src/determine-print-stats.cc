@@ -54,8 +54,8 @@ public:
   void wait_temperature() final { delegatee_->wait_temperature(); }
   void motors_enable(bool b) final { delegatee_->motors_enable(b); }
   void go_home(AxisBitmap_t axes) final { /* ignore */ }
-  void inform_origin_offset(const AxesRegister& axes) final {
-    delegatee_->inform_origin_offset(axes);
+  void inform_origin_offset(const AxesRegister& axes, const char *n) final {
+    delegatee_->inform_origin_offset(axes, n);
   }
 
   void dwell(float value) final {

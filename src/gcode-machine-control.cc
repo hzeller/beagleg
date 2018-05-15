@@ -89,7 +89,7 @@ public:
   void gcode_start(GCodeParser *parser) final;
   void gcode_finished(bool end_of_stream) final;  // End of program or stream.
 
-  void inform_origin_offset(const AxesRegister &origin) final;
+  void inform_origin_offset(const AxesRegister &origin, const char *n) final;
 
   void gcode_command_done(char letter, float val) final;
   void input_idle(bool is_first) final;
@@ -320,7 +320,8 @@ void GCodeMachineControl::Impl::motors_enable(bool b) {
 void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
   if (cfg_.acknowledge_lines) mprintf("ok\n");
 }
-void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o) {
+void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o,
+                                                     const char *) {
   coordinate_display_origin_ = o;
 }
 

@@ -85,6 +85,10 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
   return GCODE_NUM_AXES;
 }
 
+static const char *const kCoordinateSystemNames[9] = {
+  "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2", "G59.3"
+};
+
 // We keep the implementation with all its unnecessary details for the user
 // in this implementation.
 class GCodeParser::Impl {
@@ -117,7 +121,7 @@ private:
     set_all_axis_to_absolute(true);   // G90
     set_ijk_absolute(false);          // G91.1
     reset_G92();                      // No global offset.
-    set_current_offset(global_offset_g92_);
+    set_current_offset(global_offset_g92_, "H");
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
 
@@ -152,18 +156,18 @@ private:
 
   // The following methods set the origin and offset and also
   // inform the event receiver about this change.
-  void set_current_offset(const AxesRegister &offset) {
+  void set_current_offset(const AxesRegister &offset, const char *name) {
     current_global_offset_ = &offset;
-    inform_origin_offset_change();
+    inform_origin_offset_change(name);
   }
   // no need yet for set_current_origin().
 
-  void inform_origin_offset_change() {
+  void inform_origin_offset_change(const char *name) {
     AxesRegister visible_origin(*current_origin_);
     for (GCodeParserAxis a : AllAxes()) {
       visible_origin[a] += current_global_offset()[a];
     }
-    callbacks->inform_origin_offset(visible_origin);
+    callbacks->inform_origin_offset(visible_origin, name);
   }
 
   void finish_program_and_reset() {
@@ -1248,8 +1252,6 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
 // Initialize the coordiate systems from the loaded parameters
 void GCodeParser::Impl::InitCoordSystems() {
   float value;
-  const char *kCoordinateSystemNames[9] = {"G54", "G55", "G56", "G57", "G58",
-                                           "G59", "G59.1", "G59.2", "G59.3"};
   for (int i = 0; i < 9; ++i) {
     bool set = false;
     int offset = i * 20;
@@ -1271,7 +1273,7 @@ void GCodeParser::Impl::InitCoordSystems() {
     const int coord_system = (int)value;
     if (value >= 1 && value <= 9) {
       current_origin_ = &coord_system_[coord_system-1];
-      inform_origin_offset_change();
+      inform_origin_offset_change(kCoordinateSystemNames[coord_system-1]);
       Log_debug("Using Coordinate System %s",
                 kCoordinateSystemNames[coord_system]);
     } else {
@@ -1318,7 +1320,8 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
       store_parameter(StringPrintf("%d", 5221 + offset + a), coords[a]);
     }
   } else {
-    gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L or P value\n");
+    gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L%d and/or P%d value\n",
+            l_val, p_val);
   }
   return line;
 }
@@ -1354,7 +1357,7 @@ void GCodeParser::Impl::change_coord_system(float sub_command) {
   }
   store_parameter("5220", coord_system);
   current_origin_ = &coord_system_[coord_system-1];
-  inform_origin_offset_change();
+  inform_origin_offset_change(kCoordinateSystemNames[coord_system-1]);
 }
 
 // Set relative coordinate system
@@ -1376,17 +1379,17 @@ const char *GCodeParser::Impl::handle_G92(float sub_command, const char *line) {
 
       line = remaining_line;
     }
-    set_current_offset(global_offset_g92_);
+    set_current_offset(global_offset_g92_, "G92");
   }
   else if (sub_command == 92.1f) {   // Reset
     reset_G92();
-    set_current_offset(global_offset_g92_);
+    set_current_offset(global_offset_g92_, "");
   }
   else if (sub_command == 92.2f) {   // Suspend
-    set_current_offset(kZeroOffset);
+    set_current_offset(kZeroOffset, "");
   }
   else if (sub_command == 92.3f) {   // Restore
-    set_current_offset(global_offset_g92_);
+    set_current_offset(global_offset_g92_, "G92");
   }
   return line;
 }
@@ -1774,7 +1777,7 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
     // be part of tool-offset or something.
     global_offset_g92_[AXIS_Z] = (axes_pos_[AXIS_Z] - probe_thickness)
       - current_origin()[AXIS_Z];
-    set_current_offset(global_offset_g92_);
+    set_current_offset(global_offset_g92_, "G30");
   }
   return line;
 }
