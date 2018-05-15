@@ -33,6 +33,7 @@ bool GCodeParser::Config::LoadParams() {
     return false;
   }
 
+  // The default coordinate system at start-up is G54
   (*parameters)["5220"] = 1.0f;  // Only non-zero default.
 
   FILE *fp = fopen(paramfile.c_str(), "r");

@@ -1274,8 +1274,8 @@ void GCodeParser::Impl::InitCoordSystems() {
     if (value >= 1 && value <= 9) {
       current_origin_ = &coord_system_[coord_system-1];
       inform_origin_offset_change(kCoordinateSystemNames[coord_system-1]);
-      Log_debug("Using Coordinate System %s",
-                kCoordinateSystemNames[coord_system]);
+      Log_debug("Using Coordinate System from #5220 param: %s",
+                kCoordinateSystemNames[coord_system - 1]);
     } else {
       Log_debug("Invalid Coordinate System in parameters file: 5220=%d\n",
                 coord_system);

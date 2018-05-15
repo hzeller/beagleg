@@ -146,6 +146,7 @@ private:
                                          // (will be trimmed if needed)
   // Current machine configuration
   AxesRegister coordinate_display_origin_; // parser tells us
+  std::string coordinate_display_origin_name_;
   float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
   float prog_speed_factor_;              // Speed factor set by program (M220)
   time_t next_auto_disable_motor_;
@@ -321,8 +322,9 @@ void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
   if (cfg_.acknowledge_lines) mprintf("ok\n");
 }
 void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o,
-                                                     const char *) {
+                                                     const char *named) {
   coordinate_display_origin_ = o;
+  coordinate_display_origin_name_ = named;
 }
 
 void GCodeMachineControl::Impl::set_fanspeed(float speed) {
@@ -551,6 +553,9 @@ void GCodeMachineControl::Impl::mprint_current_position() {
           current_pos[AXIS_Y] - origin[AXIS_Y],
           current_pos[AXIS_Z] - origin[AXIS_Z],
           current_pos[AXIS_E] - origin[AXIS_E]);
+  if (!coordinate_display_origin_name_.empty()) {
+    mprintf(" (%s)", coordinate_display_origin_name_.c_str());
+  }
   mprintf(
 #if M114_DEBUG
     " [ABS. MACHINE CUBE X:%.6f Y:%.6f Z:%.6f]",
