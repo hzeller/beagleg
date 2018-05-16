@@ -76,6 +76,7 @@ Options:
         -c <config>       : BeagleG machine config.
         -T <tool-diameter>: Tool diameter in mm.
         -t <threshold-angle> : Threshold angle for accleration opt.
+        -q                : Quiet.
         -s                : Visualize movement speeds.
         -D                : Don't show dimensions.
         -M                : Don't show machine path, only GCode path.
@@ -84,6 +85,7 @@ Options:
         -w<width>         : Width in point (no unit) or mm (if appended)
         -e<distance>      : Eye distance in mm to show perspective.
         -a<frames>        : animation: create these number of frames showing rotation around vertical.
+        -g<grid>          : Show grid on XY plane. Optional with 'in' unit suffix (default: mm).
 [---- Rotation. Multiple can be applied in sequence ----]
         -R<roll>          : Roll: Rotate around axis pointing towards and through canvas
         -P<roll>          : Pitch: Rotate around horizontal axis.
@@ -106,21 +108,26 @@ $ src/gcode2ps -w800 -o /tmp/hello.ps -c machine.config -s somegcode.gcode
 gs -q -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dTextAlphaBits=4 -dEPSCrop -sOutputFile=/tmp/hello.ps.png /tmp/hello.ps
 ```
 
-<img src="./img/sample-gcode2ps.png" width="200"/><img src="./img/sample-gcode2ps-2.png" width="200"/>
+Depending on the `G20` or `G21` setting in the gcode file, the measurement units
+are displayed in imperial or metric. The `-g` option allows to underlay a
+grid in the X/Y plane, the second example uses `-g 10mm` to show a grid with an
+10mm raster.
+
+<img src="./img/sample-gcode2ps-2.png" width="200"/><img src="./img/sample-gcode2ps.png" width="200"/>
 
 If you don't give a machine-configuration (`-c`) or give the `-M` option, only
-the gcode path is displayed (note that helper lines such as the radius
-indication of the `G3` call or the spline control-point vectors in the
-second example are shown in dotted lightblue; you can switch
-that off with `-i`). Rapid moves (`G0`) are light-gray, regular moves (`G1`)
-black:
+the gcode path is displayed.
+Rapid moves (`G0`) are light-gray, regular moves (`G1`) black.
+Helper lines such as the radius indication of the `G3` call or the spline
+control-point vectors in the second example are shown in dotted lightblue
+(you can switch that off with `-i`).
 
 <img src="./img/sample-gcode2ps-gcode.png" width="280"/><img src="./img/sample-gcode2ps-gcode-1.png" width="280"/>
 
 By default, the output shows a top view of the X/Y axis, but you can
 choose a view with `-V` or choose rotation. In this example, the same 3D path
 shown with `-Vtop` (which is also the default) vs. `-Visometric`
-(you can abbreviate these views, e.g. `-Vt` and `-Vi` would work as well).
+(you can abbreviate these views, e.g. `-Vt` and `-Viso` would work as well).
 
 <img src="./img/sample-gcode2ps-topview.png" width="220"/><img src="./img/sample-gcode2ps-isometric.png" width="220"/>
 

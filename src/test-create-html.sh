@@ -8,7 +8,7 @@ fi
 
 #OPTIONAL_VALGRIND="valgrind --error-exitcode=5"
 IMAGE_SIZE="24%"
-PARAMS="-q -w1200 -t16 -Viso"
+PARAMS="-q -w1200 -t16 -Viso -g10"
 
 # For now, let's use the configuration in which each axis has the same steps/mm.
 # The step-speed-different.config _should_ look the same in the output, but

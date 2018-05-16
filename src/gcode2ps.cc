@@ -88,6 +88,7 @@ static constexpr char kGcodeMoveColor[] = "0 0 0";
 static constexpr char kGcodeRapidMoveColor[] = "0.7 0.7 0.7";
 static constexpr char kGcodeOriginMarkColor[] = "0.5 0.5 0.8";
 static constexpr char kGcodeOriginTextColor[] = "0 0 0";
+static constexpr char kGcodeGridColor[] = "0.7 0.7 0.9";
 
 // Machine movement rendering.
 static constexpr char kOutOfRangeColor[] = "1 0.5 0.5";
@@ -373,6 +374,26 @@ public:
     }
 
     fprintf(file_, "%s", kPSHeader);
+  }
+
+  static float start_grid(float min_value, float grid) {
+    const float offset = fmod(min_value, grid);
+    const float start = min_value - offset;
+    return start < min_value ? start + grid : start;
+  }
+
+  void DrawGrid(float d) {
+    fprintf(file_, "\n%% -- Grid\n");
+    fprintf(file_, "%s setrgbcolor 0 setlinewidth\n", kGcodeGridColor);
+    for (float x = start_grid(min_[AXIS_X], d) ; x < max_[AXIS_X]; x += d) {
+      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
+              x, min_[AXIS_Y], min_[AXIS_Z], x, max_[AXIS_Y], min_[AXIS_Z]);
+    }
+    for (float y = start_grid(min_[AXIS_Y], d) ; y < max_[AXIS_Y]; y += d) {
+      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
+              min_[AXIS_X], y, min_[AXIS_Z], max_[AXIS_X], y, min_[AXIS_Z]);
+    }
+    fprintf(file_, "stroke %% end grid\n");
   }
 
   void PrintModelFrame() {
@@ -904,6 +925,7 @@ static int usage(const char *progname, bool description = false) {
           "\t-e<distance>      : Eye distance in mm to show perspective.\n"
           "\t-a<frames>        : animation: create these number of frames "
           "showing rotation around vertical.\n"
+          "\t-g<grid>          : Show grid on XY plane. Optional with 'in' unit suffix (default: mm).\n"
           "[---- Rotation. Multiple can be applied in sequence ----]\n"
           "\t-R<roll>          : Roll: Rotate around axis pointing towards and through canvas\n"
           "\t-P<roll>          : Pitch: Rotate around horizontal axis.\n"
@@ -1009,9 +1031,10 @@ int main(int argc, char *argv[]) {
   float eye_distance = -1;
   int animation_frames = -1;
   bool quiet = false;
+  float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:q")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:qg:")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1022,6 +1045,10 @@ int main(int argc, char *argv[]) {
       break;
     case 't':
       threshold_angle = (float)atof(optarg);
+      break;
+    case 'g':
+      grid = (float)atof(optarg);
+      if (strstr(optarg, "in") != nullptr) grid *= 25.4;
       break;
     case 'c':
       config_file = strdup(optarg);
@@ -1154,6 +1181,7 @@ int main(int argc, char *argv[]) {
   }
 
   gcode_printer.PrintModelFrame();
+  if (grid > 0) gcode_printer.DrawGrid(grid);
   if (show_dimensions) gcode_printer.ShowMesaureLines();
 
   if (config_file && show_machine_path) {
