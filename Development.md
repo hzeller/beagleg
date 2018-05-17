@@ -158,6 +158,67 @@ This is a overview of the pipeline components:
 
 ![Processing](./img/machine-control.png)
 
+### Data flow - layers of processing
+The above pictures gives a general idea of the flow of information.
+
+Typically, a higher-level component creates a sequence of operations and
+calls some `Enqueue()` method on a lower level component.
+The decomposing into each of these components allows for easy
+testing and additional buffering.
+
+#### GCodeParser
+Parses G-Codes and emits new target coordinates to move to. Commands that are
+not a simple straight line (Arcs and Bezier curves) are converted into smaller
+movements.
+
+Output are _absolute_ realworld coordinates for logical axes (e.g. X:100mm)
+and the desired speed to travel to it. They are emitted as callback; in our
+case they are calling GCodeMachineControl which passes it straight to the
+planner.
+
+Type: `{AxisRegister abs_pos, float speed}`
+
+#### Planner
+Converts the desired movement and its speed into motor movement commands
+that obey the machine constraints.
+
+For a straight move, might emit a single output or create an acceleration and a
+deceleration segment. The Planner might need to buffer segments before it can
+emit them because it needs some look-ahead to know when to start decelerating
+a bunch of smaller movements to come to a stop in time.
+
+Output is _relative_ motor steps for each of the motors (e.g.
+Motor2:+322 steps), and the start- and end-speed of the axis that travels
+_most_ of the steps (called _defining axis_ in BeagleG lingo) - all the other
+axes are scaled linearly over the move: this results in the linear
+coordinated move.
+
+Type: `{int motor_steps[], float start_steps_per_sec, float end_steps_per_sec}`
+
+#### MotorOperations
+Takes the motor movement requests and converts them into fast-to-be-executed
+instructions for the hardware.
+
+Might need to break up longer segments into multiple as each can
+be at most 64k steps (due to the limits imposed by the fixed-point integer
+arithmetic).
+Prepares parameters needed for the hardware to calculate the timings between
+steps using a Taylor-series.
+
+Also implements means to track where exactly the motor position is at
+any given time to be able to be ready for e-stop/pause/resume operations.
+
+Output: various parameters in a packed struct to be enqueued to the hardware
+ring-buffer (Type: `struct MotionSegment`).
+
+#### MotionQueue
+This receives the hardware parameters from the MotorOperations and executes
+it in some micro-controller or FPGA; in this first implementation, this is
+the PRU in the BeagleBone. The `PRUMotionQueue` is the object on the host
+side communicating via a RingBuffer (residing in PRU SRAM); the PRU side is
+a fairly simple program implemented in assembly. This can be various
+implementations.
+
 ### APIs
 The functionality is implemented in a stack of independently usable APIs.
 Each part of the stack has some well-defined task, and possibly delegates

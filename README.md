@@ -228,7 +228,7 @@ these axes to motor drivers provided by the cape (`motor_1`, `motor_2`,...)
 and end switches (`switch_1`, `switch_2`,...) to logical functions
 (e.g. `min_x`). See the [annotated config file](./sample.config).
 
-## Developing
+## Development
 
 If you want to use the nicely seprated sub-APIs of BeagleG programmatically
 or want to get involved in the development, check
