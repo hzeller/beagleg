@@ -81,6 +81,7 @@ Options:
         -D                : Don't show dimensions.
         -M                : Don't show machine path, only GCode path.
         -i                : Toggle show IJK control lines.
+        -l                : [EXPERIMENTAL]: visualize laser intensity
 [---- Visualization ---- ]
         -w<width>         : Width in point (no unit) or mm (if appended)
         -e<distance>      : Eye distance in mm to show perspective.

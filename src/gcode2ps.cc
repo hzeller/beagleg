@@ -75,13 +75,19 @@
 // This is mostly only really useful for debugging stuff.
 #define SHOW_SPEED_DETAILS 0
 
-// Experimental options right now. Should be command-line flags once they
-// 'graduate'
-static bool include_home = true;    // for part bounding box
-static bool include_origin = false; // for part bounding box (0,0,0)
-static bool output_js_vertices = false;
-static bool show_out_of_range = false;  // show out of range in red.
-static bool show_beagleg = true;
+// Not all of these have command line flags yet.
+struct VisualizationOptions {
+  bool show_ijk = true;
+  bool show_speeds = false;
+  bool show_laser_burn = false;  // experimental. If on, S-value->gcode-bright
+
+  // Not with commad line flags.
+  bool include_home = true;    // for part bounding box
+  bool include_origin = false; // for part bounding box (0,0,0)
+  bool output_js_vertices = false;
+  bool show_out_of_range = false;  // show out of range in red.
+  std::string show_msg = "BeagleG ~ gcode2ps";
+};
 
 // G-code rendering
 static constexpr char kGcodeMoveColor[] = "0 0 0";
@@ -129,10 +135,10 @@ enum class ProcessingStep {
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
   GCodePrintVisualizer(FILE *file, const AxesRegister &machine_origin,
-                       bool show_ijk)
+                       const VisualizationOptions &options)
     : file_(file), machine_origin_(machine_origin),
-      show_ijk_(show_ijk) {
-    if (!include_origin) {
+      opts_(options) {
+    if (!opts_.include_origin) {
       // Make sure that we capture the true ranges of things.
       // TODO: we can use this later to determine if such axis was used,
       // e.g. by comparing max < min
@@ -157,7 +163,7 @@ public:
               machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
               machine_origin_[AXIS_Z]);
     }
-    if (include_home) RememberMinMax(machine_origin_);
+    if (opts_.include_home) RememberMinMax(machine_origin_);
     just_homed_ = true;
   }
   void inform_origin_offset(const AxesRegister& axes, const char *n) final {
@@ -184,7 +190,7 @@ public:
     // causes a call to coordinated move. So if this happens right after a G28
     // we would still include that coordinate even though we don't mean to.
     // TODO: there needs to be a callback that just sets the feedrate.
-    if (!include_home && axes == machine_origin_)
+    if (!opts_.include_home && axes == machine_origin_)
       return true;
     if (pass_ == ProcessingStep::Preprocess) {
       RememberMinMax(axes);
@@ -196,11 +202,18 @@ public:
                 rapid ? "G0 rapid" : "G1 coordinated");
         last_move_rapid_ = rapid;
       }
-      const bool not_show_after_home = just_homed_ && !include_home;
+      const bool not_show_after_home = just_homed_ && !opts_.include_home;
+      if (opts_.show_laser_burn && laser_max_ > laser_min_
+          && laser_intensity_ != last_laser_intensity_) {
+        const float scaled_intensity = (laser_intensity_ - laser_min_)
+          / (laser_max_ - laser_min_);
+        fprintf(file_, "%.2f setgray ", 1 - scaled_intensity);
+        last_laser_intensity_ = laser_intensity_;
+      }
       fprintf(file_, "%.3f %.3f %.3f %s\n",
               axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
-              not_show_after_home ? "moveto3d % post-G28" : "lineto3d");
-      if (output_js_vertices)
+              not_show_after_home ? "moveto3d % post-G28" : "lineto3ds");
+      if (opts_.output_js_vertices)
         fprintf(stdout, " [%.3f, %.3f, %.3f, %s],\n",   // ThreeJS
                 axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
                 rapid ? "true":"false");
@@ -214,7 +227,7 @@ public:
                 const AxesRegister &start,
                 const AxesRegister &center,
                 const AxesRegister &end) final {
-    if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
+    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
       const float line_size = GetDiagonalLength() / 500.0;
       fprintf(file_,
               "stroke currentpoint3d\n"  // remember for after the place
@@ -236,7 +249,7 @@ public:
                    const AxesRegister &start,
                    const AxesRegister &cp1, const AxesRegister &cp2,
                    const AxesRegister &end) final {
-    if (pass_ == ProcessingStep::GenerateOutput && show_ijk_) {
+    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
       const float line_size = GetDiagonalLength() / 500.0;
       fprintf(file_,
               "stroke currentpoint3d\n"  // remember for after the place
@@ -269,6 +282,12 @@ public:
   }
 
   const char *unprocessed(char letter, float value, const char *remain) final {
+    if (letter == 'S') {
+      // Hack to visualize brightness in lasing applications.
+      laser_intensity_ = value;
+      if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
+      if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
+    }
     return NULL;
   }
 
@@ -278,13 +297,13 @@ public:
       fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n",
               GetDiagonalLength() / 1000.0);
 
-      if (include_home) {
+      if (opts_.include_home) {
         fprintf(file_, "%f %f %f moveto3d  %% Machine origin but not homed.\n",
                 machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
                 machine_origin_[AXIS_Z]);
       }
 
-      if (output_js_vertices) {
+      if (opts_.output_js_vertices) {
         fprintf(stdout, "\n// x, y, z, is_rapid\nvar vertices = [\n");
       }
     }
@@ -300,7 +319,7 @@ public:
       fprintf(file_, "stroke\n");
       fprintf(file_, "%% -- Finished GCode Path.\n");
 
-      if (output_js_vertices) fprintf(stdout, "];\n"); // ThreeJS
+      if (opts_.output_js_vertices) fprintf(stdout, "];\n"); // ThreeJS
     }
   }
 
@@ -459,7 +478,7 @@ public:
 
     fprintf(file_, "grestore\n");
 
-    if (output_js_vertices) {
+    if (opts_.output_js_vertices) {
       fprintf(stdout, "var item_cube = [");
       fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
               min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
@@ -495,10 +514,15 @@ public:
               x + min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
-    if (show_beagleg) {
+    if (!opts_.show_msg.empty()) {
       fprintf(file_, "0.7 0.7 0.7 setrgbcolor\n");
-      DrawText("BeagleG ~ gcode2ps",
-               size, 0.3*size, TextAlign::kLeft, size*0.7, x_xy_draw);
+      float text_size = size * 0.7;
+      const float text_width = TextWidth(opts_.show_msg, text_size);
+      const float max_x_space = (max_[AXIS_X] - min_[AXIS_X]) - 2*size;
+      if (text_width > max_x_space)
+        text_size *= max_x_space / text_width;
+      DrawText(opts_.show_msg, size, 0.3*size,
+               TextAlign::kLeft, text_size, x_xy_draw);
       fprintf(file_, "stroke\n");
     }
     fprintf(file_, "0.8 0 0 setrgbcolor               %% X-axis\n");
@@ -589,10 +613,16 @@ private:
 
   FILE *const file_;
   const AxesRegister machine_origin_;
-  const bool show_ijk_;
+  const VisualizationOptions opts_;
 
+  float laser_intensity_ = 1.0;
+
+
+  float last_laser_intensity_ = 1.0;
   bool last_move_rapid_ = false;
   bool just_homed_ = true;
+
+  float laser_min_ = 1e6, laser_max_ = -1e6;
   AxesRegister min_;
   AxesRegister max_;
   ProcessingStep pass_ = ProcessingStep::Init;
@@ -607,22 +637,22 @@ private:
 class MotorOperationsPrinter : public MotorOperations {
 public:
   MotorOperationsPrinter(FILE *file, const MachineControlConfig &config,
-                         float tool_dia, bool show_speeds)
-    : file_(file), config_(config), show_speeds_(show_speeds) {
+                         float tool_dia, const VisualizationOptions &options)
+    : file_(file), config_(config), opts_(options) {
     fprintf(file_, "\n%% -- Machine path. %s\n",
-            show_speeds ? "Visualizing travel speeds" : "Simple.");
+            opts_.show_speeds ? "Visualizing travel speeds" : "Simple.");
     fprintf(file_, "%% Note, larger tool diameters slow down "
             "PostScript interpreters a lot!\n");
     fprintf(file_, "/tool-diameter %.2f def\n\n", tool_dia);
 
     fprintf(file_, "tool-diameter setlinewidth\n");
     fprintf(file_, "0 0 0 moveto3d\n");
-    if (!show_speeds_) {
+    if (!opts_.show_speeds) {
       fprintf(file_, "%s setrgbcolor\n", kMachineMoveColor);
     }
     fprintf(file_, "1 setlinejoin\n");
 
-    if (output_js_vertices) {
+    if (opts_.output_js_vertices) {
       // TODO: this is wrong if the homing is on max.
       fprintf(stdout, "var machine_cube = [");
       fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
@@ -710,7 +740,7 @@ public:
   }
 
   bool isWithinMachineCube(const MotorsRegister &m) const {
-    if (!show_out_of_range) return true;
+    if (!opts_.show_out_of_range) return true;
     return inRange(m[AXIS_X], AXIS_X)
       && inRange(m[AXIS_Y], AXIS_Y)
       && inRange(m[AXIS_Z], AXIS_Z);
@@ -729,7 +759,7 @@ public:
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
 
-    if (show_speeds_) {
+    if (opts_.show_speeds) {
 #if SHOW_SPEED_DETAILS
       fprintf(file_, "%% dx:%f dy:%f dz:%f %s (speed: %.1f->%.1f)\n",
               dx_mm, dy_mm, dz_mm,
@@ -877,7 +907,7 @@ public:
 private:
   FILE *const file_;
   const MachineControlConfig &config_;
-  const bool show_speeds_;
+  const VisualizationOptions opts_;
 
   unsigned segment_count_ = 0;
   float min_v_ = 1e10;
@@ -920,6 +950,7 @@ static int usage(const char *progname, bool description = false) {
           "\t-D                : Don't show dimensions.\n"
           "\t-M                : Don't show machine path, only GCode path.\n"
           "\t-i                : Toggle show IJK control lines.\n"
+          "\t-l                : [EXPERIMENTAL]: visualize laser intensity\n"
           "[---- Visualization ---- ]\n"
           "\t-w<width>         : Width in point (no unit) or mm (if appended)\n"
           "\t-e<distance>      : Eye distance in mm to show perspective.\n"
@@ -1016,15 +1047,14 @@ void ClearAndWarnIfNotEmpty(const char *msg, std::vector<std::string> *v) {
 
 int main(int argc, char *argv[]) {
   const char *config_file = NULL;
+  VisualizationOptions vis_options;
   FILE *output_file = stdout;
   std::string out_filename;
   float tool_diameter_mm = -1;
   bool show_dimensions = true;
   bool show_machine_path = true;
   float threshold_angle = 0;
-  bool show_speeds = false;
   bool range_check = false;
-  bool show_ijk = true;
   float scale = 1.0f;
   float bounding_box_width_mm = -1;
   std::vector<std::string> rotate_ops;
@@ -1034,7 +1064,7 @@ int main(int argc, char *argv[]) {
   float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:qg:")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:qg:l")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1050,6 +1080,9 @@ int main(int argc, char *argv[]) {
       grid = (float)atof(optarg);
       if (strstr(optarg, "in") != nullptr) grid *= 25.4;
       break;
+    case 'l':
+      vis_options.show_laser_burn = true;
+      break;
     case 'c':
       config_file = strdup(optarg);
       break;
@@ -1063,7 +1096,7 @@ int main(int argc, char *argv[]) {
       tool_diameter_mm = atof(optarg);
       break;
     case 's':
-      show_speeds = true;
+      vis_options.show_speeds = true;
       break;
     case 'S':
       scale = atof(optarg);
@@ -1078,7 +1111,7 @@ int main(int argc, char *argv[]) {
       eye_distance = atof(optarg);
       break;
     case 'i':
-      show_ijk = !show_ijk;
+      vis_options.show_ijk = !vis_options.show_ijk;
       break;
     case 'r':
       range_check = true;
@@ -1121,9 +1154,9 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  show_speeds &= (show_machine_path);
+  vis_options.show_speeds &= (show_machine_path);
 
-  if (show_speeds && !config_file) {
+  if (vis_options.show_speeds && !config_file) {
     fprintf(stderr, "Need machine-control config (-c) to show speeds (-s)\n");
     return usage(argv[0]);
   }
@@ -1153,14 +1186,15 @@ int main(int argc, char *argv[]) {
   parser_cfg.parameters = &parameters;
 
   GCodePrintVisualizer gcode_printer(output_file, parser_cfg.machine_origin,
-                                     show_ijk);
+                                     vis_options);
   gcode_printer.SetPass(ProcessingStep::Preprocess);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
   ParseFile(&gcode_viz_parser, filename, true, msg_stream);
 
-  gcode_printer.PrintPostscriptBoundingBox(printMargin,
-                                           printMargin + (show_speeds ? 15 : 0),
-                                           scale, bounding_box_width_mm);
+  gcode_printer.PrintPostscriptBoundingBox(
+    printMargin,
+    printMargin + (vis_options.show_speeds ? 15 : 0),
+    scale, bounding_box_width_mm);
 
   gcode_printer.PrintHeader(printMargin, eye_distance, animation_frames);
 
@@ -1196,7 +1230,7 @@ int main(int argc, char *argv[]) {
     Spindle spindle;
 
     MotorOperationsPrinter motor_operations_printer(
-      output_file, machine_config, tool_diameter_mm, show_speeds);
+      output_file, machine_config, tool_diameter_mm, vis_options);
     GCodeMachineControl *machine_control
       = GCodeMachineControl::Create(machine_config, &motor_operations_printer,
                                     &hardware, &spindle, msg_stream);
@@ -1223,7 +1257,7 @@ int main(int argc, char *argv[]) {
       motor_operations_printer.SetPass(ProcessingStep::GenerateOutput);
       ParseFile(&parser, filename, false, msg_stream);
 
-      if (show_speeds) {
+      if (vis_options.show_speeds) {
         float x, y, w, h;
         gcode_printer.GetDimensions(&x, &y, &w, &h);
         motor_operations_printer.PrintColorLegend(x+0.05*w, y+h, 0.9*w);
@@ -1641,6 +1675,16 @@ const char *kPSHeader = R"(
   /last_y exch def
   /last_x exch def
   last_x last_y last_z project2d lineto
+ } def
+
+
+% a lineto with stroke, but keeping currentpoint
+/lineto3ds {
+  /last_z exch def
+  /last_y exch def
+  /last_x exch def
+  last_x last_y last_z project2d lineto
+  currentpoint stroke moveto
  } def
 
 /moveto3d-last {  % Useful after a stroke without having to push currentpoint3d
