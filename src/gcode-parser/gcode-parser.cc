@@ -1426,6 +1426,9 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
       feedrate = f_param_to_feedrate(unit_value);
       any_change = true;
     }
+    else if (axis_l == 'S') {
+      callbacks->change_spindle_speed(value);
+    }
     else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)

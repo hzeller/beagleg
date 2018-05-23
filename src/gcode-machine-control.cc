@@ -382,6 +382,7 @@ void GCodeMachineControl::Impl::handle_M105() {
   mprintf("T-300\n");
 }
 
+// TODO(hzeller): the M3/M4 block should be dealt with in the gcode parser.
 const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
                                                       const char *remaining) {
   int spindle_rpm = -1;

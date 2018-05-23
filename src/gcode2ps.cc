@@ -281,13 +281,14 @@ public:
     }
   }
 
+  void change_spindle_speed(float value) final {
+    // Hack to visualize brightness in lasing applications.
+    laser_intensity_ = value;
+    if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
+    if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
+  }
+
   const char *unprocessed(char letter, float value, const char *remain) final {
-    if (letter == 'S') {
-      // Hack to visualize brightness in lasing applications.
-      laser_intensity_ = value;
-      if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
-      if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
-    }
     return NULL;
   }
 

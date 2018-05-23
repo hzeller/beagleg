@@ -121,6 +121,14 @@ public:
     virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
                             float *probed_position) { return false; }
 
+    // TODO: M3/M4 should be dealt with in the parser.
+    //TODOvirtual void set_spindle_on(bool ccw, float value) {}
+    //TODOvirtual void set_spindle_off() {}
+
+    // Change of spindle speed in the current mode.
+    // This might be part of a G0/G1 code.
+    virtual void change_spindle_speed(float value) {}
+
     virtual void set_speed_factor(float factor) = 0;// M220 feedrate factor 0..1
     virtual void set_fanspeed(float value) = 0;     // M106, M107: speed 0...255
     virtual void set_temperature(float degrees_c)=0; // M104, M109: Set temp. in Celsius
