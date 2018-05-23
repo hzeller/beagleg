@@ -949,7 +949,8 @@ static int usage(const char *progname, bool description = false) {
           "\t-q                : Quiet.\n"
           "\t-s                : Visualize movement speeds.\n"
           "\t-D                : Don't show dimensions.\n"
-          "\t-M                : Don't show machine path, only GCode path.\n"
+          "\t-G                : Suppress GCode output, just show machine path.\n"
+          "\t-M                : Suppress machine path output.\n"
           "\t-i                : Toggle show IJK control lines.\n"
           "\t-l                : [EXPERIMENTAL]: visualize laser intensity\n"
           "[---- Visualization ---- ]\n"
@@ -1053,7 +1054,8 @@ int main(int argc, char *argv[]) {
   std::string out_filename;
   float tool_diameter_mm = -1;
   bool show_dimensions = true;
-  bool show_machine_path = true;
+  bool show_machine_path = true;  // Also requires config.
+  bool show_gcode_path = true;
   float threshold_angle = 0;
   bool range_check = false;
   float scale = 1.0f;
@@ -1065,7 +1067,7 @@ int main(int argc, char *argv[]) {
   float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMt:srS:iR:P:Y:V:e:a:w:qg:l")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMGt:srS:iR:P:Y:V:e:a:w:qg:l")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1092,6 +1094,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'M':
       show_machine_path = false;
+      break;
+    case 'G':
+      show_gcode_path = false;
       break;
     case 'T':
       tool_diameter_mm = atof(optarg);
@@ -1158,8 +1163,16 @@ int main(int argc, char *argv[]) {
   vis_options.show_speeds &= (show_machine_path);
 
   if (vis_options.show_speeds && !config_file) {
-    fprintf(stderr, "Need machine-control config (-c) to show speeds (-s)\n");
-    return usage(argv[0]);
+    fprintf(stderr, "FYI: Need machine-control config (-c) "
+            "to show speeds (-s)\n");
+    vis_options.show_speeds = false;
+  }
+
+  if (vis_options.show_laser_burn && !show_gcode_path) {
+    // TODO: once we pass down the pwm in motor operations, that should work.
+    fprintf(stderr, "FYI: Can only show laser color (-l) if GCode path is "
+            "not disabled with -G\n");
+    vis_options.show_laser_burn = false;
   }
 
   if (tool_diameter_mm >= 0 && !config_file) {
@@ -1268,9 +1281,11 @@ int main(int argc, char *argv[]) {
   }
 
   gcode_printer.ShowHomePos(parser_cfg.machine_origin);
-  // We print the gcode on top of the colored machine visualization.
-  gcode_printer.SetPass(ProcessingStep::GenerateOutput);
-  ParseFile(&gcode_viz_parser, filename, false, msg_stream);
+  if (show_gcode_path) {
+    // We print the gcode on top of the colored machine visualization.
+    gcode_printer.SetPass(ProcessingStep::GenerateOutput);
+    ParseFile(&gcode_viz_parser, filename, false, msg_stream);
+  }
 
   if (animation_frames > 0) {
     fprintf(output_file, "} def\n");

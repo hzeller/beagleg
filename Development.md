@@ -125,6 +125,8 @@ control-point vectors in the second example are shown in dotted lightblue
 
 <img src="./img/sample-gcode2ps-gcode.png" width="280"/><img src="./img/sample-gcode2ps-gcode-1.png" width="280"/>
 
+#### 3D projections
+
 By default, the output shows a top view of the X/Y axis, but you can
 choose a view with `-V` or choose rotation. In this example, the same 3D path
 shown with `-Vtop` (which is also the default) vs. `-Visometric`
@@ -136,11 +138,25 @@ The default view is orthogonal, but with `-e<eye-distance>`, you can add
 perspective. Note: the 3D projection is calculated in the PostScript itself,
 so you can edit the file and modify the projection angles there.
 
+#### Animation
+
 As a, wait for it, _silly twist_, you can also generate animations; enable
 with the `-a` option. Here `-e150 -a36`, generating 36 frames.
 
 <img src="./img/sample-gcode2ps-anim.gif"/>
 
+#### Laser visualization
+
+For laser cutters, the spindle speed is usually translated to the power of
+the laser. With the `-l` option, the spindle speed is translated to the
+brightness of the GCode path (higher spindle => darker line), thus showing you
+an output of a laser scanning application (Note, the actual machine control
+does _not_ yet implement spindle PWM change per line-segment, so it can't yet
+be used for laser cutters. TBD.).
+
+<img src="./img/sample-gcode2ps-laser.png" width=500/>
+
+#### For development testing
 This tool is used for the visual end2end output creating a HTML page with
 images of a set of testing `*.gcode` files:
 
