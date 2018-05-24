@@ -80,13 +80,13 @@ struct VisualizationOptions {
   bool show_ijk = true;
   bool show_speeds = false;
   bool show_laser_burn = false;  // experimental. If on, S-value->gcode-bright
+  std::string show_title = "BeagleG ~ gcode2ps";
 
   // Not with commad line flags.
   bool include_home = true;    // for part bounding box
   bool include_origin = false; // for part bounding box (0,0,0)
   bool output_js_vertices = false;
   bool show_out_of_range = false;  // show out of range in red.
-  std::string show_msg = "BeagleG ~ gcode2ps";
 };
 
 // G-code rendering
@@ -515,14 +515,14 @@ public:
               x + min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
-    if (!opts_.show_msg.empty()) {
+    if (!opts_.show_title.empty()) {
       fprintf(file_, "0.7 0.7 0.7 setrgbcolor\n");
       float text_size = size * 0.7;
-      const float text_width = TextWidth(opts_.show_msg, text_size);
+      const float text_width = TextWidth(opts_.show_title, text_size);
       const float max_x_space = (max_[AXIS_X] - min_[AXIS_X]) - 2*size;
       if (text_width > max_x_space)
         text_size *= max_x_space / text_width;
-      DrawText(opts_.show_msg, size, 0.3*size,
+      DrawText(opts_.show_title, size, 0.3*size,
                TextAlign::kLeft, text_size, x_xy_draw);
       fprintf(file_, "stroke\n");
     }
@@ -959,6 +959,7 @@ static int usage(const char *progname, bool description = false) {
           "\t-a<frames>        : animation: create these number of frames "
           "showing rotation around vertical.\n"
           "\t-g<grid>          : Show grid on XY plane. Optional with 'in' unit suffix (default: mm).\n"
+          "\t-C<caption>       : Caption text\n"
           "[---- Rotation. Multiple can be applied in sequence ----]\n"
           "\t-R<roll>          : Roll: Rotate around axis pointing towards and through canvas\n"
           "\t-P<roll>          : Pitch: Rotate around horizontal axis.\n"
@@ -1067,7 +1068,7 @@ int main(int argc, char *argv[]) {
   float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMGt:srS:iR:P:Y:V:e:a:w:qg:l")) != -1) {
+  while ((opt = getopt(argc, argv, "o:c:T:DMGt:srS:iR:P:Y:V:e:a:w:qg:lC:")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1085,6 +1086,9 @@ int main(int argc, char *argv[]) {
       break;
     case 'l':
       vis_options.show_laser_burn = true;
+      break;
+    case 'C':
+      vis_options.show_title = optarg;
       break;
     case 'c':
       config_file = strdup(optarg);

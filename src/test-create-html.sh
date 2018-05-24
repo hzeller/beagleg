@@ -28,7 +28,7 @@ rm -f $OUT_HTML
 while [ $# -ne 0 ] ; do
     GCODE_FILE=$1
     BASENAME=$(basename $GCODE_FILE .gcode)
-    $OPTIONAL_VALGRIND $GCODE2PS $PARAMS -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE
+    $OPTIONAL_VALGRIND $GCODE2PS $PARAMS -o $TEST_OUT_DIR/${BASENAME}.ps $BEAGLEG_CONFIG -s -T2 $GCODE_FILE -C "${BASENAME}"
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 5 ] ; then
 	ERRMSG="<span style='color:#ffff00; font-weight:bold; background-color:#ff0000'> Got valgrind errors </span>"
