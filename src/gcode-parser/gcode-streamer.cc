@@ -25,7 +25,7 @@
 GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
                              GCodeParser::EventReceiver *parse_events)
   : event_server_(event_server), parser_(parser), parse_events_(parse_events),
-    is_processing_(false), connection_fd_(-1) {
+    is_processing_(false), connection_fd_(-1), lines_processed_(0) {
   // Let's start the input idle tasklet
   // TODO: the lifetime implications are a bit problematic as we need to
   // outlive the Loop() of the event server.
@@ -45,6 +45,7 @@ bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
 
   msg_stream_ = msg_stream;
   connection_fd_ = fd;
+  lines_processed_ = 0;
 
   event_server_->RunOnReadable(connection_fd_, [this](){
     return ReadData();
@@ -58,6 +59,7 @@ void GCodeStreamer::CloseStream() {
   }
   close(connection_fd_);
   connection_fd_ = -1;
+  Log_info("Processed %d GCode blocks.", lines_processed_);
 }
 
 // New data to be fed into the linebuffer
@@ -86,6 +88,7 @@ bool GCodeStreamer::ReadData() {
     // This should return true or false in case the line was movement or not
     // and only if is, reset the timer.
     parser_->ParseLine(line, msg_stream_);
+    ++lines_processed_;
   }
 
   // Loop again

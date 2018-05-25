@@ -125,7 +125,6 @@ static bool drop_privileges(StringPiece privs) {
 }
 
 // Reads the given "gcode_filename" with GCode and operates machine with it.
-// If "loop_count" is >= 0, repeats this number after the first execution.
 static void send_file_to_machine(GCodeMachineControl *machine,
                                  GCodeStreamer *streamer,
                                  const char *gcode_filename) {
@@ -137,7 +136,7 @@ static void send_file_to_machine(GCodeMachineControl *machine,
 // Open server. Return file-descriptor or -1 if listen fails.
 // Bind to "bind_addr" (can be NULL, then it is 0.0.0.0) and "port".
 static int open_server(const char *bind_addr, int port) {
-  if (port > 65535) {
+  if (port < 0 || port > 65535) {
     Log_error("Invalid port %d\n", port);
     return -1;
   }
@@ -229,14 +228,17 @@ static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
 // definition first what we want from a status server.
 // At this point: whenever it receives the character 'p' it prints the
 // position as json.
-static void run_status_server(int listen_socket, FDMultiplexer *event_server,
+static void run_status_server(const char *bind_addr, int port,
+                              FDMultiplexer *event_server,
                               GCodeMachineControl *machine) {
+  const int listen_socket = open_server(bind_addr, port);
+  if (listen_socket < 0) return;
   if (listen(listen_socket, 2) < 0) {
     Log_error("listen(fd=%d) failed: %s", listen_socket, strerror(errno));
     return;
   }
 
-  Log_info("Starting experimental status server");
+  Log_info("Starting experimental status server on port %d", port);
 
   event_server->RunOnReadable(
     listen_socket, [listen_socket, machine, event_server]() {
@@ -548,8 +550,8 @@ int main(int argc, char *argv[]) {
                      streamer,  bind_addr, listen_port);
   }
 
-  if (status_server_port) {
-    run_status_server(open_server(bind_addr, status_server_port),
+  if (status_server_port > 0 && !has_filename) {
+    run_status_server(bind_addr, status_server_port,
                       &event_server, machine_control);
   }
 

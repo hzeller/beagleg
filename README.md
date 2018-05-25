@@ -126,6 +126,7 @@ Options:
   -p, --port <port>          : Listen on this TCP port for GCode.
   -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).
   -l, --logfile <logfile>    : Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).
+      --param <paramfile>    : Parameter file to use.
   -d, --daemon               : Run as daemon.
       --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to this (default: daemon:daemon)
       --help                 : Display this help text and exit.
@@ -135,7 +136,6 @@ Mostly for testing and debugging:
   -n                         : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).
   -P                         : Verbose: Show some more debug output (Default: off).
   -S                         : Synchronous: don't queue (Default: off).
-      --loop[=count]         : Loop file number of times (no value: forever; equal sign with value important.)
       --allow-m111           : Allow changing the debug level with M111 (Default: off).
 
 Configuration file overrides:
@@ -155,12 +155,14 @@ More details about the G-Code code parsed and handled can be found in the
 ### Examples
 
 For testing your motor settings, you might initially just have a simple
-file that you want to loop over:
+file:
 
-    sudo ./machine-control -c my.config -f 10 --loop myfile.gcode
+    sudo ./machine-control -c my.config -f 10 myfile.gcode
 
-Output the file `myfile.gcode` in 10x the original speed, repeat this file
-forever (say you want to stress-test).
+Output the file `myfile.gcode` in 10x the original speed (say you want to
+stress-test). Note, the factor will only scale feedrate, but the machine will
+always obey the machine constraints with maximum feed and acceleration given in
+the configuration file.
 
     echo "G1 X100 F10000 G1 X0 F1000" | sudo ./machine-control /dev/stdin
 
@@ -172,7 +174,7 @@ little tweaks.
 
 Listen on TCP port 4444 for incoming connections and execute G-Codes over this
 line. So you could use `telnet beaglebone-hostname 4444` to have an interactive
-session or send a file with `socat`:
+session or send a file simple via `socat` from a remote machine:
 
      cat myfile.gcode | socat -t5 - TCP4:beaglebone-hostname:4444
 

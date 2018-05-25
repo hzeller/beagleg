@@ -50,6 +50,7 @@ private:
 
   FILE *msg_stream_;
   int connection_fd_;
+  int lines_processed_;
 
   bool ReadData();
   bool Timeout();
