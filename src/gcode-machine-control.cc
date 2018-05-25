@@ -108,6 +108,10 @@ public:
   const char *unprocessed(char letter, float value, const char *) final;
 
 private:
+  bool in_estop();
+  void set_estop(bool hard);
+  bool clear_estop();
+  bool check_for_estop();
   bool check_for_pause();
   void issue_motor_move_if_possible();
   bool test_homing_status_ok();
@@ -368,6 +372,43 @@ void GCodeMachineControl::Impl::wait_for_start() {
   }
 }
 
+bool GCodeMachineControl::Impl::in_estop() {
+  return hardware_mapping_->InSoftEStop();
+}
+
+void GCodeMachineControl::Impl::set_estop(bool hard) {
+  hardware_mapping_->AuxOutputsOff();
+  set_output_flags(HardwareMapping::OUT_ESTOP, true);
+  motors_enable(false);
+  homing_state_ = HOMING_STATE_NEVER_HOMED;
+  mprintf("// Beagleg: %s E-Stop.\n", hard ? "Hard" : "Soft");
+}
+
+bool GCodeMachineControl::Impl::clear_estop() {
+  if (in_estop()) {
+    if (hardware_mapping_->TestEStopSwitch()) {
+      mprintf("// Beagleg: still in Hard E-Stop.\n");
+      return false;
+    }
+    set_output_flags(HardwareMapping::OUT_ESTOP, false);
+    hardware_mapping_->SetAuxOutputs();
+    mprintf("// Beagleg: Soft E-Stop cleared.\n");
+  }
+  return true;
+}
+
+bool GCodeMachineControl::Impl::check_for_estop() {
+  // TODO(Hartley): in case of (estop() == true) should we just return just
+  // that? Because right now, we only return if we see the EStop switch the
+  // first time.
+  if (!in_estop() && hardware_mapping_->TestEStopSwitch()) {
+    Log_info("E-Stop input detected, forcing Software E-Stop.");
+    set_estop(true);
+    return true;
+  }
+  return false;
+}
+
 bool GCodeMachineControl::Impl::check_for_pause() {
   return hardware_mapping_->TestPauseSwitch();
 }
@@ -421,11 +462,8 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
 
   const int code = (int)value;
   switch (code) {
-  case 0:
-  case 999:
-    set_output_flags(HardwareMapping::OUT_ESTOP, code == 0);
-    hardware_mapping_->SetAuxOutputs();
-    break;
+  case 0: set_estop(false); break;
+  case 999: clear_estop(); break;
   case 3: case 4: case 5:                   // aux pin spindle control
   case 7: case 8: case 9: case 10: case 11: // aux pin mist/flood/vacuum control
   case 42:                                  // aux pin state query
@@ -724,9 +762,11 @@ void GCodeMachineControl::Impl::dwell(float value) {
     usleep((int) (value * 1000));
   }
 
-  if (pause_enabled_ && check_for_pause()) {
-    Log_debug("Pause input detected, waiting for Start");
-    wait_for_start();
+  if (!check_for_estop()) {
+    if (pause_enabled_ && check_for_pause()) {
+      Log_debug("Pause input detected, waiting for Start");
+      wait_for_start();
+    }
   }
 }
 
@@ -749,6 +789,7 @@ void GCodeMachineControl::Impl::input_idle(bool is_first) {
     set_fanspeed(0);
     next_auto_disable_fan_ = -1;
   }
+  check_for_estop();
 }
 
 void GCodeMachineControl::Impl::set_speed_factor(float value) {
@@ -830,6 +871,7 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
 
 void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   planner_->BringPathToHalt();
+  if (!clear_estop()) return;
   for (const char axis_letter : cfg_.home_order) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_letter);
     if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))

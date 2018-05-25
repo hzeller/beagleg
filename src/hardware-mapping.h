@@ -185,6 +185,13 @@ public:
   // problems due to the buffer.
   void SetAuxOutputs();
 
+  // Turn all logic outputs off immediately (unbuffered).
+  void AuxOutputsOff();
+
+  // Returns true if we are in software E-Stop (as set by
+  // UpdateAuxBitmap(OUT_ESTOP,...), even if it is not mapped to a physical pin.
+  bool InSoftEStop();
+
   // Set PWM value for given output immediately.
   void SetPWMOutput(LogicOutput type, float value);
 
@@ -280,6 +287,8 @@ private:
   int pause_input_;
   int start_input_;
   int probe_input_;
+
+  bool estop_state_;
 
   AuxBitmap aux_bits_;       // Set via M42 or various other settings.
 

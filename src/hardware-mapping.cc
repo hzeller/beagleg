@@ -32,7 +32,7 @@
 
 HardwareMapping::HardwareMapping()
   : estop_input_(0), pause_input_(0), start_input_(0), probe_input_(0),
-    aux_bits_(0),
+    estop_state_(true), aux_bits_(0),
     is_hardware_initialized_(false) {
 }
 
@@ -183,6 +183,7 @@ void HardwareMapping::ResetHardware() {
 
 void HardwareMapping::EnableMotors(bool on) {
   if (!is_hardware_initialized_) return;
+  if (on && InSoftEStop()) return;
   // Right now, we just have this hardcoded, but if 'enable' should
   // ever be configurable via config file and not given by the hardware
   // mapping include, we can do that here.
@@ -206,6 +207,7 @@ void HardwareMapping::UpdateAuxBits(int pin, bool is_on) {
 void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on) {
   if (is_on) aux_bits_ |= output_to_aux_bits_[type];
   else       aux_bits_ &= ~output_to_aux_bits_[type];
+  if (type == OUT_ESTOP) estop_state_ = is_on;
 }
 
 void HardwareMapping::SetAuxOutputs() {
@@ -214,6 +216,15 @@ void HardwareMapping::SetAuxOutputs() {
     if (aux_bits_ & (1 << i)) set_gpio(get_aux_bit_gpio_descriptor(i + 1));
     else                      clr_gpio(get_aux_bit_gpio_descriptor(i + 1));
   }
+}
+
+void HardwareMapping::AuxOutputsOff() {
+  aux_bits_ = 0;
+  SetAuxOutputs();
+}
+
+bool HardwareMapping::InSoftEStop() {
+  return estop_state_;
 }
 
 void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
