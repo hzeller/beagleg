@@ -187,22 +187,26 @@ static bool within_acceptable_range(double new_val, double old_val,
 // most times, which is inconvenient. TODO(hzeller): speed matching is not
 // cutting it :)
 static double determine_joining_speed(const struct AxisTarget *from,
-                                     const struct AxisTarget *to,
-                                     const double threshold) {
+                                      const struct AxisTarget *to,
+                                      const double threshold) {
   // the dot product of the vectors
   const double dot = from->dx*to->dx + from->dy*to->dy + from->dz*to->dz;
   const double mag = from->len * to->len;
   if (dot == 0) return 0.0;        // orthogonal 90 degree, full stop
-  if (dot == mag) return to->speed; // codirectional 0 degree, keep accelerating
+  if (dot >= mag) return to->speed; // codirectional 0 degree, keep accelerating
 
   // the angle between the vectors
   const double rad2deg = 180.0 / M_PI;
   const double angle = std::fabs(std::acos(dot / mag) * rad2deg);
 
-  if (angle <= threshold)
-    return to->speed;               // in tolerance, keep accelerating
   if (angle >= 45.0)
     return 0.0;                     // angle to large, come to full stop
+  if (angle <= threshold) {         // in tolerance, keep accelerating
+    const double deg2rad = M_PI / 180.0;
+    const double angle_speed_adj = std::cos((angle + 60) * deg2rad);
+    //Log_debug("%s: angle: %f adj: %f\n", __func__, angle, angle_speed_adj);
+    return to->speed * angle_speed_adj;
+  }
 
   // The angle between the from and to segments is < 45 degrees but greater
   // than the threshold. Use the "old" logic to determine the joining speed
