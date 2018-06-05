@@ -47,8 +47,11 @@ public:
   FixedArray<T,N,IDX> &operator= (const FixedArray<T,N,IDX> &other) {
     CopyFrom(other); return *this;
   }
-  T &operator[] (IDX i) { assert(i < N); return data_[i]; }
-  const T & operator[] (IDX i) const { assert(i < N); return data_[i]; }
+  T &operator[] (IDX i) { assert((int)i < N); return data_[(int)i]; }
+  const T & operator[] (IDX i) const {
+    assert((int)i < N);
+    return data_[(int)i];
+  }
   bool operator== (const FixedArray<T,N,IDX> &other) const {
     return memcmp(data_, other.data_, sizeof(data_)) == 0;
   }
