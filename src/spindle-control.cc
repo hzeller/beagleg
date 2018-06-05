@@ -121,7 +121,7 @@ public:
 
   // Right now, this sets the output immediately, but we might want to do this
   // along with the move if this is a laser.
-  void set_output_synchronous(HardwareMapping::LogicOutput out, bool is_on) {
+  void set_output_synchronous(HardwareMapping::NamedOutput out, bool is_on) {
     hardware_mapping_->UpdateAuxBitmap(out, is_on);
     hardware_mapping_->SetAuxOutputs();
   }
@@ -146,15 +146,15 @@ public:
   static bool CheckRequiredHardware(const SpindleConfig &config,
                                     const HardwareMapping *hw) {
     bool success = true;
-    if (!hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE)
-        && !hw->HasPWMMapping(HardwareMapping::OUT_SPINDLE_SPEED)) {
+    if (!hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE)
+        && !hw->HasPWMMapping(HardwareMapping::NamedOutput::SPINDLE_SPEED)) {
       // We want to have at least one of these.
       Log_info("No 'spindle' Aux pin configured to turn on spindle or "
                "'spindle-speed' PWM output to control its speed.");
       success = false;
     }
     if (config.allow_ccw &&
-        !hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE_DIRECTION)) {
+        !hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE_DIRECTION)) {
       Log_info("allow-ccw set, but no spindle-direction aux bit configured");
       success = false;
     }
@@ -169,7 +169,7 @@ public:
 
     // Turn on spindle power if necessary.
     if (is_off_) {
-      set_output_synchronous(HardwareMapping::OUT_SPINDLE, true);
+      set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, true);
       sleep_ms(config_.pwr_delay_ms);
     }
 
@@ -177,7 +177,7 @@ public:
     if (ccw != is_ccw_) ramp_down();
 
     // set the spindle direction
-    set_output_synchronous(HardwareMapping::OUT_SPINDLE_DIRECTION, ccw);
+    set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE_DIRECTION, ccw);
     is_ccw_ = ccw;
 
     // ramp the spindle to the target speed
@@ -188,7 +188,7 @@ public:
       if ((epsilon < 0 && duty_cycle_ < target) ||
           (epsilon > 0 && duty_cycle_ > target))
         duty_cycle_ = target;
-      hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED,
+      hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::SPINDLE_SPEED,
                                       duty_cycle_);
       sleep_ms(kRampDelayMs);
     }
@@ -207,7 +207,7 @@ public:
   void Off() final {
     ramp_down();
     sleep_ms(config_.off_delay_ms);
-    set_output_synchronous(HardwareMapping::OUT_SPINDLE, false);
+    set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, false);
     is_off_ = true;
     Log_debug("PWMSpindle: off");
   }
@@ -219,7 +219,7 @@ private:
         duty_cycle_ -= kRampEpsilon;
       else
         duty_cycle_ = 0;
-      hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_SPINDLE_SPEED,
+      hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::SPINDLE_SPEED,
                                       duty_cycle_);
       sleep_ms(kRampDelayMs);
     }
@@ -338,12 +338,12 @@ public:
   static bool CheckRequiredHardware(const SpindleConfig &config,
                                     const HardwareMapping *hw) {
     bool success = true;
-    if (!hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE)) {
+    if (!hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE)) {
       Log_info("No 'spindle' Aux pin configured to turn on spindle.");
       success = false;
     }
     if (config.allow_ccw &&
-        !hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE_DIRECTION)) {
+        !hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE_DIRECTION)) {
       Log_info("allow-ccw set, but no spindle-direction aux bit configured");
       success = false;
     }
@@ -380,7 +380,7 @@ public:
     }
 
     if (is_off_) {
-      set_output_synchronous(HardwareMapping::OUT_SPINDLE, true);
+      set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, true);
       sleep_ms(config_.pwr_delay_ms);
       exit_safe_start();
     }
@@ -411,7 +411,7 @@ public:
     send(&command, 1);
 
     sleep_ms(config_.off_delay_ms);
-    set_output_synchronous(HardwareMapping::OUT_SPINDLE, false);
+    set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, false);
     is_off_ = true;
     Log_debug("PololuSMCSpindle: off");
   }

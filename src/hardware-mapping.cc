@@ -44,7 +44,7 @@ HardwareMapping::~HardwareMapping() {
   }
 }
 
-bool HardwareMapping::AddAuxMapping(LogicOutput output, int aux) {
+bool HardwareMapping::AddAuxMapping(NamedOutput output, int aux) {
   if (aux == 0) return true;  // allowed null-mapping
   if (aux < 1 || aux > NUM_BOOL_OUTPUTS) {
     Log_error("Aux %d out of range [%d..%d]", aux, 1, NUM_BOOL_OUTPUTS);
@@ -62,11 +62,11 @@ bool HardwareMapping::AddAuxMapping(LogicOutput output, int aux) {
   output_to_aux_bits_[output] |= 1 << (aux-1);
   return true;
 }
-bool HardwareMapping::HasAuxMapping(LogicOutput output) const {
+bool HardwareMapping::HasAuxMapping(NamedOutput output) const {
   return output_to_aux_bits_[output] != 0;
 }
 
-bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
+bool HardwareMapping::AddPWMMapping(NamedOutput output, int pwm) {
   if (pwm == 0) return true;  // allowedd null-mapping
   if (pwm < 1 || pwm > NUM_PWM_OUTPUTS) {
     Log_error("PWM %d out of range [%d..%d]", pwm, 1, NUM_BOOL_OUTPUTS);
@@ -89,7 +89,7 @@ bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
   output_to_pwm_gpio_[output] = gpio_descriptor;
   return true;
 }
-bool HardwareMapping::HasPWMMapping(LogicOutput output) const {
+bool HardwareMapping::HasPWMMapping(NamedOutput output) const {
   return output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED;
 }
 
@@ -210,11 +210,11 @@ void HardwareMapping::UpdateAuxBits(int pin, bool is_on) {
   else       aux_bits_ &= ~(1 << (pin - 1));
 }
 
-void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on) {
+void HardwareMapping::UpdateAuxBitmap(NamedOutput type, bool is_on) {
   if (is_on) aux_bits_ |= output_to_aux_bits_[type];
   else       aux_bits_ &= ~output_to_aux_bits_[type];
 
-  if (type == OUT_ESTOP) estop_state_ = is_on;  // Estop: special attention.
+  if (type == NamedOutput::ESTOP) estop_state_ = is_on;  // Estop: special attention.
 }
 
 void HardwareMapping::SetAuxOutputs() {
@@ -234,7 +234,7 @@ bool HardwareMapping::InSoftEStop() {
   return estop_state_;
 }
 
-void HardwareMapping::SetPWMOutput(LogicOutput type, float value) {
+void HardwareMapping::SetPWMOutput(NamedOutput type, float value) {
 #ifdef _DISABLE_PWM_TIMERS
   return;
 #else
@@ -387,18 +387,18 @@ public:
 
 private:
   bool SetAuxMapping(int line_no, int aux_number, const std::string &value) {
-    LogicOutput output;
+    NamedOutput output;
     if (NameToOutput(value, &output)) {
-      if (output == OUT_HOTEND || output == OUT_HEATEDBED) {
+      if (output == NamedOutput::HOTEND || output == NamedOutput::HEATEDBED) {
         ReportError(line_no, "It is a dangerous to connect hotends "
                     "or heated beds to a boolean output. Use a PWM output!");
         return false;
       }
-      if (aux_number == 16 && output != OUT_LED) {
+      if (aux_number == 16 && output != NamedOutput::LED) {
         ReportError(line_no, "Aux 16 can only be mapped to an led!");
         return false;
       }
-      if (output == OUT_LED && aux_number != 16) {
+      if (output == NamedOutput::LED && aux_number != 16) {
         ReportError(line_no, "An led can only be mapped to Aux 16!");
         return false;
       }
@@ -412,7 +412,7 @@ private:
   }
 
   bool SetPwmMapping(int line_no, int pwm_number, const std::string &value) {
-    LogicOutput output;
+    NamedOutput output;
     if (NameToOutput(value, &output)) {
       Log_debug("Pwm %d -> %s", pwm_number, value.c_str());
       return config_->AddPWMMapping(output, pwm_number);
@@ -527,48 +527,49 @@ bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
   return parser->EmitConfigValues(&reader);
 }
 
-const char *HardwareMapping::OutputToName(LogicOutput output) {
+const char *HardwareMapping::OutputToName(NamedOutput output) {
   switch (output) {
-  case OUT_MIST:        return "mist";
-  case OUT_FLOOD:       return "flood";
-  case OUT_VACUUM:      return "vacuum";
-  case OUT_SPINDLE:     return "spindle";
-  case OUT_SPINDLE_SPEED:  return "spindle-speed";
-  case OUT_SPINDLE_DIRECTION: return "spindle-dir";
-  case OUT_COOLER:      return "cooler";
-  case OUT_CASE_LIGHTS: return "case-lights";
-  case OUT_FAN:         return "fan";
-  case OUT_HOTEND:      return "hotend";
-  case OUT_HEATEDBED:   return "heatedbed";
-  case OUT_POINTER:     return "pointer";
-  case OUT_LED:         return "led";
-  case OUT_ATX_POWER:   return "atx-power";
-  case OUT_ESTOP:       return "estop";
+  case NamedOutput::MIST:        return "mist";
+  case NamedOutput::FLOOD:       return "flood";
+  case NamedOutput::VACUUM:      return "vacuum";
+  case NamedOutput::SPINDLE:     return "spindle";
+  case NamedOutput::SPINDLE_SPEED:  return "spindle-speed";
+  case NamedOutput::SPINDLE_DIRECTION: return "spindle-dir";
+  case NamedOutput::COOLER:      return "cooler";
+  case NamedOutput::CASE_LIGHTS: return "case-lights";
+  case NamedOutput::FAN:         return "fan";
+  case NamedOutput::HOTEND:      return "hotend";
+  case NamedOutput::HEATEDBED:   return "heatedbed";
+  case NamedOutput::POINTER:     return "pointer";
+  case NamedOutput::LED:         return "led";
+  case NamedOutput::ATX_POWER:   return "atx-power";
+  case NamedOutput::ESTOP:       return "estop";
 
-  case NUM_OUTPUTS: return "<invalid>";
+  case NamedOutput::NUM_OUTPUTS: return "<invalid>";
     // no default case to have the compiler warn about new things.
   }
   return "<invalid>";
 }
 
-bool HardwareMapping::NameToOutput(StringPiece str, LogicOutput *result) {
+bool HardwareMapping::NameToOutput(StringPiece str, NamedOutput *result) {
   const std::string n = ToLower(str);
 #define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)
-  MAP_VAL(n == "mist",        OUT_MIST);
-  MAP_VAL(n == "flood",       OUT_FLOOD);
-  MAP_VAL(n == "vacuum",      OUT_VACUUM);
-  MAP_VAL(n == "spindle" || n == "spindle-on", OUT_SPINDLE);
-  MAP_VAL(n == "spindle-speed" || n == "spindle-pwm", OUT_SPINDLE_SPEED);
-  MAP_VAL(n == "spindle-dir", OUT_SPINDLE_DIRECTION);
-  MAP_VAL(n == "cooler",      OUT_COOLER);
-  MAP_VAL(n == "case-lights", OUT_CASE_LIGHTS);
-  MAP_VAL(n == "fan",         OUT_FAN);
-  MAP_VAL(n == "hotend",      OUT_HOTEND);
-  MAP_VAL(n == "heatedbed",   OUT_HEATEDBED);
-  MAP_VAL(n == "pointer",     OUT_POINTER);
-  MAP_VAL(n == "led",         OUT_LED);
-  MAP_VAL(n == "atx-power",   OUT_ATX_POWER);
-  MAP_VAL(n == "estop",       OUT_ESTOP);
+  MAP_VAL(n == "mist",        NamedOutput::MIST);
+  MAP_VAL(n == "flood",       NamedOutput::FLOOD);
+  MAP_VAL(n == "vacuum",      NamedOutput::VACUUM);
+  MAP_VAL(n == "spindle" || n == "spindle-on", NamedOutput::SPINDLE);
+  MAP_VAL(n == "spindle-speed" || n == "spindle-pwm",
+          NamedOutput::SPINDLE_SPEED);
+  MAP_VAL(n == "spindle-dir", NamedOutput::SPINDLE_DIRECTION);
+  MAP_VAL(n == "cooler",      NamedOutput::COOLER);
+  MAP_VAL(n == "case-lights", NamedOutput::CASE_LIGHTS);
+  MAP_VAL(n == "fan",         NamedOutput::FAN);
+  MAP_VAL(n == "hotend",      NamedOutput::HOTEND);
+  MAP_VAL(n == "heatedbed",   NamedOutput::HEATEDBED);
+  MAP_VAL(n == "pointer",     NamedOutput::POINTER);
+  MAP_VAL(n == "led",         NamedOutput::LED);
+  MAP_VAL(n == "atx-power",   NamedOutput::ATX_POWER);
+  MAP_VAL(n == "estop",       NamedOutput::ESTOP);
 #undef MAP_VAL
   return false;
 }

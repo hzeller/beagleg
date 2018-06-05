@@ -127,7 +127,7 @@ private:
   int move_to_probe(enum GCodeParserAxis axis, float feedrate, const int dir,
                     int max_steps);
   void home_axis(enum GCodeParserAxis axis);
-  void set_output_flags(HardwareMapping::LogicOutput out, bool is_on);
+  void set_output_flags(HardwareMapping::NamedOutput out, bool is_on);
   void handle_M105();
   // Parse GCode spindle M3/M4 block.
   const char *set_spindle_on(bool is_ccw, const char *);
@@ -335,8 +335,8 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   if (speed < 0.0 || speed > 255.0) return;
   float duty_cycle = speed / 255.0;
   // The fan can be mapped to an aux and/or pwm signal
-  set_output_flags(HardwareMapping::OUT_FAN, duty_cycle > 0.0);
-  hardware_mapping_->SetPWMOutput(HardwareMapping::OUT_FAN, duty_cycle);
+  set_output_flags(HardwareMapping::NamedOutput::FAN, duty_cycle > 0.0);
+  hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::FAN, duty_cycle);
 }
 
 // number of checks to ensure the pause switch is inactive
@@ -362,10 +362,10 @@ void GCodeMachineControl::Impl::wait_for_start() {
     mprintf("// BeagleG: waiting for start switch\n");
     const int flash_usec = 100 * 1000;
     while (!hardware_mapping_->TestStartSwitch()) {
-      set_output_flags(HardwareMapping::OUT_LED, true);
+      set_output_flags(HardwareMapping::NamedOutput::LED, true);
       hardware_mapping_->SetAuxOutputs();
       usleep(flash_usec);
-      set_output_flags(HardwareMapping::OUT_LED, false);
+      set_output_flags(HardwareMapping::NamedOutput::LED, false);
       hardware_mapping_->SetAuxOutputs();
       usleep(flash_usec);
     }
@@ -378,7 +378,7 @@ bool GCodeMachineControl::Impl::in_estop() {
 
 void GCodeMachineControl::Impl::set_estop(bool hard) {
   hardware_mapping_->AuxOutputsOff();
-  set_output_flags(HardwareMapping::OUT_ESTOP, true);
+  set_output_flags(HardwareMapping::NamedOutput::ESTOP, true);
   motors_enable(false);
   homing_state_ = HOMING_STATE_NEVER_HOMED;
   mprintf("// Beagleg: %s E-Stop.\n", hard ? "Hard" : "Soft");
@@ -390,7 +390,7 @@ bool GCodeMachineControl::Impl::clear_estop() {
       mprintf("// Beagleg: still in Hard E-Stop.\n");
       return false;
     }
-    set_output_flags(HardwareMapping::OUT_ESTOP, false);
+    set_output_flags(HardwareMapping::NamedOutput::ESTOP, false);
     hardware_mapping_->SetAuxOutputs();
     mprintf("// Beagleg: Soft E-Stop cleared.\n");
   }
@@ -479,7 +479,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     break;
   case 80:
   case 81:
-    set_output_flags(HardwareMapping::OUT_ATX_POWER, code == 80);
+    set_output_flags(HardwareMapping::NamedOutput::ATX_POWER, code == 80);
     hardware_mapping_->SetAuxOutputs();
     break;
   case 105: handle_M105(); break;
@@ -501,8 +501,8 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   return remaining;
 }
 
-const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value,
-                                                        const char *remaining) {
+const char *GCodeMachineControl::Impl::aux_bit_commands(
+  char letter, float value, const char *remaining) {
   const int m_code = (int)value;
   const char* after_pair;
 
@@ -510,14 +510,14 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
   case 3: remaining = set_spindle_on(false, remaining); break;  // CW
   case 4: remaining = set_spindle_on(true, remaining); break;   // CCW
   case 5: set_spindle_off(); break;
-  case 7: set_output_flags(HardwareMapping::OUT_MIST, true); break;
-  case 8: set_output_flags(HardwareMapping::OUT_FLOOD, true); break;
+  case 7: set_output_flags(HardwareMapping::NamedOutput::MIST, true); break;
+  case 8: set_output_flags(HardwareMapping::NamedOutput::FLOOD, true); break;
   case 9:
-    set_output_flags(HardwareMapping::OUT_MIST, false);
-    set_output_flags(HardwareMapping::OUT_FLOOD, false);
+    set_output_flags(HardwareMapping::NamedOutput::MIST, false);
+    set_output_flags(HardwareMapping::NamedOutput::FLOOD, false);
     break;
-  case 10: set_output_flags(HardwareMapping::OUT_VACUUM, true); break;
-  case 11: set_output_flags(HardwareMapping::OUT_VACUUM, false); break;
+  case 10: set_output_flags(HardwareMapping::NamedOutput::VACUUM, true); break;
+  case 11: set_output_flags(HardwareMapping::NamedOutput::VACUUM, false); break;
   case 42:
   case 62: case 63: case 64: case 65: {
     int bit_value = -1;
@@ -550,8 +550,12 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
     }
   }
     break;
-  case 245: set_output_flags(HardwareMapping::OUT_COOLER, true); break;
-  case 246: set_output_flags(HardwareMapping::OUT_COOLER, false); break;
+  case 245:
+    set_output_flags(HardwareMapping::NamedOutput::COOLER, true);
+    break;
+  case 246:
+    set_output_flags(HardwareMapping::NamedOutput::COOLER, false);
+    break;
   case 355: {
     int on_value = 0;
     for (;;) {
@@ -561,15 +565,15 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(char letter, float value
       else break;
       remaining = after_pair;
     }
-    set_output_flags(HardwareMapping::OUT_CASE_LIGHTS, on_value > 0);
+    set_output_flags(HardwareMapping::NamedOutput::CASE_LIGHTS, on_value > 0);
   }
     break;
   }
   return remaining;
 }
 
-void GCodeMachineControl::Impl::set_output_flags(HardwareMapping::LogicOutput out,
-                                                 bool is_on) {
+void GCodeMachineControl::Impl::set_output_flags(
+  HardwareMapping::NamedOutput out, bool is_on) {
   hardware_mapping_->UpdateAuxBitmap(out, is_on);
 }
 

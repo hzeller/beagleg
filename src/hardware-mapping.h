@@ -91,22 +91,22 @@ public:
     TRIGGER_ANY  = 0x03    // Any of the axis is triggering
   };
 
-  enum LogicOutput {
-    OUT_MIST,              // M7 = on; M9 = off
-    OUT_FLOOD,             // M8 = on; M9 = off
-    OUT_VACUUM,            // M10 = on; M11 = off
-    OUT_SPINDLE,           // M3/M4 = on; M5 = off
-    OUT_SPINDLE_SPEED,
-    OUT_SPINDLE_DIRECTION, // M4 = on; M3/M5 = off
-    OUT_COOLER,            // M245 = on; M246 = off
-    OUT_CASE_LIGHTS,       // M355 S1 = on; M355 S0 = off
-    OUT_FAN,               // M106 Sn (set pwm or on if n > 0); M107 = off
-    OUT_HOTEND,
-    OUT_HEATEDBED,
-    OUT_POINTER,           // M64 Px = on; M65 Px = off
-    OUT_LED,               // toggles on/off with M42 while waiting for start switch
-    OUT_ATX_POWER,         // M80 = on; M81 = off
-    OUT_ESTOP,             // M0 = on; M999 = off
+  enum class NamedOutput {
+    MIST,              // M7 = on; M9 = off
+    FLOOD,             // M8 = on; M9 = off
+    VACUUM,            // M10 = on; M11 = off
+    SPINDLE,           // M3/M4 = on; M5 = off
+    SPINDLE_SPEED,
+    SPINDLE_DIRECTION, // M4 = on; M3/M5 = off
+    COOLER,            // M245 = on; M246 = off
+    CASE_LIGHTS,       // M355 S1 = on; M355 S0 = off
+    FAN,               // M106 Sn (set pwm or on if n > 0); M107 = off
+    HOTEND,
+    HEATEDBED,
+    POINTER,           // M64 Px = on; M65 Px = off
+    LED,               // toggles on/off with M42 while waiting for start switch
+    ATX_POWER,         // M80 = on; M81 = off
+    ESTOP,             // M0 = on; M999 = off
 
     NUM_OUTPUTS   // last.
   };
@@ -124,13 +124,13 @@ public:
 
   // Connect logic output to aux pin in the range [1..NUM_BOOL_OUTPUTS]
   // A value of 0 for 'aux' is accepted, but does not connect it to anything.
-  bool AddAuxMapping(LogicOutput output, int aux);
-  bool HasAuxMapping(LogicOutput output) const;
+  bool AddAuxMapping(NamedOutput output, int aux);
+  bool HasAuxMapping(NamedOutput output) const;
 
   // Connect logic output to pwm pin in the range [1..NUM_PWM_OUTPUTS]
   // A value of 0 for 'pwm' is accpeted, but does not connect it to anything.
-  bool AddPWMMapping(LogicOutput output, int pwm);
-  bool HasPWMMapping(LogicOutput output) const;
+  bool AddPWMMapping(NamedOutput output, int pwm);
+  bool HasPWMMapping(NamedOutput output) const;
 
   // Add a motor mapping: connect the logic axis to given motor.
   // Motor is in the range [1..NUM_MOTORS]. If 'mirrored' is true,
@@ -179,7 +179,7 @@ public:
   // Set logic output value to on/off for the particular logic output.
   // Only updates the aux_bits_ does not set the output (can be done
   // with SetAuxOutput()).
-  void UpdateAuxBitmap(LogicOutput type, bool value);
+  void UpdateAuxBitmap(NamedOutput type, bool value);
 
   // Set the output according to the aux_bits_ immediately (unbuffered).
   // There are some cases in which this is necessary, but usually
@@ -195,7 +195,7 @@ public:
   bool InSoftEStop();
 
   // Set PWM value for given output immediately.
-  void SetPWMOutput(LogicOutput type, float value);
+  void SetPWMOutput(NamedOutput type, float value);
 
   // -- Motor outputs
 
@@ -257,8 +257,8 @@ private:
   typedef uint32_t GPIODefinition;
 
   // Converts the human readable name of an output to the enumeration if possible.
-  static bool NameToOutput(StringPiece str, LogicOutput *result);
-  static const char *OutputToName(LogicOutput output);
+  static bool NameToOutput(StringPiece str, NamedOutput *result);
+  static const char *OutputToName(NamedOutput output);
 
   // Return GPIO definition for various types of out/input. Count starts with 1.
   static GPIODefinition get_aux_bit_gpio_descriptor(int aux_number);
@@ -272,8 +272,8 @@ private:
   void ResetHardware();  // Initialize to a safe state.
 
   // Mapping of logical outputs to hardware outputs.
-  FixedArray<AuxBitmap, NUM_OUTPUTS> output_to_aux_bits_;
-  FixedArray<GPIODefinition, NUM_OUTPUTS> output_to_pwm_gpio_;
+  FixedArray<AuxBitmap, (int)NamedOutput::NUM_OUTPUTS, NamedOutput> output_to_aux_bits_;
+  FixedArray<GPIODefinition, (int)NamedOutput::NUM_OUTPUTS, NamedOutput> output_to_pwm_gpio_;
 
     // "axis_to_driver": Which axis is mapped to which physical output drivers.
   // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
