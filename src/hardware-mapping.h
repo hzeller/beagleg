@@ -125,10 +125,12 @@ public:
   // Connect logic output to aux pin in the range [1..NUM_BOOL_OUTPUTS]
   // A value of 0 for 'aux' is accepted, but does not connect it to anything.
   bool AddAuxMapping(LogicOutput output, int aux);
+  bool HasAuxMapping(LogicOutput output) const;
 
   // Connect logic output to pwm pin in the range [1..NUM_PWM_OUTPUTS]
   // A value of 0 for 'pwm' is accpeted, but does not connect it to anything.
   bool AddPWMMapping(LogicOutput output, int pwm);
+  bool HasPWMMapping(LogicOutput output) const;
 
   // Add a motor mapping: connect the logic axis to given motor.
   // Motor is in the range [1..NUM_MOTORS]. If 'mirrored' is true,
@@ -137,7 +139,7 @@ public:
   bool AddMotorMapping(LogicAxis axis, int motor, bool mirrored);
 
   // Determine if we have a motor configured for given axis.
-  bool HasMotorFor(LogicAxis axis) { return axis_to_driver_[axis] != 0; }
+  bool HasMotorFor(LogicAxis axis) const { return axis_to_driver_[axis] != 0; }
 
   // Return first motor free to map. Returns value in the range
   // [1..NUM_MOTORS] if there is a free motor, 0 otherwise.

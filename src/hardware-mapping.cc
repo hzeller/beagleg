@@ -62,6 +62,9 @@ bool HardwareMapping::AddAuxMapping(LogicOutput output, int aux) {
   output_to_aux_bits_[output] |= 1 << (aux-1);
   return true;
 }
+bool HardwareMapping::HasAuxMapping(LogicOutput output) const {
+  return output_to_aux_bits_[output] != 0;
+}
 
 bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
   if (pwm == 0) return true;  // allowedd null-mapping
@@ -69,7 +72,7 @@ bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
     Log_error("PWM %d out of range [%d..%d]", pwm, 1, NUM_BOOL_OUTPUTS);
     return false;
   }
-  if (output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED) {
+  if (HasPWMMapping(output)) {
     // TODO: do we want to allow 1:n mapping, same output, multiple pins ?
     Log_error("Attempt to map '%s' which is already "
               "mapped to different pin", OutputToName(output));
@@ -85,6 +88,9 @@ bool HardwareMapping::AddPWMMapping(LogicOutput output, int pwm) {
   }
   output_to_pwm_gpio_[output] = gpio_descriptor;
   return true;
+}
+bool HardwareMapping::HasPWMMapping(LogicOutput output) const {
+  return output_to_pwm_gpio_[output] != GPIO_NOT_MAPPED;
 }
 
 bool HardwareMapping::AddMotorMapping(LogicAxis axis, int motor,
@@ -207,7 +213,8 @@ void HardwareMapping::UpdateAuxBits(int pin, bool is_on) {
 void HardwareMapping::UpdateAuxBitmap(LogicOutput type, bool is_on) {
   if (is_on) aux_bits_ |= output_to_aux_bits_[type];
   else       aux_bits_ &= ~output_to_aux_bits_[type];
-  if (type == OUT_ESTOP) estop_state_ = is_on;
+
+  if (type == OUT_ESTOP) estop_state_ = is_on;  // Estop: special attention.
 }
 
 void HardwareMapping::SetAuxOutputs() {

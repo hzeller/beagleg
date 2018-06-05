@@ -107,12 +107,13 @@ double ConfigParser::Reader::ParseDoubleExpression(const char *input,
 }
 
 void ConfigParser::Reader::ReportError(int line_no, const std::string &msg) {
-  std::cerr << line_no << ":" << msg << std::endl;
+  Log_error("%d: %s", line_no, msg.c_str());
 }
 
 ConfigParser::ConfigParser() : parse_success_(true) {}
 
 bool ConfigParser::SetContentFromFile(const char *filename) {
+  if (!filename) return false;
   parse_success_ = true;
   std::ifstream file_stream(filename, std::ios::binary);
   content_.assign(std::istreambuf_iterator<char>(file_stream),

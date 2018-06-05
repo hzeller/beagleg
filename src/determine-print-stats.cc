@@ -131,7 +131,6 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   result->y_min = 1e7;
   result->y_min = 1e7;
   HardwareMapping hardware;  // We never initialize, just sim mode.
-  Spindle spindle;
 
   // Motor control that just determines the time spent turning the motor.
   // We do that by intercepting the motor operations by replacing the
@@ -139,7 +138,7 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   StatsMotorOperations stats_motor_ops(result);
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &stats_motor_ops,
-                                  &hardware, &spindle, NULL);
+                                  &hardware, nullptr, nullptr);
   if (!machine_control)
     return false;
 

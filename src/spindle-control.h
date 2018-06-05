@@ -25,35 +25,38 @@
 class HardwareMapping;
 class ConfigParser;
 
+// Spindle configuration as read from config file.
+struct SpindleConfig {
+  SpindleConfig();
+  bool ConfigureFromFile(ConfigParser *parser);
+
+  std::string type;
+  std::string port;
+  // TODO: other config options e.g. needed for modbus spindles.
+
+  int max_rpm;
+  int pwr_delay_ms;
+  int on_delay_ms;
+  int off_delay_ms;
+  bool allow_ccw;
+};
+
 class Spindle {
 public:
-  Spindle();
-  ~Spindle() {}
+  // Factory for a spindle given the configuration. Returns an instance
+  // of a spindle if it can be created given the available hardware-mapping.
+  // Otherwise, returns nullptr and might info-log why it couldn't create a
+  // spindle (which might be fine for many set-ups, e.g. 3D printers).
+  static Spindle *CreateFromConfig(const SpindleConfig &config,
+                                   HardwareMapping *hardware_mapping);
 
-   bool ConfigureFromFile(ConfigParser *parser);
-
-   bool Init(HardwareMapping *hardware_mapping);
+  virtual ~Spindle() {}
 
    // Turn spindle on clockwise (M3) or counterclockwise (M4) at speed (Sxx)
-   void On(bool ccw, int rpm);
+  virtual void On(bool ccw, int rpm) = 0;
+
    // Turn spindle off (M5)
-   void Off();
-
-// FIXME: why can't this be private?
-  class Impl;
-  Impl *impl_;
-
-private:
-  class ConfigReader;
-
-  std::string type_;
-  std::string port_;
-
-  int max_rpm_;
-  int pwr_delay_ms_;
-  int on_delay_ms_;
-  int off_delay_ms_;
-  bool allow_ccw_;
+  virtual void Off() = 0;
 };
 
 #endif  // BEAGLEG_SPINDLE_CONTROL_

@@ -34,6 +34,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <memory>
+
 #include "common/fd-mux.h"
 #include "common/logging.h"
 #include "common/string-util.h"
@@ -454,13 +456,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  Spindle spindle;
-  if (!spindle.ConfigureFromFile(&config_parser)) {
-    Log_error("Exiting. Parse error in configuration file '%s'", config_file);
+  SpindleConfig spindle_config;
+  if (!spindle_config.ConfigureFromFile(&config_parser)) {
+    Log_error("Exiting. Errors in spindle configuration in (%s)", config_file);
     return 1;
   }
-  if (!spindle.Init(&hardware_mapping))
-    Log_error("Unable to initialize spindle");
+
+  std::unique_ptr<Spindle> spindle(
+    Spindle::CreateFromConfig(spindle_config, &hardware_mapping));
 
   // ... other configurations that read from that file.
 
@@ -523,7 +526,7 @@ int main(int argc, char *argv[]) {
 
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &motor_operations,
-                                  &hardware_mapping, &spindle,
+                                  &hardware_mapping, spindle.get(),
                                   stderr);
   if (machine_control == NULL) {
     Log_error("Exiting. Cannot initialize machine control.");

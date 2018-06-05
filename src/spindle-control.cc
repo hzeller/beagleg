@@ -17,6 +17,9 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// At this point, we only have two spindle implementations, for now just kept
+// in one file.
+
 #include "spindle-control.h"
 
 #include <stdlib.h>
@@ -25,6 +28,8 @@
 #include <termios.h>
 #include <time.h>
 #include <errno.h>
+
+#include <memory>
 
 #include "common/logging.h"
 #include "common/string-util.h"
@@ -42,10 +47,12 @@ static const char kPort[] = "/dev/ttyACM0";
 static const int kMaxRPM = 3000;
 
 // Default simple-pwm spindle ramping constants; 10% ramp change every 10ms
+// TODO: make configurable. Lasers can be ramped up and down in no time :)
 static const float kRampEpsilon = 0.1;
 static const int kRampDelayMs = 10;
 
 static void sleep_ms(int ms) {
+  // TODO(hzeller): This needs to hook up with the file multiplexer
   if (ms <= 0) return;
   struct timespec req;
   struct timespec rem;
@@ -61,130 +68,121 @@ static void sleep_ms(int ms) {
   }
 }
 
-Spindle::Spindle() {
-  impl_ = NULL;
-  type_ = kType;
-  port_ = kPort;
-  max_rpm_ = kMaxRPM;
-  pwr_delay_ms_ = 0;
-  on_delay_ms_ = 0;
-  off_delay_ms_ = 0;
-  allow_ccw_ = false;
+SpindleConfig::SpindleConfig() {
+  type = kType;
+  port = kPort;
+  max_rpm = kMaxRPM;
+  pwr_delay_ms = 0;
+  on_delay_ms = 0;
+  off_delay_ms = 0;
+  allow_ccw = false;
 }
 
-class Spindle::ConfigReader : public ConfigParser::Reader {
+namespace {
+class SpindleConfigReader : public ConfigParser::Reader {
 public:
-  ConfigReader(Spindle *config) : config_(config) {}
+  SpindleConfigReader(SpindleConfig *config) : config_(config) {}
 
   bool SeenSection(int line_no, const std::string &section_name) final {
-    current_section_ = section_name;
-    return (section_name == "spindle");
+    return (section_name == "spindle");  // The only section we deal with.
   }
 
   bool SeenNameValue(int line_no,
-                     const std::string &name,
-                     const std::string &value) final {
+                     const std::string &name, const std::string &value) final {
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
-    if (current_section_ == "spindle") {
-      ACCEPT_VALUE("type",           String, &config_->type_);
-      ACCEPT_VALUE("port",           String, &config_->port_);
-      ACCEPT_VALUE("max-rpm",        Int,    &config_->max_rpm_);
-      ACCEPT_VALUE("pwr-delay-msec", Int,    &config_->pwr_delay_ms_);
-      ACCEPT_VALUE("on-delay-msec",  Int,    &config_->on_delay_ms_);
-      ACCEPT_VALUE("off-delay-msec", Int,    &config_->off_delay_ms_);
-      ACCEPT_VALUE("allow-ccw",      Bool,   &config_->allow_ccw_);
-
-      return false;
-    }
-    ReportError(line_no, StringPrintf("Unexpected configuration option '%s'",
-                                      name.c_str()));
-
+    ACCEPT_VALUE("type",           String, &config_->type);
+    ACCEPT_VALUE("port",           String, &config_->port);
+    ACCEPT_VALUE("max-rpm",        Int,    &config_->max_rpm);
+    ACCEPT_VALUE("pwr-delay-msec", Int,    &config_->pwr_delay_ms);
+    ACCEPT_VALUE("on-delay-msec",  Int,    &config_->on_delay_ms);
+    ACCEPT_VALUE("off-delay-msec", Int,    &config_->off_delay_ms);
+    ACCEPT_VALUE("allow-ccw",      Bool,   &config_->allow_ccw);
 #undef ACCEPT_VALUE
+
+    ReportError(line_no, StringPrintf("Unexpected configuration option "
+                                      "'%s' in spindle section", name.c_str()));
     return false;
   }
 
-  void ReportError(int line_no, const std::string &msg) final {
-    Log_error("Line %d: %s", line_no, msg.c_str());
-  }
-
 private:
-  Spindle *const config_;
-
-  std::string current_section_;
+  SpindleConfig *const config_;
 };
 
-bool Spindle::ConfigureFromFile(ConfigParser *parser) {
-  Spindle::ConfigReader reader(this);
-  return parser->EmitConfigValues(&reader);
-}
 
-class Spindle::Impl {
+// Convenience base-class for all our spindles.
+class BaseSpindle : public Spindle {
 public:
-  Impl(HardwareMapping *hardware_mapping, int max_rpm,
-       int pwr_delay_ms, int on_delay_ms, int off_delay_ms)
-    : hardware_mapping_(hardware_mapping), max_rpm_(max_rpm),
-      pwr_delay_ms_(pwr_delay_ms),
-      on_delay_ms_(on_delay_ms),
-      off_delay_ms_(off_delay_ms) {
-    is_off_ = true;
-    is_ccw_ = false;
-    duty_cycle_ = 0;
-  }
-
-  virtual ~Impl() {}
+  BaseSpindle(const SpindleConfig &config, HardwareMapping *hardware_mapping)
+    : config_(config), hardware_mapping_(hardware_mapping) {}
 
   virtual bool Init() { return true; }
-
   virtual void On(bool ccw, int rpm) = 0;
   virtual void Off() = 0;
 
-  void set_output(HardwareMapping::LogicOutput out, bool is_on) {
+  // Right now, this sets the output immediately, but we might want to do this
+  // along with the move if this is a laser.
+  void set_output_synchronous(HardwareMapping::LogicOutput out, bool is_on) {
     hardware_mapping_->UpdateAuxBitmap(out, is_on);
     hardware_mapping_->SetAuxOutputs();
   }
 
 protected:
-  HardwareMapping *hardware_mapping_;
+  const SpindleConfig config_;
+  HardwareMapping *const hardware_mapping_;
 
-  int max_rpm_;
-  int pwr_delay_ms_;
-  int on_delay_ms_;
-  int off_delay_ms_;
-
-  bool is_off_;
-  bool is_ccw_;
-  float duty_cycle_;
+  bool is_off_ = true;
+  bool is_ccw_ = false;
+  float duty_cycle_ = 0;
 };
 
-class PWMSpindle : public Spindle::Impl {
+class PWMSpindle : public BaseSpindle {
 public:
-  PWMSpindle(HardwareMapping *hardware_mapping, int max_rpm,
-             int pwr_delay_ms, int on_delay_ms, int off_delay_ms)
-    : Impl(hardware_mapping, max_rpm, pwr_delay_ms, on_delay_ms, off_delay_ms) {
-    Log_debug("PWMSpindle: constructed");
-    Log_debug("  max_rpm      : %d", max_rpm);
-    Log_debug("  pwr_delay_ms : %d", pwr_delay_ms);
-    Log_debug("  on_delay_ms  : %d", on_delay_ms);
-    Log_debug("  off_delay_ms : %d", off_delay_ms);
+  PWMSpindle(const SpindleConfig &config, HardwareMapping *hardware_mapping)
+    : BaseSpindle(config, hardware_mapping) {
+    Log_debug("PWMSpindle");
+  }
+
+  // Litmus test before constructing.
+  static bool CheckRequiredHardware(const SpindleConfig &config,
+                                    const HardwareMapping *hw) {
+    bool success = true;
+    if (!hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE)
+        && !hw->HasPWMMapping(HardwareMapping::OUT_SPINDLE_SPEED)) {
+      // We want to have at least one of these.
+      Log_info("No 'spindle' Aux pin configured to turn on spindle or "
+               "'spindle-speed' PWM output to control its speed.");
+      success = false;
+    }
+    if (config.allow_ccw &&
+        !hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE_DIRECTION)) {
+      Log_info("allow-ccw set, but no spindle-direction aux bit configured");
+      success = false;
+    }
+    return success;
   }
 
   void On(bool ccw, int rpm) final {
-    // turn on spindle power if necessary
+    if (!config_.allow_ccw && ccw) {
+      Log_debug("Spindle: ccw rotation is not allowed");
+      return;
+    }
+
+    // Turn on spindle power if necessary.
     if (is_off_) {
-      set_output(HardwareMapping::OUT_SPINDLE, true);
-      if (pwr_delay_ms_) sleep_ms(pwr_delay_ms_);
+      set_output_synchronous(HardwareMapping::OUT_SPINDLE, true);
+      sleep_ms(config_.pwr_delay_ms);
     }
 
     // direction change? ramp down spindle
     if (ccw != is_ccw_) ramp_down();
 
     // set the spindle direction
-    set_output(HardwareMapping::OUT_SPINDLE_DIRECTION, ccw);
+    set_output_synchronous(HardwareMapping::OUT_SPINDLE_DIRECTION, ccw);
     is_ccw_ = ccw;
 
     // ramp the spindle to the target speed
-    float target = std::min((float)rpm / max_rpm_, 1.0f);
-    float epsilon = (duty_cycle_ < target) ? kRampEpsilon : -kRampEpsilon;
+    const float target = std::min((float)rpm / config_.max_rpm, 1.0f);
+    const float epsilon = (duty_cycle_ < target) ? kRampEpsilon : -kRampEpsilon;
     while (duty_cycle_ != target) {
       duty_cycle_ += epsilon;
       if ((epsilon < 0 && duty_cycle_ < target) ||
@@ -197,18 +195,19 @@ public:
 
     // optionally delay before continuing
     if (is_off_) {
-      if (on_delay_ms_) sleep_ms(on_delay_ms_);
+      sleep_ms(config_.on_delay_ms);
       is_off_ = false;
     }
 
     Log_debug("PWMSpindle: on %s at %d RPM (duty_cycle: %f)",
-              ccw ? "ccw" : "cw", (int)(max_rpm_ * duty_cycle_), duty_cycle_);
+              ccw ? "ccw" : "cw",
+              (int)(config_.max_rpm * duty_cycle_), duty_cycle_);
   }
 
   void Off() final {
     ramp_down();
-    if (off_delay_ms_) sleep_ms(off_delay_ms_);
-    set_output(HardwareMapping::OUT_SPINDLE, false);
+    sleep_ms(config_.off_delay_ms);
+    set_output_synchronous(HardwareMapping::OUT_SPINDLE, false);
     is_off_ = true;
     Log_debug("PWMSpindle: off");
   }
@@ -227,7 +226,7 @@ private:
   }
 };
 
-class PololuSMCSpindle : public Spindle::Impl {
+class PololuSMCSpindle : public BaseSpindle {
 private:
   enum {
     // Command codes
@@ -319,24 +318,39 @@ private:
   };
 
 public:
-  PololuSMCSpindle(HardwareMapping *hardware_mapping, const char *port,
-                   int max_rpm, int pwr_delay_ms, int on_delay_ms,
-                   int off_delay_ms)
-    : Impl(hardware_mapping, max_rpm, pwr_delay_ms, on_delay_ms, off_delay_ms) {
-    fd_ = open(port, O_RDWR | O_NOCTTY);
-    Log_debug("PololuSMCSpindle: constructed");
-    Log_debug("  port         : %s  (fd = %d)", port, fd_);
-    Log_debug("  max_rpm      : %d", max_rpm);
-    Log_debug("  pwr_delay_ms : %d", pwr_delay_ms);
-    Log_debug("  on_delay_ms  : %d", on_delay_ms);
-    Log_debug("  off_delay_ms : %d", off_delay_ms);
+  PololuSMCSpindle(const SpindleConfig &config,
+                   HardwareMapping *hardware_mapping)
+    : BaseSpindle(config, hardware_mapping) {
+    fd_ = open(config.port.c_str(), O_RDWR | O_NOCTTY);
+    Log_debug("PololuSMCSpindle:");
+    Log_debug("  port         : %s  (fd = %d)", config.port.c_str(), fd_);
+    Log_debug("  max_rpm      : %d", config_.max_rpm);
+    Log_debug("  pwr_delay_ms : %d", config_.pwr_delay_ms);
+    Log_debug("  on_delay_ms  : %d", config_.on_delay_ms);
+    Log_debug("  off_delay_ms : %d", config_.off_delay_ms);
   }
 
   ~PololuSMCSpindle() {
     if (fd_) close(fd_);
   }
 
-  bool Init() {
+  // Litmus test before constructing.
+  static bool CheckRequiredHardware(const SpindleConfig &config,
+                                    const HardwareMapping *hw) {
+    bool success = true;
+    if (!hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE)) {
+      Log_info("No 'spindle' Aux pin configured to turn on spindle.");
+      success = false;
+    }
+    if (config.allow_ccw &&
+        !hw->HasAuxMapping(HardwareMapping::OUT_SPINDLE_DIRECTION)) {
+      Log_info("allow-ccw set, but no spindle-direction aux bit configured");
+      success = false;
+    }
+    return success;
+  }
+
+  bool Init() final {
     if (fd_ == -1) return false;
 
     struct termios options;
@@ -357,17 +371,22 @@ public:
     return true;
   }
 
-  void On(bool ccw, int rpm) {
+  void On(bool ccw, int rpm) final {
     if (fd_ == -1) return;
 
+    if (!config_.allow_ccw && ccw) {
+      Log_debug("Spindle: ccw rotation is not allowed");
+      return;
+    }
+
     if (is_off_) {
-      set_output(HardwareMapping::OUT_SPINDLE, true);
-      if (pwr_delay_ms_) sleep_ms(pwr_delay_ms_);
+      set_output_synchronous(HardwareMapping::OUT_SPINDLE, true);
+      sleep_ms(config_.pwr_delay_ms);
       exit_safe_start();
     }
 
     // scale the desired RPM to the MAX_SPEED of the SMC
-    int speed = std::min(rpm * MAX_SPEED / max_rpm_, (int)MAX_SPEED);
+    int speed = std::min(rpm * MAX_SPEED / config_.max_rpm, (int)MAX_SPEED);
 
     unsigned char command[3];
     command[0] = (ccw) ? CMD_MOTOR_REVERSE : CMD_MOTOR_FORWARD;
@@ -376,13 +395,13 @@ public:
     send(command, sizeof(command));
 
     if (is_off_) {
-      if (on_delay_ms_) sleep_ms(on_delay_ms_);
+      sleep_ms(config_.on_delay_ms);
       is_off_ = false;
     }
 
-    float duty_cycle = std::min((float)rpm / max_rpm_, 1.0f);
+    float duty_cycle = std::min((float)rpm / config_.max_rpm, 1.0f);
     Log_debug("PololuSMCSpindle: on %s at %d RPM (speed: %d)",
-              ccw ? "ccw" : "cw", (int)(max_rpm_ * duty_cycle), speed);
+              ccw ? "ccw" : "cw", (int)(config_.max_rpm * duty_cycle), speed);
   }
 
   void Off() {
@@ -391,8 +410,8 @@ public:
     const unsigned char command = CMD_STOP_MOTOR;
     send(&command, 1);
 
-    if (off_delay_ms_) sleep_ms(off_delay_ms_);
-    set_output(HardwareMapping::OUT_SPINDLE, false);
+    sleep_ms(config_.off_delay_ms);
+    set_output_synchronous(HardwareMapping::OUT_SPINDLE, false);
     is_off_ = true;
     Log_debug("PololuSMCSpindle: off");
   }
@@ -421,31 +440,37 @@ private:
 
   int fd_;
 };
+}  // anonymous namespace
 
-bool Spindle::Init(HardwareMapping *hardware_mapping) {
-  std::string line;
-  if (type_ == "simple-pwm") {
-    impl_ = new PWMSpindle(hardware_mapping, max_rpm_,
-                           pwr_delay_ms_, on_delay_ms_, off_delay_ms_);
-  } else if (type_ == "pololu-smc") {
-    impl_ = new PololuSMCSpindle(hardware_mapping, port_.c_str(), max_rpm_,
-                                 pwr_delay_ms_, on_delay_ms_, off_delay_ms_);
-  } else {
-    return false;
+bool SpindleConfig::ConfigureFromFile(ConfigParser *parser) {
+  SpindleConfigReader reader(this);
+  return parser->EmitConfigValues(&reader);
+}
+
+Spindle *Spindle::CreateFromConfig(const SpindleConfig &config,
+                                   HardwareMapping *hardware_mapping) {
+  std::unique_ptr<BaseSpindle> spindle;
+  if (config.type == "simple-pwm" &&
+      PWMSpindle::CheckRequiredHardware(config, hardware_mapping)) {
+    spindle.reset(new PWMSpindle(config, hardware_mapping));
   }
-  Log_debug("  allow_ccw : %s", allow_ccw_ ? "yes" : "no");
-  return impl_->Init();
-}
+  else if (config.type == "pololu-smc" &&
+           PololuSMCSpindle::CheckRequiredHardware(config, hardware_mapping)) {
+    spindle.reset(new PololuSMCSpindle(config, hardware_mapping));
+  }
+  else {
+    Log_info("No spindle.");
+    // TODO: return a dummy spindle to avoid testing for nullptr everywhere?
+    return nullptr;
+  }
 
-void Spindle::On(bool ccw, int rpm) {
-    if (!allow_ccw_ && ccw) {
-      Log_debug("Spindle: ccw rotation is not allowed");
-      return;
-    }
+  if (!spindle->Init())
+    return nullptr;
 
-  if (impl_) impl_->On(ccw, rpm);
-}
-
-void Spindle::Off() {
-  if (impl_) impl_->Off();
+  Log_debug("  max_rpm      : %d", config.max_rpm);
+  Log_debug("  pwr_delay_ms : %d", config.pwr_delay_ms);
+  Log_debug("  on_delay_ms  : %d", config.on_delay_ms);
+  Log_debug("  off_delay_ms : %d", config.off_delay_ms);
+  Log_debug("  allow_ccw : %s", config.allow_ccw ? "yes" : "no");
+  return spindle.release();
 }

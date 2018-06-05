@@ -426,6 +426,7 @@ void GCodeMachineControl::Impl::handle_M105() {
 // TODO(hzeller): the M3/M4 block should be dealt with in the gcode parser.
 const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
                                                       const char *remaining) {
+  if (!spindle_) return remaining;
   int spindle_rpm = -1;
   const char* after_pair;
   char letter;
@@ -445,6 +446,7 @@ const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
 }
 
 void GCodeMachineControl::Impl::set_spindle_off() {
+  if (!spindle_) return;
   // Ensure that the PRU queue is flushed before turning off the spindle.
   planner_->BringPathToHalt();
   spindle_->Off();
