@@ -92,6 +92,10 @@ class GCodeMachineControl {
   // of the returned pointer.
   GCodeParser::EventReceiver *ParseEventReceiver();
 
+  // Return the E-Stop status.
+  // Can only be called in the same thread that also handles gcode updates.
+  int GetEStopStatus();
+
   // Return current position relative to origin.
   // Can only be called in the same thread that also handles gcode updates.
   void GetCurrentPosition(AxesRegister *pos);

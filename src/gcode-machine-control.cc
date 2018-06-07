@@ -83,6 +83,7 @@ public:
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
+  int GetEStopStatus();
   void GetCurrentPosition(AxesRegister *pos);
 
   // -- GCodeParser::Events interface implementation --
@@ -577,6 +578,15 @@ void GCodeMachineControl::Impl::set_output_flags(
   hardware_mapping_->UpdateAuxBitmap(out, is_on);
 }
 
+int GCodeMachineControl::Impl::GetEStopStatus() {
+  if (in_estop()) {
+    if (hardware_mapping_->TestEStopSwitch())
+      return 2;  // hard
+    return 1;    // soft
+  }
+  return 0;      // none
+}
+
 void GCodeMachineControl::Impl::GetCurrentPosition(AxesRegister *pos) {
   planner_->GetCurrentPosition(pos);
   for (const GCodeParserAxis axis : AllAxes()) {
@@ -950,6 +960,10 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
     (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
       ? impl_->config().move_range_mm[axis] : 0;
   }
+}
+
+int GCodeMachineControl::GetEStopStatus() {
+  return impl_->GetEStopStatus();
 }
 
 void GCodeMachineControl::GetCurrentPosition(AxesRegister *pos) {

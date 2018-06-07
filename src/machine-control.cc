@@ -261,9 +261,18 @@ static void run_status_server(const char *bind_addr, int port,
           if (query == 'p') {
             AxesRegister pos;
             machine->GetCurrentPosition(&pos);
+	    // JSON {"x_axis":fval, "y_axis":fval, "z-axis":fval, "note":"experimental"}
             dprintf(conn, "{\"x_axis\":%.3f, \"y_axis\":%.3f, "
                     "\"z_axis\":%.3f, \"note\":\"experimental\"}\n",
                     pos[AXIS_X], pos[AXIS_Y], pos[AXIS_Z]);
+          }
+          if (query == 's') {
+            int estop_status = machine->GetEStopStatus();
+	    // JSON {"estop":"status"}
+            dprintf(conn, "{\"estop\":\"%s\"}\n",
+                    estop_status == 0 ? "none" :
+                    estop_status == 1 ? "soft" :
+                    estop_status == 2 ? "hard" : "unknown");
           }
           return true;
         });
