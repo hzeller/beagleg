@@ -541,23 +541,32 @@ public:
     fprintf(file_, "currentpoint3d stroke gsave "
             "%s setrgbcolor 0 setlinewidth ",
             kGcodeOriginTextColor);
-    DrawText(named, size/4, size/4, TextAlign::kLeft, 1.5*size,
+    DrawText(named, 0, size, TextAlign::kCenter, 1.5*size,
              [this, origin](bool d, float x, float y) {
                fprintf(file_, "%.3f %.3f %.3f %s\n",
                        origin[AXIS_X] + x, origin[AXIS_Y] + y, origin[AXIS_Z],
                        d ? "lineto3d" : "moveto3d");
              });
     fprintf(file_, "stroke %s setrgbcolor\n", kGcodeOriginMarkColor);
-    fprintf(file_, "%.3f %.3f %.3f moveto3d\n",
-            origin[AXIS_X] - size, origin[AXIS_Y], origin[AXIS_Z]);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
-            origin[AXIS_X], origin[AXIS_Y] + size, origin[AXIS_Z]);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
-            origin[AXIS_X], origin[AXIS_Y] - size, origin[AXIS_Z]);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n",
-            origin[AXIS_X] + size, origin[AXIS_Y], origin[AXIS_Z]);
+    const float x = origin[AXIS_X];
+    const float y = origin[AXIS_Y];
+    const float z = origin[AXIS_Z];
 
-    fprintf(file_, "closepath fill grestore moveto3d\n");
+    // Octagon with bottom-left quadrant filled.
+    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x-size, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x-0.707*size, y-0.707*size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y-size, z);
+    fprintf(file_, "closepath fill\n");
+    // remaining part, non-filled.
+    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y - size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x+0.707*size, y-0.707*size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x+size, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x+0.707*size, y+0.707*size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y+size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x-0.707*size, y+0.707*size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x-size, y, z);
+    fprintf(file_, "stroke grestore moveto3d\n");
   }
 
   void ShowHomePos(const AxesRegister &origin) {
