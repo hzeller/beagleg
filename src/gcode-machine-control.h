@@ -68,6 +68,12 @@ struct MachineControlConfig {
 // A class that controls a machine via gcode.
 class GCodeMachineControl {
  public:
+  enum class EStopState {
+    ESTOP_NONE,
+    ESTOP_SOFT,
+    ESTOP_HARD
+  };
+
   // Factor to create a GCodeMachineControl.
   // The MotorOperations provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
@@ -94,7 +100,7 @@ class GCodeMachineControl {
 
   // Return the E-Stop status.
   // Can only be called in the same thread that also handles gcode updates.
-  int GetEStopStatus();
+  EStopState GetEStopStatus();
 
   // Return current position relative to origin.
   // Can only be called in the same thread that also handles gcode updates.

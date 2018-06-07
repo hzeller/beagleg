@@ -83,7 +83,7 @@ public:
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
-  int GetEStopStatus();
+  EStopState GetEStopStatus();
   void GetCurrentPosition(AxesRegister *pos);
 
   // -- GCodeParser::Events interface implementation --
@@ -578,13 +578,13 @@ void GCodeMachineControl::Impl::set_output_flags(
   hardware_mapping_->UpdateAuxBitmap(out, is_on);
 }
 
-int GCodeMachineControl::Impl::GetEStopStatus() {
+GCodeMachineControl::EStopState GCodeMachineControl::Impl::GetEStopStatus() {
   if (in_estop()) {
     if (hardware_mapping_->TestEStopSwitch())
-      return 2;  // hard
-    return 1;    // soft
+      return GCodeMachineControl::EStopState::ESTOP_HARD;
+    return GCodeMachineControl::EStopState::ESTOP_SOFT;
   }
-  return 0;      // none
+  return GCodeMachineControl::EStopState::ESTOP_NONE;
 }
 
 void GCodeMachineControl::Impl::GetCurrentPosition(AxesRegister *pos) {
@@ -962,7 +962,7 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   }
 }
 
-int GCodeMachineControl::GetEStopStatus() {
+GCodeMachineControl::EStopState GCodeMachineControl::GetEStopStatus() {
   return impl_->GetEStopStatus();
 }
 
