@@ -273,9 +273,9 @@ public:
     // Remember if things were set to inch or metric, so that we can
     // show dimensions in preferred units.
     if (letter == 'G') {
-      if (val == 21) {
+      if (val == 21 || val == 71) {
         prefer_inch_ = false;
-      } else if (val == 20) {
+      } else if (val == 20 || val == 70) {
         prefer_inch_ = true;
       }
     }
@@ -490,7 +490,7 @@ public:
 
   void ShowMesaureLines() {
     fprintf(file_, "\n%% -- Measurement lines\n");
-    const float size = GetDiagonalLength() / 30;
+    const float size = GetDiagonalLength() / 40;
     fprintf(file_, "%.1f setlinewidth\n", size/20);
 
     // Various functions to draw into directon of the axis on given
@@ -1067,8 +1067,8 @@ int main(int argc, char *argv[]) {
   bool show_dimensions = true;
   bool show_machine_path = true;  // Also requires config.
   bool show_gcode_path = true;
-  float threshold_angle = 0;
-  float speed_tune_angle = 0;
+  float threshold_angle = 10;   // Same defaults as machine control.
+  float speed_tune_angle = 60;
   bool range_check = false;
   float scale = 1.0f;
   float bounding_box_width_mm = -1;
