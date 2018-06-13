@@ -31,6 +31,7 @@ static void init_test_config(struct MachineControlConfig *c,
     c->max_feedrate[i] = (i+1) * 1000;
   }
   c->threshold_angle = 0;
+  c->speed_tune_angle = 0;
   c->require_homing = false;
 }
 

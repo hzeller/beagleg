@@ -49,6 +49,7 @@ struct MachineControlConfig {
 
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
   float threshold_angle;      // Threshold angle to ignore speed changes
+  float speed_tune_angle;     // Angle added to the angle between vectors for speed tuning
 
   std::string home_order;        // Order in which axes are homed.
 

@@ -954,7 +954,8 @@ static int usage(const char *progname, bool description = false) {
           "\t-o <output-file>  : Name of output file; stdout default.\n"
           "\t-c <config>       : BeagleG machine config.\n"
           "\t-T <tool-diameter>: Tool diameter in mm.\n"
-          "\t-t <threshold-angle> : Threshold angle for accleration opt.\n"
+          "\t-t <threshold-angle>  : Threshold angle for accleration opt.\n"
+          "\t-A <speed-tune-angle> : Speed tuning angle for accleration opt.\n"
           "\t-q                : Quiet.\n"
           "\t-s                : Visualize movement speeds.\n"
           "\t-D                : Don't show dimensions.\n"
@@ -1067,6 +1068,7 @@ int main(int argc, char *argv[]) {
   bool show_machine_path = true;  // Also requires config.
   bool show_gcode_path = true;
   float threshold_angle = 0;
+  float speed_tune_angle = 0;
   bool range_check = false;
   float scale = 1.0f;
   float bounding_box_width_mm = -1;
@@ -1077,7 +1079,7 @@ int main(int argc, char *argv[]) {
   float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "o:c:T:DMGt:srS:iR:P:Y:V:e:a:w:qg:lC:")) != -1) {
+  while ((opt = getopt(argc, argv, "a:A:c:C:De:g:GilMo:P:qrR:sS:t:T:V:w:Y:")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1088,6 +1090,9 @@ int main(int argc, char *argv[]) {
       break;
     case 't':
       threshold_angle = (float)atof(optarg);
+      break;
+    case 'A':
+      speed_tune_angle = (float)atof(optarg);
       break;
     case 'g':
       grid = (float)atof(optarg);
@@ -1247,6 +1252,7 @@ int main(int argc, char *argv[]) {
 
   if (config_file && show_machine_path) {
     machine_config.threshold_angle = threshold_angle;
+    machine_config.speed_tune_angle = speed_tune_angle;
     machine_config.acknowledge_lines = false;
     machine_config.range_check = range_check;
 

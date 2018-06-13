@@ -31,6 +31,7 @@ static void InitTestConfig(struct MachineControlConfig *c) {
     c->max_feedrate[i] = 10000;
   }
   c->threshold_angle = 0;
+  c->speed_tune_angle = 0;
   c->require_homing = false;
 }
 
@@ -127,12 +128,14 @@ public:
   // If angle or config is not set, assumes default. Takes ownership of
   // config.
   PlannerHarness(float threshold_angle = 0,
+                 float speed_tune_angle = 0,
                  MachineControlConfig *config = NULL)
     : config_(config ? config : new MachineControlConfig()),
       motor_ops_(*config_), finished_(false) {
     if (!config) {
       InitTestConfig(config_);
       config_->threshold_angle = threshold_angle;
+      config_->speed_tune_angle = speed_tune_angle;
     }
     simulated_hardware_.AddMotorMapping(AXIS_X, 1, false);
     simulated_hardware_.AddMotorMapping(AXIS_Y, 2, false);
@@ -260,7 +263,7 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   config->steps_per_mm[AXIS_Y] = 1000;
   config->steps_per_mm[defining_axis] *= 12.345;
 
-  PlannerHarness plantest(0, config);
+  PlannerHarness plantest(0, 0, config);
 
   // Let's do a diagonal move.
   // First: AXIS_X shall be dominant
@@ -311,6 +314,7 @@ TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_YY) {
 }
 
 static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
+                                                   float speed_tune_angle,
                                                    float start_angle,
                                                    float delta_angle) {
   const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
@@ -318,7 +322,7 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
   fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f)\n",
           threshold_angle, start_angle, delta_angle);
 #endif
-  PlannerHarness plantest(threshold_angle);
+  PlannerHarness plantest(threshold_angle, speed_tune_angle);
   const float kSegmentLen = 100;
 
   float radangle = 2 * M_PI * start_angle / 360;
@@ -338,7 +342,9 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
 
 TEST(PlannerTest, CornerMove_90Degrees) {
   const float kThresholdAngle = 5.0f;
-  std::vector<LinearSegmentSteps> segments = DoAngleMove(kThresholdAngle, 0, 90);
+  const float kSpeedTuneAngle = 0.0f;
+  std::vector<LinearSegmentSteps> segments =
+    DoAngleMove(kThresholdAngle, kSpeedTuneAngle, 0, 90);
   ASSERT_EQ(4, (int)segments.size());
 
   // This is a 90 degree move, we expect to slow down all the way to zero
@@ -348,10 +354,11 @@ TEST(PlannerTest, CornerMove_90Degrees) {
 }
 
 void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
+  const float kSpeedTuneAngle = 0.0f;
   // Essentially, we go around the circle as starting segments.
   for (float angle = 0; angle < 360; angle += threshold/2) {
     std::vector<LinearSegmentSteps> segments =
-      DoAngleMove(threshold, angle, testing_angle);
+      DoAngleMove(threshold, kSpeedTuneAngle, angle, testing_angle);
 
     // Depending on the two move angles we expect 2 to 4 segments.
     // 2 segments (first move euclid speed is faster than the second)

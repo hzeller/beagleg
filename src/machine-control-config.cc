@@ -42,6 +42,7 @@ MachineControlConfig::MachineControlConfig() {
   enable_pause = false;
   home_order = kHomeOrder;
   threshold_angle = -1;
+  speed_tune_angle = 0;
   auto_motor_disable_seconds = -1;
   auto_fan_disable_seconds = -1;
   auto_fan_pwm = 0;

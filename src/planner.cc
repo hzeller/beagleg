@@ -188,22 +188,26 @@ static bool within_acceptable_range(double new_val, double old_val,
 // cutting it :)
 static double determine_joining_speed(const struct AxisTarget *from,
                                       const struct AxisTarget *to,
-                                      const double threshold) {
+                                      const double threshold,
+                                      const double speed_tune_angle) {
   // the dot product of the vectors
   const double dot = from->dx*to->dx + from->dy*to->dy + from->dz*to->dz;
   const double mag = from->len * to->len;
-  if (dot == 0) return 0.0;        // orthogonal 90 degree, full stop
-  if (dot >= mag) return to->speed; // codirectional 0 degree, keep accelerating
+  if (dot == 0) return 0.0;         // orthogonal 90 degree, full stop
+  if (dot < 0) return 0.0;          // turning around, full stop
+  const double dotmag = dot / mag;
+  if (within_acceptable_range(1.0, dotmag, 1e-5))
+    return to->speed;               // codirectional 0 degree, keep accelerating
 
   // the angle between the vectors
   const double rad2deg = 180.0 / M_PI;
-  const double angle = std::fabs(std::acos(dot / mag) * rad2deg);
+  const double angle = std::fabs(std::acos(dotmag) * rad2deg);
 
   if (angle >= 45.0)
     return 0.0;                     // angle to large, come to full stop
   if (angle <= threshold) {         // in tolerance, keep accelerating
     const double deg2rad = M_PI / 180.0;
-    const double angle_speed_adj = std::cos((angle + 60) * deg2rad);
+    const double angle_speed_adj = std::cos((angle + speed_tune_angle) * deg2rad);
     //Log_debug("%s: angle: %f adj: %f\n", __func__, angle, angle_speed_adj);
     return to->speed * angle_speed_adj;
   }
@@ -357,7 +361,8 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
   // to decelerate further (after all, it has a fixed feed-rate it should not
   // go over).
   double next_speed = determine_joining_speed(target_pos, upcoming,
-                                             cfg_->threshold_angle);
+                                             cfg_->threshold_angle,
+                                             cfg_->speed_tune_angle);
   // Clamp the next speed to insure that this segment does not go over.
   if (next_speed > target_pos->speed)
     next_speed = target_pos->speed;

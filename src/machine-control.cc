@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cmath>
 #include <memory>
 
 #include "common/fd-mux.h"
@@ -72,7 +73,10 @@ static int usage(const char *prog, const char *msg) {
           "  -P                         : Verbose: Show some more debug output (Default: off).\n"
           "  -S                         : Synchronous: don't queue (Default: off).\n"
           "      --allow-m111           : Allow changing the debug level with M111 (Default: off).\n"
-          // --threshold-angle specifies threshold angle used for arc segment acceleration.
+          "\nSegment acceleration tuning:\n"
+          "     --threshold-angle       : Specifies the threshold angle used for segment acceleration (Default: 10 degrees).\n"
+          "     --speed-tune-angle      : Specifies the angle used for proportional speed-tuning. (Default: 60 degrees)\n\n"
+          "                               The --threshold-angle + --speed-tune-angle must be less than 90 degrees.\n"
           "\nConfiguration file overrides:\n"
           "     --homing-required       : Require homing before any moves (require-homing = yes).\n"
           "     --nohoming-required     : (Opposite of above^): Don't require homing before any moves (require-homing = no).\n"
@@ -303,6 +307,7 @@ int main(int argc, char *argv[]) {
   enum LongOptionsOnly {
     OPT_HELP = 1000,
     OPT_SET_THRESHOLD_ANGLE,
+    OPT_SET_SPEED_TUNE_ANGLE,
     OPT_REQUIRE_HOMING,
     OPT_DONT_REQUIRE_HOMING,
     OPT_DISABLE_RANGE_CHECK,
@@ -337,6 +342,7 @@ int main(int argc, char *argv[]) {
 
     // possibly deprecated soon.
     { "threshold-angle",    required_argument, NULL, OPT_SET_THRESHOLD_ANGLE },
+    { "speed-tune-angle",   required_argument, NULL, OPT_SET_SPEED_TUNE_ANGLE },
 
     { 0,                    0,                 0,    0  },
   };
@@ -349,6 +355,7 @@ int main(int argc, char *argv[]) {
   bool disable_range_check = false;
   bool allow_m111 = false;
   config.threshold_angle = 10;
+  config.speed_tune_angle = 60;
   int opt;
   while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:",
                             long_options, NULL)) != -1) {
@@ -360,6 +367,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_SET_THRESHOLD_ANGLE:
       config.threshold_angle = (float)atof(optarg);
+      break;
+    case OPT_SET_SPEED_TUNE_ANGLE:
+      config.speed_tune_angle = (float)atof(optarg);
       break;
     case OPT_REQUIRE_HOMING:
       require_homing = true;
@@ -424,6 +434,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (config.threshold_angle + config.speed_tune_angle >= 90) {
+    return usage(argv[0], "--threshold-angle + --speed-tune-angle must be < 90 degrees.");
+  }
+
   if (require_homing && dont_require_homing) {
     return usage(argv[0], "Choose one: --homing-required or --nohoming-required.");
   }
@@ -438,6 +452,14 @@ int main(int argc, char *argv[]) {
   Log_init(as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
   Log_info("BeagleG " BEAGLEG_VERSION " startup; "
            CAPE_NAME " hardware interface.");
+
+  if (config.threshold_angle > 0) {
+    const double deg2rad = M_PI / 180.0;
+    const double min_speed_adj = std::cos(config.speed_tune_angle * deg2rad);
+    const double max_speed_adj = std::cos((config.threshold_angle + config.speed_tune_angle) * deg2rad);
+    Log_debug("Speed-tuning from %.2f to %.2f for angles +/-%.2f degrees (speed-tune @ %.2f degrees)\n",
+              min_speed_adj, max_speed_adj, config.threshold_angle, config.speed_tune_angle);
+  }
 
   // If reading from file: don't print 'ok' for every line.
   config.acknowledge_lines = !has_filename;
