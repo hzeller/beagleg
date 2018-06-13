@@ -206,10 +206,12 @@ static double determine_joining_speed(const struct AxisTarget *from,
   if (angle >= 45.0)
     return 0.0;                     // angle to large, come to full stop
   if (angle <= threshold) {         // in tolerance, keep accelerating
-    const double deg2rad = M_PI / 180.0;
-    const double angle_speed_adj = std::cos((angle + speed_tune_angle) * deg2rad);
-    //Log_debug("%s: angle: %f adj: %f\n", __func__, angle, angle_speed_adj);
-    return to->speed * angle_speed_adj;
+    if (dot < 1) {                  // speed tune segments less than 1mm (i.e. arcs)
+      const double deg2rad = M_PI / 180.0;
+      const double angle_speed_adj = std::cos((angle + speed_tune_angle) * deg2rad);
+      return to->speed * angle_speed_adj;
+    }
+    return to->speed;
   }
 
   // The angle between the from and to segments is < 45 degrees but greater
