@@ -145,7 +145,9 @@ int FDMultiplexer::Loop() {
   const unsigned timeout = idle_ms_;
 
   arm_signal_handler();
-  while (SingleCycle(timeout)) {}
+  while (SingleCycle(timeout) && !caught_signal) {
+    /**/
+  }
   disarm_signal_handler();
 
   return caught_signal ? 1 : 0;
