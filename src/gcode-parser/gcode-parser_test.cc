@@ -58,7 +58,7 @@ public:
   // Main function to test. Returns 'false' if parsing failed.
   bool TestParseLine(const char *block) {
     int errors_before = parser_->error_count();
-    parser_->ParseLine(block, stderr);
+    parser_->ParseBlock(block, stderr);
     return parser_->error_count() == errors_before;
   }
 

@@ -71,7 +71,7 @@ bool GCodeStreamer::ReadData() {
     // Parse any potentially remaining gcode from previous connections.
     const char *line = reader_.IncompleteLine();
     if (line) {
-      parser_->ParseLine(line, msg_stream_);
+      parser_->ParseBlock(line, msg_stream_);
     }
 
     // always call gcode_finished() to disable motors at end of stream
@@ -87,7 +87,7 @@ bool GCodeStreamer::ReadData() {
     // NOTE:(important)
     // This should return true or false in case the line was movement or not
     // and only if is, reset the timer.
-    parser_->ParseLine(line, msg_stream_);
+    parser_->ParseBlock(line, msg_stream_);
     ++lines_processed_;
   }
 

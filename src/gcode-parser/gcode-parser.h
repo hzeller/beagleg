@@ -219,9 +219,9 @@ public:
               bool allow_m111);
   ~GCodeParser();
 
-  // Main workhorse: Parse a gcode line, call callbacks if needed.
+  // Main workhorse: Parse a gcode block (a line), call callbacks if needed.
   // If "err_stream" is non-NULL, sends error messages that way.
-  void ParseLine(const char *line, FILE *err_stream);
+  void ParseBlock(const char *line, FILE *err_stream);
 
   // Read and parse GCode from "input_fd" and call callbacks.
   // Error messages are sent to "err_stream" if non-NULL.
