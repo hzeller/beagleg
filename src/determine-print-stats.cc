@@ -150,7 +150,7 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   GCodeParser::Config::ParamMap parameters;
   parser_cfg.parameters = &parameters;
   GCodeParser parser(parser_cfg, &stats_event_receiver, false);
-  const bool success = parser.ParseStream(input_fd, msg_out) == 0
+  const bool success = parser.ReadFile(fdopen(input_fd, "r"), msg_out)
     && parser.error_count() == 0;
   delete machine_control;
   return success;

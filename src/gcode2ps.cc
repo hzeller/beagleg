@@ -981,17 +981,14 @@ static int usage(const char *progname, bool description = false) {
 
 static bool ParseFile(GCodeParser *parser, const char *filename,
                       bool do_reset, FILE *msg_stream) {
-  const int fd = open(filename, O_RDONLY);
-  if (fd < 0) {
+  if (!parser->ReadFile(fopen(filename, "r"), msg_stream)) {
     fprintf(stderr, "Cannot open %s\n", filename);
     return false;
   }
-
-  parser->ParseStream(fd, msg_stream);
   // Make sure to reset parser properly.
-  if (do_reset) parser->ParseBlock("G28 M02", msg_stream); // M02 needs to be last.
+  if (do_reset)
+    parser->ParseBlock("G28 M02", msg_stream); // M02 needs to be last.
 
-  close(fd);
   return true;
 }
 

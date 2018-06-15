@@ -223,11 +223,15 @@ public:
   // If "err_stream" is non-NULL, sends error messages that way.
   void ParseBlock(const char *line, FILE *err_stream);
 
-  // Read and parse GCode from "input_fd" and call callbacks.
+  // Convenience function: Read gcode from file. This reads the file
+  // line-by-line, parses these blocks and call the EventReceiver.
+  // Closes input stream after EOF.
+  // The input is expected to be a stream with no stalls, so no input_idle()
+  // will be called (Reading from a socket ? Use GCodeStreamer instead.).
+  //
   // Error messages are sent to "err_stream" if non-NULL.
-  // Reads until EOF (returns 0) or signal occured (returns 2).
-  // The input file descriptor is closed.
-  int ParseStream(int input_fd, FILE *err_stream);
+  // Returns true on success.
+  bool ReadFile(FILE *input_gcode_stream, FILE *output_err_stream);
 
   // Utility function: Parses next pair in the line of G-code (e.g. 'P123' is
   // a pair of the letter 'P' and the value '123').
