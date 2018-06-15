@@ -1,0 +1,12 @@
+Support to start BeagleG using systemd.
+
+Just modify according to your taste, then
+  sudo make install
+
+Copy your configuration file to /etc/beagleg.config
+
+Pretty basic right now; Questions (as I am more comfortable with SysV init:)
+  * is it an ok practice to have a start script like run-beagleg.sh which then is
+    called from systemd ?
+  * What is the recommended service to depend on so that the uio_pruss module
+    is properly loaded ? Right now this is happening manually.

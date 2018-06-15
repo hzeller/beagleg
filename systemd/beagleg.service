@@ -1,0 +1,10 @@
+[Unit]
+Description=BeagleG - CNC motion control
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/run-beagleg.sh
+
+[Install]
+WantedBy=basic.target
+
