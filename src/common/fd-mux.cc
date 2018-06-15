@@ -32,7 +32,7 @@
 static volatile sig_atomic_t caught_signal = 0;
 
 static void receive_signal(int signo) {
-  static char msg[] = "Caught signal. Shutting down ASAP.\n";
+  static const char msg[] = "Caught signal. Shutting down ASAP.\n";
   if (!caught_signal) {
     write(STDERR_FILENO, msg, sizeof(msg));
   }
@@ -43,14 +43,15 @@ static void arm_signal_handler() {
   caught_signal = 0;
   struct sigaction sa = {};
   sa.sa_handler = receive_signal;
-  sa.sa_flags = SA_RESETHAND;  // oneshot, no restart
+
+  // We might get multiple signals on shutdown, so not using SA_RESETHAND
+  sa.sa_flags = 0;
   sigaction(SIGTERM, &sa, NULL);  // Regular kill
   sigaction(SIGINT, &sa, NULL);   // Ctrl-C
 
   // Other, internal problems that should never happen, but
   // can trigger multiple times before we gain back control
-  // to shut down as cleanly as possible. These are not one-shot.
-  sa.sa_flags = 0;
+  // to shut down as cleanly as possible.
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
   sigaction(SIGFPE, &sa, NULL);
