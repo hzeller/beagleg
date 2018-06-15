@@ -97,7 +97,7 @@ public:
        GCodeParser::EventReceiver *parse_events, bool allow_m111);
   ~Impl();
 
-  void ParseLine(GCodeParser *owner, const char *line, FILE *err_stream);
+  void ParseBlock(GCodeParser *owner, const char *line, FILE *err_stream);
   int ParseStream(GCodeParser *owner, int input_fd, FILE *err_stream);
   const char *gcodep_parse_pair_with_linenumber(int line_num,
                                                 const char *line,
@@ -1116,8 +1116,8 @@ void GCodeParser::Impl::gcodep_while_end() {
       if (control_parse_.ExpectNext(&line, CK_DO)) {
         std::vector<StringPiece> piece = SplitString(while_loop_, "\n");
         for (size_t i=0; i < piece.size(); i++)
-          ParseLine(while_owner_, piece[i].ToString().c_str(),
-                    while_err_stream_);
+          ParseBlock(while_owner_, piece[i].ToString().c_str(),
+                     while_err_stream_);
       } else {
         gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
         return;
@@ -1806,8 +1806,8 @@ const char *GCodeParser::Impl::handle_M111(const char *line) {
 }
 
 // Note: changes here should be documented in G-code.md as well.
-void GCodeParser::Impl::ParseLine(GCodeParser *owner,
-                                  const char *line, FILE *err_stream) {
+void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
+                                   const char *line, FILE *err_stream) {
   if (debug_level_ & DEBUG_PARSER) {
     Log_debug("GCodeParser| %s", line);
   }
@@ -2007,7 +2007,7 @@ int GCodeParser::Impl::ParseStream(GCodeParser *owner,
     if (fgets(buffer, sizeof(buffer), gcode_stream) == NULL)
       break;
 
-    ParseLine(owner, buffer, err_stream);
+    ParseBlock(owner, buffer, err_stream);
   }
   disarm_signal_handler();
 
@@ -2032,8 +2032,8 @@ GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events,
 GCodeParser::~GCodeParser() {
   delete impl_;
 }
-void GCodeParser::ParseLine(const char *line, FILE *err_stream) {
-  impl_->ParseLine(this, line, err_stream);
+void GCodeParser::ParseBlock(const char *line, FILE *err_stream) {
+  impl_->ParseBlock(this, line, err_stream);
 }
 int GCodeParser::ParseStream(int input_fd, FILE *err_stream) {
   return impl_->ParseStream(this, input_fd, err_stream);

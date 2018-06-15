@@ -989,7 +989,7 @@ static bool ParseFile(GCodeParser *parser, const char *filename,
 
   parser->ParseStream(fd, msg_stream);
   // Make sure to reset parser properly.
-  if (do_reset) parser->ParseLine("G28 M02", msg_stream); // M02 needs to be last.
+  if (do_reset) parser->ParseBlock("G28 M02", msg_stream); // M02 needs to be last.
 
   close(fd);
   return true;
