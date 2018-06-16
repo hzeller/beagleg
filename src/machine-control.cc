@@ -275,9 +275,9 @@ static void run_status_server(const char *bind_addr, int port,
 	    GCodeMachineControl::HomingState home_status = machine->GetHomeStatus();
             // JSON {"estop":"status", "homed":"status", "motors":bool}
             dprintf(conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
-                    estop_status == GCodeMachineControl::EStopState::ESTOP_NONE ? "none" :
-                    estop_status == GCodeMachineControl::EStopState::ESTOP_SOFT ? "soft" :
-                    estop_status == GCodeMachineControl::EStopState::ESTOP_HARD ? "hard" : "unknown",
+                    estop_status == GCodeMachineControl::EStopState::NONE ? "none" :
+                    estop_status == GCodeMachineControl::EStopState::SOFT ? "soft" :
+                    estop_status == GCodeMachineControl::EStopState::HARD ? "hard" : "unknown",
                     home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no" :
                     home_status == GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED ? "maybe" :
                     home_status == GCodeMachineControl::HomingState::HOMED ? "yes" : "unknown",

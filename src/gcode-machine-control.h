@@ -69,11 +69,7 @@ struct MachineControlConfig {
 // A class that controls a machine via gcode.
 class GCodeMachineControl {
  public:
-  enum class EStopState {
-    ESTOP_NONE,
-    ESTOP_SOFT,
-    ESTOP_HARD
-  };
+  enum class EStopState {  NONE,  SOFT,  HARD  };
 
   // The three levels of homing confidence. If we ever switch off
   // power to the motors after homing, we can't be sure.

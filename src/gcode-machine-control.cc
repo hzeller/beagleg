@@ -575,10 +575,10 @@ void GCodeMachineControl::Impl::set_output_flags(
 GCodeMachineControl::EStopState GCodeMachineControl::Impl::GetEStopStatus() {
   if (in_estop()) {
     if (hardware_mapping_->TestEStopSwitch())
-      return GCodeMachineControl::EStopState::ESTOP_HARD;
-    return GCodeMachineControl::EStopState::ESTOP_SOFT;
+      return GCodeMachineControl::EStopState::HARD;
+    return GCodeMachineControl::EStopState::SOFT;
   }
-  return GCodeMachineControl::EStopState::ESTOP_NONE;
+  return GCodeMachineControl::EStopState::NONE;
 }
 
 GCodeMachineControl::HomingState GCodeMachineControl::Impl::GetHomeStatus() {
