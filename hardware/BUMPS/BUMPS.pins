@@ -1,0 +1,36 @@
+# Run with config-pin -f BUMPS.pins
+# Step signals
+P9.18 low     # motor 1
+P9.17 low     # motor 2
+P9.21 low     # motor 3
+P9.42 low     # motor 4
+P9.22 low     # motor 5
+P9.26 low     # motor 6 (extern)
+P9.24 low     # motor 7 (extern)
+P9.41 low     # motor 8 (extern)
+
+# Dir signals
+P8.16 low     # motor 1
+P8.15 low     # motor 2
+P8.11 low     # motor 3
+P9.15 low     # motor 4
+P8.12 low     # motor 5
+P9.23 low     # motor 6 (extern)
+P9.14 low     # motor 7 (extern)
+P9.16 low     # motor 8 (extern)
+
+# Output
+P9.12 low     # Motor enable
+P9.11 low     # AUX 1
+P9.13 low     # AUX 2
+P8.09 timer   # PWM1 Power PWM
+P8.10 timer   # PWM2 Power PWM
+P8.07 timer   # PWM3 Open Collector PWM
+P8.08 timer   # PWM4 Open Collector PWM
+
+# Input
+P8.13 in      # END_X
+P8.14 in      # END_Y
+P8.17 in      # END_Z
+
+# (TODO: Analog)
