@@ -272,11 +272,16 @@ static void run_status_server(const char *bind_addr, int port,
           }
           if (query == 's') {
             GCodeMachineControl::EStopState estop_status = machine->GetEStopStatus();
-            // JSON {"estop":"status"}
-            dprintf(conn, "{\"estop\":\"%s\"}\n",
+	    GCodeMachineControl::HomingState home_status = machine->GetHomeStatus();
+            // JSON {"estop":"status", "homed":"status", "motors":bool}
+            dprintf(conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
                     estop_status == GCodeMachineControl::EStopState::ESTOP_NONE ? "none" :
                     estop_status == GCodeMachineControl::EStopState::ESTOP_SOFT ? "soft" :
-                    estop_status == GCodeMachineControl::EStopState::ESTOP_HARD ? "hard" : "unknown");
+                    estop_status == GCodeMachineControl::EStopState::ESTOP_HARD ? "hard" : "unknown",
+                    home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no" :
+                    home_status == GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED ? "maybe" :
+                    home_status == GCodeMachineControl::HomingState::HOMED ? "yes" : "unknown",
+		    machine->GetMotorsEnabled() ? "true" : "false");
           }
           return true;
         });

@@ -53,14 +53,6 @@
 #define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
   "CAPE:" CAPE_NAME " FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
-// The three levels of homing confidence. If we ever switch off
-// power to the motors after homing, we can't be sure.
-enum HomingState {
-  HOMING_STATE_NEVER_HOMED,
-  HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED,
-  HOMING_STATE_HOMED
-};
-
 // The GCode control implementation. Essentially we are a state machine
 // driven by the events we get from the gcode parsing.
 // We implement the event receiver interface directly.
@@ -84,6 +76,8 @@ public:
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
   EStopState GetEStopStatus();
+  HomingState GetHomeStatus();
+  bool GetMotorsEnabled();
   void GetCurrentPosition(AxesRegister *pos);
 
   // -- GCodeParser::Events interface implementation --
@@ -158,7 +152,7 @@ private:
   time_t next_auto_disable_fan_;
   bool pause_enabled_;                  // Enabled via M120, disabled via M121
 
-  enum HomingState homing_state_;
+  GCodeMachineControl::HomingState homing_state_;
 };
 
 static inline int round2int(float x) { return (int) roundf(x); }
@@ -177,7 +171,7 @@ GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
     g0_feedrate_mm_per_sec_(-1),
     current_feedrate_mm_per_sec_(-1),
     prog_speed_factor_(1),
-    homing_state_(HOMING_STATE_NEVER_HOMED) {
+    homing_state_(GCodeMachineControl::HomingState::NEVER_HOMED) {
     pause_enabled_ = cfg_.enable_pause;
     next_auto_disable_motor_ = -1;
     next_auto_disable_fan_ = -1;
@@ -319,8 +313,8 @@ void GCodeMachineControl::Impl::wait_temperature() {
 void GCodeMachineControl::Impl::motors_enable(bool b) {
   planner_->BringPathToHalt();
   motor_ops_->MotorEnable(b);
-  if (!b && homing_state_ == HOMING_STATE_HOMED) {
-    homing_state_ = HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED;
+  if (!b && homing_state_ == GCodeMachineControl::HomingState::HOMED) {
+    homing_state_ = GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED;
   }
 }
 void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
@@ -381,7 +375,7 @@ void GCodeMachineControl::Impl::set_estop(bool hard) {
   hardware_mapping_->AuxOutputsOff();
   set_output_flags(HardwareMapping::NamedOutput::ESTOP, true);
   motors_enable(false);
-  homing_state_ = HOMING_STATE_NEVER_HOMED;
+  homing_state_ = GCodeMachineControl::HomingState::NEVER_HOMED;
   mprintf("// Beagleg: %s E-Stop.\n", hard ? "Hard" : "Soft");
 }
 
@@ -587,6 +581,14 @@ GCodeMachineControl::EStopState GCodeMachineControl::Impl::GetEStopStatus() {
   return GCodeMachineControl::EStopState::ESTOP_NONE;
 }
 
+GCodeMachineControl::HomingState GCodeMachineControl::Impl::GetHomeStatus() {
+  return homing_state_;
+}
+
+bool GCodeMachineControl::Impl::GetMotorsEnabled() {
+  return hardware_mapping_->MotorsEnabled();
+}
+
 void GCodeMachineControl::Impl::GetCurrentPosition(AxesRegister *pos) {
   planner_->GetCurrentPosition(pos);
   for (const GCodeParserAxis axis : AllAxes()) {
@@ -619,13 +621,13 @@ void GCodeMachineControl::Impl::mprint_current_position() {
 #endif
           current_pos[AXIS_X], current_pos[AXIS_Y], current_pos[AXIS_Z]);
   switch (homing_state_) {
-  case HOMING_STATE_NEVER_HOMED:
+  case GCodeMachineControl::HomingState::NEVER_HOMED:
     mprintf(" (Unsure: machine never homed!)\n");
     break;
-  case HOMING_STATE_HOMED_BUT_MOTORS_UNPOWERED:
+  case GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED:
     mprintf(" (Lower confidence: motor power off at least once after homing)\n");
     break;
-  case HOMING_STATE_HOMED:
+  case GCodeMachineControl::HomingState::HOMED:
     mprintf(" (confident: machine was homed)\n");
     break;
   }
@@ -677,7 +679,7 @@ void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
 bool GCodeMachineControl::Impl::test_homing_status_ok() {
   if (!cfg_.require_homing)
     return true;
-  if (homing_state_ > HOMING_STATE_NEVER_HOMED)
+  if (homing_state_ > GCodeMachineControl::HomingState::NEVER_HOMED)
     return true;
   mprintf("// ERROR: please home machine first (G28).\n");
   return false;
@@ -894,7 +896,7 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
       continue;
     home_axis(axis);
   }
-  homing_state_ = HOMING_STATE_HOMED;
+  homing_state_ = GCodeMachineControl::HomingState::HOMED;
 }
 
 bool GCodeMachineControl::Impl::probe_axis(float feedrate,
@@ -964,6 +966,14 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
 
 GCodeMachineControl::EStopState GCodeMachineControl::GetEStopStatus() {
   return impl_->GetEStopStatus();
+}
+
+GCodeMachineControl::HomingState GCodeMachineControl::GetHomeStatus() {
+  return impl_->GetHomeStatus();
+}
+
+bool GCodeMachineControl::GetMotorsEnabled() {
+  return impl_->GetMotorsEnabled();
 }
 
 void GCodeMachineControl::GetCurrentPosition(AxesRegister *pos) {

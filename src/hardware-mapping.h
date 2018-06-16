@@ -194,6 +194,9 @@ public:
   // UpdateAuxBitmap(OUT_ESTOP,...), even if it is not mapped to a physical pin.
   bool InSoftEStop();
 
+  // Returns true if the motors are enabled.
+  bool MotorsEnabled();
+
   // Set PWM value for given output immediately.
   void SetPWMOutput(NamedOutput type, float value);
 
@@ -291,6 +294,7 @@ private:
   int probe_input_;
 
   bool estop_state_;
+  bool motors_enabled_;
 
   AuxBitmap aux_bits_;       // Set via M42 or various other settings.
 

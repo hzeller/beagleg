@@ -32,7 +32,7 @@
 
 HardwareMapping::HardwareMapping()
   : estop_input_(0), pause_input_(0), start_input_(0), probe_input_(0),
-    estop_state_(true), aux_bits_(0),
+    estop_state_(true), motors_enabled_(false), aux_bits_(0),
     is_hardware_initialized_(false) {
 }
 
@@ -195,6 +195,7 @@ void HardwareMapping::EnableMotors(bool on) {
   // mapping include, we can do that here.
   if (on ^ MOTOR_ENABLE_IS_ACTIVE_HIGH) clr_gpio(MOTOR_ENABLE_GPIO);
   else set_gpio(MOTOR_ENABLE_GPIO);
+  motors_enabled_ = on;
 }
 
 HardwareMapping::AuxBitmap HardwareMapping::GetAuxBits() {
@@ -232,6 +233,10 @@ void HardwareMapping::AuxOutputsOff() {
 
 bool HardwareMapping::InSoftEStop() {
   return estop_state_;
+}
+
+bool HardwareMapping::MotorsEnabled() {
+  return motors_enabled_;
 }
 
 void HardwareMapping::SetPWMOutput(NamedOutput type, float value) {
