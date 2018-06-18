@@ -1,0 +1,119 @@
+
+
+# INSTALLATION
+
+## Get one of the latest linux Debian images
+
+Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images):
+
+If necessary, check the integrity of the downloaded image by matching its sha256sum hash and the one provided on the website (on a linux terminal,
+just run `sha256sum bone-debian-XXXXXXXX.img.xz`).
+
+
+## Flash the SD card
+**WARNING**: **Be careful when selecting the device to be flashed, as you may end up losing data inside it.**
+
+Connect an empty SD card to your PC and extract and copy the image over your sd card.
+
+Based on the platform this can be done via the following methods:
+
+#### **Linux**
+On a terminal, save the SD card device path by inspecting `lsblk`. The SD card should be under a path similar to `/dev/mmcblkN`. Run on the terminal, `xzcat bone-debian-XXXXXXXX.img.xz | sudo dd of=/dev/mmcblkN`.
+Before extracting the SD card remember to run `sync` in order to flush any remaining buffered I/O operation.
+
+#### **Linux / Mac OS / Windows**
+Using the graphical tool **https://etcher.io/**. Select the downloaded image , the target device and then click on **Flash**.
+
+
+## Boot
+
+1. Connect the beaglebone to your local LAN with DHCP enabled or via USB.
+2. Insert the SD card on the beaglebone slot.
+3. Turn on the beaglebone.
+
+### Connect via SSH
+
+If you connected the beaglebone via USB, a virtual Ethernet interface should appear on your PC.
+
+
+#### **Linux / Mac OS**
+
+Open a terminal and run: `ssh debian@beaglebone.local`
+the default password is usually `temppwd`.
+
+#### **Windows**
+
+Download the ssh client from https://www.putty.org/.
+use as hostname `debian@beaglebone.local` and connect using the usual `temppwd` password.
+
+
+## Prepare the environment
+
+If the following one-liner:
+```
+if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; else echo "uio_pruss module not present"; fi`
+```
+
+will return `The kernel is BeagleG-ready`, it means that you can skip this section, otherwise you will need some additional steps.
+
+Beagleg as it is now, requires a kernel module called `uio_pruss` (see [this](https://elinux.org/Ti_AM33XX_PRUSSv2#Communication)).
+
+To enable it, you will need to edit your `/boot/uEnv.txt`
+and change:
+
+```
+###PRUSS OPTIONS
+###pru_rproc (4.4.x-ti kernel)
+#uboot_overlay_pru=/lib/firmware/AM335X-PRU-RPROC-4-4-TI-00A0.dtbo
+###pru_uio (4.4.x-ti, 4.14.x-ti & mainline/bone kernel)
+#uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
+###
+
+```
+
+uncommenting the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
+
+Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module.
+
+To do so, run `/opt/scripts/tools/update_kernel.sh` and on completion,
+execute a reboot.
+
+## Install BeagleG
+
+
+Let's start from fetching the BeagleG repository with:
+
+```
+git clone --recursive https://github.com/hzeller/beagleg.git
+```
+
+change directory into the repository and run `make`.
+
+
+# TROUBLESHOOTING
+
+## Empty am335x_pru_package folder
+
+When compiling, you might encounter the following error:
+```
+make -e -C src all
+make[1]: Entering directory '/home/debian/beagleg/src'
+g++ -std=c++11 -Wall -I. -I../am335x_pru_package/pru_sw/app_loader/include -I../hardware/BUMPS -D_XOPEN_SOURCE=500 -mtune=cortex-a8 -march=armv7-a -O3 -DCAPE_NAME='"BUMPS"' -DBEAGLEG_VERSION='"2018-06-16 (commit=51db5c7)"'   -c  machine-control.cc -o machine-control.o
+g++ -std=c++11 -Wall -I. -I../am335x_pru_package/pru_sw/app_loader/include -I../hardware/BUMPS -D_XOPEN_SOURCE=500 -mtune=cortex-a8 -march=armv7-a -O3 -DCAPE_NAME='"BUMPS"' -DBEAGLEG_VERSION='"2018-06-16 (commit=51db5c7)"'   -c  motor-operations.cc -o motor-operations.o
+g++ -std=c++11 -Wall -I. -I../am335x_pru_package/pru_sw/app_loader/include -I../hardware/BUMPS -D_XOPEN_SOURCE=500 -mtune=cortex-a8 -march=armv7-a -O3 -DCAPE_NAME='"BUMPS"' -DBEAGLEG_VERSION='"2018-06-16 (commit=51db5c7)"'   -c  sim-firmware.cc -o sim-firmware.o
+g++ -std=c++11 -Wall -I. -I../am335x_pru_package/pru_sw/app_loader/include -I../hardware/BUMPS -D_XOPEN_SOURCE=500 -mtune=cortex-a8 -march=armv7-a -O3 -DCAPE_NAME='"BUMPS"' -DBEAGLEG_VERSION='"2018-06-16 (commit=51db5c7)"'   -c  pru-motion-queue.cc -o pru-motion-queue.o
+make -C ../am335x_pru_package
+make[2]: Entering directory '/home/debian/beagleg/am335x_pru_package'
+make[2]: *** No targets specified and no makefile found.  Stop.
+make[2]: Leaving directory '/home/debian/beagleg/am335x_pru_package'
+Makefile:141: recipe for target '../am335x_pru_package/pru_sw/utils/pasm' failed
+make[1]: *** [../am335x_pru_package/pru_sw/utils/pasm] Error 2
+make[1]: Leaving directory '/home/debian/beagleg/src'
+Makefile:32: recipe for target 'all' failed
+make: *** [all] Error 2
+```
+
+this means that you most probably forgot to clone the repository with the `--recursive` flag.
+
+If that's the case, you can simply run inside the repository folder
+`git submodule update --init --recursive` and run `make` again.
