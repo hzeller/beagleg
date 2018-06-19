@@ -75,7 +75,7 @@ uncommenting the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`
 
 Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module.
 
-To do so, run `/opt/scripts/tools/update_kernel.sh` and on completion,
+To do so, run `sudo -s -- apt-get update; apt-get upgrade` and on completion,
 execute a reboot.
 
 ## Install BeagleG
