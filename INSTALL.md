@@ -4,10 +4,10 @@
 
 ## Get one of the latest linux Debian images
 
-Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images):
+Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images). This installation guide refers to *bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz*.
 
 If necessary, check the integrity of the downloaded image by matching its sha256sum hash and the one provided on the website (on a linux terminal,
-just run `sha256sum bone-debian-XXXXXXXX.img.xz`).
+just run `sha256sum bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz`).
 
 
 ## Flash the SD card
@@ -18,7 +18,7 @@ Connect an empty SD card to your PC and extract and copy the image over your sd 
 Based on the platform this can be done via the following methods:
 
 #### **Linux**
-On a terminal, save the SD card device path by inspecting `lsblk`. The SD card should be under a path similar to `/dev/mmcblkN`. Run on the terminal, `xzcat bone-debian-XXXXXXXX.img.xz | sudo dd of=/dev/mmcblkN`.
+On a terminal, save the SD card device path by inspecting `lsblk`. The SD card should be under a path similar to `/dev/mmcblkN`. Run on the terminal, `xzcat bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz | sudo dd of=/dev/mmcblkN`.
 Before extracting the SD card remember to run `sync` in order to flush any remaining buffered I/O operation.
 
 #### **Linux / Mac OS / Windows**
@@ -73,9 +73,9 @@ and change:
 
 uncommenting the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
 
-Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module.
+Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module and device tree overlay.
 
-To do so, run `sudo -s -- apt-get update; apt-get upgrade` and on completion,
+To do so, run `sudo apt-get update; sudo apt-get upgrade` and on completion,
 execute a reboot.
 
 ## Install BeagleG
