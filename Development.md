@@ -156,6 +156,33 @@ be used for laser cutters. TBD.).
 
 <img src="./img/sample-gcode2ps-laser.png" width=500/>
 
+### Generated loops hardware counter using internal eQEP
+The AM335x processor provides an Enhanced Quadrature Encoder Pulse (eQEP).
+This can be useful to test the correctness of the number of steps and debug possible drifts.
+In order to access it via the Linux file system, it's necessary to load the correct device tree overlay at boot.
+
+For example, to enable the eQEP0, it's necessary to add a line inside
+`/boot/uEnv.txt`:
+
+```
+cape_enable=bone_capemgr.enable_partno=bone_eqep0
+```
+and reboot.
+
+After reboot, `/sys/devices/platform/ocp/48300000.epwmss/48300180.eqep/`
+should be populated with some files:
+```
+driver  enabled  modalias  mode  period  position  power  subsystem  uevent
+```
+
+For eQEP0 `P9_42` and `P9_27` are respectively eQEP0A and eQEP0B.
+In order to test a specific axis, opportunely connect the **direction** output
+on `P9_42` and the **step** output on `P9_27`.
+
+Run `echo 0 > /sys/devices/platform/ocp/48300000.epwmss/48300180.eqep/position` to reset
+the counter to zero and start some motion.
+You will see the value inside the `position` file change accordingly to the number of LOOPS generated from the PRU.
+
 #### For development testing
 This tool is used for the visual end2end output creating a HTML page with
 images of a set of testing `*.gcode` files:
