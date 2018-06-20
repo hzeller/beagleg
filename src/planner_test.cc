@@ -455,6 +455,105 @@ TEST(PlannerTest, CornerMove_Shallow_NegativeAngle) {
   testShallowAngleAllStartingPoints(kThresholdAngle, kTestingAngle);
 }
 
+#if 0  // Needs fixing. PR #44 under way
+// This function compute acceleration based on the starting velocity, the ending
+// velocity and the path in steps
+static int acceleration_segment(float v0, float v1, int delta) {
+  double acceleration;
+  acceleration = (v1 * v1 - v0 * v0) / (2.0 * abs(delta));
+  return (int)(acceleration);
+}
+// I found a problem with the wrong speed determining for the segment in the
+// planner. This occurs with short segments of the movement,followed by a change
+// in the direction of motion. This is typical for the case when a straight line
+// goes into an arc or circle. In these segments, due to a high initial speed
+// and a short braking path in the segment,there is an acceleration exceeding
+// the permissible limits. That as a result leads to an uncontrollable
+// situation.
+TEST(PlannerTest, DetectOutRangeAcceleration) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  config->steps_per_mm[AXIS_X] = 1000;
+  config->steps_per_mm[AXIS_Y] = 1000;
+  config->acceleration[AXIS_X] = 100;  // mm/s^2
+  config->acceleration[AXIS_Y] = 100;  // mm/s^2
+  PlannerHarness plantest(2.5, 0, config);
+  float speed = 10000;
+  AxesRegister pos;
+  pos[AXIS_X] = 60;
+  pos[AXIS_Y] = 250;
+  plantest.Enqueue(pos, speed);  // long movement
+  pos[AXIS_X] = 60;
+  pos[AXIS_Y] = 100;
+  plantest.Enqueue(pos, speed);  // long movement
+  pos[AXIS_X] = 60;
+  pos[AXIS_Y] = 99.9;
+  plantest.Enqueue(pos, speed);  // short movement
+  pos[AXIS_X] = 60;
+  pos[AXIS_Y] = 99.8;
+  plantest.Enqueue(pos, speed);  // short movement
+  pos[AXIS_X] = 60;
+  pos[AXIS_Y] = 99.7;
+  plantest.Enqueue(pos, speed);  // short movement
+  pos[AXIS_X] = 60.1;
+  pos[AXIS_Y] = 99.6;
+  plantest.Enqueue(pos, speed);  // change direction angle 45 degree, this is
+                                 // the problematic part of moving
+  pos[AXIS_X] = 60.2;
+  pos[AXIS_Y] = 99.5;
+  plantest.Enqueue(pos, speed);  // continue moving
+  pos[AXIS_X] = 60.3;
+  pos[AXIS_Y] = 99.5;
+  plantest.Enqueue(pos, speed);  // change direction angle 135 degree
+  pos[AXIS_X] = 60.4;
+  pos[AXIS_Y] = 99.4;
+  plantest.Enqueue(pos, speed);  // continue moving
+  std::vector<LinearSegmentSteps> segments = plantest.segments();
+  int ax, ay;
+  for (size_t i = 0; i < segments.size(); ++i) {
+    ax = 0;
+    ay = 0;
+    if (abs(segments[i].steps[AXIS_X]) > abs(segments[i].steps[AXIS_Y])) {
+      if (abs(segments[i].steps[AXIS_X]) > 0) {
+        ax = acceleration_segment(segments[i].v0, segments[i].v1,
+                                  segments[i].steps[AXIS_X]);
+      } else
+        ax = 0;
+    } else {
+      if (abs(segments[i].steps[AXIS_Y]) > 0) {
+        ay = acceleration_segment(segments[i].v0, segments[i].v1,
+                                  segments[i].steps[AXIS_Y]);
+      } else
+        ay = 0;
+    }
+#if 1
+    fprintf(stderr,
+            "segment[%d] v0=%f  v1=%f    lenghtX=%d   lenghtY=%d   accelX=%d  "
+            "accelY=%d \n",
+            (int)i, segments[i].v0, segments[i].v1, segments[i].steps[AXIS_X],
+            segments[i].steps[AXIS_Y], ax, ay);
+#endif
+    // When I tried different speed values ​​and boundary accelerations, I
+    // found that the acceleration is sometimes
+    // a little more than the boundary permissible, within 0.5..1%. Then I
+    // decided to add 0.3% to acceleration limits value
+    // Maybe this is not a problem and such a deviation is permissible. This
+    // should be tested directly on the cnc machine.
+    if (abs(ax) > 0) {
+      EXPECT_GE(
+        config->acceleration[AXIS_X] * config->steps_per_mm[AXIS_X] * 1.003,
+        abs(ax));  // added 0.3% of the acceleration limit
+    }
+    if (abs(ay) > 0) {
+      EXPECT_GE(
+        config->acceleration[AXIS_Y] * config->steps_per_mm[AXIS_Y] * 1.003,
+        abs(ay));  // added 0.3% of the acceleration limit
+    }
+  }
+  VerifyCommonExpectations(plantest.segments());
+}
+#endif
+
 int main(int argc, char *argv[]) {
   Log_init("/dev/stderr");
   ::testing::InitGoogleTest(&argc, argv);
