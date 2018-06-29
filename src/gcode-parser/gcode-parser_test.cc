@@ -466,79 +466,90 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
   EXPECT_FALSE(counter.TestParseLine("#<3>=42"));
 }
 
-TEST(GCodeParserTest, set_system_origin) {
+// todo: test G28
+
+TEST(GCodeParserTest, CoordinateSystemNamesRepresentedIn5220) {
   ParseTester counter;
-
-  // set the G54 coordinate system to 100,100,0
-  counter.TestParseLine("G10 L2 P1 X100 Y100 Z0");
-
-  // make sure we are at the home position with no offset
-  counter.TestParseLine("G1 X0 Y0 Z0");
-  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
-  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
-  EXPECT_EQ(HOME_X, counter.parser_offset[AXIS_X]);
-  EXPECT_EQ(HOME_Y, counter.parser_offset[AXIS_Y]);
-  EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
-
-  // change to the G54 coordinate system
-  counter.TestParseLine("G54");
-  EXPECT_EQ(1, counter.get_parameter(5220));
-
-  // the machine is not expected to move
-  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
-  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
-  // the offset should be set
-  EXPECT_EQ(100, counter.parser_offset[AXIS_X]);
-  EXPECT_EQ(100, counter.parser_offset[AXIS_Y]);
-  EXPECT_EQ(0, counter.parser_offset[AXIS_Z]);
-
-  // test the remaing GCodes
-  EXPECT_TRUE(counter.TestParseLine("G55"));
-  EXPECT_EQ(2, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G56"));
-  EXPECT_EQ(3, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G57"));
-  EXPECT_EQ(4, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G58"));
-  EXPECT_EQ(5, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G59"));
-  EXPECT_EQ(6, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G59.1"));
-  EXPECT_EQ(7, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G59.2"));
-  EXPECT_EQ(8, counter.get_parameter(5220));
-
-  EXPECT_TRUE(counter.TestParseLine("G59.3"));
-  EXPECT_EQ(9, counter.get_parameter(5220));
+  const char *coord_systems[9] = { "G54", "G55", "G56", "G57", "G58", "G59",
+                                   "G59.1", "G59.2", "G59.3" };
+  for (int i = 0; i < 9; ++i) {
+    EXPECT_TRUE(counter.TestParseLine(coord_systems[i]));
+    EXPECT_EQ(i+1, counter.get_parameter(5220));
+  }
 
   // this one should fail as we attempt to choose an invalid coordinate system.
   EXPECT_FALSE(counter.TestParseLine("G59.4"));
   EXPECT_EQ(9, counter.get_parameter(5220));     // kept at prev. coord system.
+}
+
+TEST(GCodeParserTest, SetCoordinateSystemG10) {
+  ParseTester counter;
+
+  // Set the G55 coordinate system to 100,100,0 relative to machine home.
+  counter.TestParseLine("G10 L2 P2 X100 Y100 Z0");
+
+  // We're still in G54 which has a default offset of (0,0,0), so our display
+  // offset is zero relative to home.
+  EXPECT_EQ(1, counter.get_parameter(5220));  // current coordinate system.
+  EXPECT_EQ(HOME_X, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
+
+  // When switching to G55, the display offset is shifted.
+  counter.TestParseLine("G55");
+  EXPECT_EQ(2, counter.get_parameter(5220));  // current coordinate system.
+  EXPECT_EQ(HOME_X + 100, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 100, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
+
+  // Moving in G55 coordinate system now should move us to the given offsets
+  counter.TestParseLine("G1 X0 Y0 Z0");
+
+  // the machine-pos is now home + new origin offset
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 100, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
 
   // set the G56 coordinate system to 25,50,10
   EXPECT_TRUE(counter.TestParseLine("G10 L2 P3 X25 Y50 Z10"));
   EXPECT_TRUE(counter.TestParseLine("G56"));
-  // the machine is still not expected to move
-  EXPECT_EQ(HOME_X, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+
+  // The display offset are now different ...
+  EXPECT_EQ(HOME_X + 25, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 50, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 10, counter.parser_offset[AXIS_Z]);
+
+  // .. but the machine is not expected to have moved for its current abs pos.
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 100, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
-  // the offset should be set
-  EXPECT_EQ(25, counter.parser_offset[AXIS_X]);
-  EXPECT_EQ(50, counter.parser_offset[AXIS_Y]);
-  EXPECT_EQ(10, counter.parser_offset[AXIS_Z]);
-  // move to the new origin
+
+  // Move to the new origin
   counter.TestParseLine("G1 X0 Y0 Z0");
-  EXPECT_EQ(25, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(50, counter.abs_pos[AXIS_Y]);
-  EXPECT_EQ(10, counter.abs_pos[AXIS_Z]);
+  EXPECT_EQ(HOME_X + 25, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 10, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, SetCoordinateSystemG10_G90_G91) {
+  ParseTester counter;
+
+  // Set the G55 coordinate system to 100,100,0 in absolute
+  // coordinates (G90), i.e. relative to machine origin.
+  counter.TestParseLine("G90 G10 L2 P2 X100 Y100 Z0");
+
+  // When switching to G55, the display offset is shifted.
+  counter.TestParseLine("G55");
+  EXPECT_EQ(2, counter.get_parameter(5220));  // current coordinate system.
+  EXPECT_EQ(HOME_X + 100, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 100, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
+
+  // Now, switching to relative mode with G91, update the coordinate.
+  counter.TestParseLine("G91 G10 L2 P2 X5 Y5 Z5");
+  EXPECT_EQ(HOME_X + 100 + 5, counter.parser_offset[AXIS_X]);
+  EXPECT_EQ(HOME_Y + 100 + 5, counter.parser_offset[AXIS_Y]);
+  EXPECT_EQ(HOME_Z + 5, counter.parser_offset[AXIS_Z]);
 }
 
 class ArcTester : public ParseTester {

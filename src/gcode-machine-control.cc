@@ -610,9 +610,6 @@ void GCodeMachineControl::Impl::mprint_current_position() {
           current_pos[AXIS_Y] - origin[AXIS_Y],
           current_pos[AXIS_Z] - origin[AXIS_Z],
           current_pos[AXIS_E] - origin[AXIS_E]);
-  if (!coordinate_display_origin_name_.empty()) {
-    mprintf(" (%s)", coordinate_display_origin_name_.c_str());
-  }
   mprintf(
 #if M114_DEBUG
     " [ABS. MACHINE CUBE X:%.6f Y:%.6f Z:%.6f]",
@@ -620,6 +617,11 @@ void GCodeMachineControl::Impl::mprint_current_position() {
     " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
 #endif
           current_pos[AXIS_X], current_pos[AXIS_Y], current_pos[AXIS_Z]);
+
+  // Coordinate system. Always printed, even if empty to have a predictable
+  // format.
+  mprintf(" [%s]", coordinate_display_origin_name_.c_str());
+
   switch (homing_state_) {
   case GCodeMachineControl::HomingState::NEVER_HOMED:
     mprintf(" (Unsure: machine never homed!)\n");

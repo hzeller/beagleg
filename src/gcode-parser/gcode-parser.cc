@@ -143,7 +143,9 @@ private:
     for (GCodeParserAxis a : AllAxes()) {
       axis_is_absolute_[a] = value;
     }
+    modal_absolute_g90_ = value;
   }
+
   void set_ijk_absolute(bool absolute) {
     if (absolute) {
       gprintf(GLOG_SEMANTIC_ERR, "TODO: We don't support absolute IJK yet\n");
@@ -320,8 +322,12 @@ private:
   int modal_g0_g1_;
   int line_number_;
   float unit_to_mm_factor_;               // metric: 1.0; imperial 25.4
+
+  // We distinguish axes here, because in 3D printers, the E-axis can be
+  // set relative independently of the other axes.
   bool axis_is_absolute_[GCODE_NUM_AXES]; // G90 or G91 active.
-  bool ijk_is_absolute_;
+  bool ijk_is_absolute_ = false;
+  bool modal_absolute_g90_ = true;        // All axes, but E might differ
 
   // The axes_pos is the current absolute position of the machine
   // in the work-cube. It always is positive in the range of
@@ -332,9 +338,10 @@ private:
   // -- Origins
   // All the following coordinates are absolute positions. They
   // can be choosen as active origin.
-  // The home position is not necessarily {0,0,0...}, but it is where
-  // the end-switches are.
-  const AxesRegister home_position_;
+  // The machine origin or home position is not necessarily {0,0,0...}, but
+  // it is where the end-switches are.
+  const AxesRegister machine_origin_;
+
   // Coordinate systems 1-9 (G54 to G59.3) (zero-indexed)
   AxesRegister coord_system_[9];
 
@@ -387,12 +394,12 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     // a job). So that needs to be more flexible ans possibly be part of the
     // incoming config.
     axes_pos_(config_.machine_origin),
-    home_position_(config_.machine_origin),
+    machine_origin_(config_.machine_origin),
     // The current origin is the same as the home position (where the home
     // switches are) That means for CNC machines with machine origins e.g.
     // on the top right, that all valid coordinates to stay within the
     // machine cube are negative.
-    current_origin_(&home_position_),
+    current_origin_(&machine_origin_),
     current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
     while_err_stream_(NULL), do_while_(false),
@@ -1243,7 +1250,7 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   // Now update the world position
   for (GCodeParserAxis a : AllAxes()) {
     if (homing_flags & (1 << a)) {
-      axes_pos_[a] = home_position_[a];
+      axes_pos_[a] = machine_origin_[a];
     }
   }
 
@@ -1260,7 +1267,7 @@ void GCodeParser::Impl::InitCoordSystems() {
     std::string coords = "";
     for (GCodeParserAxis axis : AllAxes()) {
       read_parameter(StringPrintf("%d", 5221 + offset + axis), &value);
-      coord_system_[i][axis] = value;
+      coord_system_[i][axis] = machine_origin_[axis] + value;
       if (axis <= AXIS_Y || value)
         coords += StringPrintf(" %c:%.3f", gcodep_axis2letter(axis), value);
       if (value) set = true;
@@ -1270,18 +1277,19 @@ void GCodeParser::Impl::InitCoordSystems() {
                 set ? coords.c_str() : " undefined");
     }
   }
-  if (read_parameter("5220", &value)) {
-    const int coord_system = (int)value;
-    if (value >= 1 && value <= 9) {
-      current_origin_ = &coord_system_[coord_system-1];
-      inform_origin_offset_change(kCoordinateSystemNames[coord_system-1]);
-      Log_debug("Using Coordinate System from #5220 param: %s",
-                kCoordinateSystemNames[coord_system - 1]);
-    } else {
-      Log_debug("Invalid Coordinate System in parameters file: 5220=%d\n",
-                coord_system);
-    }
+
+  if (!read_parameter("5220", &value) || value < 1 || value > 9) {
+    value = 1;     // If not set or invalid, force G54
+    store_parameter("5220", value);
   }
+
+  const int coord_system = (int)value - 1;
+  assert(coord_system >= 0 && coord_system < 9);  // enforced above.
+
+  current_origin_ = &coord_system_[coord_system];
+  inform_origin_offset_change(kCoordinateSystemNames[coord_system]);
+  Log_debug("Using Coordinate system #5220=%d: %s",
+            coord_system + 1, kCoordinateSystemNames[coord_system]);
 }
 
 // Set coordinate system data
@@ -1310,20 +1318,45 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
     }
     line = remaining_line;
   }
-  if (l_val == 2 && p_val >= 1 && p_val <= 9) {
-    for (GCodeParserAxis a : AllAxes()) {
-      if (!have_val[a]) coords[a] = coord_system_[p_val-1][a];
-    }
-    coord_system_[p_val-1] = coords;
-    // Now update the parameters
-    int offset = (p_val-1) * 20;
-    for (GCodeParserAxis a : AllAxes()) {
-      store_parameter(StringPrintf("%d", 5221 + offset + a), coords[a]);
-    }
-  } else {
-    gprintf(GLOG_SYNTAX_ERR, "handle_G10: invalid L%d and/or P%d value\n",
-            l_val, p_val);
+
+  // Right now, we only do G10 origin offsets. If we do more, calling various
+  // functions would probably be good.
+
+  if (l_val != 2) {
+    gprintf(GLOG_SEMANTIC_ERR, "G10: can only handle G10 L2\n");
+    return line;
   }
+
+  if (p_val < 1 || p_val > 9) {
+    gprintf(GLOG_SEMANTIC_ERR, "G10 L2 P%d - coordinate system P-value needs "
+            "to be between P1..P9\n", p_val);
+    return line;
+  }
+
+  const int cs = p_val - 1;   // Target coordinate system.
+
+  // Update coordinate system with values that changed.
+  for (GCodeParserAxis a : AllAxes()) {
+    if (!have_val[a]) continue;
+    coord_system_[cs][a] = modal_absolute_g90_
+      ? machine_origin_[a] + coords[a]
+      : coord_system_[cs][a] + coords[a];
+  }
+
+  // Now update the parameters
+  const int variable_offset = cs * 20;
+  for (GCodeParserAxis a : AllAxes()) {
+    if (!have_val[a]) continue;
+    // We always store the absolute offset from home.
+    store_parameter(StringPrintf("%d", 5221 + variable_offset + a),
+                    coord_system_[cs][a] - machine_origin_[a]);
+  }
+  if (current_origin_ == &coord_system_[cs]) {
+    // If this was our currently active coordiate system, we need to inform
+    // about the new display offsets.
+    inform_origin_offset_change(kCoordinateSystemNames[cs]);
+  }
+
   return line;
 }
 
@@ -1353,7 +1386,7 @@ void GCodeParser::Impl::change_coord_system(float sub_command) {
     if (sub_command == 59.3f) { coord_system = 9; break; }
     // fallthru
   default:
-    gprintf(GLOG_SYNTAX_ERR, "invalid coordinate system\n");
+    gprintf(GLOG_SYNTAX_ERR, "invalid coordinate system %.1f\n", sub_command);
     return;
   }
   store_parameter("5220", coord_system);

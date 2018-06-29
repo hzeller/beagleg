@@ -36,6 +36,7 @@
 #include "common/container.h"
 
 // Axis supported by this parser.
+// Sequence matters, as these determine the 52xx variables
 enum GCodeParserAxis {
   AXIS_X, AXIS_Y, AXIS_Z,
   AXIS_A, AXIS_B, AXIS_C,
@@ -83,13 +84,18 @@ public:
     virtual void gcode_finished(bool end_of_stream) {}
 
     // The parser handles relative positions and coordinate systems internally,
-    // so the machine does not have to worry about that.
-    // But for display purposes, the machine might be interested in the current
-    // offset that applies.
-    // This callback informs about the current origin, relative to the (0/0/0)
-    // machine cube.
-    // If needed after the callback returns, the receiver needs to make a copy
-    // of the register.
+    // so the machine does not have to worry about that: all move commands
+    // are always given relative to (0,0,0) of the machine cube.
+    //
+    // For display purposes however, the machine might be interested in the
+    // current offset that applies.
+    // This callback informs about the current origin used for absolute
+    // positions in GCode.
+    // The "offset" if provided relative to (0,0,0) of the machine cube.
+    // (If needed after the callback returns, the receiver needs to make a copy
+    //  of the register.)
+    // The "named_offset" gives the name of the coordinate system that is,
+    // e.g. 'G54'.
     virtual void inform_origin_offset(const AxesRegister &offset,
                                       const char *named_offset) {}
 
