@@ -569,14 +569,14 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   GCodeParser::Config parser_cfg(paramfile);
+  parser_cfg.allow_m111 = allow_m111;
   GCodeParser::Config::ParamMap parameters;
   parser_cfg.parameters = &parameters;
   parser_cfg.LoadParams();
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser = new GCodeParser(parser_cfg,
-                                        machine_control->ParseEventReceiver(),
-                                        allow_m111);
+                                        machine_control->ParseEventReceiver());
   GCodeStreamer *streamer =
     new GCodeStreamer(&event_server, parser,
                       machine_control->ParseEventReceiver());

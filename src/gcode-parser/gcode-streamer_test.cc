@@ -57,7 +57,7 @@ private:
 class StreamTester : public GCodeParser::EventReceiver {
 public:
   StreamTester()
-    : parser_(new GCodeParser(GCodeParser::Config(), this, false)),
+    : parser_(new GCodeParser(GCodeParser::Config(), this)),
       streamer_(new GCodeStreamer(&event_server_, parser_.get(), this)),
       stream_mock_(NULL) {}
 

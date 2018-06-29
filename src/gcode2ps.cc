@@ -1217,7 +1217,7 @@ int main(int argc, char *argv[]) {
   GCodePrintVisualizer gcode_printer(output_file, parser_cfg.machine_origin,
                                      vis_options);
   gcode_printer.SetPass(ProcessingStep::Preprocess);
-  GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer, false);
+  GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer);
   ParseFile(&gcode_viz_parser, filename, true, msg_stream);
 
   gcode_printer.PrintPostscriptBoundingBox(
@@ -1273,8 +1273,7 @@ int main(int argc, char *argv[]) {
     } else {
       machine_control->SetMsgOut(NULL);
       motor_operations_printer.SetPass(ProcessingStep::Preprocess);
-      GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver(),
-                         false);
+      GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver());
       ParseFile(&parser, filename, true, msg_stream);
 
       machine_control->SetMsgOut(msg_stream);

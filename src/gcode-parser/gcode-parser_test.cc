@@ -42,7 +42,7 @@ public:
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
     config.parameters = &parameters_;
-    parser_ = new GCodeParser(config, this, false);
+    parser_ = new GCodeParser(config, this);
     EXPECT_EQ(0, parser_->error_count());
   }
   ~ParseTester() override { delete parser_; }

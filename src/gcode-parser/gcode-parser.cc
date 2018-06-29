@@ -94,7 +94,7 @@ static const char *const kCoordinateSystemNames[9] = {
 class GCodeParser::Impl {
 public:
   Impl(const GCodeParser::Config &config,
-       GCodeParser::EventReceiver *parse_events, bool allow_m111);
+       GCodeParser::EventReceiver *parse_events);
   ~Impl();
 
   void ParseBlock(GCodeParser *owner, const char *line, FILE *err_stream);
@@ -380,8 +380,7 @@ private:
 const AxesRegister GCodeParser::Impl::kZeroOffset;
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
-                        GCodeParser::EventReceiver *parse_events,
-                        bool allow_m111)
+                        GCodeParser::EventReceiver *parse_events)
   : callbacks_(parse_events), config_(parse_config),
     program_in_progress_(false),
     err_msg_(NULL), modal_g0_g1_(0),
@@ -403,7 +402,8 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
     current_global_offset_(&kZeroOffset),
     arc_normal_(AXIS_Z),
     while_err_stream_(NULL), do_while_(false),
-    debug_level_(DEBUG_NONE), allow_m111_(allow_m111), error_count_(0)
+    debug_level_(DEBUG_NONE),
+    error_count_(0)
 {
   assert(callbacks_);  // otherwise, this is not very useful.
   reset_G92();
@@ -1820,7 +1820,7 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
 }
 
 const char *GCodeParser::Impl::handle_M111(const char *line) {
-  if (allow_m111_) {
+  if (config_.allow_m111) {
     int level = -1;
     char letter;
     float value;
@@ -1955,9 +1955,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
   err_msg_ = NULL;
 }
 
-GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events,
-                         bool allow_m111)
-  : impl_(new Impl(config, parse_events, allow_m111)) {
+GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events)
+  : impl_(new Impl(config, parse_events)) {
 }
 GCodeParser::~GCodeParser() {
   delete impl_;
