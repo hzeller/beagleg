@@ -1,5 +1,3 @@
-
-
 # INSTALLATION
 
 ## Get one of the latest linux Debian images
@@ -89,6 +87,7 @@ git clone --recursive https://github.com/hzeller/beagleg.git
 
 change directory into the repository and run `make`.
 
+The resulting `machine-control` binary will be in the toplevel directory.
 
 # TROUBLESHOOTING
 

@@ -25,85 +25,12 @@ kernel).
 
 The main `machine-control` program is parsing G-Code, extracting axes moves and
 enqueues them to the realtime unit. It can receive G-Code from a file or
-socket (you can just telnet to it for an interactive session, how cool is that?).
+socket (you can just telnet to it for an interactive session, how
+cool is that?).
 
 ## Install
-### System configuration
-
-In order to run BeagleG on your BeagleBone you will need to be sure
-that uio_pruss kernel module has been installed and loaded in the kernel.
-You can easily test if the module it's available by running:
-
-    if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; else echo "Need uio_pruss module"; fi
-
-then just load it using:
-
-    sudo modprobe uio_pruss
-
-or add it to /etc/modules to make it persistent:
-
-    sudo sh -c 'echo uio_pruss >> /etc/modules'
-
-if the uio_pruss module is not available, you might be running a 4.x kernel
-from TI; they are experimenting with a new way to connect to the PRU (remoteproc)
-which is not marked stable or ready yet, and is not backward compatible with
-older kernels still commonly run on BeagleBones, so we can't use it in BeagleG
-yet. You can see that if you ask `uname -r` returns something like
-`4.4.12-ti-r32` - with a `ti` after the version number.
-
-In that case, you will need to
-[change your kernel version](http://elinux.org/BeagleBoardDebian#Install_Latest_Kernel_Image) to a bone prefix one (e.g. `4.4.14-bone`).
-
-#### Newer kernels
-Newest beagleboard kernels support both remoteproc and uio_pruss modules.
-In order to use the uio_pruss one simply follow the directives that you can find inside `/boot/uEnv.txt`:
-
-```
-###PRUSS OPTIONS
-###pru_rproc (4.4.x-ti kernel)
-#uboot_overlay_pru=/lib/firmware/AM335X-PRU-RPROC-4-4-TI-00A0.dtbo
-###pru_uio (4.4.x-ti & mainline/bone kernel)
-uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
-```
-
-Some 4.4 linux kernel versions do not have the timers drivers enabled.
-In order to be able to use the PWM you would need to recompile the kernel with
-CONFIG_OMAP_DM_TIMER=y.
-
-In order to use BeagleG **without** the PWM TIMERS support, you can compile beagleg with:
-```
-CONFIG_FLAGS=-D_DISABLE_PWM_TIMERS make
-```
-
-
-### Build
-To build, we need the BeagleG code and the PRU assembler with supporting library.
-The BeagleG repository is set up in a way that the PRU assembler is checked out via
-a git sub-module to make it simple.
-
-Clone the BeagleG repository with the `--recursive` flag to get this sub-module
-
-```
-git clone --recursive https://github.com/hzeller/beagleg.git
-```
-
-(If you are a github user, you might want to use the git protocol).
-
-Then just
-
-```
-cd beagleg
-make
-```
-
-If you have an older debian wheezy with a gcc 4.6 as default compiler, you need
-to install a g++ 4.7 first to be able to compile; then set the CXX variable
-to this compiler when running make:
-
-```
-sudo apt-get install g++-4.7
-CXX=g++-4.7 make
-```
+For system configuration and building the `machine-control` binary, see
+[INSTALL.md](./INSTALL.md).
 
 ## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
@@ -114,6 +41,8 @@ to install the device overlay. You find it in the `hardware/` subdirectory.
     sudo hardware/start-devicetree-overlay.sh hardware/BUMPS/BeagleG.dts
 
 See the [Hardware page](./hardware) how to enable the cape at boot time.
+(Note: this section will be simpler once we switched entirely to universal
+cape).
 
 ## Machine control binary
 To control a machine with G-Code, use the `machine-control` binary.
@@ -137,6 +66,12 @@ Mostly for testing and debugging:
   -P                         : Verbose: Show some more debug output (Default: off).
   -S                         : Synchronous: don't queue (Default: off).
       --allow-m111           : Allow changing the debug level with M111 (Default: off).
+
+Segment acceleration tuning:
+     --threshold-angle       : Specifies the threshold angle used for segment acceleration (Default: 10 degrees).
+     --speed-tune-angle      : Specifies the angle used for proportional speed-tuning. (Default: 60 degrees)
+
+                               The --threshold-angle + --speed-tune-angle must be less than 90 degrees.
 
 Configuration file overrides:
      --homing-required       : Require homing before any moves (require-homing = yes).
