@@ -23,12 +23,13 @@
 static void InitTestConfig(struct MachineControlConfig *c) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
-    c->steps_per_mm[i] = steps_per_mm;
+    const GCodeParserAxis axis = (GCodeParserAxis) i;
+    c->steps_per_mm[axis] = steps_per_mm;
     // We do different steps/mm to detect problems when going between
     // euclidian space and step-space.
     steps_per_mm *= SPEED_STEP_FACTOR;
-    c->acceleration[i] = 100;  // mm/s^2
-    c->max_feedrate[i] = 10000;
+    c->acceleration[axis] = 100;  // mm/s^2
+    c->max_feedrate[axis] = 10000;
   }
   c->threshold_angle = 0;
   c->speed_tune_angle = 0;
@@ -98,10 +99,11 @@ private:
     const float dy = seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz = seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
     const float hypotenuse = sqrtf(dx*dx + dy*dy + dz*dz);
-    int defining_axis = AXIS_X;
+    GCodeParserAxis defining_axis = AXIS_X;
     for (int i = AXIS_Y; i < AXIS_Z; ++i) {
-      if (abs(seg->steps[i]) > abs(seg->steps[defining_axis]))
-        defining_axis = i;
+      const GCodeParserAxis a = (GCodeParserAxis) i;
+      if (abs(seg->steps[a]) > abs(seg->steps[defining_axis]))
+        defining_axis = a;
     }
 
     // The hypotenuse is faster than each of the sides, so its speed is

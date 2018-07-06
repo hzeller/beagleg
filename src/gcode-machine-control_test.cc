@@ -26,9 +26,10 @@
 static void init_test_config(struct MachineControlConfig *c,
                              HardwareMapping *hmap) {
   for (int i = 0; i <= AXIS_Z; ++i) {
-    c->steps_per_mm[i] = 100;  // step/mm
-    c->acceleration[i] = 1000;  // mm/s^2
-    c->max_feedrate[i] = (i+1) * 1000;
+    const GCodeParserAxis axis = (GCodeParserAxis) i;
+    c->steps_per_mm[axis] = 100;  // step/mm
+    c->acceleration[axis] = 1000;  // mm/s^2
+    c->max_feedrate[axis] = (i+1) * 1000;
   }
   c->threshold_angle = 0;
   c->speed_tune_angle = 0;

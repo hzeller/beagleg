@@ -82,11 +82,13 @@ struct VisualizationOptions {
   bool show_laser_burn = false;  // experimental. If on, S-value->gcode-bright
   std::string show_title = "BeagleG ~ gcode2ps";
 
-  // Not with commad line flags.
-  bool include_home = true;    // for part bounding box
-  bool include_origin = false; // for part bounding box (0,0,0)
+  // Not handled with commad line flags (yet)
+  bool include_machine_bounding_box = false;
+  bool include_machine_origin = true;    // in case we want it even if now bbox
+
   bool output_js_vertices = false;
-  bool show_out_of_range = false;  // show out of range in red.
+  bool show_out_of_range = false;        // Show out of range in red.
+  float relative_font_size = 1.0 / 40;   // Fraction of machine cube diagonal.
 };
 
 // G-code rendering
@@ -135,16 +137,20 @@ enum class ProcessingStep {
 class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 public:
   GCodePrintVisualizer(FILE *file, const AxesRegister &machine_origin,
+                       const AxesRegister &move_range,
                        const VisualizationOptions &options)
     : file_(file), machine_origin_(machine_origin),
       opts_(options) {
-    if (!opts_.include_origin) {
+    if (!opts_.include_machine_bounding_box) {
       // Make sure that we capture the true ranges of things.
       // TODO: we can use this later to determine if such axis was used,
       // e.g. by comparing max < min
       min_[AXIS_X] = 1e6; max_[AXIS_X] = -1e6;
       min_[AXIS_Y] = 1e6; max_[AXIS_Y] = -1e6;
       min_[AXIS_Z] = 1e6; max_[AXIS_Z] = -1e6;
+    }
+    else {
+      RememberMinMax(move_range);
     }
   }
 
@@ -163,18 +169,18 @@ public:
               machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
               machine_origin_[AXIS_Z]);
     }
-    if (opts_.include_home) RememberMinMax(machine_origin_);
+    if (opts_.include_machine_origin) RememberMinMax(machine_origin_);
     just_homed_ = true;
   }
   void inform_origin_offset(const AxesRegister& axes, const char *n) final {
     if (pass_ == ProcessingStep::GenerateOutput) {
       ShowNamedOrigin(axes, n);
-    }
 #if 0
     // Should we print an origin marker here ?
-    fprintf(stderr, "Got origin [%f,%f,%f]\n",
-            axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z]);
+    fprintf(stderr, "Got origin [%f,%f,%f] %s\n",
+            axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], n);
 #endif
+    }
   }
   void dwell(float value) final { }
   bool rapid_move(float feed, const AxesRegister &axes) final {
@@ -190,7 +196,7 @@ public:
     // causes a call to coordinated move. So if this happens right after a G28
     // we would still include that coordinate even though we don't mean to.
     // TODO: there needs to be a callback that just sets the feedrate.
-    if (!opts_.include_home && axes == machine_origin_)
+    if (!opts_.include_machine_origin && axes == machine_origin_)
       return true;
     if (pass_ == ProcessingStep::Preprocess) {
       RememberMinMax(axes);
@@ -202,7 +208,8 @@ public:
                 rapid ? "G0 rapid" : "G1 coordinated");
         last_move_rapid_ = rapid;
       }
-      const bool not_show_after_home = just_homed_ && !opts_.include_home;
+      const bool not_show_after_home = (just_homed_ &&
+                                        !opts_.include_machine_origin);
       if (opts_.show_laser_burn && laser_max_ > laser_min_
           && laser_intensity_ != last_laser_intensity_) {
         const float scaled_intensity = (laser_intensity_ - laser_min_)
@@ -298,7 +305,7 @@ public:
       fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n",
               GetDiagonalLength() / 1000.0);
 
-      if (opts_.include_home) {
+      if (opts_.include_machine_origin) {
         fprintf(file_, "%f %f %f moveto3d  %% Machine origin but not homed.\n",
                 machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
                 machine_origin_[AXIS_Z]);
@@ -490,7 +497,7 @@ public:
 
   void ShowMesaureLines() {
     fprintf(file_, "\n%% -- Measurement lines\n");
-    const float size = GetDiagonalLength() / 40;
+    const float size = opts_.relative_font_size * GetDiagonalLength();
     fprintf(file_, "%.1f setlinewidth\n", size/20);
 
     // Various functions to draw into directon of the axis on given
@@ -515,6 +522,14 @@ public:
               x + min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
+#if 0
+    auto z_xz_draw = [this, size](bool do_line, float x, float y) {
+      fprintf(file_, "%.3f %.3f %.3f %s\n",
+              min_[AXIS_X]-y-1.5*size, max_[AXIS_Y],
+              x + min_[AXIS_Z],
+              do_line ? "lineto3d" : "moveto3d");
+    };
+#endif
     if (!opts_.show_title.empty()) {
       fprintf(file_, "0.7 0.7 0.7 setrgbcolor\n");
       float text_size = size * 0.7;
@@ -537,7 +552,7 @@ public:
 
   void ShowNamedOrigin(const AxesRegister &origin, const char *named) {
     fprintf(file_, "\n%% -- Origin %s\n", named);
-    const float size = GetDiagonalLength() / 70;
+    const float size = opts_.relative_font_size * GetDiagonalLength() / 2;
     fprintf(file_, "currentpoint3d stroke gsave "
             "%s setrgbcolor 0 setlinewidth ",
             kGcodeOriginTextColor);
@@ -666,9 +681,8 @@ public:
       // TODO: this is wrong if the homing is on max.
       fprintf(stdout, "var machine_cube = [");
       fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
-              0.0, 0.0, 0.0,
-              config_.move_range_mm[AXIS_X],
-              config_.move_range_mm[AXIS_Y],config_.move_range_mm[AXIS_Z]);
+              0.0, 0.0, 0.0, config_.move_range_mm[AXIS_X],
+              config_.move_range_mm[AXIS_Y], config_.move_range_mm[AXIS_Z]);
     }
   }
 
@@ -695,10 +709,10 @@ public:
   }
 
   void Enqueue(const LinearSegmentSteps &param) final {
-    int dominant_axis = 0;
+    GCodeParserAxis dominant_axis = AXIS_X;
     for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
       if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
-        dominant_axis = i;
+        dominant_axis = (GCodeParserAxis) i;  // here, we have motor=axis
     }
     if (config_.steps_per_mm[dominant_axis] == 0 ||
         param.steps[dominant_axis] == 0) {
@@ -756,7 +770,8 @@ public:
       && inRange(m[AXIS_Z], AXIS_Z);
   }
 
-  void PrintSegment(const LinearSegmentSteps &param, int dominant_axis) {
+  void PrintSegment(const LinearSegmentSteps &param,
+                    GCodeParserAxis dominant_axis) {
     assert(pass_ == ProcessingStep::GenerateOutput);
     if (!param.steps[AXIS_X] && !param.steps[AXIS_Y] && !param.steps[AXIS_Z])
       return;
@@ -979,15 +994,29 @@ static int usage(const char *progname, bool description = false) {
   return 1;
 }
 
+static void Reset(GCodeParser *parser, GCodePrintVisualizer *viz) {
+  if (viz) viz->SetPass(ProcessingStep::Init);
+  parser->ParseBlock(R"(
+G90
+G10 L2 P1 X0Y0Z0
+G10 L2 P2 X0Y0Z0
+G10 L2 P3 X0Y0Z0
+G10 L2 P4 X0Y0Z0
+G10 L2 P5 X0Y0Z0
+G10 L2 P6 X0Y0Z0
+G10 L2 P7 X0Y0Z0
+G10 L2 P8 X0Y0Z0
+G10 L2 P9 X0Y0Z0
+G28
+M02)", nullptr); // M02 needs to be last.
+}
+
 static bool ParseFile(GCodeParser *parser, const char *filename,
-                      bool do_reset, FILE *msg_stream) {
+                      FILE *msg_stream) {
   if (!parser->ReadFile(fopen(filename, "r"), msg_stream)) {
     fprintf(stderr, "Cannot open %s\n", filename);
     return false;
   }
-  // Make sure to reset parser properly.
-  if (do_reset)
-    parser->ParseBlock("G28 M02", msg_stream); // M02 needs to be last.
 
   return true;
 }
@@ -1215,10 +1244,12 @@ int main(int argc, char *argv[]) {
   parser_cfg.parameters = &parameters;
 
   GCodePrintVisualizer gcode_printer(output_file, parser_cfg.machine_origin,
+                                     machine_config.move_range_mm,
                                      vis_options);
   gcode_printer.SetPass(ProcessingStep::Preprocess);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer);
-  ParseFile(&gcode_viz_parser, filename, true, msg_stream);
+  ParseFile(&gcode_viz_parser, filename, msg_stream);
+  Reset(&gcode_viz_parser, &gcode_printer);
 
   gcode_printer.PrintPostscriptBoundingBox(
     printMargin,
@@ -1274,7 +1305,8 @@ int main(int argc, char *argv[]) {
       machine_control->SetMsgOut(NULL);
       motor_operations_printer.SetPass(ProcessingStep::Preprocess);
       GCodeParser parser(parser_cfg, machine_control->ParseEventReceiver());
-      ParseFile(&parser, filename, true, msg_stream);
+      ParseFile(&parser, filename, msg_stream);
+      Reset(&parser, nullptr);
 
       machine_control->SetMsgOut(msg_stream);
       // The moves are segmented into colored segments. Don't make segments
@@ -1283,7 +1315,7 @@ int main(int argc, char *argv[]) {
       motor_operations_printer.SetColorSegmentLength(
         gcode_printer.GetDiagonalLength()/100);
       motor_operations_printer.SetPass(ProcessingStep::GenerateOutput);
-      ParseFile(&parser, filename, false, msg_stream);
+      ParseFile(&parser, filename, msg_stream);
 
       if (vis_options.show_speeds) {
         float x, y, w, h;
@@ -1298,7 +1330,7 @@ int main(int argc, char *argv[]) {
   if (show_gcode_path) {
     // We print the gcode on top of the colored machine visualization.
     gcode_printer.SetPass(ProcessingStep::GenerateOutput);
-    ParseFile(&gcode_viz_parser, filename, false, msg_stream);
+    ParseFile(&gcode_viz_parser, filename, msg_stream);
   }
 
   if (animation_frames > 0) {

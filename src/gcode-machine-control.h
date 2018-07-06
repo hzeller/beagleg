@@ -28,7 +28,7 @@
 class MotorOperations;
 class ConfigParser;
 class Spindle;
-typedef FixedArray<float, GCODE_NUM_AXES> FloatAxisConfig;
+typedef AxesRegister FloatAxisConfig;
 
 /* Configuration constants for the controller.
  * Parameters in the arrays are always indexed by logical axes, e.g. AXIS_X.
