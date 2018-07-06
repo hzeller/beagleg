@@ -2,11 +2,13 @@
 
 ## Get one of the latest linux Debian images
 
-Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images). This installation guide refers to *bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz*.
+Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images). This installation guide refers to [*bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz*](http://debian.beagleboard.org/images/bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz).
 
 If necessary, check the integrity of the downloaded image by matching its sha256sum hash and the one provided on the website (on a linux terminal,
 just run `sha256sum bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz`).
 
+Always use the most minimal image you can find, e.g. no graphical user
+interface etc.
 
 ## Flash the SD card
 **WARNING**: **Be careful when selecting the device to be flashed, as you may end up losing data inside it.**
@@ -69,7 +71,7 @@ and change:
 
 ```
 
-uncommenting the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
+uncommenting (removing the `#` in front) the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
 
 Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module and device tree overlay.
 
@@ -87,9 +89,51 @@ git clone --recursive https://github.com/hzeller/beagleg.git
 
 change directory into the repository and run `make`.
 
-The resulting `machine-control` binary will be in the toplevel directory.
+The resulting `machine-control` binary will be in the toplevel directory. You
+can `sudo make install` it, or run it right there.
 
 # TROUBLESHOOTING
+
+In general, make sure to have the latest Beaglebone Debian image; most of
+earlier images have various problems that are not covered here for brevity.
+
+In any case of trouble, make sure to have your system up-to-date
+
+```
+sudo apt-get update
+sudo apt-get upgrade
+```
+
+... and have a fresh kernel
+
+```
+cd /opt/scripts/tools/
+git pull
+sudo ./update_kernel.sh
+```
+
+## uio_pruss not loaded
+
+In some older kernels, you might need to manually
+
+```
+sudo modprobe uio_pruss
+```
+
+## System locks up
+
+If you have some older debian image, then you might run into this: Some
+4.4 linux kernel versions do not have the timers drivers enabled which results
+in a kernel panic when BeagleG initializes these.
+In order to be able to use the PWM you would need to recompile the kernel with
+`CONFIG_OMAP_DM_TIMER=y`.
+
+Alternatively, in order to use BeagleG without the PWM TIMERS support, you
+can compile beagleg with:
+
+```
+CONFIG_FLAGS=-D_DISABLE_PWM_TIMERS make
+```
 
 ## Empty am335x_pru_package folder
 
