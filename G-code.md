@@ -146,6 +146,79 @@ both must be given.
 * `X- Y-` - end point of spline (absolute or relative depending on current mode)
 * `I- J-` - relative offset from start point to control point
 
+### Coordinate Systems
+
+#### Machine Origin
+The Machine Origin is defined to be where the end-switches are located, i.e.
+where the `home-pos` is configured for that particular axis in the
+configuration file (see [sample.config](sample.config)). Together with the
+range with each axis, this defines the available machine cube within the
+tool can move.
+
+The `machine-control` program will always make sure that the machine is never
+allowed to execute moves that escape this machine cube.
+
+Often, the home position is not at the bottom left corner of the machine cube
+as one would expect in a simple coordinate system with only positive
+coordinates. In particular CNC machines for instance have the Z-axis origin
+at the very top (as homing at the very bottom will certainly crash the spindle
+somewhere). So relative to the _machine origin_, only negative Z coordinates
+are valid in that case.
+
+Let's assume a machine that has the X axis homed on the left, but the Y axis
+on the back of the machine cube and the Z axis on the top; in the
+[gcode2ps]-visualization, this shows a little right-handed coordinate system
+marker, colored in Red (X-Axis), Green (Y) and Blue (Z) at the left/back/top of
+the machine cube:
+
+<img src="img/machine-origin.png" width="50%"/>
+
+#### Work Coordinate Systems
+
+BeagleG supports 9 work coordinate system slots, G54-G59 and G59.1-G59.3.
+
+The position of these coordinate system can be set using the `G10` command
+according to the G-Code standard with `P1` to `P9` referencing the work
+coordinate systems `G54`, `G55`, etc. When setting the
+coordinate system, the X/Y/Z values passed to G10 always are relative to
+the _machine origin_. Let's set the G55 coordinate
+system (`P2`). We want it to be at the bottom of the machine cube, 100mm in X/Y
+direction from the left bottom corner. Given the homing position of our
+sample machine, this is partially in negative coordinates:
+
+```
+G10 L2 P2 X100 Y-100 Z-150 (100mm to the right, 100mm to the front and 150mm down)
+```
+
+<img src="img/set-g55.png" width="50%"/>
+
+The coordinate was given in this case in the context of common absolute
+coordinates (`G90`).
+If coordinates are chosen to be relative with `G91`, we are _updating_ the
+coordinates _relative_ to the previous location of the work coordinate system.
+So with a
+
+```
+G91 G10 L2 P2 X50 (50mm to the right)
+```
+
+We are moving G55 work coordinate system 50mm to the right relative to its
+previous location:
+
+<img src="img/set-g55-update.png" width="50%"/>
+
+#### Default work coordinate system
+
+If you have specified a parameter file (with the `--param` option to
+`machine-control`), the last used coordinate system including its configured
+position is chosen.
+Otherwise `G54` is the default coordinate system originating at the machine
+origin.
+
+So in particular if you are having a machine origin at an inconvenient spot,
+it is a good idea to supply a parameter file to persistently configure your
+coordinate systems.
+
 ### M Codes
 
 Command          | Callback              | Description
@@ -235,3 +308,4 @@ for the user to handle (see description in API).
 [RepRap Wiki]: http://reprap.org/wiki/G-code
 [Intro GCode]: http://en.wikipedia.org/wiki/G-code
 [NIST RS274NGC]: http://spin1-www.nist.gov/customcf/get_pdf.cfm?pub_id=823374
+[gcode2ps]: ./Development.md#gcode2ps
