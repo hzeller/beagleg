@@ -322,12 +322,7 @@ public:
                    HardwareMapping *hardware_mapping)
     : BaseSpindle(config, hardware_mapping) {
     fd_ = open(config.port.c_str(), O_RDWR | O_NOCTTY);
-    Log_debug("PololuSMCSpindle:");
-    Log_debug("  port         : %s  (fd = %d)", config.port.c_str(), fd_);
-    Log_debug("  max_rpm      : %d", config_.max_rpm);
-    Log_debug("  pwr_delay_ms : %d", config_.pwr_delay_ms);
-    Log_debug("  on_delay_ms  : %d", config_.on_delay_ms);
-    Log_debug("  off_delay_ms : %d", config_.off_delay_ms);
+    Log_debug("PololuSMCSpindle: port %s  (fd = %d)", config.port.c_str(), fd_);
   }
 
   ~PololuSMCSpindle() {
@@ -471,6 +466,6 @@ Spindle *Spindle::CreateFromConfig(const SpindleConfig &config,
   Log_debug("  pwr_delay_ms : %d", config.pwr_delay_ms);
   Log_debug("  on_delay_ms  : %d", config.on_delay_ms);
   Log_debug("  off_delay_ms : %d", config.off_delay_ms);
-  Log_debug("  allow_ccw : %s", config.allow_ccw ? "yes" : "no");
+  Log_debug("  allow_ccw    : %s", config.allow_ccw ? "yes" : "no");
   return spindle.release();
 }
