@@ -893,12 +893,14 @@ int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
   float v0 = 0;
   float v1 = feedrate;
   while (!hardware_mapping_->TestAxisSwitch(axis, trigger)) {
+    if (hardware_mapping_->TestEStopSwitch()) return 0;
     total_movement += planner_->DirectDrive(axis, dir * kHomingMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.
   }
 
   // Go back until switch is not triggered anymore.
   while (hardware_mapping_->TestAxisSwitch(axis, trigger)) {
+    if (hardware_mapping_->TestEStopSwitch()) return 0;
     total_movement += planner_->DirectDrive(axis, -dir * kBackoffMM, v0, v1);
   }
 
@@ -952,6 +954,7 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
       continue;
     home_axis(axis);
   }
+  if (check_for_estop()) return;
   homing_state_ = GCodeMachineControl::HomingState::HOMED;
 }
 
