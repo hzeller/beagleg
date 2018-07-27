@@ -1453,6 +1453,7 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
   float feedrate = -1;
   const char *remaining_line;
   AxesRegister new_pos = axes_pos_;
+  AxisBitmap_t affected_axes = 0;
 
   while ((remaining_line = gparse_pair(line, &axis_l, &value))) {
     const float unit_value = value * unit_to_mm_factor_;
@@ -1469,12 +1470,14 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
         break;  // Invalid axis: possibly start of new command.
       new_pos[update_axis] = abs_axis_pos(update_axis, unit_value);
       any_change = true;
+      affected_axes |= (1 << update_axis);
     }
     line = remaining_line;
   }
 
   bool did_move = false;
   if (any_change) {
+    callbacks()->clamp_to_range(affected_axes, &new_pos);
     if (modal_g0_g1_) {
       did_move = callbacks()->coordinated_move(feedrate, new_pos);
     } else {

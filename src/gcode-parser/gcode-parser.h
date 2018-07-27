@@ -236,6 +236,17 @@ public:
   virtual void dwell(float time_ms) = 0;     // G4: dwell for milliseconds.
   virtual void motors_enable(bool enable) = 0;   // M17, M84, M18: Switch on/off motors
 
+  // Give receiver an opportunity to modify a target coordinate, e.g. clamp
+  // ranges before executing a G0/G1 move to prevent hitting a range-check
+  // later.
+  // Note, if you clamp values, following GCode will be relative to the new
+  // coordinate, so thoughtful consideration is needed; often it is better
+  // to go into soft-EStop in range conditions.
+  // (typically, only Z-clamping makes sense, so this is what it is called
+  // for now).
+  // [This API might change before things are fully settled]
+  virtual void clamp_to_range(AxisBitmap_t affected, AxesRegister *axes) {}
+
   // G1 (coordinated move) and G0 (rapid move). Move to absolute coordinates.
   // First parameter is feedrate in mm/sec if provided, or -1 otherwise.
   //   (typically, the user would need to remember the positive values).

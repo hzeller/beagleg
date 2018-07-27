@@ -38,6 +38,7 @@ MachineControlConfig::MachineControlConfig() {
   debug_print = false;
   synchronous = false;
   range_check = true;
+  clamp_to_range = "";
   require_homing = true;
   enable_pause = false;
   home_order = kHomeOrder;
@@ -81,6 +82,7 @@ public:
       ACCEPT_VALUE("home-order",     String, &config_->home_order);
       ACCEPT_VALUE("require-homing", Bool,   &config_->require_homing);
       ACCEPT_VALUE("range-check",    Bool,   &config_->range_check);
+      ACCEPT_VALUE("clamp-to-range", String, &config_->clamp_to_range);
       ACCEPT_VALUE("synchronous",    Bool,   &config_->synchronous);
       ACCEPT_VALUE("enable-pause",   Bool,   &config_->enable_pause);
       ACCEPT_VALUE("auto-motor-disable-seconds",

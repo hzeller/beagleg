@@ -98,6 +98,7 @@ public:
   void wait_temperature() final;                // M109, M116: Wait for temp. reached.
   void dwell(float time_ms) final;              // G4: dwell for milliseconds.
   void motors_enable(bool enable) final;        // M17,M84,M18: Switch on/off motors
+  void clamp_to_range(AxisBitmap_t affected, AxesRegister *axes) final;
   bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target) final;
   bool rapid_move(float feed_mm_p_sec, const AxesRegister &target) final;
   const char *unprocessed(char letter, float value, const char *) final;
@@ -134,15 +135,17 @@ private:
 private:
   const struct MachineControlConfig cfg_;
   MotorOperations *const motor_ops_;
-  Planner *planner_;
   HardwareMapping *const hardware_mapping_;
   Spindle *const spindle_;
-  FILE *msg_stream_;
-  GCodeParser *parser_;
+
+  Planner *planner_ = nullptr;
+  FILE *msg_stream_ = nullptr;
+  GCodeParser *parser_ = nullptr;
 
   // Derived configuration
   float g0_feedrate_mm_per_sec_;         // Highest of all axes; used for G0
                                          // (will be trimmed if needed)
+  AxisBitmap_t axis_clamped_;            // All axes that are clamped to range
   // Current machine configuration
   AxesRegister coordinate_display_origin_; // parser tells us
   std::string coordinate_display_origin_name_;
@@ -232,6 +235,27 @@ bool GCodeMachineControl::Impl::Init() {
     }
   }
 
+  axis_clamped_ = 0;
+  for (char c : cfg_.clamp_to_range) {
+    const GCodeParserAxis clamped_axis = gcodep_letter2axis(c);
+    if (clamped_axis == GCODE_NUM_AXES) {
+      Log_error("clamp-to-range: Invalid clamping axis %c", c);
+      ++error_count;
+      continue;
+    }
+
+    // Technically, we can do all axes, but in practice, it doesn't make sense
+    // without risking undesirable work-results.
+    // So for now, only do that on Z which can make sense in 2.5D applications.
+    if (clamped_axis != AXIS_Z) {
+      Log_error("clamp-to-range: Only Z-axis clamp allowed (not %c)", c);
+      ++error_count;
+      continue;
+    }
+
+    axis_clamped_ |= (1 << clamped_axis);
+  }
+
   // Now let's see what motors are mapped to any useful output.
   Log_debug("-- Config --\n");
   for (const GCodeParserAxis axis : AllAxes()) {
@@ -274,8 +298,11 @@ bool GCodeMachineControl::Impl::Init() {
       line += StringPrintf("HOME@max->|; ");
     }
 
+    if (axis_clamped_ & (1 << axis))
+      line += " [clamped to range]";
+
     if (!cfg_.range_check)
-      line += "Limit checks disabled!";
+      line += " Limit checks disabled!";
 
     Log_debug("%s", line.c_str());
 
@@ -731,6 +758,33 @@ bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &a
     }
   }
   return true;
+}
+
+void GCodeMachineControl::Impl::clamp_to_range(AxisBitmap_t affected,
+                                               AxesRegister *mutable_axes) {
+  // Due diligence: only clamp if all affected axes are actually configured.
+  // Otherwise we might end up in undesirable positions with partial clamps.
+  // (Right now, only Z-Axis is allowed in fact, see Init()).
+  if ((affected & axis_clamped_) != affected)
+    return;
+
+  AxesRegister &axes = *mutable_axes;
+  for (const GCodeParserAxis i : AllAxes()) {
+    if ((axis_clamped_ & (1 << i)) == 0)
+      continue;
+    if (axes[i] < 0) {
+      mprintf("// WARNING clamping Axis %c move %.1f to %.1fmm\n",
+              gcodep_axis2letter(i), axes[i], 0);
+      axes[i] = 0;
+    }
+    const float max_limit = cfg_.move_range_mm[i];
+    if (max_limit <= 0) continue;
+    if (axes[i] > max_limit) {
+      mprintf("// WARNING clamping Axis %c move %.1f to %.1fmm\n",
+              gcodep_axis2letter(i), axes[i], max_limit);
+      axes[i] = max_limit;
+    }
+  }
 }
 
 bool GCodeMachineControl::Impl::coordinated_move(float feed,

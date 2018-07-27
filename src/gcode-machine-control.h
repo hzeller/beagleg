@@ -61,6 +61,9 @@ struct MachineControlConfig {
   bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
   bool require_homing;          // Require homing before any moves.
   bool range_check;             // Do machine limit checks. Default 1.
+  std::string clamp_to_range;   // Clamp these axes to machine range before
+                                // range check. Dangerous.
+                                // Support only "" or "Z" right now.
   bool debug_print;             // Print step-tuples to output_fd if 1.
   bool synchronous;             // Don't queue, wait for command to finish if 1.
   bool enable_pause;            // Enable pause switch detection. Default 0.
