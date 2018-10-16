@@ -100,6 +100,8 @@ public:
       ACCEPT_EXPR("max-feedrate",     &config_->max_feedrate[current_axis_]);
       ACCEPT_EXPR("max-anglerate",    &config_->max_feedrate[current_axis_]);
 
+      ACCEPT_EXPR("max-probe-feedrate", &config_->max_probe_feedrate[current_axis_]);
+
       ACCEPT_EXPR("max-acceleration", &config_->acceleration[current_axis_]);
 
       ACCEPT_EXPR("range",            &config_->move_range_mm[current_axis_]);

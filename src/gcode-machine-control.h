@@ -47,6 +47,8 @@ struct MachineControlConfig {
   FloatAxisConfig max_feedrate;   // Max feedrate for axis (mm/s)
   FloatAxisConfig acceleration;   // Max acceleration for axis (mm/s^2)
 
+  FloatAxisConfig max_probe_feedrate; // Max probe feedrate for axis (mm/s)
+
   float speed_factor;         // Multiply feed with. Should be 1.0 by default.
   float threshold_angle;      // Threshold angle to ignore speed changes
   float speed_tune_angle;     // Angle added to the angle between vectors for speed tuning

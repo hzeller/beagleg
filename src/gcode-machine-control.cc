@@ -199,6 +199,17 @@ bool GCodeMachineControl::Impl::Init() {
                 cfg_.max_feedrate[axis], gcodep_axis2letter(axis));
       return false;
     }
+    if (hardware_mapping_->HasProbeSwitch(axis)) {
+      if (cfg_.max_probe_feedrate[axis] <= 0 ||
+          cfg_.max_probe_feedrate[axis] > cfg_.max_feedrate[axis]) {
+        // Permissible hard override. We want to keep cfg_ const for most of the
+        // places, so writing here in Init() is permissible.
+        const_cast<MachineControlConfig&>(cfg_).max_probe_feedrate[axis]
+                                             = cfg_.max_feedrate[axis];
+         Log_debug("Probe feedrate clamped to %.1f for axis %c\n",
+                   cfg_.max_probe_feedrate[axis], gcodep_axis2letter(axis));
+      }
+    }
     if (cfg_.acceleration[axis] < 0) {
       Log_error("Invalid negative acceleration %.1f for axis %c\n",
                 cfg_.acceleration[axis], gcodep_axis2letter(axis));
@@ -296,6 +307,10 @@ bool GCodeMachineControl::Impl::Init() {
       if (hardware_mapping_->HasProbeSwitch(axis))
         line += "|<-PROBE@min; ";
       line += StringPrintf("HOME@max->|; ");
+    }
+    if (hardware_mapping_->HasProbeSwitch(axis)) {
+      line += StringPrintf(" [ probe @ %.1f%s/s ]",
+                           cfg_.max_probe_feedrate[axis], unit);
     }
 
     if (axis_clamped_ & (1 << axis))
@@ -922,6 +937,8 @@ int GCodeMachineControl::Impl::move_to_probe(enum GCodeParserAxis axis,
   int total_movement = 0;
   float v0 = 0;
   float v1 = feedrate;
+  if (v1 > cfg_.max_probe_feedrate[axis])
+    v1 = cfg_.max_probe_feedrate[axis];
   while (!hardware_mapping_->TestProbeSwitch()) {
     total_movement += planner_->DirectDrive(axis, dir * kProbeMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.
