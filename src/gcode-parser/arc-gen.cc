@@ -45,12 +45,12 @@
 #define MM_PER_ARC_SEGMENT      0.1
 
 // Generate an arc. Input is the
-static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
+static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
                     bool is_cw,                        // 0 CCW, 1 CW
                     AxesRegister *position_out,   // start position. Will be updated.
                     const AxesRegister &center,     // Offset to center.
                     const AxesRegister &target,     // Target position.
-                    std::function<void(const AxesRegister&)> segment_output) {
+                    std::function<bool(const AxesRegister&)> segment_output) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
   switch (normal_axis) {
@@ -58,7 +58,7 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
   case AXIS_X: plane[0] = AXIS_Y; plane[1] = AXIS_Z; plane[2] = AXIS_X; break;
   case AXIS_Y: plane[0] = AXIS_X; plane[1] = AXIS_Z; plane[2] = AXIS_Y; break;
   default:
-    return;   // Invalid axis.
+    return true;   // Invalid axis (ignore move).
   }
 
   // Alias reference for readable use with [] operator
@@ -99,7 +99,7 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
 
   // We don't care about non-XYZ moves (e.g. extruder)
   if (mm_of_travel < 0.00001)
-    return;
+    return true; // (ignore move)
 
   // Figure out how many segments for this gcode
   const int segments = floorf(mm_of_travel / MM_PER_ARC_SEGMENT);
@@ -119,14 +119,14 @@ static void arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
     position[plane[2]] += linear_per_segment;
 
     // Emit
-    segment_output(position);
+    if (!segment_output(position)) return false;
   }
 
   // Ensure last segment arrives at target location.
   for (int axis = AXIS_X; axis <= AXIS_Z; axis++) {
     position[(GCodeParserAxis)axis] = target[(GCodeParserAxis)axis];
   }
-  segment_output(position);
+  return segment_output(position);
 }
 
 static AxesRegister calc_bezier_point(float t,
@@ -152,11 +152,11 @@ static AxesRegister calc_bezier_point(float t,
   return p;
 }
 
-static void spline_gen(const AxesRegister &start,
+static bool spline_gen(const AxesRegister &start,
                        const AxesRegister &cp1,
                        const AxesRegister &cp2,
                        const AxesRegister &target,
-                std::function<void (const AxesRegister& pos)> segment_output) {
+                std::function<bool(const AxesRegister& pos)> segment_output) {
 #if 0
   Log_debug("spline_gen: start:%.3f,%.3f cp1:%.3f,%.3f cp2:%.3f,%.3f end:%.3f,%.3f\n",
             position[AXIS_X], position[AXIS_Y],
@@ -166,31 +166,31 @@ static void spline_gen(const AxesRegister &start,
 #endif
 
   for (float t = 0; t < 1; t += 0.01f) {
-    segment_output(calc_bezier_point(t, start, cp1, cp2, target));
+    if (!segment_output(calc_bezier_point(t, start, cp1, cp2, target))) return false;
   }
-  segment_output(target);
+  return segment_output(target);
 }
 
-void GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
+bool GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
                                           GCodeParserAxis normal_axis,
                                           bool clockwise,
                                           const AxesRegister &start,
                                           const AxesRegister &center,
                                           const AxesRegister &end) {
   AxesRegister position = start;
-  arc_gen(normal_axis, clockwise, &position,
-          center, end, [this, feed_mm_p_sec](const AxesRegister &pos) {
-            coordinated_move(feed_mm_p_sec, pos);
-          });
+  return arc_gen(normal_axis, clockwise, &position,
+                 center, end, [this, feed_mm_p_sec](const AxesRegister &pos) {
+                                return coordinated_move(feed_mm_p_sec, pos);
+                });
 }
 
-void GCodeParser::EventReceiver::spline_move(float feed_mm_p_sec,
+bool GCodeParser::EventReceiver::spline_move(float feed_mm_p_sec,
                                              const AxesRegister &start,
                                              const AxesRegister &cp1,
                                              const AxesRegister &cp2,
                                              const AxesRegister &end) {
-  spline_gen(start, cp1, cp2, end,
-             [this, feed_mm_p_sec](const AxesRegister &pos) {
-               coordinated_move(feed_mm_p_sec, pos);
-             });
+  return spline_gen(start, cp1, cp2, end,
+                    [this, feed_mm_p_sec](const AxesRegister &pos) {
+                      return coordinated_move(feed_mm_p_sec, pos);
+                    });
 }

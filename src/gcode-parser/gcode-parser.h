@@ -272,7 +272,7 @@ public:
   // TODO(hzeller): We could probably generalize this by having a
   //  'normal vector' instead of normal_axis + clockwise. This would allow for
   //  arbitrarily placed arcs in space (but there is no GCode for it).
-  virtual void arc_move(float feed_mm_p_sec,
+  virtual bool arc_move(float feed_mm_p_sec,
                         GCodeParserAxis normal_axis, bool clockwise,
                         const AxesRegister &start,
                         const AxesRegister &center,
@@ -283,7 +283,7 @@ public:
   // control points "cp1" and "cp2".
   // The default implementation linearlizes curve and calls coordinated_move()
   // with the segments.
-  virtual void spline_move(float feed_mm_p_sec,
+  virtual bool spline_move(float feed_mm_p_sec,
                            const AxesRegister &start,
                            const AxesRegister &cp1, const AxesRegister &cp2,
                            const AxesRegister &end);

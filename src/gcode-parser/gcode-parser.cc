@@ -1639,9 +1639,9 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   absolute_center[AXIS_X] += offset[AXIS_X];
   absolute_center[AXIS_Y] += offset[AXIS_Y];
   absolute_center[AXIS_Z] += offset[AXIS_Z];
-  callbacks()->arc_move(feedrate, arc_normal_, is_cw,
-                      axes_pos_, absolute_center, target);
-  axes_pos_ = target;
+  if (callbacks()->arc_move(feedrate, arc_normal_, is_cw,
+                            axes_pos_, absolute_center, target))
+    axes_pos_ = target;
   return line;
 }
 
@@ -1791,8 +1791,8 @@ const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line
     cp2 = _cp2;
   }
 
-  callbacks()->spline_move(-1, axes_pos_, cp1, cp2, target);
-  axes_pos_ = target;
+  if (callbacks()->spline_move(-1, axes_pos_, cp1, cp2, target))
+    axes_pos_ = target;
   return line;
 }
 
