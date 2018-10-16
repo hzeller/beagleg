@@ -48,11 +48,12 @@ public:
     EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
   }
 
-  void Enqueue(const LinearSegmentSteps &param) final {
+  bool Enqueue(const LinearSegmentSteps &param) final {
     const int number = (int)(current_ - expect_);
     EXPECT_NE(END_SENTINEL, current_->aux_bits);
     ExpectEq(current_, param, number);
     ++current_;
+    return true;
   }
 
   void MotorEnable(bool on) final {}

@@ -41,7 +41,7 @@ public:
   FakeMotorOperations(const MachineControlConfig &config)
     : config_(config) {}
 
-  void Enqueue(const LinearSegmentSteps &segment) final {
+  bool Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
     // Prepare for printing.
 
@@ -80,6 +80,7 @@ public:
 #endif
 
     collected_.push_back(segment);
+    return true;
   }
 
   void MotorEnable(bool on) final {}

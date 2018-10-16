@@ -22,10 +22,11 @@ class MockMotionQueue : public MotionQueue {
 public:
   MockMotionQueue() : remaining_loops_(0), queue_size_(0) {}
 
-  void Enqueue(MotionSegment *segment) {
+  bool Enqueue(MotionSegment *segment) {
     remaining_loops_ = segment->loops_accel
       + segment->loops_travel + segment->loops_decel;
     queue_size_++;
+    return true;
   }
 
   void WaitQueueEmpty() {};
