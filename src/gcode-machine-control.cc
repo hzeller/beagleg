@@ -414,6 +414,7 @@ bool GCodeMachineControl::Impl::in_estop() {
 }
 
 void GCodeMachineControl::Impl::set_estop(bool hard) {
+  set_spindle_off();
   hardware_mapping_->AuxOutputsOff();
   set_output_flags(HardwareMapping::NamedOutput::ESTOP, true);
   motors_enable(false);
