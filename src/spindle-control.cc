@@ -93,6 +93,8 @@ public:
     ACCEPT_VALUE("type",           String, &config_->type);
     ACCEPT_VALUE("port",           String, &config_->port);
     ACCEPT_VALUE("max-rpm",        Int,    &config_->max_rpm);
+    ACCEPT_VALUE("max-accel",      Int,    &config_->max_accel);
+    ACCEPT_VALUE("max-decel",      Int,    &config_->max_decel);
     ACCEPT_VALUE("pwr-delay-msec", Int,    &config_->pwr_delay_ms);
     ACCEPT_VALUE("on-delay-msec",  Int,    &config_->on_delay_ms);
     ACCEPT_VALUE("off-delay-msec", Int,    &config_->off_delay_ms);
@@ -314,6 +316,20 @@ private:
     RESET_FLAGS_SOFTWARE                  = 0x14,
     RESET_FLAGS_WATCHDOG                  = 0x24,
 
+    // Set Motor Limit IDs
+    SYMMERIC_LIMIT_MAX_SPEED              = 0,
+    SYMMERIC_LIMIT_MAX_ACCEL              = 1,
+    SYMMERIC_LIMIT_MAX_DECEL              = 2,
+    SYMMERIC_LIMIT_BRAKE_DURATION         = 3,
+    FORWARD_LIMIT_MAX_SPEED               = 4,
+    FORWARD_LIMIT_MAX_ACCEL               = 5,
+    FORWARD_LIMIT_MAX_DECEL               = 6,
+    FORWARD_LIMIT_BRAKE_DURATION          = 7,
+    REVERSE_LIMIT_MAX_SPEED               = 8,
+    REVERSE_LIMIT_MAX_ACCEL               = 9,
+    REVERSE_LIMIT_MAX_DECEL               = 10,
+    REVERSE_LIMIT_BRAKE_DURATION          = 11,
+
     MAX_SPEED                             = 3200
   };
 
@@ -354,12 +370,15 @@ public:
     options.c_oflag &= ~(ONLCR | OCRNL);
     tcsetattr(fd_, TCSANOW, &options);
 
-    const unsigned char command = CMD_GET_FIRMWARE_VER;
-    send(&command, 1);
-    unsigned char response[4];
-    receive(response, 4);
+    int id, major, minor;
+    get_version(&id, &major, &minor);
     Log_debug("PololuSMCSpindle: initialized  ProductID:0x%04x  Firmware:%d.%d\n",
-           response[0] + 256 * response[1], response[3], response[2]);
+              id, major, minor);
+
+    set_motor_limit(SYMMERIC_LIMIT_MAX_ACCEL, config_.max_accel);
+    set_motor_limit(SYMMERIC_LIMIT_MAX_DECEL, config_.max_decel);
+    check_limits(true);
+    check_limits(false);
 
     Off();
 
@@ -382,15 +401,16 @@ public:
 
     // scale the desired RPM to the MAX_SPEED of the SMC
     int speed = std::min(rpm * MAX_SPEED / config_.max_rpm, (int)MAX_SPEED);
-
-    unsigned char command[3];
-    command[0] = (ccw) ? CMD_MOTOR_REVERSE : CMD_MOTOR_FORWARD;
-    command[1] = speed & 0x1f;
-    command[2] = (speed >> 5) & 0x7f;
-    send(command, sizeof(command));
+    set_target_speed(ccw, speed);
 
     if (is_off_) {
+      // wait for the SMC to fully accelerate the motor
       sleep_ms(config_.on_delay_ms);
+      signed short actual = (signed short)get_variable(SPEED);
+      while (actual < speed) {
+        sleep_ms(250);
+        actual = (signed short)get_variable(SPEED);
+      }
       is_off_ = false;
     }
 
@@ -405,7 +425,14 @@ public:
     const unsigned char command = CMD_STOP_MOTOR;
     send(&command, 1);
 
+    // wait for the SMC to fully decelerate the motor
     sleep_ms(config_.off_delay_ms);
+    signed short speed = (signed short)get_variable(SPEED);
+    while (speed) {
+      sleep_ms(250);
+      speed = (signed short)get_variable(SPEED);
+    };
+
     set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, false);
     is_off_ = true;
     Log_debug("PololuSMCSpindle: off");
@@ -413,8 +440,149 @@ public:
 
 private:
   void exit_safe_start() {
+    check_errors(ERRORS_OCCURED);
     const unsigned char command = CMD_EXIT_SAFE_START;
     send(&command, 1);
+  }
+
+  void get_version(int *id, int *major, int *minor) {
+    const unsigned char command = CMD_GET_FIRMWARE_VER;
+    send(&command, 1);
+    unsigned char response[4];
+    receive(response, 4);
+
+    if (id) *id = response[0] + 256 * response[1];
+    if (minor) *minor = response[2];
+    if (major) *major = response[3];
+  }
+
+  void set_target_speed(bool ccw, int speed) {
+    unsigned char command[3];
+    command[0] = (ccw) ? CMD_MOTOR_REVERSE : CMD_MOTOR_FORWARD;
+    command[1] = speed & 0x1f;
+    command[2] = (speed >> 5) & 0x7f;
+    send(command, sizeof(command));
+  }
+
+  void set_motor_limit(int id, int val) {
+    if (val == 0) return;
+    const char *name;
+    switch (id) {
+    case SYMMERIC_LIMIT_MAX_SPEED:
+    case FORWARD_LIMIT_MAX_SPEED:
+    case REVERSE_LIMIT_MAX_SPEED:
+      name = "Max Speed";
+      break;
+
+    case SYMMERIC_LIMIT_MAX_ACCEL:
+    case FORWARD_LIMIT_MAX_ACCEL:
+    case REVERSE_LIMIT_MAX_ACCEL:
+      name = "Max Accel";
+      break;
+
+    case SYMMERIC_LIMIT_MAX_DECEL:
+    case FORWARD_LIMIT_MAX_DECEL:
+    case REVERSE_LIMIT_MAX_DECEL:
+      name = "Max Decel";
+      break;
+
+    case SYMMERIC_LIMIT_BRAKE_DURATION:
+    case FORWARD_LIMIT_BRAKE_DURATION:
+    case REVERSE_LIMIT_BRAKE_DURATION:
+      name = "Brake Duration";
+      break;
+
+    default:
+      Log_error("Invalid motor limit id (%d)\n", id);
+      return;
+    }
+
+    unsigned char command[4];
+    command[0] = CMD_SET_MOTOR_LIMIT;
+    command[1] = id;
+    command[2] = val & 0x7f;
+    command[3] = (val >> 7) & 0x7f;
+    send(command, sizeof(command));
+
+    unsigned char response[1];
+    receive(response, 1);
+
+    switch (response[0]) {
+    case 0:
+      Log_debug("  %s limit set to %d\n", name, val);
+      break;
+    case 1:
+      Log_debug("  Unable to set %s forward limit to %d because of Hard Motor Limit settings\n",
+                name, val);
+      break;
+    case 2:
+      Log_debug("  Unable to set %s reverse limit to %d because of Hard Motor Limit settings\n",
+                name, val);
+      break;
+    case 3:
+      Log_debug("  Unable to set %s forward and reverse limits %d because of Hard Motor Limit settings\n",
+                name, val);
+      break;
+    }
+  }
+
+  // Reads a variable from the SMC and returns it as a number between 0 and 65535.
+  // The 'id' must be one of Variable Ids listed in the class definition.
+  // For variables that are actually signed, additional processing is required.
+  int get_variable(unsigned char id) {
+    unsigned char command[2] = { CMD_GET_VARIABLE, id };
+    send(command, sizeof(command));
+    unsigned char response[2];
+    receive(response, sizeof(response));
+
+    return response[0] + 256 * response[1];
+  }
+
+  // Read the status flag register Error Status or Errors Occurred.
+  // Note, reading the Errors Occurred register clears all the bits.
+  void check_errors(unsigned char id) {
+    int errors = get_variable(id);
+    if (errors) {
+      Log_debug("  Error%s: 0x%04x\n",
+                id == ERROR_STATUS ? " status" : "s occurred", errors);
+      if (errors & ERROR_STATUS_SAFE_START_VIOLATION)
+        Log_debug("    Safe-Start Violation\n");
+      if (errors & ERROR_STATUS_REQUIRED_CHANNEL_INVALID)
+        Log_debug("    Required Channel Invalid\n");
+      if (errors & ERROR_STATUS_SERIAL_ERROR)
+        Log_debug("    Serial Error\n");
+      if (errors & ERROR_STATUS_COMMAND_TIMEOUT)
+        Log_debug("    Command Timeout\n");
+      if (errors & ERROR_STATUS_LIMIT_KILL_SWITCH)
+        Log_debug("    Limit/Kill Switch\n");
+      if (errors & ERROR_STATUS_LOW_VIN)
+        Log_debug("    Low VIN\n");
+      if (errors & ERROR_STATUS_HIGH_VIN)
+        Log_debug("    High VIN\n");
+      if (errors & ERROR_STATUS_OVER_TEMPERATURE)
+        Log_debug("    Over Temperature\n");
+      if (errors & ERROR_STATUS_MOTOR_DRIVER_ERROR)
+        Log_debug("    Motor Driver Error\n");
+      if (errors & ERROR_STATUS_ERR_LINE_HIGH)
+        Log_debug("    ERR Line High\n");
+    }
+  }
+
+  void check_limits(bool forward) {
+    int speed, accel, decel, brake;
+    if (forward) {
+      speed = get_variable(MAX_SPEED_FORWARD);
+      accel = get_variable(MAX_ACCELERATION_FORWARD);
+      decel = get_variable(MAX_DECELERATION_FORWARD);
+      brake = get_variable(BRAKE_DURATION_FORWARD);
+    } else {
+      speed = get_variable(MAX_SPEED_REVERSE);
+      accel = get_variable(MAX_ACCELERATION_REVERSE);
+      decel = get_variable(MAX_DECELERATION_REVERSE);
+      brake = get_variable(BRAKE_DURATION_REVERSE);
+    }
+    Log_debug("  %s max speed: %d max accel: %d max decel: %d brake duration: %d\n",
+              forward ? "Forward" : "Reverse", speed, accel, decel, brake);
   }
 
   void send(const void *buf, int count) {
@@ -463,6 +631,8 @@ Spindle *Spindle::CreateFromConfig(const SpindleConfig &config,
     return nullptr;
 
   Log_debug("  max_rpm      : %d", config.max_rpm);
+  Log_debug("  max_accel    : %d", config.max_accel);
+  Log_debug("  max_decel    : %d", config.max_decel);
   Log_debug("  pwr_delay_ms : %d", config.pwr_delay_ms);
   Log_debug("  on_delay_ms  : %d", config.on_delay_ms);
   Log_debug("  off_delay_ms : %d", config.off_delay_ms);

@@ -35,6 +35,8 @@ struct SpindleConfig {
   // TODO: other config options e.g. needed for modbus spindles.
 
   int max_rpm;
+  int max_accel;
+  int max_decel;
   int pwr_delay_ms;
   int on_delay_ms;
   int off_delay_ms;
