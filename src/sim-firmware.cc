@@ -162,9 +162,9 @@ static double euclid(double x, double y, double z) {
 }
 
 // This simulates what happens in the PRU. For testing purposes.
-void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
+bool SimFirmwareQueue::Enqueue(MotionSegment *segment) {
   if (segment->state == STATE_EXIT)
-    return;
+    return true;
   // setting output direction according to segment->direction_bits;
 
   bzero(&state, sizeof(state));
@@ -317,6 +317,7 @@ void SimFirmwareQueue::Enqueue(MotionSegment *segment) {
     }
     fprintf(out_, "%s\n", msg);
   }
+  return true;
 }
 
 SimFirmwareQueue::SimFirmwareQueue(FILE *out, int relevant_motors)

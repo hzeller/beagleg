@@ -30,6 +30,7 @@
 #define STATE_EMPTY  0   // Queue element empty, ready to be filled by host
 #define STATE_FILLED 1   // Queue element filled by host, to be picked up by PRU
 #define STATE_EXIT   2   // Filled by host, no parameters; tells PRU to exit.
+#define STATE_ABORT  3   // Filled by PRU when Estop is detected
 
 #define QUEUE_LEN 16
 

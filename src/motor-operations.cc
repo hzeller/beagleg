@@ -115,7 +115,7 @@ MotionQueueMotorOperations::~MotionQueueMotorOperations() {
   delete shadow_queue_;
 }
 
-void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param,
+bool MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param,
                                                  int defining_axis_steps) {
   struct MotionSegment new_element = {};
   new_element.direction_bits = 0;
@@ -194,7 +194,7 @@ void MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
   new_element.aux = param.aux_bits;
   new_element.state = STATE_FILLED;
   backend_->MotorEnable(true);
-  backend_->Enqueue(&new_element);
+  return backend_->Enqueue(&new_element);
 }
 
 bool MotionQueueMotorOperations::GetPhysicalStatus(PhysicalStatus *status) {
@@ -252,8 +252,9 @@ static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   return defining_axis_steps;
 }
 
-void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
+bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
   const int defining_axis_steps = get_defining_axis_steps(param);
+  bool ret;
 
   if (defining_axis_steps == 0) {
     // The new segment is based on the previous position.
@@ -267,7 +268,7 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
     history_segment.aux_bits = param.aux_bits;
     shadow_queue_->push_front(history_segment);
 
-    backend_->Enqueue(&empty_element);
+    ret = backend_->Enqueue(&empty_element);
   }
   else if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
     // We have more steps that we can enqueue in one chunk, so let's cut
@@ -303,12 +304,13 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
       const double v1 = v1squared > 0.0 ? sqrt(v1squared) : 0;
       output.v0 = previous_speed;
       output.v1 = v1;
-      EnqueueInternal(output, division_steps);
+      ret = EnqueueInternal(output, division_steps);
+      if (!ret) break;
       previous = accumulator;
       previous_speed = v1;
     }
   } else {
-    EnqueueInternal(param, defining_axis_steps);
+    ret = EnqueueInternal(param, defining_axis_steps);
   }
   // Shrink the queue and remove the elements that we are not interested
   // in anymore.
@@ -317,6 +319,7 @@ void MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
   const int buffer_size = backend_->GetPendingElements(NULL);
   const int new_size = buffer_size > 0 ? buffer_size : 1;
   shadow_queue_->resize(new_size);
+  return ret;
 }
 
 void MotionQueueMotorOperations::MotorEnable(bool on) {

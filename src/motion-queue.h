@@ -97,7 +97,8 @@ public:
   // Enqueue a motion segment into queue. Blocks until capacity of queue allows
   // to receive more elements.
   // Might change values in MotionSegment.
-  virtual void Enqueue(MotionSegment *segment) = 0;
+  // Returns true if segment was added, false if PRU abort was detected
+  virtual bool Enqueue(MotionSegment *segment) = 0;
 
   // Block and wait for queue to be empty.
   virtual void WaitQueueEmpty() = 0;
@@ -129,7 +130,7 @@ public:
   PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
   ~PRUMotionQueue();
 
-  void Enqueue(MotionSegment *segment);
+  bool Enqueue(MotionSegment *segment);
   void WaitQueueEmpty();
   void MotorEnable(bool on);
   void Shutdown(bool flush_queue);
@@ -137,6 +138,8 @@ public:
 
 private:
   bool Init();
+
+  void ClearPRUAbort(unsigned int idx);
 
   HardwareMapping *const hardware_mapping_;
   PruHardwareInterface *const pru_interface_;
@@ -149,7 +152,7 @@ private:
 // Queue that does nothing. For testing purposes.
 class DummyMotionQueue : public MotionQueue {
 public:
-  void Enqueue(MotionSegment *segment) {}
+  bool Enqueue(MotionSegment *segment) { return true; }
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}

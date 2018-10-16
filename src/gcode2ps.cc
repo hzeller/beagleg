@@ -708,7 +708,7 @@ public:
     if (v < min_v_) min_v_ = v;
   }
 
-  void Enqueue(const LinearSegmentSteps &param) final {
+  bool Enqueue(const LinearSegmentSteps &param) final {
     GCodeParserAxis dominant_axis = AXIS_X;
     for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
       if (abs(param.steps[i]) > abs(param.steps[dominant_axis]))
@@ -716,7 +716,7 @@ public:
     }
     if (config_.steps_per_mm[dominant_axis] == 0 ||
         param.steps[dominant_axis] == 0) {
-      return;  // Nothing really to do.
+      return true;  // Nothing really to do.
     }
 
     switch (pass_) {
@@ -748,6 +748,7 @@ public:
       PrintSegment(param, dominant_axis);
       break;
     }
+    return true;
   }
 
   // Set the length of how long the smallest colored range should be.

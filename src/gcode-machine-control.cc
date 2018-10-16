@@ -802,7 +802,9 @@ bool GCodeMachineControl::Impl::coordinated_move(float feed,
   }
 
   float feedrate = prog_speed_factor_ * current_feedrate_mm_per_sec_;
-  planner_->Enqueue(axis, feedrate);
+  if (!planner_->Enqueue(axis, feedrate)) {
+    if (check_for_estop()) return false;
+  }
   return true;
 }
 
@@ -817,7 +819,9 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
   if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
     current_feedrate_mm_per_sec_ = given;  // At least something for G1.
   }
-  planner_->Enqueue(axis, given > 0 ? given : rapid_feed);
+  if (!planner_->Enqueue(axis, given > 0 ? given : rapid_feed)) {
+    if (check_for_estop()) return false;
+  }
   return true;
 }
 

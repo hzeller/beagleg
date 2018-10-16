@@ -26,7 +26,7 @@ public:
   SimFirmwareQueue(FILE *out, int relevant_motors = MOTION_MOTOR_COUNT);
   ~SimFirmwareQueue() override;
 
-  void Enqueue(MotionSegment *segment) final;
+  bool Enqueue(MotionSegment *segment) final;
   void WaitQueueEmpty() final {}
   void MotorEnable(bool on) final {}
   void Shutdown(bool flush_queue) final {}

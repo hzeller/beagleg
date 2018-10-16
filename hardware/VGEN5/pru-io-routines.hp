@@ -3,3 +3,30 @@
 
 ;; Just use the generic ones.
 #include "../../src/pru-generic-io-routines.hp"
+
+// HARDCODED function to check the E-Stop input on the VGEN5 board
+// IN_7_GPIO (GPIO_0_BASE | 27) is the dedicated E-Stop input
+//
+// NOTE: two reads are done for a minimal debouce
+//
+// Available registers:
+// r0 = used to return the E-Stop status (0=ok, 1=E-Stop active)
+// r4 = GPIO_DATAIN register for the EStop input
+// r5 = EStop input bit
+// r6 = GPIO_DATAIN register value
+CheckForEStop:
+	MOV r4, (IN_7_GPIO & 0xfffff000)
+	QBEQ estop_ok, r4.w2, GPIO_NOT_MAPPED
+	MOV r5, GPIO_DATAIN
+	ADD r4, r4, r5
+	MOV r5, (IN_7_GPIO & 0x1f)
+debounce:
+	LBBO r6, r4, 0, 4
+	QBBC estop_ok, r6, r5
+	QBEQ estop_active, r0, 1
+	MOV r0, 1
+	JMP debounce
+estop_ok:
+	MOV r0, 0
+estop_active:
+	RET

@@ -58,7 +58,7 @@ public:
        MotorOperations *motor_backend);
   ~Impl();
 
-  void move_machine_steps(const struct AxisTarget *last_pos,
+  bool move_machine_steps(const struct AxisTarget *last_pos,
                           struct AxisTarget *target_pos,
                           const struct AxisTarget *upcoming);
 
@@ -66,8 +66,8 @@ public:
                               enum GCodeParserAxis axis,
                               int steps);
 
-  void issue_motor_move_if_possible();
-  void machine_move(const AxesRegister &axis, float feedrate);
+  bool issue_motor_move_if_possible();
+  bool machine_move(const AxesRegister &axis, float feedrate);
   void bring_path_to_halt();
 
   float acceleration_for_move(const int *axis_steps,
@@ -327,18 +327,21 @@ double Planner::Impl::euclidian_speed(const struct AxisTarget *t) {
 //
 // Since we calculate the deceleration, this modifies the speed of target_pos
 // to reflect what the last speed was at the end of the move.
-void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
+//
+// Returns true if move was executed, false if aborted
+bool Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
                                        struct AxisTarget *target_pos,
                                        const struct AxisTarget *upcoming) {
+  bool ret = true;
   if (target_pos->delta_steps[target_pos->defining_axis] == 0) {
     if (last_aux_bits_ != target_pos->aux_bits) {
       // Special treatment: bits changed since last time, let's push them through.
       struct LinearSegmentSteps bit_set_command = {};
       bit_set_command.aux_bits = target_pos->aux_bits;
-      motor_ops_->Enqueue(bit_set_command);
+      ret = motor_ops_->Enqueue(bit_set_command);
       last_aux_bits_ = target_pos->aux_bits;
     }
-    return;
+    return ret;
   }
   struct LinearSegmentSteps accel_command = {};
   struct LinearSegmentSteps move_command = {};
@@ -476,24 +479,29 @@ void Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
 
   if (cfg_->synchronous) motor_ops_->WaitQueueEmpty();
 
-  if (has_accel) motor_ops_->Enqueue(accel_command);
-  if (has_move) motor_ops_->Enqueue(move_command);
-  if (has_decel) motor_ops_->Enqueue(decel_command);
+  // Make sure each segment gets added in case we get aborted
+  if (has_accel)        ret = motor_ops_->Enqueue(accel_command);
+  if (ret && has_move)  ret = motor_ops_->Enqueue(move_command);
+  if (ret && has_decel) ret = motor_ops_->Enqueue(decel_command);
 
   last_aux_bits_ = target_pos->aux_bits;
+
+  return ret;
 }
 
 // If we have enough data in the queue, issue motor move.
-void Planner::Impl::issue_motor_move_if_possible() {
+bool Planner::Impl::issue_motor_move_if_possible() {
+  bool ret = true;
   if (planning_buffer_.size() >= 3) {
-    move_machine_steps(planning_buffer_[0],  // Current established position.
-                       planning_buffer_[1],  // Position we want to move to.
-                       planning_buffer_[2]); // Next upcoming.
+    ret = move_machine_steps(planning_buffer_[0],  // Current established position.
+                             planning_buffer_[1],  // Position we want to move to.
+                             planning_buffer_[2]); // Next upcoming.
     planning_buffer_.pop_front();
   }
+  return ret;
 }
 
-void Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
+bool Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   assert(position_known_);   // call SetExternalPosition() after DirectDrive()
   // We always have a previous position.
   struct AxisTarget *previous = planning_buffer_.back();
@@ -520,7 +528,7 @@ void Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   if (max_steps == 0) {
     // Nothing to do, ignore this move.
     planning_buffer_.pop_back();
-    return;
+    return true;
   }
 
   assert(max_steps > 0);
@@ -541,8 +549,9 @@ void Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   if (new_pos->speed > max_axis_speed_[defining_axis])
     new_pos->speed = max_axis_speed_[defining_axis];
 
-  issue_motor_move_if_possible();
-  path_halted_ = false;
+  bool ret = issue_motor_move_if_possible();
+  if (ret) path_halted_ = false;
+  return ret;
 }
 
 void Planner::Impl::bring_path_to_halt() {
@@ -632,8 +641,8 @@ Planner::Planner(const MachineControlConfig *config,
 
 Planner::~Planner() { delete impl_; }
 
-void Planner::Enqueue(const AxesRegister &target_pos, float speed) {
-  impl_->machine_move(target_pos, speed);
+bool Planner::Enqueue(const AxesRegister &target_pos, float speed) {
+  return impl_->machine_move(target_pos, speed);
 }
 
 void Planner::BringPathToHalt() {

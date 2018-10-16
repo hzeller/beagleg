@@ -38,7 +38,8 @@ public:
 
   // Enqueue a new target position to go to in a linear movement from
   // the current position.
-  void Enqueue(const AxesRegister &target_pos, float speed);
+  // Returns true if successful, false if aborted
+  bool Enqueue(const AxesRegister &target_pos, float speed);
 
   // Flush the queue and wait until all remaining motor
   // operations have been flushed.

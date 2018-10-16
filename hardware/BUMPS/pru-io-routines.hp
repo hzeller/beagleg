@@ -3,3 +3,7 @@
 
 ;; For now, we just use the generic ones.
 #include "../../src/pru-generic-io-routines.hp"
+
+// Dummy function
+CheckForEStop:
+	RET

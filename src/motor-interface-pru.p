@@ -198,6 +198,7 @@ QUEUE_READ:
 	.assign QueueHeader, r1.w0, r1.w0, queue_header
 	LBCO queue_header, CONST_PRUDRAM, r2, SIZE(queue_header)
 	QBEQ QUEUE_READ, queue_header.state, STATE_EMPTY ; wait until got data.
+	QBEQ QUEUE_READ, queue_header.state, STATE_ABORT
 
 	QBEQ FINISH, queue_header.state, STATE_EXIT
 
@@ -240,6 +241,17 @@ QUEUE_READ:
 	;; status-variable:   r28
 	;; call/ret:          r30
 STEP_GEN:
+	MOV r0, 0
+	CALL CheckForEStop
+	QBNE DO_STEP_GEN, r0, 1
+	// Estop detected, update the queue status and abort
+	ZERO &r28, 3			// Estop detected, zero the loop counter
+	ADD r28, r28, 1			// status_loops++ (removed by UpdateQueueStatus)
+	UpdateQueueStatus
+	MOV queue_header.state, STATE_ABORT
+	JMP STEP_GEN_ABORTED
+
+DO_STEP_GEN:
 	;;
 	;; Generate motion profile configured by TravelParameters
 	;;
@@ -261,6 +273,7 @@ STEP_GEN:
 	CalculateDelay r1, travel_params, r3, r5, r6
 	QBEQ DONE_STEP_GEN, r1, 0       ; special value 0: all steps consumed.
 	UpdateQueueStatus
+
 STEP_DELAY:				; Create time delay between steps.
 	SUB r1, r1, 1                   ; two cycles per loop.
 	QBNE STEP_DELAY, r1, 0
@@ -270,6 +283,7 @@ STEP_DELAY:				; Create time delay between steps.
 DONE_STEP_GEN:
 	;; We are done with instruction. Mark slot as empty...
 	MOV queue_header.state, STATE_EMPTY
+STEP_GEN_ABORTED:
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16 ; signal host program free slot.
 

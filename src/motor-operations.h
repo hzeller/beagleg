@@ -59,10 +59,11 @@ public:
 
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
-  // otherwise it waits until a slot frees up.
+  // otherwise it waits until a slot frees up or an abort happens.
   // If "err_stream" is non-NULL, prints error message there.
   // Automatically enables motors if not already.
-  virtual void Enqueue(const LinearSegmentSteps &segment) = 0;
+  // Returns true if the move was added, false if aborted
+  virtual bool Enqueue(const LinearSegmentSteps &segment) = 0;
 
   // Waits for the queue to be empty and Enables/disables motors according to the
   // given boolean value (Right now, motors cannot be individually addressed).
@@ -86,14 +87,14 @@ public:
   MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend);
   ~MotionQueueMotorOperations() override;
 
-  void Enqueue(const LinearSegmentSteps &segment) final;
+  bool Enqueue(const LinearSegmentSteps &segment) final;
   void MotorEnable(bool on) final;
   void WaitQueueEmpty() final;
   bool GetPhysicalStatus(PhysicalStatus *status) final;
   void SetExternalPosition(int axis, int pos) final;
 
 private:
-  void EnqueueInternal(const LinearSegmentSteps &param,
+  bool EnqueueInternal(const LinearSegmentSteps &param,
                        int defining_axis_steps);
 
   HardwareMapping *const hardware_mapping_;

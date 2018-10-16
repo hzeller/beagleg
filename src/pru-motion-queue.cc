@@ -91,6 +91,11 @@ static inline unsigned int RingbufferOffset(unsigned int current, int offset) {
   return (QUEUE_LEN + current + offset) % QUEUE_LEN;
 }
 
+void PRUMotionQueue::ClearPRUAbort(unsigned int idx) {
+  volatile MotionSegment *e = &pru_data_->ring_buffer[idx];
+  e->state = STATE_EMPTY;
+}
+
 int PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
   // Get data from the PRU
   const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
@@ -119,7 +124,7 @@ static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) 
   }
 }
 
-void PRUMotionQueue::Enqueue(MotionSegment *element) {
+bool PRUMotionQueue::Enqueue(MotionSegment *element) {
   const uint8_t state_to_send = element->state;
   assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
   // Initially, we copy everything with 'STATE_EMPTY', then flip the state
@@ -128,6 +133,10 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 
   queue_pos_ %= QUEUE_LEN;
   while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
+    if (pru_data_->ring_buffer[queue_pos_].state == STATE_ABORT) {
+      ClearPRUAbort(queue_pos_);
+      return false;
+    }
     pru_interface_->WaitEvent();
   }
 
@@ -140,11 +149,15 @@ void PRUMotionQueue::Enqueue(MotionSegment *element) {
 #ifdef DEBUG_QUEUE
   DumpMotionSegment(queue_element, pru_data_);
 #endif
+  return true;
 }
 
 void PRUMotionQueue::WaitQueueEmpty() {
   const unsigned int last_insert_index = RingbufferOffset(queue_pos_, -1);
   while (pru_data_->ring_buffer[last_insert_index].state != STATE_EMPTY) {
+    if (pru_data_->ring_buffer[last_insert_index].state == STATE_ABORT) {
+      break;
+    }
     pru_interface_->WaitEvent();
   }
 }
