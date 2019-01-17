@@ -384,14 +384,14 @@ void GCodeMachineControl::Impl::wait_for_start() {
   if (pause_enabled_ && check_for_pause()) {
     mprintf("// BeagleG: pause switch active\n");
     int pause_active = PAUSE_ACTIVE_DETECT;
+    // The switch reading is debounced. We add additional delay with
+    // the while loop to ensure that the pause switch has been cleared.
     while (pause_active) {
       usleep(1000);
-      // TODO: we should probably have de-bouncing logic rather in the
-      // hardware mapping. E.g. something like TestPauseSwitch(2000).
       if (check_for_pause())
-	pause_active = PAUSE_ACTIVE_DETECT;
+        pause_active = PAUSE_ACTIVE_DETECT;
       else
-	pause_active--;
+        pause_active--;
     }
     mprintf("// BeagleG: pause switch cleared\n");
   }

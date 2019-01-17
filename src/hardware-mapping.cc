@@ -305,9 +305,21 @@ HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(LogicAxis axis
 bool HardwareMapping::TestSwitch(const int switch_number, bool def_result) {
   if (!is_hardware_initialized_) return def_result;
   GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
-  if (gpio_def != GPIO_NOT_MAPPED)
-    return (get_gpio(gpio_def) == trigger_level_[switch_number-1]);
-  return def_result;
+  if (gpio_def == GPIO_NOT_MAPPED) return def_result;
+  bool state = get_gpio(gpio_def);
+  int debounce = 0;
+  for (;;) {
+    usleep(10);
+    bool new_state = get_gpio(gpio_def);
+    if (new_state == state) {
+      debounce++;
+      if (debounce == 2) break;
+    } else {
+      state = new_state;
+      debounce = 0;
+    }
+  }
+  return (state == trigger_level_[switch_number-1]);
 }
 
 bool HardwareMapping::TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger) {
