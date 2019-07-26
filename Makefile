@@ -12,7 +12,7 @@
 
 # Change here for which hardware you are compiling. See hardware/ directory.
 # Currently supported BUMPS, CRAMPS, and VGEN5
-export BEAGLEG_HARDWARE_TARGET?=BUMPS
+#export BEAGLEG_HARDWARE_TARGET?=BUMPS
 
 # Disable PWM timers. See README.md.
 #export CONFIG_FLAGS?=-D_DISABLE_PWM_TIMERS
@@ -23,7 +23,7 @@ export BEAGLEG_HARDWARE_TARGET?=BUMPS
 
 # Tuning options for ARM CPU. Unset this in an environment variable if not
 # compiled on the Beaglebone but on a different system.
-export ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
+#export ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 
 PREFIX?=/usr/local
 BINDIR=$(PREFIX)/bin
