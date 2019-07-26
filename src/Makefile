@@ -21,6 +21,9 @@ CONFIG_FLAGS?=
 # on a different system.
 ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
 
+# Allow to c onfigure e.g. BEAGLEG_HARDWARE_TARGET in a configuration file.
+-include config.mk
+
 # Location of am335x package https://github.com/beagleboard/am335x_pru_package
 # We check this out in a local git submodule.
 AM335_BASE=../am335x_pru_package
