@@ -134,7 +134,7 @@ $(PRU_BIN) : motor-interface-constants.h \
 	$(CROSS_COMPILE)$(CXX)  $(GTEST_INCLUDE) $(CXXFLAGS) -c  $< -o $@
 	@$(CROSS_COMPILE)$(CXX) $(GTEST_INCLUDE) $(CXXFLAGS) -MM $< > $@.d
 
-%_bin.h : %.p $(PASM)
+%_bin.h : %.p $(PASM) compiler-flags
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
 
 $(PASM):
