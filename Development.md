@@ -341,3 +341,14 @@ of many-hour long jobs. This might be useful to display to the user.
 ![gcode-print-stats](./img/print-stats.png)
 
 [ccache]: https://ccache.samba.org/
+
+### Roadmap
+Not everything I'd like to have is implemented yet, but getting closer as weekend
+hacking permits.
+
+- [ ] Shoveller: Assuming an emergency stop and no steps were missed, restart the gcode from the last position.
+- [ ] Implement the code for soft pause/resume.
+- [ ] High performance/light Status Server
+- [ ] Change the code to be compatible with remoteproc new kernel feature.
+- [ ] Include some tests for the pru code (maybe by using a PRU virtualization)
+- [ ] Needed for full 3D printer solution: add PWM/PID-loop for heaters.

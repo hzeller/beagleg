@@ -179,15 +179,6 @@ it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-## TODO
-Not everything I'd like to have is implemented yet, but getting closer as weekend
-hacking permits.
-
-   - Needed for full 3D printer solution: add PWM/PID-loop for heaters.
-   - Fast pause without waiting for queues to empty, but still be able to
-     recover exact last position. That way pause/resume is possible.
-   - ...
-
 [run-vid]: ./img/beagleg-vid-thumb.jpg
 [BUMPS]: https://github.com/hzeller/bumps
 [BUMPS-img]: ./img/bumps-connect.jpg
