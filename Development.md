@@ -346,7 +346,8 @@ of many-hour long jobs. This might be useful to display to the user.
 Not everything I'd like to have is implemented yet, but getting closer as weekend
 hacking permits.
 
-- [ ] Shoveller: Allow start and stop to be possible + allow asynchronous operations.
+- [ ] Shoveller: Assuming an emergency stop and no steps were missed, restart the gcode from the last position.
+- [ ] Implement the code for soft pause/resume.
 - [ ] High performance/light Status Server
 - [ ] Change the code to be compatible with remoteproc new kernel feature.
 - [ ] Include some tests for the pru code (maybe by using a PRU virtualization)
