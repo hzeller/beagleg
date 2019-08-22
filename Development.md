@@ -348,7 +348,33 @@ hacking permits.
 
 - [ ] Shoveller: Assuming an emergency stop and no steps were missed, restart the gcode from the last position.
 - [ ] Implement the code for soft pause/resume.
+- [ ] Planner:  make sure to slow down early enough to obey machine constraints (it does not yet for tiny segments at the end of movement)
 - [ ] High performance/light Status Server
 - [ ] Change the code to be compatible with remoteproc new kernel feature.
 - [ ] Include some tests for the pru code (maybe by using a PRU virtualization)
 - [ ] Needed for full 3D printer solution: add PWM/PID-loop for heaters.
+- [ ] Motion: consider limited constant jerk movements.
+
+### Random thought collction for roadmap points above
+
+#### Shoveller
+
+ - Initial impementation: assume hard stop (e.g. emergency stop) and be able
+   to revover the state back from the PRU to be put back into the linear segment
+   steps queue. Goal: be able to restart the operation after completely
+   empty PRU state.
+ - Note, in this first implementation we just assume hard stops and starts and
+   that steppers don't use steps.
+ - We might use that later to be able to do other operations 'in-between' after
+   an emergency stop (e.g. manually jogging away the tool, then restart
+   will move it back to where we stopped.
+
+#### Planner
+
+ - right now, we just do proper 'ramp up' of acceleration, but not
+   deceleration. In order to do that, we need to delay emitting
+   LinearSegmentSteps until we know that we can stop within the deceleration
+   constraints. Otherwise we need to edit the speeds backwards.
+
+#### Status Server
+ - Issue [#38](https://github.com/hzeller/beagleg/issues/38) has some good discussion.
