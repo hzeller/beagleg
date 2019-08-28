@@ -49,6 +49,7 @@
 #include "motor-operations.h"
 #include "pru-hardware-interface.h"
 #include "sim-firmware.h"
+#include "sim-audio-out.h"
 #include "spindle-control.h"
 
 static int usage(const char *prog, const char *msg) {
@@ -70,6 +71,7 @@ static int usage(const char *prog, const char *msg) {
           "  -f <factor>                : Feedrate speed factor (Default 1.0).\n"
           "  -n                         : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
           // -N dry-run with simulation output; mostly for development, so not mentioned here.
+          // -W <wav-file>  dry run for development: output wav file.
           "  -P                         : Verbose: Show some more debug output (Default: off).\n"
           "  -S                         : Synchronous: don't queue (Default: off).\n"
           "      --allow-m111           : Allow changing the debug level with M111 (Default: off).\n"
@@ -361,8 +363,9 @@ int main(int argc, char *argv[]) {
   bool allow_m111 = false;
   config.threshold_angle = 10;
   config.speed_tune_angle = 60;
+  FILE *wav_output = nullptr;
   int opt;
-  while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:",
+  while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:W:",
                             long_options, NULL)) != -1) {
     switch (opt) {
     case 'f':
@@ -391,6 +394,10 @@ int main(int argc, char *argv[]) {
     case 'N':
       dry_run = true;
       simulation_output = true;
+      break;
+    case 'W':
+      dry_run = true;
+      wav_output = fopen(optarg, "w");
       break;
     case 'P':
       config.debug_print = true;
@@ -534,6 +541,8 @@ int main(int argc, char *argv[]) {
     // The backend
     if (simulation_output) {
       motion_backend = new SimFirmwareQueue(stdout, 3); // TODO: derive from cfg
+    } else if (wav_output) {
+      motion_backend = new SimFirmwareAudioQueue(wav_output);
     } else {
       motion_backend = new DummyMotionQueue();
     }

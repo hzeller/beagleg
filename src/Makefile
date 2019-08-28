@@ -73,7 +73,7 @@ GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o pwm-timer.o config-parser.o \
 	      machine-control-config.o hardware-mapping.o \
 	      spindle-control.o planner.o adc.o
-OBJECTS=motor-operations.o sim-firmware.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
+OBJECTS=motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
