@@ -289,7 +289,7 @@ path sees the given speed in space, not each individual axis:
     G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
 
 ## API
-G-code parsing as provided by [the G-Code parse API](./gcode-parser/gcode-parser.h) receives
+G-code parsing as provided by [the G-Code parse API](./src/gcode-parser/gcode-parser.h) receives
 G-code from a file-descriptor (via the `int gcodep_parse_stream()` function)
 and calls parametrized parse-callbacks representing slightly more higher-level commands.
 
@@ -307,5 +307,5 @@ for the user to handle (see description in API).
 [LinuxCNC]: http://linuxcnc.org/docs/html/gcode.html
 [RepRap Wiki]: http://reprap.org/wiki/G-code
 [Intro GCode]: http://en.wikipedia.org/wiki/G-code
-[NIST RS274NGC]: http://spin1-www.nist.gov/customcf/get_pdf.cfm?pub_id=823374
+[NIST RS274NGC]: https://nist.gov/customcf/get_pdf.cfm?pub_id=823374
 [gcode2ps]: ./Development.md#gcode2ps
