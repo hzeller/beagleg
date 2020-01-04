@@ -1,17 +1,19 @@
 BealgeG G-Code interpretation
 -----------------------------
 
-##Syntax
+## Syntax
 
 G-Code is essentially a pair of 'letters' and 'numbers' that tell the machine
 what to do. It is well described [somewhere else][Intro GCode], so this is only a
 quick overview.
 G-Codes are typically organized in lines. These are typical commands:
 
-    G1 X10 Y20 ; move to X-coordinate 10 and Y=20
-    G1X0Y8     ; no need for spaces between pairs - but readability sucks.
-    G1 X10 (small move) Y200 (big move) ; comments can be in-line with parenthesis
-    G1 X10 Y100 G1 X0 Y0  ; multiple commands can be in one line.
+```GCode
+G1 X10 Y20 ; move to X-coordinate 10 and Y=20
+G1X0Y8     ; no need for spaces between pairs - but readability sucks.
+G1 X10 (small move) Y200 (big move) ; comments can be in-line with parenthesis
+G1 X10 Y100 G1 X0 Y0  ; multiple commands can be in one line.
+```
 
 `G1` means: move in a coordinated move, i.e. the axis move in a way that the
 final move resembles a straight line in the N-dimensional space they are in.
@@ -20,53 +22,9 @@ Comments can be at the end of line and start with a semicolon.
 There can be comments _between_ pairs with parenthesis. This is not supported
 by every G-Code interpreter, but BeagleG does:
 
-    G1(coordinated move) X10(to this position)
-
-## Parameters / Expressions and Binary/Unary Operations
-
-BeagleG supportes the use of parameters. A parameter is specified by a pound
-character `#` followed by an integer value. Currently parameters 0 to 5399 are
-supported. Parameter 0 is read-only and always evaluates to `0.0f`. Some of the
-parameters are used internally, these are all in the > 5000 range and should
-not be used.
-
-Parameter setting is done by:
-* a pound character `#`
-* an integer value between `1` and `5399`
-* an equal sign `=`
-* a real value
-
-For example `#1=123.4` is a parameter setting meaning set parameter 1 to 123.4.
-
-Unlike the [NIST RS274NGC] specification, parameter setting takes effect immediately.
-For example, `G1 #1=10 X#1` will result in a coordinated move to X=10.
-
-Parameters are not currently persistent. All parameters default to `0.0f`.
-
-Expressions are also supported along with Binary/Unary operations. An expression
-is a set of character starting with a left bracket `[` and ending with a balanced
-right bracket `]`. In between the brackets are numbers, parameter values,
-mathematical operations, and other expressions. Expressions are evaluated to
-produce a number. An example of an expression is `[1 + cos[0] - [#3 ** [4.0/2]]]`.
-
-Binary operations appear only inside excpressions. Nine binary operations are
-defined. These are four basic mathematical operations: addition `+`, subtraction `-`,
-multiplication `*`, and division `/`. There are three logical operations:
-non-exclusive or `OR`, exculsive or `XOR`, and logical and `AND`. The eighth
-operation is the modulus operation `MOD`. The ninth operation is the "power"
-operation `**` of raising the number on the left of the operation to the power
-on the right.
-
-A unary operation is either `ATAN` followed by one expression divided by another
-expression (for example `ATAN[2]/[1+3]`) or any other unary operation followed
-by an expression (for example `SIN[90]`). The unary operations are: absolute value
-`ABS`, arc cosine `ACOS`, arc sine `ASIN`, arc tangent `ATAN`, cosine `COS`,
-e raised to the given power `EXP`, round down `FIX`, round up `FUP`, natural
-logarithm `LN`, round down to the nearest whole number `ROUND`, sine `SIN`,
-square root `SQRT`, and tangent `TAN`. Arguments to unary operations which
-take angle measurements (`COS`, `SIN`, and `TAN`) are in degrees. Values returned
-by unary operations which return angle measurements (`ACOS`, `ASIN`, and `ATAN`)
-are also in degrees.
+```GCode
+G1(coordinated move) X10(to this position)
+```
 
 ## Supported commands
 
@@ -146,6 +104,147 @@ both must be given.
 * `X- Y-` - end point of spline (absolute or relative depending on current mode)
 * `I- J-` - relative offset from start point to control point
 
+### M Codes
+
+Command          | Callback              | Description
+-----------------|-----------------------|-----------------------------
+M2               | `gcode_finished()`    | Program end. Resets back to defaults.
+M24              | `wait_for_start()`    | Start/resume a program. Waits for the start input if available.
+M17              | `motors_enable()`     | Switch on motors.
+M18              | `motors_enable()`     | Switch off motors.
+M30              | `gcode_finished()`    | Program end. Resets back to defaults.
+M84              | `motors_enable()`     | Switch off motors.
+M82              | -                     | Set E-axis to absolute.
+M83              | -                     | Set E-axis to relative.
+M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
+M116             | `wait_temperature()`  | Wait for temperature to be reached
+M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
+M106 Snnn        | `set_fanspeed()`      | set speed of fan; 0..255
+M107             | `set_fanspeed(0)`     | switch off fan.
+M111 Snnn        | -                     | Set debug level.
+M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
+M500             | `save_params()`       | Save parameters.
+M501             | `load_params()`       | Load parameters.
+
+### M Codes dealt with by gcode-machine-control
+The standard M-Code are directly handled by the G-code parser and result
+in parametrized callbacks. Other not quite standard G-codes are handled in
+[gcode-machine-control](./gcode-machine-control.c) when receiving
+the `unprocessed()` callback (see API below):
+
+Command          | Description
+-----------------|----------------------------------------
+M0               | Unconditional stop, sets Software E-Stop.
+M3 Sxx           | Spindle On Clockwise at speed Sxx
+M4 Sxx           | Spindle On Counterclockwise at speed Sxx
+M5               | Spindle Off
+M7               | Turn mist on
+M8               | Turn flood on
+M9               | Turn all coolant off
+M10              | Turn on vacuum
+M11              | Turn off vacuum
+M42 Pnn          | Get state of AUX Pin nn.
+M42 Pnn Sxx      | Set AUX Pin nn to value xx
+M62 Pnn          | Set AUX Pin nn to 1
+M63 Pnn          | Set AUX Pin nn to 0
+M64 Pnn          | Set AUX Pin nn to 1; updates immediately, independent of buffered moves.
+M65 Pnn          | Set AUX Pin nn to 0; updates immediately, independent of buffered moves.
+M80              | ATX Power On.
+M81              | ATX Power Off.
+M105             | Get current extruder temperature.
+M114             | Get current position; coordinate units in mm.
+M115             | Get firmware version.
+M117             | Display message.
+M119             | Get endstop status.
+M120             | Enable pause switch detection.
+M121             | Disable pause switch detection.
+M245             | Start cooler
+M246             | Stop cooler
+M355             | Turn case lights on/off
+M400             | Wait for queue to be empty. Equivalent to G4 P0.
+M999             | Clear Software E-Stop.
+
+### Feedrate in Euclidian space
+The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
+understood as representing coordinates in an Euclidian space (not entirely
+unwarranted :) ) and thus applies a feedrate in a way that the resulting
+path sees the given speed in space, not each individual axis:
+
+```GCode
+G28 G1 X100      F100  ; moves X with feedrate 100mm/min
+G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
+```
+
+## Parameters / Variables
+
+BeagleG supportes the use of RS274/NGC parameters which is their wording
+meaning variables that can be used instead of number literals within programs.
+
+Variables/parameters are numbered. A parameter is specified by a pound
+character `#` followed by an integer value.
+Currently parameters 0 to 5399 are supported. Parameter 0 is read-only and
+always evaluates to `0.0f`. Some of the system parameters are used internally,
+these are all in the > 5000 range and should not be used.
+
+Parameter setting is done by:
+* a pound character `#`
+* an integer value between `1` and `5399`
+* an equal sign `=`
+* a real value
+
+For example `#1=123.4` is a parameter setting meaning set parameter 1 to 123.4.
+
+Unlike the [NIST RS274NGC] specification, parameter setting takes effect
+immediately. For example, `G1 #1=10 X#1` will result in a coordinated move
+to X=10.
+
+Parameters are persistent in the parameter file, the `--param` name given to
+`machine-control`.
+
+## Expressions and Binary/Unary Operations
+
+Expressions are also supported along with Binary/Unary operations. An expression
+is a set of character starting with a left bracket `[` and ending with a balanced
+right bracket `]`. In between the brackets are numbers, parameter values,
+mathematical operations, and other expressions. Expressions are evaluated to
+produce a number. An example of an expression is `[1 + cos[0] - [#3 ** [4.0/2]]]`. Numbers starting with `#` expand variables; so the `#3` in the previous example reads the content of variable 3.
+
+### Operators
+
+Binary operations appear only inside excpressions.
+Ther are basic mathematical operations:
+addition `+`, subtraction `-`, multiplication `*`, and division `/`.
+The `MOD` operation is the modulo operation, returning the remainder of a
+division.
+
+The "power" operation `**` of raising the number on the left of the operation
+to the power on the right (e.g. `[5**2]` yields 25).
+
+There are three logical operations: non-exclusive or `OR`, exculsive or `XOR`,
+and logical and `AND`.
+
+A unary operations look like function calls: an operator followed by an
+expression in square brackets providing the parameter; the `ATAN` function
+gets two expressions which are separated by the division operator. The
+trigonometric functions all use degrees to accept (`SIN`, `COS`, `TAN`) or
+return (`ASIN`, `ACOS`, `ATAN`).
+
+The unary operations/functions are:
+
+Operation(s)        | Description
+--------------------|-------------------------------------------------
+`ATAN[y]/[x]`       | Returns the arcustangens of y/x in degrees.
+`ASIN[x]`, `ACOS[x]`| arc sine and cosine of `x` (result in degrees)
+`SIN[x]`, `COS[x]`  | sine, cosine of `x` (parameter in degrees)
+`TAN[x]`            | Tangens of `x` (parameter in degrees).
+`EXP[x]`            | returns e<sup>x</sup>
+`LN[x]`             | Returns natural logarithm.
+`SQRT[x]`           | Return square root of `x`.
+`ABS[v]`            | Returns the absolute value of v
+`ROUND[x]`          | Round to the nearest whole number.
+`FIX[x]`            | Round down. `FIX[0.5]` is 0.0; `FIX[-0.5]` is -1.0
+`FUP[x]`            | Round up. `FUP[0.5]` is 1.0; `FUP[-0.5]` is 0.0
+
 ### Coordinate Systems
 
 #### Machine Origin
@@ -218,75 +317,6 @@ origin.
 So in particular if you are having a machine origin at an inconvenient spot,
 it is a good idea to supply a parameter file to persistently configure your
 coordinate systems.
-
-### M Codes
-
-Command          | Callback              | Description
------------------|-----------------------|-----------------------------
-M2               | `gcode_finished()`    | Program end. Resets back to defaults.
-M24              | `wait_for_start()`    | Start/resume a program. Waits for the start input if available.
-M17              | `motors_enable()`     | Switch on motors.
-M18              | `motors_enable()`     | Switch off motors.
-M30              | `gcode_finished()`    | Program end. Resets back to defaults.
-M84              | `motors_enable()`     | Switch off motors.
-M82              | -                     | Set E-axis to absolute.
-M83              | -                     | Set E-axis to relative.
-M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
-M116             | `wait_temperature()`  | Wait for temperature to be reached
-M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
-M106 Snnn        | `set_fanspeed()`      | set speed of fan; 0..255
-M107             | `set_fanspeed(0)`     | switch off fan.
-M111 Snnn        | -                     | Set debug level.
-M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
-M500             | `save_params()`       | Save parameters.
-M501             | `load_params()`       | Load parameters.
-
-### M Codes dealt with by gcode-machine-control
-The standard M-Code are directly handled by the G-code parser and result
-in parametrized callbacks. Other not quite standard G-codes are handled in
-[gcode-machine-control](./gcode-machine-control.c) when receiving
-the `unprocessed()` callback (see API below):
-
-Command          | Description
------------------|----------------------------------------
-M0               | Unconditional stop, sets Software E-Stop.
-M3 Sxx           | Spindle On Clockwise at speed Sxx
-M4 Sxx           | Spindle On Counterclockwise at speed Sxx
-M5               | Spindle Off
-M7               | Turn mist on
-M8               | Turn flood on
-M9               | Turn all coolant off
-M10              | Turn on vacuum
-M11              | Turn off vacuum
-M42 Pnn          | Get state of AUX Pin nn.
-M42 Pnn Sxx      | Set AUX Pin nn to value xx
-M62 Pnn          | Set AUX Pin nn to 1
-M63 Pnn          | Set AUX Pin nn to 0
-M64 Pnn          | Set AUX Pin nn to 1; updates immediately, independent of buffered moves.
-M65 Pnn          | Set AUX Pin nn to 0; updates immediately, independent of buffered moves.
-M80              | ATX Power On.
-M81              | ATX Power Off.
-M105             | Get current extruder temperature.
-M114             | Get current position; coordinate units in mm.
-M115             | Get firmware version.
-M117             | Display message.
-M119             | Get endstop status.
-M120             | Enable pause switch detection.
-M121             | Disable pause switch detection.
-M245             | Start cooler
-M246             | Stop cooler
-M355             | Turn case lights on/off
-M400             | Wait for queue to be empty. Equivalent to G4 P0.
-M999             | Clear Software E-Stop.
-
-### Feedrate in Euclidian space
-The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
-understood as representing coordinates in an Euclidian space (not entirely
-unwarranted :) ) and thus applies a feedrate in a way that the resulting
-path sees the given speed in space, not each individual axis:
-
-    G28 G1 X100      F100  ; moves X with feedrate 100mm/min
-    G28 G1 X100 Y100 F100  ; moves X and Y with feedrate 100/sqrt(2) ~ 70.7mm/min
 
 ## API
 G-code parsing as provided by [the G-Code parse API](./src/gcode-parser/gcode-parser.h) receives
