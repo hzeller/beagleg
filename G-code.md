@@ -127,6 +127,7 @@ M500             | `save_params()`       | Save parameters.
 M501             | `load_params()`       | Load parameters.
 
 ### M Codes dealt with by gcode-machine-control
+
 The standard M-Code are directly handled by the G-code parser and result
 in parametrized callbacks. Other not quite standard G-codes are handled in
 [gcode-machine-control](./gcode-machine-control.c) when receiving
@@ -181,25 +182,64 @@ BeagleG supportes the use of RS274/NGC parameters which is their wording
 meaning variables that can be used instead of number literals within programs.
 
 Variables/parameters are numbered. A parameter is specified by a pound
-character `#` followed by an integer value.
-Currently parameters 0 to 5399 are supported. Parameter 0 is read-only and
-always evaluates to `0.0f`. Some of the system parameters are used internally,
-these are all in the > 5000 range and should not be used.
+character `#` followed by an integer value. Numbered variables are somewhat
+tedious and a testament to the age of GCode when machines had limited memory.
+To make GCode more readable, BeagleG also allows non-numeric variable names.
+
+For numeric parameters, the range of `#0` to `#5399` is supported.
+Parameter `#0` is read-only and always evaluates to `0.0f`.
+You can use the values from `#0...#4999` freely in any program. Parameters above
+`#5000` are used to store system parameters, so should not be written by
+programs (but you're free to read the variables and use in your expressions).
 
 Parameter setting is done by:
 * a pound character `#`
 * an integer value between `1` and `5399`
+  * And as an extension to NIST: also an alphanumeric identifier is allowed.
 * an equal sign `=`
 * a real value
 
 For example `#1=123.4` is a parameter setting meaning set parameter 1 to 123.4.
 
 Unlike the [NIST RS274NGC] specification, parameter setting takes effect
-immediately. For example, `G1 #1=10 X#1` will result in a coordinated move
-to X=10.
+immediately in the same block. For example, the assignment inside this
+command `G1 #1=10 X#1` and the subsequent use of the value will result in a
+coordinated move to X=10.
+
+You can use the variable in any expressions, but usually GCode would not allow
+to see the value itself easily. To simplify interactive programming, BeagleG
+allows to query a variable: if you write it on a line without assignment, the
+current value is printed in a `//` comment style output:
+
+```
+#1
+// #1 = 123.40000
+```
+
+### Non-numeric
+
+As an extension to the NIST specification, BeagleG allows to use alphanumeric
+variables which will make programming much less tedious
+
+```
+#foo=42
+ok
+#foo
+// #foo = 42.000000
+```
+
+Parameters that start with an underscore (e.g. `#_foo`) are considered 'global'
+and are persisted in the parameter file; they are available with the next
+start-up of BeagleG.
+
+### Persistence
 
 Parameters are persistent in the parameter file, the `--param` name given to
-`machine-control`.
+`machine-control` to be available at the next start-up.
+
+All numerical parameters are stored in the file at the end of the session.
+Of the alphanumeric parameters, only the global values (with names starting
+with `_` underscore) are persisted.
 
 ## Expressions and Binary/Unary Operations
 
