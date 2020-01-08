@@ -116,10 +116,6 @@ public:
     return false;
   }
 
-  void ReportError(int line_no, const std::string &msg) final {
-    Log_error("Line %d: %s", line_no, msg.c_str());
-  }
-
 private:
   bool SetHomePos(int line_no, enum GCodeParserAxis axis,
                   const std::string &value) {

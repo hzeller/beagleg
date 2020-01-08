@@ -398,10 +398,6 @@ public:
     return false;
   }
 
-  void ReportError(int line_no, const std::string &msg) final {
-    Log_error("Line %d: %s", line_no, msg.c_str());
-  }
-
 private:
   bool SetAuxMapping(int line_no, int aux_number, const std::string &value) {
     NamedOutput output;

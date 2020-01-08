@@ -29,6 +29,42 @@
 #include "common/logging.h"
 #include "common/string-util.h"
 
+// Parse a super-simple multiplicative expression.
+static double ParseDoubleExpression(const char *input, double fallback,
+                                    char **end) {
+  const char *full_expr = input;
+  double value = strtod(input, end);
+  if (*end == input) return fallback;
+  for (;;) {
+    while (isspace(**end)) ++*end;
+    const char op = **end;
+    if (op != '/' && op != '*') {
+      return value;  // done. Not an operation.
+    }
+    ++*end;
+    while (isspace(**end)) ++*end;
+    input = *end;
+    double operand;
+    if (*input == '(') {
+      operand = ParseDoubleExpression(input+1, 1.0, end);
+      if (**end != ')') {
+        fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
+        return fallback;
+      } else {
+        ++*end;
+      }
+    } else {
+      operand = strtod(input, end);
+    }
+    if (*end == input) return fallback;
+    if (op == '/')
+      value /= operand;
+    else if (op == '*')
+      value *= operand;
+  }
+  return value;
+}
+
 bool ConfigParser::Reader::ParseString(const std::string &value,
                                        std::string *result) {
   *result = value;
@@ -70,44 +106,8 @@ bool ConfigParser::Reader::ParseFloatExpr(const std::string &value,
   return false;
 }
 
-double ConfigParser::Reader::ParseDoubleExpression(const char *input,
-                                                   double fallback,
-                                                   char **end) {
-  const char *full_expr = input;
-  double value = strtod(input, end);
-  if (*end == input) return fallback;
-  for (;;) {
-    while (isspace(**end)) ++*end;
-    const char op = **end;
-    if (op != '/' && op != '*') {
-      return value;  // done. Not an operation.
-    }
-    ++*end;
-    while (isspace(**end)) ++*end;
-    input = *end;
-    double operand;
-    if (*input == '(') {
-      operand = ParseDoubleExpression(input+1, 1.0, end);
-      if (**end != ')') {
-        fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
-        return fallback;
-      } else {
-        ++*end;
-      }
-    } else {
-      operand = strtod(input, end);
-    }
-    if (*end == input) return fallback;
-    if (op == '/')
-      value /= operand;
-    else if (op == '*')
-      value *= operand;
-  }
-  return value;
-}
-
 void ConfigParser::Reader::ReportError(int line_no, const std::string &msg) {
-  Log_error("%d: %s", line_no, msg.c_str());
+  Log_error("Line %d: %s", line_no, msg.c_str());
 }
 
 ConfigParser::ConfigParser() : parse_success_(true) {}
@@ -121,12 +121,13 @@ bool ConfigParser::SetContentFromFile(const char *filename) {
   return file_stream.good();
 }
 
-void ConfigParser::SetContent(const std::string &content) {
+void ConfigParser::SetContent(StringPiece content) {
   parse_success_ = true;
-  content_ = content;
+  content_ = content.ToString();
 }
 
-// Extract next line out of source. Takes
+// Extract next line out of source; returns line, modifies "source"
+// to point to next
 // Modifies source.
 static StringPiece NextLine(StringPiece *source) {
   StringPiece result;
@@ -135,12 +136,12 @@ static StringPiece NextLine(StringPiece *source) {
   const StringPiece::iterator start = source->begin();
   StringPiece::iterator endline = start;
   for (/**/; endline != source->end(); ++endline) {
-    // Whatever comes first terminates our line.
+    // Whatever newline or comment comes first terminates our resulting line...
     if (!result.data() &&
         (*endline == '#' || *endline == '\r' || *endline == '\n')) {
       result.assign(start, endline - start);
     }
-    if (*endline == '\n') {
+    if (*endline == '\n') { // ... but we wait until \n to reposition source
       source->assign(endline + 1, source->length() - (endline - start) - 1);
       return result;
     }
@@ -151,7 +152,7 @@ static StringPiece NextLine(StringPiece *source) {
   return result;
 }
 
-static std::string CanonicalizeName(const StringPiece &s) {
+static std::string CanonicalizeName(const StringPiece s) {
   return ToLower(TrimWhitespace(s));
 }
 
@@ -181,7 +182,7 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
         continue;
       }
 
-      StringPiece section = line.substr(1, line.length() - 2);
+      const StringPiece section = line.substr(1, line.length() - 2);
       current_section = CanonicalizeName(section);
       current_section_interested = reader->SeenSection(line_no, current_section);
     }
@@ -193,17 +194,18 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
         continue;
       }
       if (current_section_interested) {
-        std::string name = CanonicalizeName(StringPiece(line.begin(),
-                                                        eq_pos - line.begin()));
-        StringPiece value_piece
+        const std::string name = CanonicalizeName(
+          StringPiece(line.begin(), eq_pos - line.begin()));
+        const StringPiece value_piece
           = TrimWhitespace(StringPiece(eq_pos + 1, line.end() - eq_pos - 1));
         std::string value = value_piece.ToString();
         bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {
-          reader->ReportError(line_no,
-                              StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
-                                           current_section.c_str(),
-                                           name.c_str(), value.c_str()));
+          reader->ReportError(
+            line_no,
+            StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
+                         current_section.c_str(),
+                         name.c_str(), value.c_str()));
         }
         success &= could_parse;
       }

@@ -19,12 +19,17 @@
 #ifndef _BEAGLEG_CONFIG_PARSER_H
 #define _BEAGLEG_CONFIG_PARSER_H
 
-#include <map>
 #include <string>
 #include <vector>
 
+#include "common/string-util.h"
+
+// The config parser reads a configuration file and passes tokenized
+// values to a ConfigParser::Reader.
 class ConfigParser {
 public:
+  // A reader has to be implemented by a subsystem that needs configuration
+  // from the file.
   class Reader {
   public:
     virtual ~Reader() {}
@@ -44,6 +49,7 @@ public:
     virtual void ReportError(int line_no, const std::string &msg);
 
   protected:
+    // Convenience functions that can be used in derived readers.
     // All the Accept() functions are done in the way that they always return
     // 'true' if the expected name is not matched, otherwise they return the
     // outcome of parsing the value. That way, they can be chained with &&
@@ -51,8 +57,6 @@ public:
     static bool ParseInt(const std::string &value, int *result);
     static bool ParseBool(const std::string &value, bool *result);
     static bool ParseFloatExpr(const std::string &value, float *result);
-
-    static double ParseDoubleExpression(const char *input, double fallback, char **end);
   };
 
   // Create a config parser.
@@ -68,17 +72,29 @@ public:
   // Set content of configuration file as one string. Typically useful in
   // unit tests.
   // Overwrites any previous content.
-  void SetContent(const std::string &content);
+  void SetContent(StringPiece content);
 
-  // Emit configuration values to the Reader. Returns 'true' if
-  // configuration file could be parsed (no syntax errors, and all calls to
-  // SeenNameValue() returned true).
-  // Reader is not taken over.
+  // Emit configuration values to the Reader for all sections it is interested
+  // in.
+  //
+  // This method can be called many times with different Readers. The
+  // ConfigParser is handed to various subsystems of the machine-config for
+  // each of them to configure itself. This allows the ConfigParser to focus on
+  // tokenization and the configured subsections to ingest name/values.
+  //
+  // The parser informes the reader about new sections it has seen
+  // (calling SeenSection()) and asks if the reader is interested in
+  // name/value pairs in that section. If so, it provides the reader with these
+  // calling SeenNameValue().
+  //
+  // Returns 'true' if configuration file could be parsed (no syntax errors,
+  // and all calls to SeenNameValue() returned true).
+  //
+  // Reader-ownership is not taken over.
   bool EmitConfigValues(Reader *reader);
 
 private:
   std::string content_;
   bool parse_success_;
-  std::map<std::string, bool> claimed_sections_;
 };
 #endif // _BEAGLEG_CONFIG_PARSER_H
