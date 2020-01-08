@@ -94,8 +94,9 @@ bool GCodeParser::Config::SaveParams() const {
   // simply copy them to a temporary structure that sorts them numerically.
   std::map<int, float> numeric_params;
   for (const auto name_value : *parameters) {
+    if (name_value.first.empty()) continue;   // Should not happen.
     if (!isdigit(name_value.first[0]))
-      break;
+      break;   // last one with digit.
     numeric_params[atoi(name_value.first.c_str())] = name_value.second;
   }
 
@@ -111,6 +112,7 @@ bool GCodeParser::Config::SaveParams() const {
   // Now, all the non-numeric parmeters
   int start_alpha = pcount;
   for (const auto name_value : *parameters) {
+    if (name_value.first.empty()) continue;      // Should not happen.
     if (isdigit(name_value.first[0])) continue;  // Numeric: already written
     if (name_value.first[0] != '_') continue;    // Only write global parameters
     if (name_value.second == 0) continue;        // Don't write boring zeroes.
