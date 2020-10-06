@@ -49,7 +49,7 @@ valgrind-test: $(UNITTEST_BINARIES)
 
 
 %_test: %_test.o $(GENLIB) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(GENLIB) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(GENLIB) $(TEST_FRAMEWORK_OBJECTS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@

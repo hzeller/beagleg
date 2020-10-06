@@ -127,7 +127,7 @@ $(PRU_BIN) : motor-interface-constants.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
 %_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) $(COMMON_LIBS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(LDFLAGS) $(TEST_FRAMEWORK_OBJECTS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(TEST_FRAMEWORK_OBJECTS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
