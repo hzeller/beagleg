@@ -92,16 +92,6 @@ struct VisualizationOptions {
 };
 
 // G-code rendering
-static constexpr char kGcodeMoveColor[] = "0 0 0";
-static constexpr char kGcodeRapidMoveColor[] = "0.7 0.7 0.7";
-static constexpr char kGcodeOriginMarkColor[] = "0.5 0.5 0.8";
-static constexpr char kGcodeOriginTextColor[] = "0 0 0";
-static constexpr char kGcodeGridColor[] = "0.7 0.7 0.9";
-
-// Machine movement rendering.
-static constexpr char kOutOfRangeColor[] = "1 0.5 0.5";
-static constexpr char kMachineMoveColor[] = "0.6 0.6 0.6";
-
 static constexpr char kInchFormat[] = "%.3f";        // w/o unit
 static constexpr char kInchUnitFormat[] = "%.3f\"";  // w/ unit
 
@@ -120,7 +110,7 @@ static const std::map<std::string, const char *> kNamedViews = {
 
 namespace {
 extern const char *viridis_colors[];
-extern const char *kPSHeader;
+extern const char kPSHeader[];
 }
 
 // Our classes generally work in two phases. Use some symbolic names here for
@@ -172,6 +162,7 @@ public:
     if (opts_.include_machine_origin) RememberMinMax(machine_origin_);
     just_homed_ = true;
   }
+
   void inform_origin_offset(const AxesRegister& axes, const char *n) final {
     if (pass_ == ProcessingStep::GenerateOutput) {
       ShowNamedOrigin(axes, n);
@@ -203,7 +194,7 @@ public:
     } else {
       if (rapid != last_move_rapid_) {
         fprintf(file_, "%s switch-color %.3f setlinewidth %% %s move\n",
-                rapid ? kGcodeRapidMoveColor : kGcodeMoveColor,
+                rapid ? "GcodeRapidMoveColor" : "GcodeMoveColor",
                 rapid ? 0.0 : GetDiagonalLength() / 1000.0,
                 rapid ? "G0 rapid" : "G1 coordinated");
         last_move_rapid_ = rapid;
@@ -239,7 +230,8 @@ public:
       fprintf(file_,
               "stroke currentpoint3d\n"  // remember for after the place
               "currentpoint3d gsave moveto3d\n\t "   // save restore
-              "[%.3f] 0 setdash %.3f setlinewidth 0.8 0.8 1 setrgbcolor\n"
+              "[%.3f] 0 setdash %.3f setlinewidth "
+              "CurveHelpLinesColor setrgbcolor\n"
               "\t%f %f %f lineto3d %f %f %f lineto3d stroke\n"
               "\tgrestore %% end show radius\n"
               "moveto3d %% go back to last currentpoint3d\n",
@@ -261,7 +253,8 @@ public:
       fprintf(file_,
               "stroke currentpoint3d\n"  // remember for after the place
               "currentpoint3d gsave moveto3d\n\t "   // save restore
-              "[%.3f] 0 setdash %.3f setlinewidth 0.8 0.8 1 setrgbcolor\n"
+              "[%.3f] 0 setdash %.3f setlinewidth "
+              "CurveHelpLinesColor setrgbcolor\n"
               "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
               "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
               "\tgrestore %% end show control points\n"
@@ -400,7 +393,32 @@ public:
       fprintf(file_, "/animation-frames %d def\n", animation_frames);
     }
 
-    fprintf(file_, "%s", kPSHeader);
+    fputs(kPSHeader, file_);
+  }
+
+  void PrintColorChoice(const char *fixed_color) {
+    struct Col { const char* color; const char *default_value; };
+    static constexpr Col kDefaultColors[] = {
+      {"/GcodeMoveColor",       "0 0 0"},
+      {"/TitleColor",           "0.7 0.7 0.7"},
+      {"/GcodeRapidMoveColor",  "0.7 0.7 0.7"},
+      {"/GcodeOriginMarkColor", "0.5 0.5 0.8"},
+      {"/GcodeOriginTextColor", "0 0 0"},
+      {"/GcodeGridColor",       "0.7 0.7 0.9"},
+      {"/OutOfRangeColor",      "1 0.5 0.5"},
+      {"/MachineMoveColor",     "0.6 0.6 0.6"},
+      {"/CurveHelpLinesColor",  "0.8 0.8 1"},
+      {"/XAxisColor",           "0.8 0.4 0.4"},
+      {"/YAxisColor",           "0.4 0.8 0.4"},
+      {"/ZAxisColor",           "0.4 0.4 0.8"},
+    };
+
+    fprintf(file_, "%% -- Color choices\n");
+    for (auto c : kDefaultColors) {
+      fprintf(file_, "%s { %s } def\n",
+              c.color, fixed_color ? fixed_color : c.default_value);
+    }
+    fprintf(file_, "\n\n");
   }
 
   static float start_grid(float min_value, float grid) {
@@ -411,7 +429,7 @@ public:
 
   void DrawGrid(float d) {
     fprintf(file_, "\n%% -- Grid\n");
-    fprintf(file_, "%s setrgbcolor 0 setlinewidth\n", kGcodeGridColor);
+    fprintf(file_, "GcodeGridColor setrgbcolor 0 setlinewidth\n");
     for (float x = start_grid(min_[AXIS_X], d) ; x < max_[AXIS_X]; x += d) {
       fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
               x, min_[AXIS_Y], min_[AXIS_Z], x, max_[AXIS_Y], min_[AXIS_Z]);
@@ -471,15 +489,15 @@ public:
 
     // Primary axes.
     fprintf(file_, "\n%% -- Solid X/Y/Z marking min-axes...\n");
-    fprintf(file_, "0.4 1 0.4 setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
-            min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_, "1 0.4 0.4 setrgbcolor "
+    fprintf(file_, "XAxisColor setrgbcolor "
             "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
             min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
             max_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_, "0.4 0.4 1 setrgbcolor "
+    fprintf(file_, "YAxisColor setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
+            min_[AXIS_X], max_[AXIS_Y], min_[AXIS_Z]);
+    fprintf(file_, "ZAxisColor setrgbcolor "
             "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
             min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z],
             min_[AXIS_X], min_[AXIS_Y], max_[AXIS_Z]);
@@ -497,41 +515,43 @@ public:
 
   void ShowMesaureLines() {
     fprintf(file_, "\n%% -- Measurement lines\n");
+    fprintf(file_, "/measurement-lines {\n");
     const float size = opts_.relative_font_size * GetDiagonalLength();
-    fprintf(file_, "%.1f setlinewidth\n", size/20);
+    fprintf(file_, "    %.1f setlinewidth\n", size/20);
 
     // Various functions to draw into directon of the axis on given
     // plane.
     // TODO(hzeller): depending on view angle, we might choose different
     // planes to draw stuff on.
     auto x_xy_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "%.3f %.3f %.3f %s\n",
+      fprintf(file_, "    %.3f %.3f %.3f %s\n",
               min_[AXIS_X] + x, min_[AXIS_Y] - 1.5*size + y,
               min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
     auto y_xy_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "%.3f %.3f %.3f %s\n",
+      fprintf(file_, "    %.3f %.3f %.3f %s\n",
               min_[AXIS_X] -y - 1.5*size,
               min_[AXIS_Y] + x, min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
     auto z_yz_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "%.3f %.3f %.3f %s\n",
+      fprintf(file_, "     %.3f %.3f %.3f %s\n",
               min_[AXIS_X], max_[AXIS_Y]+y+1.5*size,
               x + min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
 #if 0
     auto z_xz_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "%.3f %.3f %.3f %s\n",
+      fprintf(file_, "    %.3f %.3f %.3f %s\n",
               min_[AXIS_X]-y-1.5*size, max_[AXIS_Y],
               x + min_[AXIS_Z],
               do_line ? "lineto3d" : "moveto3d");
     };
 #endif
     if (!opts_.show_title.empty()) {
-      fprintf(file_, "0.7 0.7 0.7 setrgbcolor\n");
+      fprintf(file_, "    %% -- Title '%s'\n", opts_.show_title.c_str());
+      fprintf(file_, "    TitleColor setrgbcolor\n");
       float text_size = size * 0.7;
       const float text_width = TextWidth(opts_.show_title, text_size);
       const float max_x_space = (max_[AXIS_X] - min_[AXIS_X]) - 2*size;
@@ -539,30 +559,31 @@ public:
         text_size *= max_x_space / text_width;
       DrawText(opts_.show_title, size, 0.3*size,
                TextAlign::kLeft, text_size, x_xy_draw);
-      fprintf(file_, "stroke\n");
+      fprintf(file_, "    stroke %% end title\n");
     }
-    fprintf(file_, "0.8 0 0 setrgbcolor               %% X-axis\n");
+    fprintf(file_, "    XAxisColor setrgbcolor               %% X-axis\n");
     MeasureLine(min_[AXIS_X], max_[AXIS_X], size, !prefer_inch_, x_xy_draw);
-    fprintf(file_, "stroke 0 0.8 0 setrgbcolor        %% Y-Axis\n");
+    fprintf(file_, "    stroke\n\n    YAxisColor setrgbcolor      %% Y-Axis\n");
     MeasureLine(min_[AXIS_Y], max_[AXIS_Y], size, !prefer_inch_, y_xy_draw);
-    fprintf(file_, "stroke 0 0 0.8 setrgbcolor        %% Z-Axis\n");
+    fprintf(file_, "    stroke\n\n    ZAxisColor setrgbcolor      %% Z-Axis\n");
     MeasureLine(min_[AXIS_Z], max_[AXIS_Z], size, !prefer_inch_, z_yz_draw);
-    fprintf(file_, "stroke 0 0 0 setrgbcolor\n");
+    fprintf(file_, "     stroke\n\n    0 0 0 setrgbcolor\n");
+    fprintf(file_, "} def\n");
+    fprintf(file_, "measurement-lines\n");
   }
 
   void ShowNamedOrigin(const AxesRegister &origin, const char *named) {
     fprintf(file_, "\n%% -- Origin %s\n", named);
     const float size = opts_.relative_font_size * GetDiagonalLength() / 2;
     fprintf(file_, "currentpoint3d stroke gsave "
-            "%s setrgbcolor 0 setlinewidth ",
-            kGcodeOriginTextColor);
+            "GcodeOriginTextColor setrgbcolor 0 setlinewidth ");
     DrawText(named, 0, size, TextAlign::kCenter, 1.5*size,
              [this, origin](bool d, float x, float y) {
                fprintf(file_, "%.3f %.3f %.3f %s\n",
                        origin[AXIS_X] + x, origin[AXIS_Y] + y, origin[AXIS_Z],
                        d ? "lineto3d" : "moveto3d");
              });
-    fprintf(file_, "stroke %s setrgbcolor\n", kGcodeOriginMarkColor);
+    fprintf(file_, "stroke GcodeOriginMarkColor setrgbcolor\n");
     const float x = origin[AXIS_X];
     const float y = origin[AXIS_Y];
     const float z = origin[AXIS_Z];
@@ -588,15 +609,14 @@ public:
     fprintf(file_, "\n%% -- Machine home\n");
     const float size = GetDiagonalLength() / 200;  // 0.5%
     fprintf(file_, "currentpoint3d stroke gsave "
-            "%s setrgbcolor %.3f setlinewidth ",
-            kGcodeOriginMarkColor, size);
-    fprintf(file_, "1 0 0 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "GcodeOriginMarkColor setrgbcolor %.3f setlinewidth ", size);
+    fprintf(file_, "XAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
             "stroke %% X\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
             origin[AXIS_X] + 10*size, origin[AXIS_Y], origin[AXIS_Z]);
-    fprintf(file_, "0 1 0 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+    fprintf(file_, "YAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
             "stroke %% Y\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
             origin[AXIS_X], origin[AXIS_Y] + 10*size, origin[AXIS_Z]);
-    fprintf(file_, "0 0 1 setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+    fprintf(file_, "ZAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
             "stroke %% Z\n", origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
             origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z] + 10*size);
 
@@ -673,7 +693,7 @@ public:
     fprintf(file_, "tool-diameter setlinewidth\n");
     fprintf(file_, "0 0 0 moveto3d\n");
     if (!opts_.show_speeds) {
-      fprintf(file_, "%s setrgbcolor\n", kMachineMoveColor);
+      fprintf(file_, "MachineMoveColor setrgbcolor\n");
     }
     fprintf(file_, "1 setlinejoin\n");
 
@@ -826,7 +846,7 @@ public:
             last_color_index_ = col_idx;
           }
         } else {
-          new_color = kOutOfRangeColor;
+          new_color = "OutOfRangeColor";
         }
         if (new_color) {
           fprintf(file_, "%s switch-color ", new_color);
@@ -849,7 +869,7 @@ public:
       if (last_outside_machine_cube != is_valid_position) {
         // only print changes.
         fprintf(file_, "%s setrgbcolor ",
-                is_valid_position ? kMachineMoveColor : kOutOfRangeColor);
+                is_valid_position ? "MachineMoveColor" : "OutOfRangeColor");
         last_outside_machine_cube = is_valid_position;
       }
       fprintf(file_, "%f %f %f lineto3d %% %d %d %d\n",
@@ -1260,6 +1280,7 @@ int main(int argc, char *argv[]) {
     scale, bounding_box_width_mm);
 
   gcode_printer.PrintHeader(printMargin, eye_distance, animation_frames);
+  gcode_printer.PrintColorChoice(nullptr);
 
   if (animation_frames > 0) {
     // In case we do animations, we want to stuff all the postscript in one
@@ -1641,7 +1662,7 @@ const char *viridis_colors[] = {
   "0.993248 0.906157 0.143936"
 };
 
-const char *kPSHeader = R"(
+const char kPSHeader[] = R"(
 % Internal 3D currentpoint register.
 /last_x 0 def
 /last_y 0 def
