@@ -17,7 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "motor-operations.h"
+#include "motion-queue-motor-operations.h"
 
 #include <assert.h>
 #include <errno.h>

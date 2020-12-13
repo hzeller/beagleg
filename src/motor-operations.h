@@ -19,9 +19,6 @@
 #ifndef _BEAGLEG_MOTOR_OPERATIONS_H_
 #define _BEAGLEG_MOTOR_OPERATIONS_H_
 
-#include <stdio.h>
-#include <deque>
-
 enum {
   BEAGLEG_NUM_MOTORS = 8
 };
@@ -76,32 +73,6 @@ public:
   virtual bool GetPhysicalStatus(PhysicalStatus *status) = 0;
 
   virtual void SetExternalPosition(int axis, int steps) = 0;
-};
-
-class HardwareMapping;
-class MotionQueue;
-
-class MotionQueueMotorOperations : public MotorOperations {
-public:
-  // Initialize motor operations, sending planned results into the motion backend.
-  MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend);
-  ~MotionQueueMotorOperations() override;
-
-  bool Enqueue(const LinearSegmentSteps &segment) final;
-  void MotorEnable(bool on) final;
-  void WaitQueueEmpty() final;
-  bool GetPhysicalStatus(PhysicalStatus *status) final;
-  void SetExternalPosition(int axis, int pos) final;
-
-private:
-  bool EnqueueInternal(const LinearSegmentSteps &param,
-                       int defining_axis_steps);
-
-  HardwareMapping *const hardware_mapping_;
-  MotionQueue *backend_;
-
-  struct HistorySegment;
-  std::deque<struct HistorySegment> *shadow_queue_;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

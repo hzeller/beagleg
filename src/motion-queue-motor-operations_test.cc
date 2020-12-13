@@ -5,6 +5,7 @@
  * retrieved.
  *
  */
+#include "motion-queue-motor-operations.h"
 #include "motion-queue.h"
 
 #include <stdio.h>

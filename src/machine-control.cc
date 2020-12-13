@@ -45,11 +45,12 @@
 #include "gcode-parser/gcode-parser.h"
 #include "gcode-parser/gcode-streamer.h"
 #include "hardware-mapping.h"
+#include "motion-queue-motor-operations.h"
 #include "motion-queue.h"
 #include "motor-operations.h"
 #include "pru-hardware-interface.h"
-#include "sim-firmware.h"
 #include "sim-audio-out.h"
+#include "sim-firmware.h"
 #include "spindle-control.h"
 
 static int usage(const char *prog, const char *msg) {
