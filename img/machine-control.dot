@@ -63,7 +63,7 @@ digraph beagleg {
 		MotorOperations -> GCode2PS;
 		//MotorOperations -> PrintStats;
 		PRUMotionQueue -> PruHardwareInterface;
-		PruHardwareInterface -> PRU [ label = " Host -> PRU\lringbuffer"];
+		PruHardwareInterface -> PRU [ label = " Host → PRU\lringbuffer"];
 	}
 
 	{
