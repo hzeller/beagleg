@@ -14,11 +14,17 @@ digraph beagleg {
 		GCodeMachineControl [ label = "GCodeMachineControl\nGCode Actions"];
 		HardwareMapping;
 		Planner;
-		MotorOperations  [label = "MotorOperations\nConvert segments\ninto firmware commands"];
+
+		MotorOperations  [label = "MotorOperations\nPass LinearSegmentSteps\nto backend"];
+
+		MotionQueueMotorOperations  [label = "MotionQueueMotorOperations\nConvert segments\ninto MotionSegment commands\nfor MotionQueue implementations."];
+
 		DummyMotionQueue [label = "DummyMotionQueue\nfor dryrun.", style=dotted];
 		PRUMotionQueue;
 		SimFirmwareQueue [label = "SimFirmwareQueue\nSimulating PRU", style=dotted];
 		GCode2PS [ style=dotted];
+		//PrintStats [ style=dotted, label="gcode-print-stats\nutility"];
+
 		PruHardwareInterface;
 	}
 
@@ -48,12 +54,14 @@ digraph beagleg {
 
 		Planner -> MotorOperations [ label = " Delta LinearSegmentSteps\l Step coordinates.\l Logic axes assigned to motors 1, 2, 3..." ]
 		// Various MotorOperations backends
-		MotorOperations -> PRUMotionQueue [ label = " MotionSegment\lPrepared for PRU"]
-		MotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
-		MotorOperations -> DummyMotionQueue;
+		MotorOperations -> MotionQueueMotorOperations
+		MotionQueueMotorOperations -> PRUMotionQueue;
+		MotionQueueMotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
+		MotionQueueMotorOperations -> DummyMotionQueue;
 		MotorOperations -> GCode2PS;
+		//MotorOperations -> PrintStats;
 		PRUMotionQueue -> PruHardwareInterface;
-		PruHardwareInterface -> PRU [ label = "Host -> PRU\lringbuffer"];
+		PruHardwareInterface -> PRU [ label = " Host -> PRU\lringbuffer"];
 	}
 
 	{

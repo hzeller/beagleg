@@ -240,8 +240,22 @@ coordinated move.
 Type: `{int motor_steps[], float start_steps_per_sec, float end_steps_per_sec}`
 
 #### MotorOperations
-Takes the motor movement requests and converts them into fast-to-be-executed
-instructions for the hardware.
+Queue that takes the linear segment requests and passes them to a hardware
+backend generating the steps.
+
+Also provides a way to query where exactly the motor position is at
+any given time to be able to be ready for e-stop/pause/resume operations.
+
+#### MotionQueueMotorOperations
+
+This implementation of MotorOperations is an intermediate that converts line segements
+into parameters used by the current hardware implementations to generate steps.
+Passes this on to `MotionQueue`.
+
+*TODO: Naming. Since the MotionSegment struct is very specific to the step delay
+calcualations via a Taylor series, this should be better reflected. There will be
+other sample-based backends implemented in an FPGA, that use entirely different
+parameters.*
 
 Might need to break up longer segments into multiple as each can
 be at most 64k steps (due to the limits imposed by the fixed-point integer
@@ -249,19 +263,20 @@ arithmetic).
 Prepares parameters needed for the hardware to calculate the timings between
 steps using a Taylor-series.
 
-Also implements means to track where exactly the motor position is at
-any given time to be able to be ready for e-stop/pause/resume operations.
-
 Output: various parameters in a packed struct to be enqueued to the hardware
-ring-buffer (Type: `struct MotionSegment`).
+(Type: `struct MotionSegment`); the receiving type is a MotionQueue.
 
 #### MotionQueue
-This receives the hardware parameters from the MotorOperations and executes
+
+This receives the hardware parameters from the `MotorQueueMotorOperations` and executes
 it in some micro-controller or FPGA; in this first implementation, this is
 the PRU in the BeagleBone. The `PRUMotionQueue` is the object on the host
 side communicating via a RingBuffer (residing in PRU SRAM); the PRU side is
 a fairly simple program implemented in assembly. This can be various
 implementations.
+
+There is also a motion queue implementation that simulates the firmware and outputs
+data for graphical inspection (`SimFirmwareQueue`).
 
 ### APIs
 The functionality is implemented in a stack of independently usable APIs.

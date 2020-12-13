@@ -22,8 +22,6 @@
 #include <stdio.h>
 #include <deque>
 
-class MotionQueue;
-
 enum {
   BEAGLEG_NUM_MOTORS = 8
 };
@@ -81,6 +79,8 @@ public:
 };
 
 class HardwareMapping;
+class MotionQueue;
+
 class MotionQueueMotorOperations : public MotorOperations {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
