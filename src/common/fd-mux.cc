@@ -29,18 +29,28 @@
 
 #include "logging.h"
 
-static volatile sig_atomic_t caught_signal = 0;
+// A signal that should trigger exiting the loop
+static volatile sig_atomic_t caught_exit_trigger_signal = 0;
+
+// A signal that is harmless for our context and shall be ignored.
+static volatile sig_atomic_t caught_ignored_signal = 0;
 
 static void receive_signal(int signo) {
   static const char msg[] = "Caught signal. Shutting down ASAP.\n";
-  if (!caught_signal) {
+  if (!caught_exit_trigger_signal) {  // only print message once.
     write(STDERR_FILENO, msg, sizeof(msg));
   }
-  caught_signal = 1;
+  caught_exit_trigger_signal = 1;
+}
+
+static void ignore_signal(int signo) {
+  caught_ignored_signal = 1;
 }
 
 static void arm_signal_handler() {
-  caught_signal = 0;
+  caught_exit_trigger_signal = 0;
+  caught_ignored_signal = 0;
+
   struct sigaction sa = {};
   sa.sa_handler = receive_signal;
 
@@ -55,6 +65,10 @@ static void arm_signal_handler() {
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
   sigaction(SIGFPE, &sa, NULL);
+
+  // Yet others, we want to ignore completely.
+  sa.sa_handler = ignore_signal;
+  sigaction(SIGPIPE, &sa, NULL);
 }
 
 static void disarm_signal_handler() {
@@ -123,8 +137,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
 
   int fds_ready = select(maxfd + 1, &read_fds, &write_fds, nullptr, &timeout);
   if (fds_ready < 0) {
-    if (!caught_signal)
-      perror("select() failed");
+    if (!caught_exit_trigger_signal) perror("select() failed");
     return false;
   }
 
@@ -146,10 +159,13 @@ int FDMultiplexer::Loop() {
   const unsigned timeout = idle_ms_;
 
   arm_signal_handler();
-  while (SingleCycle(timeout) && !caught_signal) {
-    /**/
+  while (SingleCycle(timeout) && !caught_exit_trigger_signal) {
+    if (caught_ignored_signal) {
+      Log_info("Caught SIGPIPE. Ignored.\n");
+      caught_ignored_signal = 0;
+    }
   }
   disarm_signal_handler();
 
-  return caught_signal ? 1 : 0;
+  return caught_exit_trigger_signal ? 1 : 0;
 }

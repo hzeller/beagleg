@@ -19,6 +19,7 @@
 #include "gcode-streamer.h"
 
 #include <fcntl.h>
+#include <string.h>
 
 #include "common/logging.h"
 
@@ -68,7 +69,10 @@ bool GCodeStreamer::ReadData() {
   const ssize_t data_read = line_tokenize_buffer_.Update(connection_fd_);
 
   if (data_read <= 0) {
-    if (data_read < 0) Log_error("Error reading from stream. Treating as EOF");
+    if (data_read < 0) {
+      Log_error("Error reading from stream (%s). Treating as EOF.",
+                strerror(errno));
+    }
     Log_info("Reached EOF.");
 
     // Parse any potentially remaining gcode from previous connections.
