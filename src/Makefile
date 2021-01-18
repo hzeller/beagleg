@@ -113,14 +113,14 @@ local-valgrind-tests: $(UNITTEST_BINARIES)
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
 
 test: local-tests
-	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test ; done
+	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test || exit 1; done
 
 coverage:
 	LDFLAGS="-fprofile-arcs -ftest-coverage" BEAGLEG_OPT_CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" make test
 	gcovr -r . --html --html-details -e ".*_test.cc" -p -o coverage.html
 
 valgrind-test: local-valgrind-tests
-	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test ; done
+	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test || exit 1; done
 
 $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
