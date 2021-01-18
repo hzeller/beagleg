@@ -64,12 +64,15 @@ void GCodeStreamer::CloseStream() {
 
 // New data to be fed into the linebuffer
 bool GCodeStreamer::ReadData() {
-  // Update buffer
-  if (reader_.Update(connection_fd_) == 0) {
+  // Update buffer with fresh data
+  const ssize_t data_read = line_tokenize_buffer_.Update(connection_fd_);
+
+  if (data_read <= 0) {
+    if (data_read < 0) Log_error("Error reading from stream. Treating as EOF");
     Log_info("Reached EOF.");
 
     // Parse any potentially remaining gcode from previous connections.
-    const char *line = reader_.IncompleteLine();
+    const char *line = line_tokenize_buffer_.IncompleteLine();
     if (line) {
       parser_->ParseBlock(line, msg_stream_);
     }
@@ -83,7 +86,7 @@ bool GCodeStreamer::ReadData() {
 
   is_processing_ = true;
   const char *line;
-  while ((line = reader_.ReadLine())) {
+  while ((line = line_tokenize_buffer_.ReadAndConsumeLine())) {
     // NOTE:(important)
     // This should return true or false in case the line was movement or not
     // and only if is, reset the timer.

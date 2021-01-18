@@ -23,9 +23,23 @@
 #include <functional>
 #include <unistd.h>
 
-// A reader to be used in conjunction with file descriptor event management
-// such as select() or poll(). Whenever a file descriptor is readable, it can
-// be used to udpate this LinebufReader.
+// Tokenizes a non-contiguous sequence of incoming data into lines.
+//
+// A buffer that can be updated with new bytes and then allows for extracting
+// lines separated by newlines up to that point.
+//
+// This is to be used in conjunction with file descriptor event management
+// such as select() or poll() which yield a random amount of bytes from a
+// file-descriptor.
+//
+// Usage:
+// void NewDataReady() {
+//   reader.Update(/* with new data, see method signatures */);
+//   // Get all the lines we have available now
+//   while ((line = reader.ReadAndConsumeLine()) {
+//      // do something with line
+//   }
+// }
 class LinebufReader {
 public:
   // A function to read from some data source. Similar to read(2), it gets
@@ -46,11 +60,12 @@ public:
   // been waiting.
   // If you made sure that there is data available before calling Update(),
   // this will not block.
-  int Update(ReadFun read_fun);
+  // Returns the value returned by ReadFun.
+  ssize_t Update(ReadFun read_fun);
 
   // The tpical way this will be called: with a file descriptor that has some
   // bytes ready.
-  int Update(int fd) {
+  ssize_t Update(int fd) {
     return Update([fd](char *buf, size_t len) {
             return read(fd, buf, len);
            });
@@ -58,11 +73,17 @@ public:
 
   // Return a current line if it is available. The line is a nul terminated
   // c-string without the newline character(s).
+  //
   // If there is no current line pending, or it is incomplete, returns NULL.
   // It is a good idea to call this after a call to Update() in a loop until
   // you reach NULL to empty the buffer before the next Update() comes in.
-  const char* ReadLine();
+  //
+  // Returned data is only valid until next call to Update() or
+  // ReadAndConsumeLine()..
+  const char* ReadAndConsumeLine();
 
+  // Get the current incomplete line. This is useful to receive the final
+  // data when finishing in case of a missing newline.
   // TODO(hzeller): maybe a function to get the remaining buffer when we
   // are closing the connection ? There might be some incomplete line in there.
   const char* IncompleteLine();

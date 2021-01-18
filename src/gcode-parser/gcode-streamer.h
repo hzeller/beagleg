@@ -45,7 +45,7 @@ private:
   GCodeParser *const parser_;
   GCodeParser::EventReceiver *const parse_events_;
 
-  LinebufReader reader_;
+  LinebufReader line_tokenize_buffer_;
   bool is_processing_;
 
   FILE *msg_stream_;

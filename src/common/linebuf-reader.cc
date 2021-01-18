@@ -27,14 +27,14 @@ LinebufReader::LinebufReader(size_t buf_size)
 }
 LinebufReader::~LinebufReader() { delete [] buffer_start_; }
 
-int LinebufReader::Update(ReadFun read_fun) {
+ssize_t LinebufReader::Update(ReadFun read_fun) {
   if (content_start_ - buffer_start_ > (int)(len_ / 2)) {
     const size_t copy_len = size();
     memmove(buffer_start_, content_start_, copy_len);
     content_start_ = buffer_start_;
     content_end_ = buffer_start_ + copy_len;
   }
-  ssize_t r = read_fun(content_end_, buffer_end_ - content_end_);
+  const ssize_t r = read_fun(content_end_, buffer_end_ - content_end_);
   // TODO(hzeller): if we get zero, we should consider this as end-of-stream
   // and potentially regard the buffer as 'complete' even if it doesn't have a
   // full line yet.
@@ -45,10 +45,10 @@ int LinebufReader::Update(ReadFun read_fun) {
 const char* LinebufReader::IncompleteLine() {
   *content_end_ = '\n';
   content_end_++;
-  return ReadLine();
+  return ReadAndConsumeLine();
 }
 
-const char* LinebufReader::ReadLine() {
+const char* LinebufReader::ReadAndConsumeLine() {
   for (char *i = content_start_; i < content_end_; ++i) {
     if (cr_seen_ && *i == '\n') {
       cr_seen_ = false;
@@ -56,12 +56,12 @@ const char* LinebufReader::ReadLine() {
       continue;
     }
     if (*i == '\r' || *i == '\n') {
-      cr_seen_ = (*i == '\r') ? true : false;
+      cr_seen_ = (*i == '\r');
       *i = '\0';
       const char *line = content_start_;
       content_start_ = i + 1;
       return line;
     }
   }
-  return NULL;
+  return nullptr;
 }

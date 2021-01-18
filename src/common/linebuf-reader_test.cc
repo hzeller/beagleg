@@ -81,11 +81,11 @@ TEST_P(LinebufReaderTest, LargeChunkReading) {
       return input.Read(buf, size);
     });
   EXPECT_EQ(0, input.remaining());
-  EXPECT_EQ(std::string(kSampleLines[0]), reader.ReadLine());
-  EXPECT_EQ(std::string(kSampleLines[1]), reader.ReadLine());
-  EXPECT_EQ(std::string(kSampleLines[2]), reader.ReadLine());
-  EXPECT_EQ(std::string(kSampleLines[3]), reader.ReadLine());
-  EXPECT_EQ(NULL, reader.ReadLine());
+  EXPECT_EQ(std::string(kSampleLines[0]), reader.ReadAndConsumeLine());
+  EXPECT_EQ(std::string(kSampleLines[1]), reader.ReadAndConsumeLine());
+  EXPECT_EQ(std::string(kSampleLines[2]), reader.ReadAndConsumeLine());
+  EXPECT_EQ(std::string(kSampleLines[3]), reader.ReadAndConsumeLine());
+  EXPECT_EQ(NULL, reader.ReadAndConsumeLine());
 }
 
 TEST_P(LinebufReaderTest, SmallChunkReading) {
@@ -99,7 +99,7 @@ TEST_P(LinebufReaderTest, SmallChunkReading) {
     reader.Update([&input](char *buf, size_t size) {
         return input.Read(buf, size);
       });
-    const char *potential_line = reader.ReadLine();
+    const char *potential_line = reader.ReadAndConsumeLine();
     if (potential_line != NULL) {
       fprintf(stderr, "Got line: '%s'\n", potential_line);
       EXPECT_EQ(std::string(kSampleLines[expected_next_sample]),
@@ -125,7 +125,7 @@ TEST_P(LinebufReaderTest, TightBufferReading) {
     reader.Update([&input](char *buf, size_t size) {
         return input.Read(buf, size);
       });
-    const char *potential_line = reader.ReadLine();
+    const char *potential_line = reader.ReadAndConsumeLine();
     if (potential_line != NULL) {
       EXPECT_EQ(std::string(kSampleLines[expected_next_sample]),
                 potential_line);
