@@ -86,7 +86,7 @@ public:
 
   void inform_origin_offset(const AxesRegister &origin, const char *n) final;
 
-  void gcode_command_done(char letter, float val) final;
+  void gcode_block_done() final;
   void input_idle(bool is_first) final;
   void wait_for_start() final;
   void go_home(AxisBitmap_t axis_bitmap) final;
@@ -359,7 +359,7 @@ void GCodeMachineControl::Impl::motors_enable(bool b) {
     homing_state_ = GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED;
   }
 }
-void GCodeMachineControl::Impl::gcode_command_done(char l, float v) {
+void GCodeMachineControl::Impl::gcode_block_done() {
   if (cfg_.acknowledge_lines) mprintf("ok\n");
 }
 void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o,

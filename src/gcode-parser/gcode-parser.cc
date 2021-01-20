@@ -1956,6 +1956,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
     }
   }
   err_msg_ = NULL;
+  callbacks()->gcode_block_done();
 }
 
 GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events)

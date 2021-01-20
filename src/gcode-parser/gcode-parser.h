@@ -195,9 +195,14 @@ public:
 
   // "gcode_command_done" is always executed when a command is completed,
   // which is after internally executed ones (such as G21) or commands that
-  // have triggered a callback. Mostly FYI, you can use this for logging or
-  // might use this to send "ok\n" depending on the client implementation.
+  // have triggered a callback. Mostly FYI, e.g. you can use this for logging.
   virtual void gcode_command_done(char letter, float val) {}
+
+  // gcode block done. Called when a gcode block is processed (= 1 line).
+  // If there is only one command per line (which there should, but the
+  // client might send more than one).
+  // Might use this to send "ok\n" depending on the client implementation.
+  virtual void gcode_block_done() {}
 
   // If the input has been idle and we haven't gotten any new line for more
   // than 50ms, this function is called (repeately, until there is input again).
