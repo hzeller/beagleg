@@ -319,6 +319,7 @@ int main(int argc, char *argv[]) {
     OPT_REQUIRE_HOMING,
     OPT_DONT_REQUIRE_HOMING,
     OPT_DISABLE_RANGE_CHECK,
+    OPT_DISABLE_ACK_OK,
     OPT_LOOP,
     OPT_PRIVS,
     OPT_ENABLE_M111,
@@ -347,6 +348,9 @@ int main(int argc, char *argv[]) {
     { "priv",               required_argument, NULL, OPT_PRIVS },
     { "allow-m111",         no_argument,       NULL, OPT_ENABLE_M111 },
     { "status-server",      required_argument, NULL, OPT_STATUS_SERVER },
+
+    // Not yet mentioned in --help. Possibly rarely useful.
+    { "noack-ok",           no_argument,       NULL, OPT_DISABLE_ACK_OK },
 
     // possibly deprecated soon.
     { "threshold-angle",    required_argument, NULL, OPT_SET_THRESHOLD_ANGLE },
@@ -388,6 +392,9 @@ int main(int argc, char *argv[]) {
       break;
     case OPT_DISABLE_RANGE_CHECK:
       disable_range_check = true;
+      break;
+    case OPT_DISABLE_ACK_OK:
+      config.acknowledge_lines = false;
       break;
     case 'n':
       dry_run = true;
@@ -475,7 +482,7 @@ int main(int argc, char *argv[]) {
   }
 
   // If reading from file: don't print 'ok' for every line.
-  config.acknowledge_lines = !has_filename;
+  config.acknowledge_lines &= !has_filename;
 
   if (!config_file) {
     Log_error("Expected config file -c <config>");
