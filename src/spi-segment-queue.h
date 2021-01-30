@@ -34,7 +34,6 @@ public:
   void WaitQueueEmpty() final;
   bool GetPhysicalStatus(PhysicalStatus *status) final;
   void SetExternalPosition(int axis, int pos) final;
-
 };
 
 #endif // MOTION_QUEUE_MOTOR_OPERATIONS_H

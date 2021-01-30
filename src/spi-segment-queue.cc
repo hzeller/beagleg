@@ -18,3 +18,19 @@
  */
 
 #include "spi-segment-queue.h"
+
+SPISegmentQueue::SPISegmentQueue() {
+}
+
+bool SPISegmentQueue::Enqueue(const LinearSegmentSteps &segment) {
+  return true;
+}
+
+void SPISegmentQueue::MotorEnable(bool on) { /* TODO: implement */ }
+void SPISegmentQueue::WaitQueueEmpty() { /* TODO: implement */ }
+bool SPISegmentQueue::GetPhysicalStatus(PhysicalStatus *status) {
+  return false;  // TODO: implement
+}
+void SPISegmentQueue::SetExternalPosition(int axis, int pos) {
+  // TODO: implement.
+}
