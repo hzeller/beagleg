@@ -26,7 +26,7 @@
 #include "planner.h"
 #include "hardware-mapping.h"
 #include "gcode-machine-control.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
 namespace {
 // The target position vector is essentially a position in the
@@ -55,7 +55,7 @@ class Planner::Impl {
 public:
   Impl(const MachineControlConfig *config,
        HardwareMapping *hardware_mapping,
-       MotorOperations *motor_backend);
+       SegmentQueue *motor_backend);
   ~Impl();
 
   bool move_machine_steps(const struct AxisTarget *last_pos,
@@ -101,7 +101,7 @@ public:
 private:
   const struct MachineControlConfig *const cfg_;
   HardwareMapping *const hardware_mapping_;
-  MotorOperations *const motor_ops_;
+  SegmentQueue *const motor_ops_;
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
@@ -250,7 +250,7 @@ static double determine_joining_speed(const struct AxisTarget *from,
 
 Planner::Impl::Impl(const MachineControlConfig *config,
                     HardwareMapping *hardware_mapping,
-                    MotorOperations *motor_backend)
+                    SegmentQueue *motor_backend)
   : cfg_(config), hardware_mapping_(hardware_mapping),
     motor_ops_(motor_backend),
     highest_accel_(-1), path_halted_(true), position_known_(true) {
@@ -635,7 +635,7 @@ void Planner::Impl::SetExternalPosition(GCodeParserAxis axis, float pos) {
 
 Planner::Planner(const MachineControlConfig *config,
                  HardwareMapping *hardware_mapping,
-                 MotorOperations *motor_backend)
+                 SegmentQueue *motor_backend)
   : impl_(new Impl(config, hardware_mapping, motor_backend)) {
 }
 

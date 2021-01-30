@@ -42,7 +42,7 @@
 #include "adc.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 #include "planner.h"
 #include "pwm-timer.h"
 #include "spindle-control.h"
@@ -60,7 +60,7 @@ class GCodeMachineControl::Impl : public GCodeParser::EventReceiver {
 public:
   // Create Impl. It is not fully initialized yet, call Init()
   Impl(const MachineControlConfig &config,
-       MotorOperations *motor_ops,
+       SegmentQueue *motor_ops,
        HardwareMapping *hardware_mapping,
        Spindle *spindle,
        FILE *msg_stream);
@@ -134,7 +134,7 @@ private:
 
 private:
   const struct MachineControlConfig cfg_;
-  MotorOperations *const motor_ops_;
+  SegmentQueue *const motor_ops_;
   HardwareMapping *const hardware_mapping_;
   Spindle *const spindle_;
 
@@ -161,7 +161,7 @@ private:
 static inline int round2int(float x) { return (int) roundf(x); }
 
 GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
-                                MotorOperations *motor_ops,
+                                SegmentQueue *motor_ops,
                                 HardwareMapping *hardware_mapping,
                                 Spindle *spindle,
                                 FILE *msg_stream)
@@ -1022,7 +1022,7 @@ GCodeMachineControl::~GCodeMachineControl() {
 
 GCodeMachineControl* GCodeMachineControl::Create(
   const MachineControlConfig &config,
-  MotorOperations *motor_ops,
+  SegmentQueue *motor_ops,
   HardwareMapping *hardware_mapping,
   Spindle *spindle,
   FILE *msg_stream)

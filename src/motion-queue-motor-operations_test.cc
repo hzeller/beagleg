@@ -17,7 +17,7 @@
 #include "common/container.h"
 #include "common/logging.h"
 #include "hardware-mapping.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
 class MockMotionQueue : public MotionQueue {
 public:

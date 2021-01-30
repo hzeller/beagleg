@@ -28,7 +28,7 @@
 #include "config-parser.h"
 #include "generic-gpio.h"
 #include "pwm-timer.h"
-#include "motor-operations.h"  // LinearSegmentSteps
+#include "segment-queue.h"  // LinearSegmentSteps
 
 HardwareMapping::HardwareMapping()
   : estop_input_(0), pause_input_(0), start_input_(0), probe_input_(0),

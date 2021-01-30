@@ -16,7 +16,7 @@
 #include "common/container.h"
 #include "common/logging.h"
 
-#include "motor-operations.h"
+#include "segment-queue.h"
 #include "pru-hardware-interface.h"
 #include "hardware-mapping.h"
 #include "motor-interface-constants.h"

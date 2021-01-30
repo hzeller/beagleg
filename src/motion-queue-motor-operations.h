@@ -23,9 +23,9 @@
 
 #include "hardware-mapping.h"
 #include "motion-queue.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
-class MotionQueueMotorOperations : public MotorOperations {
+class MotionQueueMotorOperations : public SegmentQueue {
 public:
   // Initialize motor operations, sending planned results into the motion backend.
   MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend);

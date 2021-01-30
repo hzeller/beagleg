@@ -13,7 +13,7 @@
 
 #include "gcode-machine-control.h"
 #include "hardware-mapping.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
 // Using different steps/mm speeds results in problems right now.
 // TODO: This should work being set to 1

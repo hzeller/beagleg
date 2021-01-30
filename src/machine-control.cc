@@ -47,7 +47,7 @@
 #include "hardware-mapping.h"
 #include "motion-queue-motor-operations.h"
 #include "motion-queue.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 #include "pru-hardware-interface.h"
 #include "sim-audio-out.h"
 #include "sim-firmware.h"

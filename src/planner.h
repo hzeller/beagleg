@@ -23,17 +23,17 @@
 
 struct MachineControlConfig;
 class HardwareMapping;
-class MotorOperations;
+class SegmentQueue;
 
 // The planner receives a sequence of desired target positions.
 // It then plans acceleration and speed profile for the physical
-// machine, and emits these to the MotorOperations backend.
+// machine, and emits these to the SegmentQueue backend.
 class Planner {
 public:
   // The planner writes out motor operations to the backend.
   Planner(const MachineControlConfig *config,
           HardwareMapping *hardware_mapping,
-          MotorOperations *motor_backend);
+          SegmentQueue *motor_backend);
   ~Planner();
 
   // Enqueue a new target position to go to in a linear movement from

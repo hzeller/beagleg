@@ -36,10 +36,10 @@
   Auto tool diameter choice.
   Choose plane of measuring text and line depending on view to be visible.
   Auto view: if things ever are only in 2D or with only minimal deviation,
-    only show that.
+  only show that.
   rotation anim: not overall yaw, but first yaw, then rest of rot.
   Put all data in one or more arrays to be able to execute more, and maybe
-    be a bit more efficient in doing so.
+  be a bit more efficient in doing so.
   Put look-up table for color gradient in program to keep rest more compact.
   Show warning: NOT HOMED
   Multiple G54 should print multiple origins
@@ -68,7 +68,7 @@
 #include "motion-queue.h"
 #include "config-parser.h"
 #include "gcode-machine-control.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 #include "spindle-control.h"
 #include "hershey.h"
 
@@ -167,9 +167,9 @@ public:
     if (pass_ == ProcessingStep::GenerateOutput) {
       ShowNamedOrigin(axes, n);
 #if 0
-    // Should we print an origin marker here ?
-    fprintf(stderr, "Got origin [%f,%f,%f] %s\n",
-            axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], n);
+      // Should we print an origin marker here ?
+      fprintf(stderr, "Got origin [%f,%f,%f] %s\n",
+              axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], n);
 #endif
     }
   }
@@ -356,14 +356,14 @@ public:
     fmt = show_metric ? kMillimeterFormat : kInchFormat;
     measure = StringPrintf(fmt, show_metric ? min : min / 25.4);
     DrawText(measure, 0, size/10, TextAlign::kCenter, size * 0.6,
-               [draw, size](bool d, float x, float y) {
-                draw(d, -y, x);
-              });
+             [draw, size](bool d, float x, float y) {
+               draw(d, -y, x);
+             });
     measure = StringPrintf(fmt, show_metric ? max : max / 25.4);
     DrawText(measure, 0, 0, TextAlign::kCenter, size * 0.6,
-              [draw, size, width](bool d, float x, float y) {
-                draw(d, width-y+0.6*size, x);
-              });
+             [draw, size, width](bool d, float x, float y) {
+               draw(d, width-y+0.6*size, x);
+             });
   }
 
   void PrintHeader(float margin, float eye_distance, int animation_frames) {
@@ -679,10 +679,10 @@ private:
 // speed range, second outputs PostScript with colored segments.
 // This also helps do determine if things line up properly with what the gcode
 // parser spits out.
-class MotorOperationsPrinter : public MotorOperations {
+class SegmentQueuePrinter : public SegmentQueue {
 public:
-  MotorOperationsPrinter(FILE *file, const MachineControlConfig &config,
-                         float tool_dia, const VisualizationOptions &options)
+  SegmentQueuePrinter(FILE *file, const MachineControlConfig &config,
+                      float tool_dia, const VisualizationOptions &options)
     : file_(file), config_(config), opts_(options) {
     fprintf(file_, "\n%% -- Machine path. %s\n",
             opts_.show_speeds ? "Visualizing travel speeds" : "Simple.");
@@ -706,7 +706,7 @@ public:
     }
   }
 
-  ~MotorOperationsPrinter() {
+  ~SegmentQueuePrinter() {
     fprintf(file_, "stroke\n%% -- Finished Machine Path.\n");
   }
 
@@ -851,8 +851,8 @@ public:
         if (new_color) {
           fprintf(file_, "%s switch-color ", new_color);
         }
-#define TO_ABS_AXIS(a) (float(current_pos_[a]) + \
-              float((i+1)*param.steps[a])/segments) / config_.steps_per_mm[a]
+#define TO_ABS_AXIS(a) (float(current_pos_[a]) +                        \
+                        float((i+1)*param.steps[a])/segments) / config_.steps_per_mm[a]
 
         fprintf(file_, "%.3f %.3f %.3f lineto3d",
                 TO_ABS_AXIS(AXIS_X), TO_ABS_AXIS(AXIS_Y), TO_ABS_AXIS(AXIS_Z));
@@ -968,7 +968,7 @@ private:
 
   bool last_outside_machine_cube = false;
 
-  MotorOperationsPrinter(const MotorOperationsPrinter &);
+  SegmentQueuePrinter(const SegmentQueuePrinter &);
 };
 
 static int usage(const char *progname, bool description = false) {
@@ -1313,7 +1313,7 @@ int main(int argc, char *argv[]) {
     // Non-initialized hardware mapping behaves like initialized
     HardwareMapping hardware;
 
-    MotorOperationsPrinter motor_operations_printer(
+    SegmentQueuePrinter motor_operations_printer(
       output_file, machine_config, tool_diameter_mm, vis_options);
     GCodeMachineControl *machine_control
       = GCodeMachineControl::Create(machine_config, &motor_operations_printer,

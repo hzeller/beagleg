@@ -24,7 +24,7 @@
 
 #include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "common/string-util.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
 
 class ConfigParser;

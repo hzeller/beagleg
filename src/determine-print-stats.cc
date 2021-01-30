@@ -27,7 +27,7 @@
 #include "gcode-parser/gcode-parser.h"
 
 #include "gcode-machine-control.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 #include "hardware-mapping.h"
 #include "spindle-control.h"
 
@@ -96,9 +96,9 @@ private:
   GCodeParser::EventReceiver *const delegatee_;
 };
 
-class StatsMotorOperations : public MotorOperations {
+class StatsSegmentQueue : public SegmentQueue {
 public:
-  StatsMotorOperations(BeagleGPrintStats *stats) : print_stats_(stats) {}
+  StatsSegmentQueue(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
   bool Enqueue(const LinearSegmentSteps &param) final {
     int max_steps = 0;
@@ -136,7 +136,7 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   // Motor control that just determines the time spent turning the motor.
   // We do that by intercepting the motor operations by replacing the
   // implementation with our own.
-  StatsMotorOperations stats_motor_ops(result);
+  StatsSegmentQueue stats_motor_ops(result);
   GCodeMachineControl *machine_control
     = GCodeMachineControl::Create(config, &stats_motor_ops,
                                   &hardware, nullptr, nullptr);

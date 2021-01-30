@@ -23,7 +23,7 @@ enum {
   BEAGLEG_NUM_MOTORS = 8
 };
 
-// The movement command send to motor operations either changes speed, or
+// The movement command send to the segment queue either changes speed, or
 // provides a steady speed. Already low-level broken down for motors.
 struct LinearSegmentSteps {
   // Speed is steps/s. If initial speed and final speed differ, the motor will
@@ -48,9 +48,9 @@ struct PhysicalStatus {
   unsigned short aux_bits;            // Auxes status
 };
 
-class MotorOperations {  // Rename SegmentQueue ?
+class SegmentQueue {
 public:
-  virtual ~MotorOperations() {}
+  virtual ~SegmentQueue() {}
 
   // Enqueue a coordinated move command.
   // If there is space in the ringbuffer, this function returns immediately,
@@ -60,8 +60,9 @@ public:
   // Returns true if the move was added, false if aborted
   virtual bool Enqueue(const LinearSegmentSteps &segment) = 0;
 
-  // Waits for the queue to be empty and Enables/disables motors according to the
-  // given boolean value (Right now, motors cannot be individually addressed).
+  // Waits for the queue to be empty and Enables/disables motors according to
+  // the given boolean value (Right now, motors cannot be individually
+  // addressed).
   virtual void MotorEnable(bool on) = 0;
 
   // Wait, until all elements in the ring-buffer are consumed.
@@ -72,6 +73,9 @@ public:
   // Returns 'true' if the status was available and is updated.
   virtual bool GetPhysicalStatus(PhysicalStatus *status) = 0;
 
+  // Set absolute position of given axis as provided from some external
+  // source (e.g. homing). This will allow accurate reporting of the
+  // PhysicalStatus.
   virtual void SetExternalPosition(int axis, int steps) = 0;
 };
 

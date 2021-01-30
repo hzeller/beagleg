@@ -15,7 +15,7 @@ digraph beagleg {
 		HardwareMapping;
 		Planner;
 
-		MotorOperations  [label = "MotorOperations\nPass LinearSegmentSteps\nto backend"];
+		SegmentQueue  [label = "SegmentQueue\nPass LinearSegmentSteps\nto backend"];
 
 		MotionQueueMotorOperations  [label = "MotionQueueMotorOperations\nConvert segments\ninto MotionSegment commands\nfor MotionQueue implementations."];
 
@@ -53,15 +53,15 @@ digraph beagleg {
 		GCodeParser -> GCodeMachineControl [ label=" Parse Events;\l Metric coordinates.\l Logic axes (X, Y, Z..)"]
 		GCodeMachineControl -> Planner [ label=" Absolute target position sequence\l with desired speed." ];
 
-		Planner -> MotorOperations [ label = " Delta LinearSegmentSteps\l Step coordinates.\l Logic axes assigned to motors 1, 2, 3..." ]
-		// Various MotorOperations backends
-		MotorOperations -> MotionQueueMotorOperations
+		Planner -> SegmentQueue [ label = " Delta LinearSegmentSteps\l Step coordinates.\l Logic axes assigned to motors 1, 2, 3..." ]
+		// Various SegmentQueue backends
+		SegmentQueue -> MotionQueueMotorOperations
 		MotionQueueMotorOperations -> PRUMotionQueue;
 		MotionQueueMotorOperations -> SimFirmwareQueue -> GNUPlotOutput;
 		MotionQueueMotorOperations -> SimFirmwareAudioQueue;
 		MotionQueueMotorOperations -> DummyMotionQueue;
-		MotorOperations -> GCode2PS;
-		//MotorOperations -> PrintStats;
+		SegmentQueue -> GCode2PS;
+		//SegmentQueue -> PrintStats;
 		PRUMotionQueue -> PruHardwareInterface;
 		PruHardwareInterface -> PRU [ label = " Host → PRU\lringbuffer"];
 	}

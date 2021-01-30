@@ -18,7 +18,7 @@
 #include "common/logging.h"
 
 #include "hardware-mapping.h"
-#include "motor-operations.h"
+#include "segment-queue.h"
 
 #define END_SENTINEL 0x42
 

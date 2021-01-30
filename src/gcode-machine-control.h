@@ -25,7 +25,7 @@
 
 #include <string>
 
-class MotorOperations;
+class SegmentQueue;
 class ConfigParser;
 class Spindle;
 typedef AxesRegister FloatAxisConfig;
@@ -85,11 +85,11 @@ class GCodeMachineControl {
   };
 
   // Factor to create a GCodeMachineControl.
-  // The MotorOperations provide the low-level motor control ops.
+  // The SegmentQueue provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
   // Returns NULL on failure.
   static GCodeMachineControl *Create(const MachineControlConfig &config,
-                                     MotorOperations *motor_backend,
+                                     SegmentQueue *motor_backend,
                                      HardwareMapping *hardware_mapping,
                                      Spindle *spindle,
                                      FILE *msg_stream);
@@ -127,7 +127,7 @@ class GCodeMachineControl {
  private:
   class Impl;
 
-  // The MotorOperations struct provide the low-level motor control ops.
+  // The SegmentQueue struct provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
   GCodeMachineControl(Impl *Impl);
 
