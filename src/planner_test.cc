@@ -36,7 +36,7 @@ static void InitTestConfig(struct MachineControlConfig *c) {
   c->require_homing = false;
 }
 
-class FakeMotorOperations : public MotorOperations {
+class FakeMotorOperations : public SegmentQueue {
 public:
   FakeMotorOperations(const MachineControlConfig &config)
     : config_(config) {}

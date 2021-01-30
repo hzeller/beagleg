@@ -37,7 +37,7 @@ static void init_test_config(struct MachineControlConfig *c,
 }
 
 namespace {
-class MockMotorOps : public MotorOperations {
+class MockMotorOps : public SegmentQueue {
 public:
   MockMotorOps(const LinearSegmentSteps *expected)
     : expect_(expected), current_(expected), errors_(0) {}
