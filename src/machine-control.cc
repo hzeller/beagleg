@@ -583,7 +583,7 @@ int main(int argc, char *argv[]) {
 #if USE_SPI_BACKEND
   auto module_sim = StepGeneratorModuleSim::Init(argc, argv);
   SPIHost spi(module_sim);
-  SPISegmentQueue motor_operations(&spi);
+  SPISegmentQueue motor_operations(&spi, module_sim);
 #else
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
@@ -657,13 +657,15 @@ int main(int argc, char *argv[]) {
   event_server.Loop();  // Run service until Ctrl-C or all sockets closed.
   Log_info("Exiting.");
 
-  // Send cycles until we have all the steps out.
-  // G1 X10 F1000  should fit into this with ../sample.config
-  module_sim->Cycle(10000);
-
   delete streamer;
   delete parser;
   delete machine_control;
+
+  // TODO: shouldn't this be happening in machine control ?
+  motor_operations.WaitQueueEmpty();
+
+  // Make sure last step generator is flushed.
+  module_sim->Cycle(10000);
 
   const bool caught_signal = (ret == 1);
   if (caught_signal) {

@@ -25,11 +25,13 @@
 
 #include "spi.h"
 
+#include "hsg-sim.h"
+
 class BeagleGSPIProtocol;
 
 class SPISegmentQueue : public SegmentQueue {
 public:
-  SPISegmentQueue(SPIHost *spi);
+  SPISegmentQueue(SPIHost *spi, StepGeneratorModuleSim *module_sim);
   ~SPISegmentQueue();
 
   bool Enqueue(const LinearSegmentSteps &segment) final;
@@ -40,6 +42,7 @@ public:
 
 private:
   BeagleGSPIProtocol *const protocol_handler_;
+  StepGeneratorModuleSim *const module_sim_;
 };
 
 #endif // MOTION_QUEUE_MOTOR_OPERATIONS_H
