@@ -55,6 +55,8 @@
 
 // New. Compile-time defined.
 #include "spi-segment-queue.h"
+#include "spi.h"
+#include "hsg-sim.h"
 #define USE_SPI_BACKEND 1
 
 static int usage(const char *prog, const char *msg) {
@@ -579,7 +581,9 @@ int main(int argc, char *argv[]) {
   }
 
 #if USE_SPI_BACKEND
-  SPISegmentQueue motor_operations;
+  auto module_sim = StepGeneratorModuleSim::Init(argc, argv);
+  SPIHost spi(module_sim);
+  SPISegmentQueue motor_operations(&spi);
 #else
   // The backend for our stepmotor control. We either talk to the PRU or
   // just ignore them on dummy.
@@ -652,6 +656,10 @@ int main(int argc, char *argv[]) {
 
   event_server.Loop();  // Run service until Ctrl-C or all sockets closed.
   Log_info("Exiting.");
+
+  // Send cycles until we have all the steps out.
+  // G1 X10 F1000  should fit into this with ../sample.config
+  module_sim->Cycle(10000);
 
   delete streamer;
   delete parser;

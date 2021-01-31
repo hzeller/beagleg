@@ -21,19 +21,25 @@
 
 #include <deque>
 
-#include "hardware-mapping.h"
-#include "motion-queue.h"
 #include "segment-queue.h"
+
+#include "spi.h"
+
+class BeagleGSPIProtocol;
 
 class SPISegmentQueue : public SegmentQueue {
 public:
-  SPISegmentQueue();
+  SPISegmentQueue(SPIHost *spi);
+  ~SPISegmentQueue();
 
   bool Enqueue(const LinearSegmentSteps &segment) final;
   void MotorEnable(bool on) final;
   void WaitQueueEmpty() final;
   bool GetPhysicalStatus(PhysicalStatus *status) final;
   void SetExternalPosition(int axis, int pos) final;
+
+private:
+  BeagleGSPIProtocol *const protocol_handler_;
 };
 
 #endif // MOTION_QUEUE_MOTOR_OPERATIONS_H
