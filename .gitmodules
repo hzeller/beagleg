@@ -1,3 +1,6 @@
 [submodule "am335x_pru_package"]
 	path = am335x_pru_package
 	url = https://github.com/hzeller/am335x_pru_package.git
+[submodule "beagleg-fpga-backend"]
+	path = beagleg-fpga-backend
+	url = https://github.com/lromor/beagleg-fpga-backend.git
