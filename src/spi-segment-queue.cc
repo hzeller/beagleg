@@ -74,6 +74,10 @@ public:
   int SendMotionSegments(const beagleg::SpiMotionSegment *segments, int count) {
     const char command = CMD_WRITE_FIFO;
     uint8_t free_slots;
+    // At first, transfer a single byte with the command. It will return the
+    // amount of slots that are free; we use that to decide how many to
+    // send.
+    // So is_last_in_transaction is false, as we intend to continue.
     if (!spi_channel_->TransferBuffer(&command, &free_slots, 1, false))
       return -1;
 
@@ -82,6 +86,11 @@ public:
       fprintf(stderr, "Available fifo space of %d < requested %d\n",
               free_slots, count);
 #endif
+
+      // Make sure to close the SPI transaction.
+      char dummy;
+      spi_channel_->TransferBuffer(&dummy, &dummy, 0, true);
+
       return 0;
     }
 
@@ -117,12 +126,22 @@ bool SPISegmentQueue::Enqueue(const LinearSegmentSteps &segment) {
   // < 0: don't send, as they are interpreted as unsigned right now
   if (motor_steps <= 0) return true;
 
-  fprintf(stderr, "got Enqueue(%d start=%.1f end=%.1f)\n",
-          motor_steps, segment.v0, segment.v1);
+  fprintf(stderr, "got Enqueue(%d (=0x%04x) steps; start_v=%.1f end_v=%.1f)",
+          motor_steps, motor_steps, segment.v0, segment.v1);
   beagleg::SpiMotionSegment seg;
   seg.count_steps = motor_steps;  // just sending motor one for now
+  static constexpr int kCycles = 100;
+  int count = 0;
   while ((protocol_handler_->SendMotionSegments(&seg, 1)) != 1) {
-    module_sim_->Cycle(100);  // Keep the clocks going.
+    count++;
+    if (count % 10 == 0) { fprintf(stderr, "."); fflush(stderr); }
+    module_sim_->Cycle(kCycles);  // Keep the clocks going.
+  }
+  if (count > 0) {
+    fprintf(stderr, "; had to emit %d * %d = %d cycles to send.\n",
+            count, kCycles, count * kCycles);
+  } else {
+    fprintf(stderr, "\n");
   }
   return true;
 }

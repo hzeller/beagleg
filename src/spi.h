@@ -11,7 +11,7 @@ class StepGeneratorModuleSim;
 class SPIHost {
 public:
   struct Options {
-    uint32_t mode;
+    uint32_t mode = 0;  // TODO: choose rasonable default.
     uint8_t bits_per_word = 8;
     uint32_t speed_hz = 500000;
     bool verbose = false;

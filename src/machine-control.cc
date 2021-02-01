@@ -583,6 +583,7 @@ int main(int argc, char *argv[]) {
 #if USE_SPI_BACKEND
   auto module_sim = StepGeneratorModuleSim::Init(argc, argv);
   SPIHost spi(module_sim);
+  spi.Connect(nullptr, { .verbose = false });   // true for hexdump
   SPISegmentQueue motor_operations(&spi, module_sim);
 #else
   // The backend for our stepmotor control. We either talk to the PRU or
