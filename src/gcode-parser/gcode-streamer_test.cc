@@ -16,8 +16,6 @@
 * You should have received a copy of the GNU General Public License
 * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "motion-queue.h"
-
 #include <stdio.h>
 #include <string.h>
 
