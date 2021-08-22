@@ -8,7 +8,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    name: Install Dependencies and Build
+    name: Build and Test
     steps:
     - name: Prepare
       run: |
