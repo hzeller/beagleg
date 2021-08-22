@@ -89,6 +89,7 @@ public:
 
   bool SeenNameValue(int line_no,
                      const std::string &name, const std::string &value) final {
+    // clang-format off
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
     ACCEPT_VALUE("type",           String, &config_->type);
     ACCEPT_VALUE("port",           String, &config_->port);
@@ -100,6 +101,7 @@ public:
     ACCEPT_VALUE("off-delay-msec", Int,    &config_->off_delay_ms);
     ACCEPT_VALUE("allow-ccw",      Bool,   &config_->allow_ccw);
 #undef ACCEPT_VALUE
+    // clang-format on
 
     ReportError(line_no, StringPrintf("Unexpected configuration option "
                                       "'%s' in spindle section", name.c_str()));
@@ -230,6 +232,7 @@ private:
 
 class PololuSMCSpindle : public BaseSpindle {
 private:
+  // clang-format off
   enum {
     // Command codes
     CMD_EXIT_SAFE_START                   = 0x83,
@@ -332,6 +335,7 @@ private:
 
     MAX_SPEED                             = 3200
   };
+  // clang-format on
 
 public:
   PololuSMCSpindle(const SpindleConfig &config,

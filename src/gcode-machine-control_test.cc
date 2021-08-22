@@ -100,9 +100,9 @@ class Harness {
     init_test_config(&config, &hardware_);
     machine_control = GCodeMachineControl::Create(config, &expect_motor_ops_,
                                                   &hardware_,
-                                                  NULL,   // spindle
-                                                  NULL);  // msg-stream
-    assert(machine_control != NULL);
+                                                  nullptr,   // spindle
+                                                  nullptr);  // msg-stream
+    assert(machine_control != nullptr);
   }
 
   ~Harness() {
@@ -146,13 +146,15 @@ TEST(GCodeMachineControlTest, initial_feedrate_not_set) {
 // expect no slow-down.
 TEST(GCodeMachineControlTest, straight_segments_same_speed) {
   // TODO(hzeller): use mock functionality for this to compare.
+  // clang-format off
   static const struct LinearSegmentSteps expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
-    { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 1st move @100mm/s
-    { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 2nd move @100mm/s
+    { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 1st @100mm/s
+    { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9500}},  // 2nd @100mm/s
     { /*v0*/ 10000.0, /*v1*/     0.0, 0, /*steps*/ { 500}},  // decel back to 0
     { 0.0, 0.0, END_SENTINEL, {}},
   };
+  // clang-format on
   Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50
@@ -172,12 +174,14 @@ TEST(GCodeMachineControlTest, straight_segments_same_speed) {
 // limit. The same concept in the same way is extended to acceleration.
 TEST(GCodeMachineControlTest, speed_clamping) {
   // Total steps x = 200 000  total steps y = 240 000
+  // clang-format off
   static const struct LinearSegmentSteps expected[] = {
     { /*v0*/     0.0, /*v1*/ 120000.0, 0, /*steps*/ { 60000, 72000}},  // accel
     { /*v0*/120000.0, /*v1*/ 120000.0, 0, /*steps*/ { 80000, 96000}},  // move
-    { /*v0*/120000.0, /*v1*/      0.0, 0, /*steps*/ { 60000, 72000}},  // decel back to 0
+    { /*v0*/120000.0, /*v1*/      0.0, 0, /*steps*/ { 60000, 72000}},  // decel
     { 0.0, 0.0, END_SENTINEL, {}},
   };
+  // clang-format on
   Harness harness(expected);
 
   AxesRegister coordinates;
@@ -195,14 +199,16 @@ TEST(GCodeMachineControlTest, speed_clamping) {
 // other, slow down the first segment at the end to the travel speed of the
 // next segment.
 TEST(GCodeMachineControlTest, straight_segments_speed_change) {
+  // clang-format off
   static const struct LinearSegmentSteps expected[] = {
     { /*v0*/     0.0, /*v1*/ 10000.0, 0, /*steps*/ { 500}},  // accel
     { /*v0*/ 10000.0, /*v1*/ 10000.0, 0, /*steps*/ {9125}},  // move @100mm/s
-    { /*v0*/ 10000.0, /*v1*/  5000.0, 0, /*steps*/ { 375}},  // slow: match next speed
+    { /*v0*/ 10000.0, /*v1*/  5000.0, 0, /*steps*/ { 375}},  // match next speed
     { /*v0*/  5000.0, /*v1*/  5000.0, 0, /*steps*/ {9875}},  // move @50mm/s
-    { /*v0*/  5000.0, /*v1*/     0.0, 0, /*steps*/ { 125}},  // final slow to zero
+    { /*v0*/  5000.0, /*v1*/     0.0, 0, /*steps*/ { 125}},  // slow to zero
     { 0.0, 0.0, END_SENTINEL, {}},
   };
+  // clang-format on
   Harness harness(expected);
 
   // Move to pos 100, then 200, first with speed 100, then speed 50

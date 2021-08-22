@@ -135,9 +135,8 @@ public:
       // Make sure that we capture the true ranges of things.
       // TODO: we can use this later to determine if such axis was used,
       // e.g. by comparing max < min
-      min_[AXIS_X] = 1e6; max_[AXIS_X] = -1e6;
-      min_[AXIS_Y] = 1e6; max_[AXIS_Y] = -1e6;
-      min_[AXIS_Z] = 1e6; max_[AXIS_Z] = -1e6;
+      min_[AXIS_X] = min_[AXIS_Y] = min_[AXIS_Z] = 1e6;
+      max_[AXIS_X] = max_[AXIS_Y] = max_[AXIS_Z] = -1e6;
     }
     else {
       RememberMinMax(move_range);
@@ -1031,7 +1030,8 @@ G10 L2 P7 X0Y0Z0
 G10 L2 P8 X0Y0Z0
 G10 L2 P9 X0Y0Z0
 G28
-M02)", nullptr); // M02 needs to be last.
+M02)", // M02 needs to be last.
+                     nullptr);
 }
 
 static bool ParseFile(GCodeParser *parser, const char *filename,

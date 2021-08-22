@@ -94,10 +94,10 @@ public:
                           float *probed_position) final;
   void set_speed_factor(float factor) final;    // M220 feedrate factor 0..1
   void set_fanspeed(float value) final;         // M106, M107: speed 0...255
-  void set_temperature(float degrees_c) final;  // M104, M109: Set temp. in Celsius.
-  void wait_temperature() final;                // M109, M116: Wait for temp. reached.
+  void set_temperature(float degrees_c) final;  // M104, M109: Set in Celsius
+  void wait_temperature() final;                // M109, M116: Wait reached.
   void dwell(float time_ms) final;              // G4: dwell for milliseconds.
-  void motors_enable(bool enable) final;        // M17,M84,M18: Switch on/off motors
+  void motors_enable(bool enable) final;        // M17,M84,M18: Switch motors.
   void clamp_to_range(AxisBitmap_t affected, AxesRegister *axes) final;
   bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target) final;
   bool rapid_move(float feed_mm_p_sec, const AxesRegister &target) final;
@@ -501,6 +501,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   if (letter != 'M') return remaining;
 
   const int code = (int)value;
+  /* clang-format off */
   switch (code) {
   case 0: set_estop(false); break;
   case 999: clear_estop(); break;
@@ -536,6 +537,7 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
     remaining = NULL;  // In this case, let's just discard remainig block.
     break;
   }
+  /* clang-format on */
   return remaining;
 }
 
@@ -544,6 +546,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(
   const int m_code = (int)value;
   const char* after_pair;
 
+  /* clang-format off */
   switch (m_code) {
   case 3: remaining = set_spindle_on(false, remaining); break;  // CW
   case 4: remaining = set_spindle_on(true, remaining); break;   // CCW
@@ -607,6 +610,7 @@ const char *GCodeMachineControl::Impl::aux_bit_commands(
   }
     break;
   }
+  /* clang-format on */
   return remaining;
 }
 

@@ -23,14 +23,14 @@
 #include <memory>
 #include <gtest/gtest.h>
 
-// Raw lines that we use as samples.
+// Raw lines that we use as samples
 constexpr int kSampleLineCount = 4;
 const char *kSampleLines[kSampleLineCount + 1] = {
-  "This is a short line",
-  "This is another, longer line",
+  "This is a short line", //
+  "This is another, longer line", //
   "",   // Emtpy line
   "",
-  NULL
+  nullptr
 };
 
 class InputStreamSimulator {
@@ -38,7 +38,7 @@ public:
   InputStreamSimulator(size_t chunk_size, const char *endline)
     : chunk_size_(chunk_size), longest_line_len_(0), read_pos_(0) {
     for (const char *line : kSampleLines) {
-      if (line == NULL) break;
+      if (line == nullptr) break;
       buffer_.append(line).append(endline);
       if (strlen(line) > longest_line_len_)
         longest_line_len_ = strlen(line);
@@ -85,7 +85,7 @@ TEST_P(LinebufReaderTest, LargeChunkReading) {
   EXPECT_EQ(std::string(kSampleLines[1]), reader.ReadAndConsumeLine());
   EXPECT_EQ(std::string(kSampleLines[2]), reader.ReadAndConsumeLine());
   EXPECT_EQ(std::string(kSampleLines[3]), reader.ReadAndConsumeLine());
-  EXPECT_EQ(NULL, reader.ReadAndConsumeLine());
+  EXPECT_EQ(nullptr, reader.ReadAndConsumeLine());
 }
 
 TEST_P(LinebufReaderTest, SmallChunkReading) {
@@ -100,7 +100,7 @@ TEST_P(LinebufReaderTest, SmallChunkReading) {
         return input.Read(buf, size);
       });
     const char *potential_line = reader.ReadAndConsumeLine();
-    if (potential_line != NULL) {
+    if (potential_line != nullptr) {
       fprintf(stderr, "Got line: '%s'\n", potential_line);
       EXPECT_EQ(std::string(kSampleLines[expected_next_sample]),
                 potential_line);
@@ -126,7 +126,7 @@ TEST_P(LinebufReaderTest, TightBufferReading) {
         return input.Read(buf, size);
       });
     const char *potential_line = reader.ReadAndConsumeLine();
-    if (potential_line != NULL) {
+    if (potential_line != nullptr) {
       EXPECT_EQ(std::string(kSampleLines[expected_next_sample]),
                 potential_line);
       expected_next_sample += 1;

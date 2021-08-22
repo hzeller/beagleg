@@ -45,9 +45,9 @@
 #include "simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =
-  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z) |
-   (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C) |
-   (1 << AXIS_U) | (1 << AXIS_V) | (1 << AXIS_W) |
+  ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z) |  //
+   (1 << AXIS_A) | (1 << AXIS_B) | (1 << AXIS_C) |  //
+   (1 << AXIS_U) | (1 << AXIS_V) | (1 << AXIS_W) |  //
    (1 << AXIS_E));
 
 char gcodep_axis2letter(enum GCodeParserAxis axis) {
@@ -70,17 +70,17 @@ char gcodep_axis2letter(enum GCodeParserAxis axis) {
 
 // Returns the GCodeParserAxis value or GCODE_NUM_AXES if out of range.
 enum GCodeParserAxis gcodep_letter2axis(char letter) {
-  switch (letter) {
-  case 'X': case 'x': return AXIS_X;
-  case 'Y': case 'y': return AXIS_Y;
-  case 'Z': case 'z': return AXIS_Z;
-  case 'A': case 'a': return AXIS_A;
-  case 'B': case 'b': return AXIS_B;
-  case 'C': case 'c': return AXIS_C;
-  case 'U': case 'u': return AXIS_U;
-  case 'V': case 'v': return AXIS_V;
-  case 'W': case 'w': return AXIS_W;
-  case 'E': case 'e': return AXIS_E;
+  switch (toupper(letter)) {
+  case 'X': return AXIS_X;
+  case 'Y': return AXIS_Y;
+  case 'Z': return AXIS_Z;
+  case 'A': return AXIS_A;
+  case 'B': return AXIS_B;
+  case 'C': return AXIS_C;
+  case 'U': return AXIS_U;
+  case 'V': return AXIS_V;
+  case 'W': return AXIS_W;
+  case 'E': return AXIS_E;
   }
   return GCODE_NUM_AXES;
 }
@@ -180,6 +180,7 @@ private:
     program_in_progress_ = false;
   }
 
+  // clang-format off
   enum Operation {
     NO_OPERATION = 0,
 
@@ -195,6 +196,7 @@ private:
     UNARY_OP_START,
     ABS, ACOS, ASIN, ATAN, COS, EXP, FIX, FUP, LN, ROUND, SIN, SQRT, TAN
   };
+  // clang-format on
 
   int precedence(Operation op) {
     if (op == RIGHT_BRACKET) return 1;
@@ -1553,6 +1555,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
 
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
     const float unit_value = value * unit_to_mm_factor_;
+    // clang-format off
     if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
     else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
     else if (letter == 'Z') target[AXIS_Z] = abs_axis_pos(AXIS_Z, unit_value);
@@ -1563,7 +1566,7 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
     else if (letter == 'P') turns = (int)value; // currently ignored
     else if (letter == 'R') { radius = unit_value; have_r = true; }
     else break;
-
+    // clang-format on
     line = remaining_line;
   }
 
@@ -1729,6 +1732,7 @@ const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line
   char letter;
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
     const float unit_value = value * unit_to_mm_factor_;
+    // clang-format off
     if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
     else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
     else if (letter == 'I') { cp1[AXIS_X] = unit_value; have_i = true; }
@@ -1739,6 +1743,7 @@ const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line
       gprintf(GLOG_SEMANTIC_ERR, "handle_spline: invalid axis specified\n");
       return NULL;
     }
+    // clang-format on
     line = remaining_line;
   }
 

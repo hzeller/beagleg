@@ -541,6 +541,7 @@ bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
 }
 
 const char *HardwareMapping::OutputToName(NamedOutput output) {
+  // clang-format off
   switch (output) {
   case NamedOutput::MIST:        return "mist";
   case NamedOutput::FLOOD:       return "flood";
@@ -561,11 +562,13 @@ const char *HardwareMapping::OutputToName(NamedOutput output) {
   case NamedOutput::NUM_OUTPUTS: return "<invalid>";
     // no default case to have the compiler warn about new things.
   }
+  // clang-format on
   return "<invalid>";
 }
 
 bool HardwareMapping::NameToOutput(StringPiece str, NamedOutput *result) {
   const std::string n = ToLower(str);
+  // clang-format off
 #define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)
   MAP_VAL(n == "mist",        NamedOutput::MIST);
   MAP_VAL(n == "flood",       NamedOutput::FLOOD);
@@ -584,6 +587,7 @@ bool HardwareMapping::NameToOutput(StringPiece str, NamedOutput *result) {
   MAP_VAL(n == "atx-power",   NamedOutput::ATX_POWER);
   MAP_VAL(n == "estop",       NamedOutput::ESTOP);
 #undef MAP_VAL
+  // clang-format on
   return false;
 }
 

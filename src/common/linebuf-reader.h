@@ -80,13 +80,13 @@ public:
   //
   // Returned data is only valid until next call to Update() or
   // ReadAndConsumeLine()..
-  const char* ReadAndConsumeLine();
+  const char *ReadAndConsumeLine();
 
   // Get the current incomplete line. This is useful to receive the final
   // data when finishing in case of a missing newline.
   // TODO(hzeller): maybe a function to get the remaining buffer when we
   // are closing the connection ? There might be some incomplete line in there.
-  const char* IncompleteLine();
+  const char *IncompleteLine();
 
   void Flush() {
     content_start_ = buffer_start_;

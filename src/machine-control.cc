@@ -327,6 +327,7 @@ int main(int argc, char *argv[]) {
     OPT_STATUS_SERVER
   };
 
+  // clang-format off
   static struct option long_options[] = {
     { "help",               no_argument,       NULL, OPT_HELP },
 
@@ -358,6 +359,7 @@ int main(int argc, char *argv[]) {
 
     { 0,                    0,                 0,    0  },
   };
+  // clang-format on
 
   int listen_port = -1;
   int status_server_port = -1;

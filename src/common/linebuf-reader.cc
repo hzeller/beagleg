@@ -42,13 +42,13 @@ ssize_t LinebufReader::Update(ReadFun read_fun) {
   return r;
 }
 
-const char* LinebufReader::IncompleteLine() {
+const char *LinebufReader::IncompleteLine() {
   *content_end_ = '\n';
   content_end_++;
   return ReadAndConsumeLine();
 }
 
-const char* LinebufReader::ReadAndConsumeLine() {
+const char *LinebufReader::ReadAndConsumeLine() {
   for (char *i = content_start_; i < content_end_; ++i) {
     if (cr_seen_ && *i == '\n') {
       cr_seen_ = false;

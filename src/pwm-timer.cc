@@ -28,6 +28,7 @@
 
 #include "pwm-timer.h"
 
+/* clang-format off */
 // Memory space mapped to the Clock Module registers
 #define CM_BASE                 0x44e00000
 #define CM_SIZE                 0x4000
@@ -88,6 +89,7 @@
 #define TIMER_OVERFLOW          0xffffffff
 
 #define TIMER_DEFAULT_FREQ      16000       // default PWM frequency is 16 KHz
+/* clang-format on */
 
 struct pwm_timer_data {
   volatile uint32_t *regs;
@@ -177,6 +179,7 @@ static void pwm_timer_calc_resolution(struct pwm_timer_data *timer, int pwm_freq
     resolution = pwm_period / clk_period;
     if (resolution < TIMER_OVERFLOW) break;
   }
+  // clang-format off
   switch (ratio) {
   default:
   case 1:   pre = 0; ptv = 0; break;
@@ -189,6 +192,7 @@ static void pwm_timer_calc_resolution(struct pwm_timer_data *timer, int pwm_freq
   case 128: pre = 1; ptv = 6; break;
   case 256: pre = 1; ptv = 7; break;
   }
+  // clang-format on
 
   timer->pwm_freq = pwm_freq;
   timer->pre = pre;
