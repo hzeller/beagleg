@@ -20,6 +20,8 @@
 #ifndef __PWM_TIMER_H
 #define __PWM_TIMER_H
 
+#include <stdint.h>
+
 #include "motor-interface-constants.h"
 
 // Start/stop the PWM timer
@@ -32,4 +34,4 @@ void pwm_timer_set_freq(uint32_t gpio_def, int pwm_freq);
 bool pwm_timers_map();
 void pwm_timers_unmap();
 
-#endif // __PWM_TIMER_H
+#endif  // __PWM_TIMER_H

@@ -20,6 +20,8 @@
 #ifndef __GENERIC_GPIO_H
 #define __GENERIC_GPIO_H
 
+#include <stdint.h>
+
 #include "motor-interface-constants.h"
 
 int get_gpio(uint32_t gpio_def);
@@ -30,4 +32,4 @@ void clr_gpio(uint32_t gpio_def);
 bool map_gpio();
 void unmap_gpio();
 
-#endif // __GENERIC_GPIO_H
+#endif  // __GENERIC_GPIO_H
