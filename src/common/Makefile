@@ -1,12 +1,11 @@
 # (c) 2013 h.zeller@acm.org
 # This is free software. License: GNU 3.0
 
-# Where the google test source has been unpacked. If this is via debian
-# package, that is probably in /usr/src.
+# Where the google test source has been unpacked.
 # You also can check out from head in https://github.com/google/googletest and
 # point to the googletest/ and googlemock/ directories.
-GTEST_SOURCE?=/usr/src/gtest
-GMOCK_SOURCE?=/usr/src/gmock
+GTEST_SOURCE?=/usr/src/googletest/googletest
+GMOCK_SOURCE?=/usr/src/googletest/googlemock
 
 # In particular, if this is a checked out version of google test/mock, this
 # makes sure that we see the right includes.

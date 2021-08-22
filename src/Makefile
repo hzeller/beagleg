@@ -32,12 +32,11 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 
-# Where the google test source has been unpacked. If this is via debian
-# package, that is probably in /usr/src.
+# Where the google test source has been unpacked.
 # You also can check out from head in https://github.com/google/googletest and
 # point to the googletest/ and googlemock/ directories.
-GTEST_SOURCE?=/usr/src/gtest
-GMOCK_SOURCE?=/usr/src/gmock
+GTEST_SOURCE?=/usr/src/googletest/googletest
+GMOCK_SOURCE?=/usr/src/googletest/googlemock
 
 # In particular, if this is a checked out version of google test/mock, this
 # makes sure that we see the right includes.

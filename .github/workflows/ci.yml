@@ -13,7 +13,7 @@ jobs:
     - name: Prepare
       run: |
         sudo apt-get update -qq
-        sudo apt install -y g++
+        sudo apt install -y g++ googletest
 
     - uses: actions/checkout@v2
       with:
