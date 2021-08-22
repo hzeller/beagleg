@@ -1,6 +1,9 @@
 BeagleG
 =======
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://github.com/hzeller/beagleg/blob/main/LICENSE) &nbsp;
+[![Ubuntu Build](../../workflows/Ubuntu%20Build/badge.svg)](../../actions?query=workflow%3A"Ubuntu+Build")
+
 Step-motor controller for CNC-like devices (or 3D printers) using the
 PRU (Programmable Realtime Unit) of the Beaglebone Black to create precisely
 timed and fast stepper-pulses for acceleration and travel.
