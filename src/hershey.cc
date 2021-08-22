@@ -25,10 +25,13 @@ namespace {
 struct HersheyGlyph {
   char width;
   char number_of_ops;
-  struct { signed char x; signed char y; } operations[55];
+  struct {
+    signed char x;
+    signed char y;
+  } operations[55];
 };
 extern const HersheyGlyph hershey_simplex[];
-}
+}  // namespace
 
 float TextWidth(StringPiece str, float size) {
   float longest_line = 0;
@@ -36,7 +39,10 @@ float TextWidth(StringPiece str, float size) {
 
   float w = 0;
   for (char c : str) {
-    if (c == '\n') { longest_line = std::max(longest_line, w); w = 0; }
+    if (c == '\n') {
+      longest_line = std::max(longest_line, w);
+      w = 0;
+    }
     if (c < 32 || c > 126) continue;
     const HersheyGlyph &glyph = hershey_simplex[c - 32];
     w += size * glyph.width;
@@ -47,12 +53,17 @@ float TextWidth(StringPiece str, float size) {
 void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
               std::function<void(bool do_line, float x, float y)> draw) {
   float dx = 0;
-  if (align == TextAlign::kRight) dx = -TextWidth(str, size);
-  else if (align == TextAlign::kCenter) dx = -TextWidth(str, size) / 2;
+  if (align == TextAlign::kRight)
+    dx = -TextWidth(str, size);
+  else if (align == TextAlign::kCenter)
+    dx = -TextWidth(str, size) / 2;
   size /= 25.0f;  // The actual coordinates are roughly in the range 0..25
   float x = 0, y = 0;
   for (char c : str) {
-    if (c == '\n') { y -= 30 * size; x = 0; }
+    if (c == '\n') {
+      y -= 30 * size;
+      x = 0;
+    }
     if (c < 32 || c > 126) continue;
     const HersheyGlyph &glyph = hershey_simplex[c - 32];
     bool pen_up = true;
@@ -62,7 +73,7 @@ void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
         pen_up = true;
         continue;
       }
-      draw(!pen_up, tx + x + size*coor.x + dx, ty + y + size*coor.y);
+      draw(!pen_up, tx + x + size * coor.x + dx, ty + y + size * coor.y);
       pen_up = false;
     }
     x += size * glyph.width;
@@ -80,6 +91,7 @@ void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
  * James Hurt|Cognition, Inc.|900 Technology Park Drive|Billerica, MA 01821
  */
 namespace {
+/* clang-format off */
 /* Glyph data for the Roman Simplex font */
 const HersheyGlyph hershey_simplex[] = {
   /*  32 ' ' */ {16,  0, {}},
@@ -359,4 +371,5 @@ const HersheyGlyph hershey_simplex[] = {
                           { 8, 11}, {10, 10}, {14,  7}, {16,  6}, {18,  6},
                           {20,  7}, {21, 10}, {21, 12}}},
 };
-}
+/* clang-format on */
+}  // namespace
