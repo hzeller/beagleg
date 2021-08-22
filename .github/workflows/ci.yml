@@ -2,6 +2,8 @@ name: 'main'
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
@@ -32,6 +34,37 @@ jobs:
     - name: Test
       run: |
         make test
+
+  Coverage:
+    runs-on: ubuntu-latest
+
+    name: Coverage prepare
+    steps:
+    - name: Prepare
+      run: |
+        sudo apt-get update -qq
+        sudo apt install -y g++ googletest lcov
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Configure shell
+      # Since we're not compiling on the Beaglebone, disable arm specifics
+      run: |
+        echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
+
+    - name: Coverage run
+      run: |
+        make -C src beagleg.coverage
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v2
+      with:
+        files: src/beagleg.coverage
+        fail_ci_if_error: true
+        verbose: true
 
   CodeFormatting:
     runs-on: ubuntu-latest
