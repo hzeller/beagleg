@@ -43,9 +43,7 @@ static void receive_signal(int signo) {
   caught_exit_trigger_signal = 1;
 }
 
-static void ignore_signal(int signo) {
-  caught_ignored_signal = 1;
-}
+static void ignore_signal(int signo) { caught_ignored_signal = 1; }
 
 static void arm_signal_handler() {
   caught_exit_trigger_signal = 0;
@@ -80,11 +78,11 @@ static void disarm_signal_handler() {
 }
 
 bool FDMultiplexer::RunOnReadable(int fd, const Handler &handler) {
-  return read_handlers_.insert({ fd, handler }).second;
+  return read_handlers_.insert({fd, handler}).second;
 }
 
 bool FDMultiplexer::RunOnWritable(int fd, const Handler &handler) {
-  return write_handlers_.insert({ fd, handler }).second;
+  return write_handlers_.insert({fd, handler}).second;
 }
 
 void FDMultiplexer::RunOnIdle(const Handler &handler) {
@@ -93,7 +91,7 @@ void FDMultiplexer::RunOnIdle(const Handler &handler) {
 
 void FDMultiplexer::CallHandlers(fd_set *to_call_fd_set, int *available_fds,
                                  HandlerMap *handlers) {
-  for (auto it = handlers->begin(); *available_fds && it != handlers->end(); ) {
+  for (auto it = handlers->begin(); *available_fds && it != handlers->end();) {
     bool keep_handler = true;
     if (FD_ISSET(it->first, to_call_fd_set)) {
       --*available_fds;
@@ -141,7 +139,7 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
     return false;
   }
 
-  if (fds_ready == 0) {             // No FDs ready: timeout situation.
+  if (fds_ready == 0) {  // No FDs ready: timeout situation.
     for (auto it = idle_handlers_.begin(); it != idle_handlers_.end(); /**/) {
       const bool keep_handler = (*it)();
       it = keep_handler ? std::next(it) : idle_handlers_.erase(it);

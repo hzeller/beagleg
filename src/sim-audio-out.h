@@ -17,14 +17,14 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "motion-queue.h"
-
 #include <stdio.h>
+
+#include "motion-queue.h"
 
 // Output to wav file. Only motor 0/1 (X/Y) on left/right channel. Helps to
 // to make smooth acceleration curves audible.
 class SimFirmwareAudioQueue : public MotionQueue {
-public:
+ public:
   SimFirmwareAudioQueue(FILE *out);
   ~SimFirmwareAudioQueue() override;
 
@@ -33,12 +33,11 @@ public:
   void MotorEnable(bool on) final {}
   void Shutdown(bool flush_queue) final {}
   int GetPendingElements(uint32_t *head_item_progress) final {
-    if (head_item_progress)
-      *head_item_progress = 0;
+    if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
 
-private:
+ private:
   class AudioWriter;
   AudioWriter *writer_;
 };

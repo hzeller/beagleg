@@ -17,29 +17,29 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "generic-gpio.h"
+
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include "common/logging.h"
-
 #include "motor-interface-constants.h"
-#include "generic-gpio.h"
 
 // Memory space mapped to the Clock Module registers
-#define CM_BASE                 0x44e00000
-#define CM_SIZE                 0x4000
+#define CM_BASE 0x44e00000
+#define CM_SIZE 0x4000
 
 // Clock Module Peripheral and Wakeup registers
-#define CM_WKUP_GPIO0_CLKCTRL   (0x400 + 0x008)
-#define CM_PER_GPIO1_CLKCTRL    (0x000 + 0x0ac)
-#define CM_PER_GPIO2_CLKCTRL    (0x000 + 0x0b0)
-#define CM_PER_GPIO3_CLKCTRL    (0x000 + 0x0b4)
+#define CM_WKUP_GPIO0_CLKCTRL (0x400 + 0x008)
+#define CM_PER_GPIO1_CLKCTRL  (0x000 + 0x0ac)
+#define CM_PER_GPIO2_CLKCTRL  (0x000 + 0x0b0)
+#define CM_PER_GPIO3_CLKCTRL  (0x000 + 0x0b4)
 
-#define IDLEST_MASK             (0x03 << 16)
-#define MODULEMODE_ENABLE       (0x02 << 0)
+#define IDLEST_MASK       (0x03 << 16)
+#define MODULEMODE_ENABLE (0x02 << 0)
 
 #define GPIO_MMAP_SIZE 0x2000
 
@@ -65,7 +65,7 @@ int get_gpio(uint32_t gpio_def) {
   uint32_t status;
 
   if (gpio_port) {
-    status = gpio_port[GPIO_DATAIN/4];
+    status = gpio_port[GPIO_DATAIN / 4];
     return (status & bitmask) ? 1 : 0;
   }
   return -1;
@@ -74,15 +74,13 @@ int get_gpio(uint32_t gpio_def) {
 void set_gpio(uint32_t gpio_def) {
   volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
   uint32_t bitmask = 1 << (gpio_def & 0x1f);
-  if (gpio_port)
-    gpio_port[GPIO_SETDATAOUT/4] = bitmask;
+  if (gpio_port) gpio_port[GPIO_SETDATAOUT / 4] = bitmask;
 }
 
 void clr_gpio(uint32_t gpio_def) {
   volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
   uint32_t bitmask = 1 << (gpio_def & 0x1f);
-  if (gpio_port)
-    gpio_port[GPIO_CLEARDATAOUT/4] = bitmask;
+  if (gpio_port) gpio_port[GPIO_CLEARDATAOUT / 4] = bitmask;
 }
 
 static void set_gpio_mask(uint32_t *mask, uint32_t gpio_def) {
@@ -96,7 +94,7 @@ static void set_gpio_mask(uint32_t *mask, uint32_t gpio_def) {
 }
 
 static void cfg_gpio_io() {
-  uint32_t output_mask[4] = { 0, 0, 0, 0 };
+  uint32_t output_mask[4] = {0, 0, 0, 0};
 
   // Motor Step signals
   set_gpio_mask(output_mask, MOTOR_1_STEP_GPIO);
@@ -143,7 +141,7 @@ static void cfg_gpio_io() {
   set_gpio_mask(output_mask, PWM_3_GPIO);
   set_gpio_mask(output_mask, PWM_4_GPIO);
 
-  uint32_t input_mask[4] = { 0, 0, 0, 0 };
+  uint32_t input_mask[4] = {0, 0, 0, 0};
   set_gpio_mask(input_mask, IN_1_GPIO);
   set_gpio_mask(input_mask, IN_2_GPIO);
   set_gpio_mask(input_mask, IN_3_GPIO);
@@ -159,32 +157,33 @@ static void cfg_gpio_io() {
 
   // Set the output enable register for each GPIO bank.
   // Output direction is signified with a zero.
-  gpio_0[GPIO_OE/4] &= ~output_mask[0];
-  gpio_1[GPIO_OE/4] &= ~output_mask[1];
-  gpio_2[GPIO_OE/4] &= ~output_mask[2];
-  gpio_3[GPIO_OE/4] &= ~output_mask[3];
+  gpio_0[GPIO_OE / 4] &= ~output_mask[0];
+  gpio_1[GPIO_OE / 4] &= ~output_mask[1];
+  gpio_2[GPIO_OE / 4] &= ~output_mask[2];
+  gpio_3[GPIO_OE / 4] &= ~output_mask[3];
 
   // All the inputs we need. Inputs are signified with a one.
-  gpio_0[GPIO_OE/4] |= input_mask[0];
-  gpio_1[GPIO_OE/4] |= input_mask[1];
-  gpio_2[GPIO_OE/4] |= input_mask[2];
-  gpio_3[GPIO_OE/4] |= input_mask[3];
+  gpio_0[GPIO_OE / 4] |= input_mask[0];
+  gpio_1[GPIO_OE / 4] |= input_mask[1];
+  gpio_2[GPIO_OE / 4] |= input_mask[2];
+  gpio_3[GPIO_OE / 4] |= input_mask[3];
 }
 
 static volatile uint32_t *map_port(int fd, size_t length, off_t offset) {
-  return (volatile uint32_t*) mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+  return (volatile uint32_t *)mmap(0, length, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED, fd, offset);
 }
 
 static void ena_gpio_clk(volatile uint32_t *cm, uint32_t reg, int bank) {
   uint32_t val;
 
-  val = cm[reg/4];
+  val = cm[reg / 4];
   if (val & IDLEST_MASK) {
     Log_debug("Enabling GPIO-%d clock", bank);
     val |= MODULEMODE_ENABLE;
-    cm[reg/4] = val;
+    cm[reg / 4] = val;
     do {
-      val = cm[reg/4];
+      val = cm[reg / 4];
     } while (val & IDLEST_MASK);
   }
 }
@@ -193,14 +192,17 @@ static int enable_gpio_clocks(int fd) {
   volatile uint32_t *cm;
 
   cm = map_port(fd, CM_SIZE, CM_BASE);
-  if (cm == MAP_FAILED) { perror("mmap() CM"); return 0; }
+  if (cm == MAP_FAILED) {
+    perror("mmap() CM");
+    return 0;
+  }
 
   ena_gpio_clk(cm, CM_WKUP_GPIO0_CLKCTRL, 0);
   ena_gpio_clk(cm, CM_PER_GPIO1_CLKCTRL, 1);
   ena_gpio_clk(cm, CM_PER_GPIO2_CLKCTRL, 2);
   ena_gpio_clk(cm, CM_PER_GPIO3_CLKCTRL, 3);
 
-  munmap((void*)cm, CM_SIZE);
+  munmap((void *)cm, CM_SIZE);
   return 1;
 }
 
@@ -209,18 +211,33 @@ bool map_gpio() {
   int fd;
 
   fd = open("/dev/mem", O_RDWR);
-  if (fd == -1) { perror("open()"); return ret; }
+  if (fd == -1) {
+    perror("open()");
+    return ret;
+  }
 
-  if (!enable_gpio_clocks(fd))  goto exit;
+  if (!enable_gpio_clocks(fd)) goto exit;
 
   gpio_0 = map_port(fd, GPIO_MMAP_SIZE, GPIO_0_BASE);
-  if (gpio_0 == MAP_FAILED) { perror("mmap() GPIO-0"); goto exit; }
+  if (gpio_0 == MAP_FAILED) {
+    perror("mmap() GPIO-0");
+    goto exit;
+  }
   gpio_1 = map_port(fd, GPIO_MMAP_SIZE, GPIO_1_BASE);
-  if (gpio_1 == MAP_FAILED) { perror("mmap() GPIO-1"); goto exit; }
+  if (gpio_1 == MAP_FAILED) {
+    perror("mmap() GPIO-1");
+    goto exit;
+  }
   gpio_2 = map_port(fd, GPIO_MMAP_SIZE, GPIO_2_BASE);
-  if (gpio_2 == MAP_FAILED) { perror("mmap() GPIO-2"); goto exit; }
+  if (gpio_2 == MAP_FAILED) {
+    perror("mmap() GPIO-2");
+    goto exit;
+  }
   gpio_3 = map_port(fd, GPIO_MMAP_SIZE, GPIO_3_BASE);
-  if (gpio_3 == MAP_FAILED) { perror("mmap() GPIO-3"); goto exit; }
+  if (gpio_3 == MAP_FAILED) {
+    perror("mmap() GPIO-3");
+    goto exit;
+  }
 
   // Set all the pins we need to the respective input/output mode.
   cfg_gpio_io();
@@ -229,14 +246,25 @@ bool map_gpio() {
 
 exit:
   close(fd);
-  if (!ret)
-    unmap_gpio();
+  if (!ret) unmap_gpio();
   return ret;
 }
 
 void unmap_gpio() {
-  if (gpio_0) { munmap((void*)gpio_0, GPIO_MMAP_SIZE); gpio_0 = NULL; }
-  if (gpio_1) { munmap((void*)gpio_1, GPIO_MMAP_SIZE); gpio_1 = NULL; }
-  if (gpio_2) { munmap((void*)gpio_2, GPIO_MMAP_SIZE); gpio_2 = NULL; }
-  if (gpio_3) { munmap((void*)gpio_3, GPIO_MMAP_SIZE); gpio_3 = NULL; }
+  if (gpio_0) {
+    munmap((void *)gpio_0, GPIO_MMAP_SIZE);
+    gpio_0 = NULL;
+  }
+  if (gpio_1) {
+    munmap((void *)gpio_1, GPIO_MMAP_SIZE);
+    gpio_1 = NULL;
+  }
+  if (gpio_2) {
+    munmap((void *)gpio_2, GPIO_MMAP_SIZE);
+    gpio_2 = NULL;
+  }
+  if (gpio_3) {
+    munmap((void *)gpio_3, GPIO_MMAP_SIZE);
+    gpio_3 = NULL;
+  }
 }

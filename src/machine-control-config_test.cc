@@ -17,24 +17,24 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "gcode-machine-control.h"  // contains struct MachineControlConfig
-
-#include "config-parser.h"
+#include <gtest/gtest.h>
 
 #include <iostream>
-#include <gtest/gtest.h>
+
+#include "config-parser.h"
+#include "gcode-machine-control.h"  // contains struct MachineControlConfig
 
 // TODO(hzeller): add tests for error conditions.
 
 TEST(MachineControlConfig, GeneralMapping) {
   ConfigParser p;
-  p.SetContent("[ general ]\n"
-               "home-order = ABC\n"
-               "require-homing = 0\n"    // three ways ..
-               "range-check = no\n"      // .. to say ...
-               "synchronous = false\n"   // 'NO'.
-               "auto-motor-disable-seconds = 188 \n"
-               );
+  p.SetContent(
+    "[ general ]\n"
+    "home-order = ABC\n"
+    "require-homing = 0\n"   // three ways ..
+    "range-check = no\n"     // .. to say ...
+    "synchronous = false\n"  // 'NO'.
+    "auto-motor-disable-seconds = 188 \n");
   MachineControlConfig config;
   EXPECT_TRUE(config.ConfigureFromFile(&p));
 
@@ -47,16 +47,17 @@ TEST(MachineControlConfig, GeneralMapping) {
 
 TEST(MachineControlConfig, AxisMapping) {
   ConfigParser p;
-  p.SetContent("[ X-Axis ]\n"
-               "steps-per-mm = 200 / (2 * 60)\n"   // simple expression support.
-               "max-feedrate = 42\n"
-               "max-acceleration = 4242\n"
-               "range = 987\n"
-               "home-pos = max\n"
+  p.SetContent(
+    "[ X-Axis ]\n"
+    "steps-per-mm = 200 / (2 * 60)\n"  // simple expression support.
+    "max-feedrate = 42\n"
+    "max-acceleration = 4242\n"
+    "range = 987\n"
+    "home-pos = max\n"
 
-               "[ Y-Axis ]\n"
-               "home-pos = min\n"       // Different home pos.
-               );
+    "[ Y-Axis ]\n"
+    "home-pos = min\n"  // Different home pos.
+  );
 
   MachineControlConfig config;
   EXPECT_TRUE(config.ConfigureFromFile(&p));

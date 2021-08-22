@@ -22,43 +22,43 @@
 #include <gtest/gtest.h>
 
 TEST(StringUtilTest, TrimWhitespace) {
-    EXPECT_EQ(StringPiece("hello"), TrimWhitespace(" \t  hello \n\r  "));
-    EXPECT_TRUE(TrimWhitespace(" \t ").empty());
+  EXPECT_EQ(StringPiece("hello"), TrimWhitespace(" \t  hello \n\r  "));
+  EXPECT_TRUE(TrimWhitespace(" \t ").empty());
 }
 
 TEST(StringUtilTest, ASCIIToLower) {
-    EXPECT_EQ("hello world", ToLower("Hello WORLD"));
-    EXPECT_EQ("hello world", ToLower("Hello WORLD"));
+  EXPECT_EQ("hello world", ToLower("Hello WORLD"));
+  EXPECT_EQ("hello world", ToLower("Hello WORLD"));
 }
 
 TEST(StringUtilTest, HasPrefix) {
-    EXPECT_TRUE(HasPrefix("hello world", "hello"));
-    EXPECT_FALSE(HasPrefix("hello world", "hellO"));
+  EXPECT_TRUE(HasPrefix("hello world", "hello"));
+  EXPECT_FALSE(HasPrefix("hello world", "hellO"));
 }
 
 TEST(StringUtilTest, SplitString) {
-    std::vector<StringPiece> result = SplitString("foo", ",");
-    EXPECT_EQ(1, (int)result.size());
-    EXPECT_EQ(StringPiece("foo"), result[0]);
+  std::vector<StringPiece> result = SplitString("foo", ",");
+  EXPECT_EQ(1, (int)result.size());
+  EXPECT_EQ(StringPiece("foo"), result[0]);
 
-    result = SplitString(",hello, world", ",");
-    EXPECT_EQ(3, (int)result.size());
-    EXPECT_EQ(StringPiece(""), result[0]);
-    EXPECT_EQ(StringPiece("hello"), result[1]);
-    EXPECT_EQ(StringPiece(" world"), result[2]);
+  result = SplitString(",hello, world", ",");
+  EXPECT_EQ(3, (int)result.size());
+  EXPECT_EQ(StringPiece(""), result[0]);
+  EXPECT_EQ(StringPiece("hello"), result[1]);
+  EXPECT_EQ(StringPiece(" world"), result[2]);
 
-    // Also test with trailing, empty field
-    result = SplitString(",hello, world,", ",");
-    EXPECT_EQ(4, (int)result.size());
-    EXPECT_EQ(StringPiece(""), result[0]);
-    EXPECT_EQ(StringPiece("hello"), result[1]);
-    EXPECT_EQ(StringPiece(" world"), result[2]);
-    EXPECT_EQ(StringPiece(""), result[3]);
+  // Also test with trailing, empty field
+  result = SplitString(",hello, world,", ",");
+  EXPECT_EQ(4, (int)result.size());
+  EXPECT_EQ(StringPiece(""), result[0]);
+  EXPECT_EQ(StringPiece("hello"), result[1]);
+  EXPECT_EQ(StringPiece(" world"), result[2]);
+  EXPECT_EQ(StringPiece(""), result[3]);
 }
 
 TEST(StringUtilTest, ParseDecimal) {
-    StringPiece longer_string("4242");
-    EXPECT_EQ(42, ParseDecimal(longer_string.substr(0, 2), -1));
+  StringPiece longer_string("4242");
+  EXPECT_EQ(42, ParseDecimal(longer_string.substr(0, 2), -1));
 }
 
 int main(int argc, char *argv[]) {

@@ -19,29 +19,25 @@
 
 #include "simple-lexer.h"
 
-#include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *skip_white(const char *line) {
-  while (*line && isspace(*line))
-    line++;
+  while (*line && isspace(*line)) line++;
   return line;
 }
 
 class SimpleLexerBase::Node {
-public:
-  Node() : value(0) {
-    memset(&next_character, 0, 256*sizeof(Node*));
-  }
+ public:
+  Node() : value(0) { memset(&next_character, 0, 256 * sizeof(Node *)); }
 
   Node *next_character[256];
   int value;
 };
 
-SimpleLexerBase::SimpleLexerBase() : root_(new Node()) {
-}
+SimpleLexerBase::SimpleLexerBase() : root_(new Node()) {}
 
 SimpleLexerBase::~SimpleLexerBase() {
   for (size_t i = 0; i < to_delete_.size(); ++i) {
@@ -61,8 +57,7 @@ void SimpleLexerBase::AddKeywordIntValue(const char *keyword, int value) {
 const char *SimpleLexerBase::ReverseMapToString(int value) {
   if (value == 0) return "?";
   KeywordMap::const_iterator found = keyword_mappings_.find(value);
-  if (found == keyword_mappings_.end())
-    return NULL;
+  if (found == keyword_mappings_.end()) return NULL;
   return found->second;
 }
 

@@ -17,17 +17,15 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "gcode-parser.h"
-
-#include <unistd.h>
-#include <sys/types.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "common/logging.h"
+#include "gcode-parser.h"
 
 bool GCodeParser::Config::LoadParams() {
-  if (paramfile.empty())
-    return false;
+  if (paramfile.empty()) return false;
   if (parameters == NULL) {
     Log_error("No parameters to load into.");
     return false;
@@ -38,8 +36,8 @@ bool GCodeParser::Config::LoadParams() {
 
   FILE *fp = fopen(paramfile.c_str(), "r");
   if (!fp) {
-    Log_error("Unable to read param file %s (%s)",
-              paramfile.c_str(), strerror(errno));
+    Log_error("Unable to read param file %s (%s)", paramfile.c_str(),
+              strerror(errno));
     return false;
   }
 
@@ -62,8 +60,7 @@ bool GCodeParser::Config::LoadParams() {
 }
 
 bool GCodeParser::Config::SaveParams() const {
-  if (paramfile.empty())
-    return false;
+  if (paramfile.empty()) return false;
   if (parameters == NULL) {
     Log_error("No parameters to save.");
     return false;
@@ -78,9 +75,10 @@ bool GCodeParser::Config::SaveParams() const {
               strerror(err));
     if (err == EACCES) {
       const std::string dir = paramfile.substr(0, paramfile.find_last_of('/'));
-      Log_error("Params-file permission problem: Need write access to %s/ "
-                "(FYI we run as uid=%d, gid=%d)",
-                dir.c_str(), getuid(), getgid());
+      Log_error(
+        "Params-file permission problem: Need write access to %s/ "
+        "(FYI we run as uid=%d, gid=%d)",
+        dir.c_str(), getuid(), getgid());
     }
     return false;
   }
@@ -94,9 +92,8 @@ bool GCodeParser::Config::SaveParams() const {
   // simply copy them to a temporary structure that sorts them numerically.
   std::map<int, float> numeric_params;
   for (const auto name_value : *parameters) {
-    if (name_value.first.empty()) continue;   // Should not happen.
-    if (!isdigit(name_value.first[0]))
-      break;   // last one with digit.
+    if (name_value.first.empty()) continue;    // Should not happen.
+    if (!isdigit(name_value.first[0])) break;  // last one with digit.
     numeric_params[atoi(name_value.first.c_str())] = name_value.second;
   }
 
@@ -126,8 +123,7 @@ bool GCodeParser::Config::SaveParams() const {
 
   if (fflush(fp) == 0 && fdatasync(fileno(fp)) == 0 && fclose(fp) == 0) {
     rename(paramfile.c_str(), (paramfile + ".bak").c_str());
-    if (rename(tmp_name.c_str(), paramfile.c_str()) == 0)
-      return true;
+    if (rename(tmp_name.c_str(), paramfile.c_str()) == 0) return true;
   }
   Log_error("Trouble writing parameter file %s (%s)", paramfile.c_str(),
             strerror(errno));

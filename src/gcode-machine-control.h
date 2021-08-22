@@ -19,11 +19,11 @@
 #ifndef _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 #define _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 
-#include "gcode-parser/gcode-parser.h"
-#include "common/container.h"
-#include "hardware-mapping.h"
-
 #include <string>
+
+#include "common/container.h"
+#include "gcode-parser/gcode-parser.h"
+#include "hardware-mapping.h"
 
 class SegmentQueue;
 class ConfigParser;
@@ -41,48 +41,48 @@ struct MachineControlConfig {
   bool ConfigureFromFile(ConfigParser *parser);
 
   // Arrays with values for each axis
-  FloatAxisConfig steps_per_mm;   // Steps per mm for each logical axis.
-  FloatAxisConfig move_range_mm;  // Range of axes in mm (0..range[axis]). -1: no limit
+  FloatAxisConfig steps_per_mm;  // Steps per mm for each logical axis.
+  FloatAxisConfig
+    move_range_mm;  // Range of axes in mm (0..range[axis]). -1: no limit
 
-  FloatAxisConfig max_feedrate;   // Max feedrate for axis (mm/s)
-  FloatAxisConfig acceleration;   // Max acceleration for axis (mm/s^2)
+  FloatAxisConfig max_feedrate;  // Max feedrate for axis (mm/s)
+  FloatAxisConfig acceleration;  // Max acceleration for axis (mm/s^2)
 
-  FloatAxisConfig max_probe_feedrate; // Max probe feedrate for axis (mm/s)
+  FloatAxisConfig max_probe_feedrate;  // Max probe feedrate for axis (mm/s)
 
-  float speed_factor;         // Multiply feed with. Should be 1.0 by default.
-  float threshold_angle;      // Threshold angle to ignore speed changes
-  float speed_tune_angle;     // Angle added to the angle between vectors for speed tuning
+  float speed_factor;      // Multiply feed with. Should be 1.0 by default.
+  float threshold_angle;   // Threshold angle to ignore speed changes
+  float speed_tune_angle;  // Angle added to the angle between vectors for speed
+                           // tuning
 
-  std::string home_order;        // Order in which axes are homed.
+  std::string home_order;  // Order in which axes are homed.
 
   FixedArray<HardwareMapping::AxisTrigger, GCODE_NUM_AXES> homing_trigger;
 
-  int auto_motor_disable_seconds; // disable motors automatically after these seconds.
-  int auto_fan_disable_seconds; // Disable fan automatically after these seconds.
-  int auto_fan_pwm;             // PWM value to automatically enable fan with.
-  bool acknowledge_lines;       // Respond w/ 'ok' on each command on msg_stream.
-  bool require_homing;          // Require homing before any moves.
-  bool range_check;             // Do machine limit checks. Default 1.
-  std::string clamp_to_range;   // Clamp these axes to machine range before
-                                // range check. Dangerous.
-                                // Support only "" or "Z" right now.
-  bool debug_print;             // Print step-tuples to output_fd if 1.
-  bool synchronous;             // Don't queue, wait for command to finish if 1.
-  bool enable_pause;            // Enable pause switch detection. Default 0.
+  int auto_motor_disable_seconds;  // disable motors automatically after these
+                                   // seconds.
+  int
+    auto_fan_disable_seconds;  // Disable fan automatically after these seconds.
+  int auto_fan_pwm;            // PWM value to automatically enable fan with.
+  bool acknowledge_lines;      // Respond w/ 'ok' on each command on msg_stream.
+  bool require_homing;         // Require homing before any moves.
+  bool range_check;            // Do machine limit checks. Default 1.
+  std::string clamp_to_range;  // Clamp these axes to machine range before
+                               // range check. Dangerous.
+                               // Support only "" or "Z" right now.
+  bool debug_print;            // Print step-tuples to output_fd if 1.
+  bool synchronous;            // Don't queue, wait for command to finish if 1.
+  bool enable_pause;           // Enable pause switch detection. Default 0.
 };
 
 // A class that controls a machine via gcode.
 class GCodeMachineControl {
  public:
-  enum class EStopState {  NONE,  SOFT,  HARD  };
+  enum class EStopState { NONE, SOFT, HARD };
 
   // The three levels of homing confidence. If we ever switch off
   // power to the motors after homing, we can't be sure.
-  enum class HomingState {
-    NEVER_HOMED,
-    HOMED_BUT_MOTORS_UNPOWERED,
-    HOMED
-  };
+  enum class HomingState { NEVER_HOMED, HOMED_BUT_MOTORS_UNPOWERED, HOMED };
 
   // Factor to create a GCodeMachineControl.
   // The SegmentQueue provide the low-level motor control ops.
@@ -91,8 +91,7 @@ class GCodeMachineControl {
   static GCodeMachineControl *Create(const MachineControlConfig &config,
                                      SegmentQueue *motor_backend,
                                      HardwareMapping *hardware_mapping,
-                                     Spindle *spindle,
-                                     FILE *msg_stream);
+                                     Spindle *spindle, FILE *msg_stream);
 
   ~GCodeMachineControl();
 
@@ -134,4 +133,4 @@ class GCodeMachineControl {
   Impl *const impl_;  // opaque state.
 };
 
-#endif //  _BEAGLEG_GCODE_MACHINE_CONTROL_H_
+#endif  //  _BEAGLEG_GCODE_MACHINE_CONTROL_H_

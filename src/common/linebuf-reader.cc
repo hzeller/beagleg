@@ -17,15 +17,17 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "linebuf-reader.h"
+
 #include "string-util.h"
 
 LinebufReader::LinebufReader(size_t buf_size)
-  : len_(buf_size),
-    buffer_start_(new char [len_]), buffer_end_(buffer_start_ + len_),
-    content_start_(buffer_start_), content_end_(buffer_start_),
-    cr_seen_(false) {
-}
-LinebufReader::~LinebufReader() { delete [] buffer_start_; }
+    : len_(buf_size),
+      buffer_start_(new char[len_]),
+      buffer_end_(buffer_start_ + len_),
+      content_start_(buffer_start_),
+      content_end_(buffer_start_),
+      cr_seen_(false) {}
+LinebufReader::~LinebufReader() { delete[] buffer_start_; }
 
 ssize_t LinebufReader::Update(ReadFun read_fun) {
   if (content_start_ - buffer_start_ > (int)(len_ / 2)) {
@@ -38,7 +40,7 @@ ssize_t LinebufReader::Update(ReadFun read_fun) {
   // TODO(hzeller): if we get zero, we should consider this as end-of-stream
   // and potentially regard the buffer as 'complete' even if it doesn't have a
   // full line yet.
-  if (r >= 0) content_end_ += r;   // so, what if r < 0 ?
+  if (r >= 0) content_end_ += r;  // so, what if r < 0 ?
   return r;
 }
 

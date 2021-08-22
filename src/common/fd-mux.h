@@ -20,15 +20,15 @@
 #ifndef FD_MUX_H_
 #define FD_MUX_H_
 
-#include <map>
+#include <sys/select.h>
+
 #include <functional>
 #include <list>
-
-#include <sys/select.h>
+#include <map>
 
 // This needs a better name.
 class FDMultiplexer {
-public:
+ public:
   FDMultiplexer(unsigned idle_ms = 50) : idle_ms_(idle_ms) {}
 
   // Handlers for events from this multiplexer.
@@ -49,7 +49,7 @@ public:
   // registered (return 0) or until a signal is triggered (return 1).
   int Loop();
 
-protected:
+ protected:
   // Run a single cycle resulting in exactly one call of a handler function.
   // This means that one of these happened:
   //   (1) The next file descriptor became ready and its Handler is called
@@ -59,7 +59,7 @@ protected:
   // This is broken out to make it simple to test steps in unit tests.
   bool SingleCycle(unsigned timeout_ms);
 
-private:
+ private:
   typedef std::map<int, Handler> HandlerMap;
 
   // Call all the handlers available in fd_set, removing the ones that
@@ -74,4 +74,4 @@ private:
   std::list<Handler> idle_handlers_;
 };
 
-#endif // FD_MUX_H_
+#endif  // FD_MUX_H_

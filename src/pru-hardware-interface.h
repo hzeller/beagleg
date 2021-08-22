@@ -24,7 +24,7 @@
 
 // Pru hardware controls
 class PruHardwareInterface {
-public:
+ public:
   virtual ~PruHardwareInterface() {}
 
   // Initialize the hardware, interrupts, etc...
@@ -45,7 +45,7 @@ public:
 };
 
 class UioPrussInterface : public PruHardwareInterface {
-public:
+ public:
   bool Init();
   bool AllocateSharedMem(void **pru_mmap, const size_t size);
   bool StartExecution();

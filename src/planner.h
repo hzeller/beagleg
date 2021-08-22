@@ -29,10 +29,9 @@ class SegmentQueue;
 // It then plans acceleration and speed profile for the physical
 // machine, and emits these to the SegmentQueue backend.
 class Planner {
-public:
+ public:
   // The planner writes out motor operations to the backend.
-  Planner(const MachineControlConfig *config,
-          HardwareMapping *hardware_mapping,
+  Planner(const MachineControlConfig *config, HardwareMapping *hardware_mapping,
           SegmentQueue *motor_backend);
   ~Planner();
 
@@ -65,7 +64,7 @@ public:
   // Precondition: BringPathToHalt() had been called before.
   void SetExternalPosition(GCodeParserAxis axis, float pos);
 
-private:
+ private:
   class Impl;
   Impl *const impl_;
 };

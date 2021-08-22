@@ -20,8 +20,8 @@
 #define _BEAGLEG_MOTION_QUEUE_H_
 
 #include <stdint.h>
-#include "common/container.h"
 
+#include "common/container.h"
 #include "pru-hardware-interface.h"
 
 // Number of motors handled by motion segment.
@@ -40,7 +40,8 @@
 //
 // There are different implementations
 //  - The main implementation uses the BeagleBone PRU.
-//  - There is a simulation implementation that mimicks the operation in the hardware
+//  - There is a simulation implementation that mimicks the operation in the
+//  hardware
 //    and outputs some graphs (sim-firmware.{h,c})
 //  - A 'dummy' implementation does nothing. Good for dry-run situations.
 // operations are basic enough to be executed by any realtime implementation
@@ -49,21 +50,22 @@
 
 struct MotionSegment {
   // Queue header
-  uint8_t state;           // see motor-interface-constants.h STATE_* constants.
+  uint8_t state;  // see motor-interface-constants.h STATE_* constants.
 
   uint8_t direction_bits;
 
   // TravelParameters (needs to match TravelParameters in motor-interface-pru.p)
-  uint16_t loops_accel;    // Phase 1: loops spent in acceleration
-  uint16_t loops_travel;   // Phase 2: lops spent in travel
-  uint16_t loops_decel;    // Phase 3: loops spent in deceleration
-  uint16_t aux;            // all 16 bits can be used
+  uint16_t loops_accel;         // Phase 1: loops spent in acceleration
+  uint16_t loops_travel;        // Phase 2: lops spent in travel
+  uint16_t loops_decel;         // Phase 3: loops spent in deceleration
+  uint16_t aux;                 // all 16 bits can be used
   uint32_t accel_series_index;  // index in taylor
 
-  uint32_t hires_accel_cycles;  // acceleration delay cycles.
-  uint32_t travel_delay_cycles; // travel delay cycles.
+  uint32_t hires_accel_cycles;   // acceleration delay cycles.
+  uint32_t travel_delay_cycles;  // travel delay cycles.
 
-  uint32_t fractions[MOTION_MOTOR_COUNT]; // fixed point fractions to add each step.
+  uint32_t
+    fractions[MOTION_MOTOR_COUNT];  // fixed point fractions to add each step.
 
 #if JERK_EXPERIMENT
   /*
@@ -82,16 +84,16 @@ namespace internal {
 // First 0-23 bits are assigned to the counter, top 24-31 bits to the index.
 // This is an internal implementation detail of the PRUMotionQueue.
 struct QueueStatus {
-  uint32_t counter : 24; // remaining number of cycles to be performed
-  uint32_t index : 8;    // represent the executing slot [0 to QUEUE_LEN - 1]
+  uint32_t counter : 24;  // remaining number of cycles to be performed
+  uint32_t index   : 8;   // represent the executing slot [0 to QUEUE_LEN - 1]
 };
-}
+}  // namespace internal
 
 typedef FixedArray<int, MOTION_MOTOR_COUNT> MotorsRegister;
 
 // Low level motion queue operations.
 class MotionQueue {
-public:
+ public:
   virtual ~MotionQueue() {}
 
   // Enqueue a motion segment into queue. Blocks until capacity of queue allows
@@ -126,7 +128,7 @@ public:
 class HardwareMapping;
 struct PRUCommunication;
 class PRUMotionQueue : public MotionQueue {
-public:
+ public:
   PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
   ~PRUMotionQueue();
 
@@ -136,7 +138,7 @@ public:
   void Shutdown(bool flush_queue);
   int GetPendingElements(uint32_t *head_item_progress);
 
-private:
+ private:
   bool Init();
 
   void ClearPRUAbort(unsigned int idx);
@@ -148,17 +150,15 @@ private:
   unsigned int queue_pos_;
 };
 
-
 // Queue that does nothing. For testing purposes.
 class DummyMotionQueue : public MotionQueue {
-public:
+ public:
   bool Enqueue(MotionSegment *segment) { return true; }
   void WaitQueueEmpty() {}
   void MotorEnable(bool on) {}
   void Shutdown(bool flush_queue) {}
   int GetPendingElements(uint32_t *head_item_progress) {
-    if (head_item_progress)
-      *head_item_progress = 0;
+    if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
 };

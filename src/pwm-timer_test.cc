@@ -3,34 +3,39 @@
  * Test for PWM timers
  */
 
+#include "pwm-timer.h"
+
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <unistd.h>
-
-#include "pwm-timer.h"
 
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <timer> <freq> [<dc>] [<delay>]\n", progname);
-  fprintf(stderr, "Options:\n"
-                  "  <timer>  : timer number to test (4, 5, 6, or 7) (Required)\n"
-                  "  <freq>   : base frequency for the PWM (in hz)   (Required)\n"
-                  "  <dc>     : duty cycle for the PWM (0 to 1)      (Optional, Default: 0.5 (50%%)\n"
-                  "  <delay>  : seconds to delay before stopping PWM (Optional, Default: 5 seconds\n");
+  fprintf(stderr,
+          "Options:\n"
+          "  <timer>  : timer number to test (4, 5, 6, or 7) (Required)\n"
+          "  <freq>   : base frequency for the PWM (in hz)   (Required)\n"
+          "  <dc>     : duty cycle for the PWM (0 to 1)      (Optional, "
+          "Default: 0.5 (50%%)\n"
+          "  <delay>  : seconds to delay before stopping PWM (Optional, "
+          "Default: 5 seconds\n");
   fprintf(stderr, "Parameters must be in the order shown above.\n");
   fprintf(stderr, "A <dc> of 0 will cause the PWM to cycle from .1 to 1.0 \n");
   return 1;
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 3) { return usage(argv[0]); }
+  if (argc < 3) {
+    return usage(argv[0]);
+  }
 
   uint32_t gpio_def;
   switch (atoi(argv[1])) {
-  case 4:  gpio_def = PIN_P8_7;  break;
-  case 5:  gpio_def = PIN_P8_9;  break;
-  case 6:  gpio_def = PIN_P8_10; break;
-  case 7:  gpio_def = PIN_P8_8;  break;
+  case 4: gpio_def = PIN_P8_7; break;
+  case 5: gpio_def = PIN_P8_9; break;
+  case 6: gpio_def = PIN_P8_10; break;
+  case 7: gpio_def = PIN_P8_8; break;
   default: return usage(argv[0]);
   }
   int freq = atoi(argv[2]);

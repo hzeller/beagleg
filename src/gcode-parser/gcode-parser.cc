@@ -41,7 +41,6 @@
 
 #include "common/logging.h"
 #include "common/string-util.h"
-
 #include "simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =
@@ -62,7 +61,8 @@ char gcodep_axis2letter(enum GCodeParserAxis axis) {
   case AXIS_V: return 'V';
   case AXIS_W: return 'W';
   case AXIS_E: return 'E';
-  case GCODE_NUM_AXES: return '?';
+  case GCODE_NUM_AXES:
+    return '?';
     // no default to have compiler warn about new values.
   }
   return '?';
@@ -86,42 +86,39 @@ enum GCodeParserAxis gcodep_letter2axis(char letter) {
 }
 
 static const char *const kCoordinateSystemNames[9] = {
-  "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2", "G59.3"
-};
+  "G54", "G55", "G56", "G57", "G58", "G59", "G59.1", "G59.2", "G59.3"};
 
 // We keep the implementation with all its unnecessary details for the user
 // in this implementation.
 class GCodeParser::Impl {
-public:
+ public:
   Impl(const GCodeParser::Config &config,
        GCodeParser::EventReceiver *parse_events);
   ~Impl();
 
   void ParseBlock(GCodeParser *owner, const char *line, FILE *err_stream);
   int ParseStream(GCodeParser *owner, int input_fd, FILE *err_stream);
-  const char *gcodep_parse_pair_with_linenumber(int line_num,
-                                                const char *line,
-                                                char *letter,
-                                                float *value,
+  const char *gcodep_parse_pair_with_linenumber(int line_num, const char *line,
+                                                char *letter, float *value,
                                                 FILE *err_stream);
   int error_count() const { return error_count_; }
   EventReceiver *callbacks() { return callbacks_; }
 
-private:
+ private:
   enum DebugLevel {
-    DEBUG_NONE        = 0,
-    DEBUG_PARSER      = (1 << 0),
-    DEBUG_EXPRESSION  = (1 << 1)
+    DEBUG_NONE = 0,
+    DEBUG_PARSER = (1 << 0),
+    DEBUG_EXPRESSION = (1 << 1)
   };
 
   // Reset parser, mostly reset relative coordinate systems to whatever they
   // should be in the beginning.
   // Does _not_ reset the machine position.
   void InitProgramDefaults() {
-    unit_to_mm_factor_ = 1.0f;        // G21
-    set_all_axis_to_absolute(true);   // G90
-    set_ijk_absolute(false);          // G91.1
-    reset_G92();                      // No global offset.
+    unit_to_mm_factor_ = 1.0f;       // G21
+    set_all_axis_to_absolute(true);  // G90
+    set_ijk_absolute(false);         // G91.1
+    reset_G92();                     // No global offset.
     set_current_offset(global_offset_g92_, "H");
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
@@ -153,9 +150,7 @@ private:
     ijk_is_absolute_ = absolute;
   }
 
-  void reset_G92() {
-    global_offset_g92_ = kZeroOffset;
-  }
+  void reset_G92() { global_offset_g92_ = kZeroOffset; }
 
   // The following methods set the origin and offset and also
   // inform the event receiver about this change.
@@ -227,14 +222,15 @@ private:
   void gcodep_while_start(const char *line);
 
   const char *gparse_pair(const char *line, char *letter, float *value) {
-    return gcodep_parse_pair_with_linenumber(line_number_, line,
-                                             letter, value, err_msg_);
+    return gcodep_parse_pair_with_linenumber(line_number_, line, letter, value,
+                                             err_msg_);
   }
 
   float abs_axis_pos(const enum GCodeParserAxis axis, const float unit_value) {
-    float relative_to = ((axis_is_absolute_[axis])
-                         ? current_origin()[axis]+current_global_offset()[axis]
-                         : axes_pos_[axis]);
+    float relative_to =
+      ((axis_is_absolute_[axis])
+         ? current_origin()[axis] + current_global_offset()[axis]
+         : axes_pos_[axis]);
     return relative_to + unit_value;
   }
 
@@ -264,11 +260,10 @@ private:
 
   // Read parameter. Do range check.
   bool read_parameter(StringPiece param_name, float *result) const {
-    if (config_.parameters == NULL)
-      return false;
+    if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
-    Config::ParamMap::const_iterator found
-      = config_.parameters->find(ToLower(param_name));
+    Config::ParamMap::const_iterator found =
+      config_.parameters->find(ToLower(param_name));
     if (found != config_.parameters->end()) {
       *result = found->second;
       return true;
@@ -280,8 +275,7 @@ private:
 
   // Read parameter. Do range check.
   bool store_parameter(StringPiece param_name, float value) {
-    if (config_.parameters == NULL)
-      return false;
+    if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
     // zero parameter can never be written.
     if (param_name == "0" || atoi(param_name.ToString().c_str()) >= 5400) {
@@ -294,7 +288,9 @@ private:
   }
 
   const AxesRegister &current_origin() const { return *current_origin_; }
-  const AxesRegister &current_global_offset() const { return *current_global_offset_; }
+  const AxesRegister &current_global_offset() const {
+    return *current_global_offset_;
+  }
 
   enum GCodePrintLevel {
     GLOG_INFO,
@@ -313,8 +309,13 @@ private:
 
   enum ControlKeyword {
     NO_CONTROL_KEYWORD,
-    CK_IF, CK_THEN, CK_ELSE, CK_ELSEIF,
-    CK_WHILE, CK_DO, CK_END
+    CK_IF,
+    CK_THEN,
+    CK_ELSE,
+    CK_ELSEIF,
+    CK_WHILE,
+    CK_DO,
+    CK_END
   };
   SimpleLexer<ControlKeyword> control_parse_;
 
@@ -323,13 +324,13 @@ private:
   FILE *err_msg_;
   int modal_g0_g1_;
   int line_number_;
-  float unit_to_mm_factor_;               // metric: 1.0; imperial 25.4
+  float unit_to_mm_factor_;  // metric: 1.0; imperial 25.4
 
   // We distinguish axes here, because in 3D printers, the E-axis can be
   // set relative independently of the other axes.
-  bool axis_is_absolute_[GCODE_NUM_AXES]; // G90 or G91 active.
+  bool axis_is_absolute_[GCODE_NUM_AXES];  // G90 or G91 active.
   bool ijk_is_absolute_ = false;
-  bool modal_absolute_g90_ = true;        // All axes, but E might differ
+  bool modal_absolute_g90_ = true;  // All axes, but E might differ
 
   // The axes_pos is the current absolute position of the machine
   // in the work-cube. It always is positive in the range of
@@ -354,7 +355,7 @@ private:
   // The current active origin is the machine absolute position with
   // respect to the machine cube. All GCode absolute positions are relative
   // to that absolute position. Just points to the actual register.
-  const AxesRegister *current_origin_;         // active origin.
+  const AxesRegister *current_origin_;  // active origin.
 
   // Active offsets from origin. They can be kNullOffset
   const AxesRegister *current_global_offset_;  // offset rel. to current origin.
@@ -383,73 +384,85 @@ const AxesRegister GCodeParser::Impl::kZeroOffset;
 
 GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
                         GCodeParser::EventReceiver *parse_events)
-  : callbacks_(parse_events), config_(parse_config),
-    program_in_progress_(false),
-    err_msg_(NULL), modal_g0_g1_(0),
-    line_number_(0),
-    unit_to_mm_factor_(1.0),  // G21
-    // When we initialize the machine, we assume the axes to
-    // be at the origin (but it better is G28-ed later)
-    // TODO(hzeller): this might not be what we want. There are situations
-    // in which we know the machine is in some other position (e.g. restarting
-    // a job). So that needs to be more flexible ans possibly be part of the
-    // incoming config.
-    axes_pos_(config_.machine_origin),
-    machine_origin_(config_.machine_origin),
-    // The current origin is the same as the home position (where the home
-    // switches are) That means for CNC machines with machine origins e.g.
-    // on the top right, that all valid coordinates to stay within the
-    // machine cube are negative.
-    current_origin_(&machine_origin_),
-    current_global_offset_(&kZeroOffset),
-    arc_normal_(AXIS_Z),
-    while_err_stream_(NULL), do_while_(false),
-    debug_level_(DEBUG_NONE),
-    error_count_(0)
-{
+    : callbacks_(parse_events),
+      config_(parse_config),
+      program_in_progress_(false),
+      err_msg_(NULL),
+      modal_g0_g1_(0),
+      line_number_(0),
+      unit_to_mm_factor_(1.0),  // G21
+      // When we initialize the machine, we assume the axes to
+      // be at the origin (but it better is G28-ed later)
+      // TODO(hzeller): this might not be what we want. There are situations
+      // in which we know the machine is in some other position (e.g. restarting
+      // a job). So that needs to be more flexible ans possibly be part of the
+      // incoming config.
+      axes_pos_(config_.machine_origin),
+      machine_origin_(config_.machine_origin),
+      // The current origin is the same as the home position (where the home
+      // switches are) That means for CNC machines with machine origins e.g.
+      // on the top right, that all valid coordinates to stay within the
+      // machine cube are negative.
+      current_origin_(&machine_origin_),
+      current_global_offset_(&kZeroOffset),
+      arc_normal_(AXIS_Z),
+      while_err_stream_(NULL),
+      do_while_(false),
+      debug_level_(DEBUG_NONE),
+      error_count_(0) {
   assert(callbacks_);  // otherwise, this is not very useful.
   reset_G92();
   InitProgramDefaults();
   InitCoordSystems();
-  op_parse_.AddKeyword("+",  PLUS);
-  op_parse_.AddKeyword("-",  MINUS);
-  op_parse_.AddKeyword("/",  DIVIDED_BY);
+  op_parse_.AddKeyword("+", PLUS);
+  op_parse_.AddKeyword("-", MINUS);
+  op_parse_.AddKeyword("/", DIVIDED_BY);
   op_parse_.AddKeyword("MOD", MODULO);
-  op_parse_.AddKeyword("*",  TIMES);
+  op_parse_.AddKeyword("*", TIMES);
   op_parse_.AddKeyword("**", POWER);
-  op_parse_.AddKeyword("==", EQ); op_parse_.AddKeyword("EQ", EQ);
-  op_parse_.AddKeyword("!=", NE); op_parse_.AddKeyword("NE", NE);
-  op_parse_.AddKeyword(">",  GT); op_parse_.AddKeyword("GT", GT);
-  op_parse_.AddKeyword(">=", GE); op_parse_.AddKeyword("GE", GE);
-  op_parse_.AddKeyword("<",  LT); op_parse_.AddKeyword("LT", LT);
-  op_parse_.AddKeyword("<=", LE); op_parse_.AddKeyword("LE", LE);
-  op_parse_.AddKeyword("AND", AND2); op_parse_.AddKeyword("&&",  AND2);
+  op_parse_.AddKeyword("==", EQ);
+  op_parse_.AddKeyword("EQ", EQ);
+  op_parse_.AddKeyword("!=", NE);
+  op_parse_.AddKeyword("NE", NE);
+  op_parse_.AddKeyword(">", GT);
+  op_parse_.AddKeyword("GT", GT);
+  op_parse_.AddKeyword(">=", GE);
+  op_parse_.AddKeyword("GE", GE);
+  op_parse_.AddKeyword("<", LT);
+  op_parse_.AddKeyword("LT", LT);
+  op_parse_.AddKeyword("<=", LE);
+  op_parse_.AddKeyword("LE", LE);
+  op_parse_.AddKeyword("AND", AND2);
+  op_parse_.AddKeyword("&&", AND2);
   op_parse_.AddKeyword("OR", NON_EXCLUSIVE_OR);
   op_parse_.AddKeyword("||", NON_EXCLUSIVE_OR);
   op_parse_.AddKeyword("XOR", EXCLUSIVE_OR);
-  op_parse_.AddKeyword("]",  RIGHT_BRACKET);
+  op_parse_.AddKeyword("]", RIGHT_BRACKET);
 
-  op_parse_.AddKeyword("abs",  ABS);
-  op_parse_.AddKeyword("tan",  TAN); op_parse_.AddKeyword("atan", ATAN);
-  op_parse_.AddKeyword("sin",  SIN); op_parse_.AddKeyword("asin", ASIN);
-  op_parse_.AddKeyword("cos",  COS); op_parse_.AddKeyword("acos", ACOS);
-  op_parse_.AddKeyword("exp",  EXP); op_parse_.AddKeyword("ln",   LN);
-  op_parse_.AddKeyword("fix",  FIX);
-  op_parse_.AddKeyword("fup",  FUP);
+  op_parse_.AddKeyword("abs", ABS);
+  op_parse_.AddKeyword("tan", TAN);
+  op_parse_.AddKeyword("atan", ATAN);
+  op_parse_.AddKeyword("sin", SIN);
+  op_parse_.AddKeyword("asin", ASIN);
+  op_parse_.AddKeyword("cos", COS);
+  op_parse_.AddKeyword("acos", ACOS);
+  op_parse_.AddKeyword("exp", EXP);
+  op_parse_.AddKeyword("ln", LN);
+  op_parse_.AddKeyword("fix", FIX);
+  op_parse_.AddKeyword("fup", FUP);
   op_parse_.AddKeyword("round", ROUND);
   op_parse_.AddKeyword("sqrt", SQRT);
 
-  control_parse_.AddKeyword("if",     CK_IF);
-  control_parse_.AddKeyword("then",   CK_THEN);
-  control_parse_.AddKeyword("else",   CK_ELSE);
+  control_parse_.AddKeyword("if", CK_IF);
+  control_parse_.AddKeyword("then", CK_THEN);
+  control_parse_.AddKeyword("else", CK_ELSE);
   control_parse_.AddKeyword("elseif", CK_ELSEIF);
-  control_parse_.AddKeyword("while",  CK_WHILE);
-  control_parse_.AddKeyword("do",     CK_DO);
-  control_parse_.AddKeyword("end",    CK_END);
+  control_parse_.AddKeyword("while", CK_WHILE);
+  control_parse_.AddKeyword("do", CK_DO);
+  control_parse_.AddKeyword("end", CK_END);
 }
 
-GCodeParser::Impl::~Impl() {
-}
+GCodeParser::Impl::~Impl() {}
 
 // gcode-printf. Prints message to stream or stderr.
 // level
@@ -457,18 +470,15 @@ GCodeParser::Impl::~Impl() {
 //   1    G-Code Syntax Error with line number
 //   2    G-Code Syntax Error
 //   3    Expression handling information (conditional on M111 S2)
-void GCodeParser::Impl::gprintf(enum GCodePrintLevel level,
-                                const char *format, ...) {
+void GCodeParser::Impl::gprintf(enum GCodePrintLevel level, const char *format,
+                                ...) {
   FILE *stream = err_msg_;
   if (stream == NULL) stream = stderr;
   switch (level) {
   case GLOG_EXPRESSION:
-    if (!(debug_level_ & DEBUG_EXPRESSION))
-      return;
+    if (!(debug_level_ & DEBUG_EXPRESSION)) return;
     // fallthru
-  case GLOG_INFO:
-    fprintf(stream, "// ");
-    break;
+  case GLOG_INFO: fprintf(stream, "// "); break;
   case GLOG_SYNTAX_ERR:
     fprintf(stream, "// Line %d: G-Code Syntax Error: ", line_number_);
     ++error_count_;
@@ -485,8 +495,7 @@ void GCodeParser::Impl::gprintf(enum GCodePrintLevel level,
 }
 
 static const char *skip_white(const char *line) {
-  while (*line && isspace(*line))
-    line++;
+  while (*line && isspace(*line)) line++;
   return line;
 }
 
@@ -508,8 +517,10 @@ static const char *ParseGcodeNumber(const char *line, float *value) {
     if ((*src == '+' || *src == '-') && dst != buffer) break;
     // only allow one decimal point
     if (*src == '.') {
-      if (have_point) break;
-      else have_point = true;
+      if (have_point)
+        break;
+      else
+        have_point = true;
     }
     *dst++ = *src++;
   }
@@ -524,7 +535,7 @@ static const char *ParseGcodeNumber(const char *line, float *value) {
 // a named one.
 // Returns the remainder of the line or NULL if parameter name could not
 // be parsed.
-const char* GCodeParser::Impl::read_param_name(const char *line,
+const char *GCodeParser::Impl::read_param_name(const char *line,
                                                std::string *result) {
   line = skip_white(line);
   if (*line == '\0') {
@@ -532,14 +543,15 @@ const char* GCodeParser::Impl::read_param_name(const char *line,
     return NULL;
   }
 
-  const bool bracketed = (*line == '<');   // #<foo>-style variables.
-  if (bracketed)
-    ++line;
+  const bool bracketed = (*line == '<');  // #<foo>-style variables.
+  if (bracketed) ++line;
 
   const bool numeric_parameter = *line == '#' || isdigit(*line);
   if (numeric_parameter && bracketed) {
-    gprintf(GLOG_SYNTAX_ERR, "The #<> bracket syntax is only allowed for "
-            "the alphanumeric parameters (at %s)", line);
+    gprintf(GLOG_SYNTAX_ERR,
+            "The #<> bracket syntax is only allowed for "
+            "the alphanumeric parameters (at %s)",
+            line);
     return NULL;
   }
 
@@ -548,21 +560,19 @@ const char* GCodeParser::Impl::read_param_name(const char *line,
     float index;
     const char *endptr = gcodep_value(line, &index);
     if (endptr == NULL) {
-      gprintf(GLOG_SYNTAX_ERR,
-              "'#' is not followed by a number but '%s'\n", line);
+      gprintf(GLOG_SYNTAX_ERR, "'#' is not followed by a number but '%s'\n",
+              line);
       return NULL;
     }
     line = endptr;
-    *result = StringPrintf("%d", (int) index);
+    *result = StringPrintf("%d", (int)index);
   } else {
     result->clear();
     // Allowing alpha-numeric parameters.
-    while (*line
-           && ((*line >= '0' && *line <= '9')
-               || (*line >= 'A' && *line <= 'Z')
-               || (*line >= 'a' && *line <= 'z')
-               || *line == '_'
-               || (bracketed && isspace(*line)))) {
+    while (*line &&
+           ((*line >= '0' && *line <= '9') || (*line >= 'A' && *line <= 'Z') ||
+            (*line >= 'a' && *line <= 'z') || *line == '_' ||
+            (bracketed && isspace(*line)))) {
       if (!isspace(*line)) {
         result->append(1, *line);
       }
@@ -582,7 +592,8 @@ const char* GCodeParser::Impl::read_param_name(const char *line,
   return result->empty() ? NULL : skip_white(line);
 }
 
-const char *GCodeParser::Impl::gcodep_parameter(const char *line, float *value) {
+const char *GCodeParser::Impl::gcodep_parameter(const char *line,
+                                                float *value) {
   std::string param_name;
   line = read_param_name(line, &param_name);
   if (line == NULL) return NULL;
@@ -595,9 +606,7 @@ const char *GCodeParser::Impl::gcodep_parameter(const char *line, float *value) 
 bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
   float val;
   switch (op) {
-  case ABS:
-    val = fabsf(*value);
-    break;
+  case ABS: val = fabsf(*value); break;
   case ACOS:
     if (*value < -1.0f || *value > 1.0f) {
       gprintf(GLOG_SYNTAX_ERR, "ACOS argument out of range\n");
@@ -612,18 +621,10 @@ bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
     }
     val = (asinf(*value) * 180.0f) / M_PI;
     break;
-  case COS:
-    val = cosf((*value * M_PI) / 180.0f);
-    break;
-  case EXP:
-    val = expf(*value);
-    break;
-  case FIX:
-    val = floorf(*value);
-    break;
-  case FUP:
-    val = ceilf(*value);
-    break;
+  case COS: val = cosf((*value * M_PI) / 180.0f); break;
+  case EXP: val = expf(*value); break;
+  case FIX: val = floorf(*value); break;
+  case FUP: val = ceilf(*value); break;
   case LN:
     if (*value <= 0.0f) {
       gprintf(GLOG_SYNTAX_ERR, "Zero or negative argument to LN\n");
@@ -634,9 +635,7 @@ bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
   case ROUND:
     val = (double)((int)(*value + ((*value < 0.0f) ? -0.5f : 0.5f)));
     break;
-  case SIN:
-    val = sinf((*value * M_PI) / 180.0f);
-    break;
+  case SIN: val = sinf((*value * M_PI) / 180.0f); break;
   case SQRT:
     if (*value < 0.0f) {
       gprintf(GLOG_SYNTAX_ERR, "Negative argument to SQRT\n");
@@ -644,15 +643,13 @@ bool GCodeParser::Impl::execute_unary(float *value, Operation op) {
     }
     val = sqrtf(*value);
     break;
-  case TAN:
-    val = tanf((*value * M_PI) / 180.0f);
-    break;
+  case TAN: val = tanf((*value * M_PI) / 180.0f); break;
   default:
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown unary operation\n");
     return false;
   }
-  gprintf(GLOG_EXPRESSION, "%s[%f] -> %f\n", op_parse_.AsString(op),
-          *value, val);
+  gprintf(GLOG_EXPRESSION, "%s[%f] -> %f\n", op_parse_.AsString(op), *value,
+          val);
   *value = val;
   return true;
 }
@@ -680,8 +677,8 @@ const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
   line = endptr;
 
   float val = (atan2f(*value, value2) * 180.0f) / M_PI;
-  gprintf(GLOG_EXPRESSION, "%s[%f]/[%f] -> %f\n",
-          op_parse_.AsString(ATAN), *value, value2, val);
+  gprintf(GLOG_EXPRESSION, "%s[%f]/[%f] -> %f\n", op_parse_.AsString(ATAN),
+          *value, value2, val);
   *value = val;
   return line;
 }
@@ -737,12 +734,14 @@ const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
   return line;
 }
 
-bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) {
+bool GCodeParser::Impl::execute_binary(float *left, Operation op,
+                                       float *right) {
   float val = *left;
   switch (op) {
   case POWER:
     if (*left < 0.0f && floor(*right) != *right) {
-      gprintf(GLOG_SYNTAX_ERR, "Attempt to raise negative to non-integer power\n");
+      gprintf(GLOG_SYNTAX_ERR,
+              "Attempt to raise negative to non-integer power\n");
       return false;
     }
     val = powf(*left, *right);
@@ -757,52 +756,33 @@ bool GCodeParser::Impl::execute_binary(float *left, Operation op, float *right) 
   case MODULO:
     val = fmodf(*left, *right);
     // always calculates a positive answer
-    if (val < 0.0f)
-      val += fabsf(*right);
+    if (val < 0.0f) val += fabsf(*right);
     break;
-  case TIMES:
-    val = *left * *right;
-    break;
-  case AND2:
-    val = (*left == 0.0f || *right == 0.0f) ? 0.0f : 1.0f;
-    break;
+  case TIMES: val = *left * *right; break;
+  case AND2: val = (*left == 0.0f || *right == 0.0f) ? 0.0f : 1.0f; break;
   case EXCLUSIVE_OR:
     val = (((*left == 0.0f) && (*right != 0.0f)) ||
-           ((*left != 0.0f) && (*right == 0.0f))) ? 1.0f : 0.0f;
+           ((*left != 0.0f) && (*right == 0.0f)))
+            ? 1.0f
+            : 0.0f;
     break;
-  case MINUS:
-    val = *left - *right;
-    break;
+  case MINUS: val = *left - *right; break;
   case NON_EXCLUSIVE_OR:
     val = ((*left != 0.0f) || (*right != 0.0f)) ? 1.0f : 0.0f;
     break;
-  case PLUS:
-    val = *left + *right;
-    break;
-  case EQ:
-    val = (*left == *right) ? 1.0f : 0.0f;
-    break;
-  case NE:
-    val = (*left != *right) ? 1.0f : 0.0f;
-    break;
-  case GT:
-    val = (*left > *right) ? 1.0f : 0.0f;
-    break;
-  case GE:
-    val = (*left >= *right) ? 1.0f : 0.0f;
-    break;
-  case LT:
-    val = (*left < *right) ? 1.0f : 0.0f;
-    break;
-  case LE:
-    val = (*left <= *right) ? 1.0f : 0.0f;
-    break;
+  case PLUS: val = *left + *right; break;
+  case EQ: val = (*left == *right) ? 1.0f : 0.0f; break;
+  case NE: val = (*left != *right) ? 1.0f : 0.0f; break;
+  case GT: val = (*left > *right) ? 1.0f : 0.0f; break;
+  case GE: val = (*left >= *right) ? 1.0f : 0.0f; break;
+  case LT: val = (*left < *right) ? 1.0f : 0.0f; break;
+  case LE: val = (*left <= *right) ? 1.0f : 0.0f; break;
   default:
     gprintf(GLOG_SYNTAX_ERR, "Attempt to execute unknown binary operation\n");
     return false;
   }
-  gprintf(GLOG_EXPRESSION, "[%f %s %f] -> %f\n",
-          *left, op_parse_.AsString(op), *right, val);
+  gprintf(GLOG_EXPRESSION, "[%f %s %f] -> %f\n", *left, op_parse_.AsString(op),
+          *right, val);
   *left = val;
   return true;
 }
@@ -819,20 +799,21 @@ const char *GCodeParser::Impl::gcodep_operation(const char *line,
 }
 
 // the expression stack needs to be at least one greater than the max precedence
-#define MAX_STACK   6
+#define MAX_STACK 6
 
-const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value) {
+const char *GCodeParser::Impl::gcodep_expression(const char *line,
+                                                 float *value) {
   float vals[MAX_STACK];
   Operation ops[MAX_STACK];
   int stack = 0;
   const char *endptr;
   line = skip_white(line);
 
-  for (ops[0] = NO_OPERATION; ops[0] != RIGHT_BRACKET; ) {
+  for (ops[0] = NO_OPERATION; ops[0] != RIGHT_BRACKET;) {
     endptr = gcodep_value(line, &vals[stack]);
     if (endptr == NULL) {
       if (*line == '-') {
-        line = skip_white(line+1);
+        line = skip_white(line + 1);
         if (*line == '-') {
           gprintf(GLOG_SYNTAX_ERR, "double-negative detected\n");
           return NULL;
@@ -857,8 +838,7 @@ const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value)
 
     // handle the first left value and single value for the unary operations
     if (stack == 0) {
-      if (ops[stack] == RIGHT_BRACKET)
-        break;
+      if (ops[stack] == RIGHT_BRACKET) break;
       stack++;
       continue;
     }
@@ -870,12 +850,13 @@ const char *GCodeParser::Impl::gcodep_expression(const char *line, float *value)
         return NULL;
       }
     } else {  // precedence of latest operator is <= previous precedence
-      for ( ; precedence(ops[stack]) <= precedence(ops[stack - 1]); ) {
+      for (; precedence(ops[stack]) <= precedence(ops[stack - 1]);) {
         if (!execute_binary(&vals[stack - 1], ops[stack - 1], &vals[stack]))
           return NULL;
 
         ops[stack - 1] = ops[stack];
-        if (stack > 1 && precedence(ops[stack - 1]) <= precedence(ops[stack - 2]))
+        if (stack > 1 &&
+            precedence(ops[stack - 1]) <= precedence(ops[stack - 2]))
           stack--;
         else
           break;
@@ -896,26 +877,15 @@ const char *GCodeParser::Impl::gcodep_value(const char *line, float *value) {
 
   const char *endptr;
   switch (c) {
-  case '\0':
-    endptr = NULL;
-    break;
-  case '[':
-    endptr = gcodep_expression(line + 1, value);
-    break;
-  case '#':
-    endptr = gcodep_parameter(line + 1, value);
-    break;
-  case 'U':
-    endptr = gcodep_unary(line, value);
-    break;
-  default:
-    endptr = ParseGcodeNumber(line, value);
-    break;
+  case '\0': endptr = NULL; break;
+  case '[': endptr = gcodep_expression(line + 1, value); break;
+  case '#': endptr = gcodep_parameter(line + 1, value); break;
+  case 'U': endptr = gcodep_unary(line, value); break;
+  default: endptr = ParseGcodeNumber(line, value); break;
   }
-  if (line == endptr || endptr == NULL)
-    return NULL;
+  if (line == endptr || endptr == NULL) return NULL;
 
-  line = skip_white(endptr); // Makes the line better to deal with.
+  line = skip_white(endptr);  // Makes the line better to deal with.
   return line;
 }
 
@@ -926,18 +896,16 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   const char *log_name = param_name.c_str();
 
   float value;
-  if (*line     == '+' &&
-      *(line+1) == '+') {
-    line = skip_white(line+2);
+  if (*line == '+' && *(line + 1) == '+') {
+    line = skip_white(line + 2);
     read_parameter(param_name, &value);
     value++;
     store_parameter(param_name, value);
     gprintf(GLOG_EXPRESSION, "#%s++ -> #%s=%f\n", log_name, log_name, value);
     return line;
   }
-  if (*line     == '-' &&
-      *(line+1) == '-') {
-    line = skip_white(line+2);
+  if (*line == '-' && *(line + 1) == '-') {
+    line = skip_white(line + 2);
     read_parameter(param_name, &value);
     value--;
     store_parameter(param_name, value);
@@ -946,24 +914,20 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   }
 
   Operation op = NO_OPERATION;
-  if (*line     == '+' &&
-      *(line+1) == '=') {
-    line = skip_white(line+2);
+  if (*line == '+' && *(line + 1) == '=') {
+    line = skip_white(line + 2);
     op = PLUS;
-  } else if (*line     == '-' &&
-             *(line+1) == '=') {
-    line = skip_white(line+2);
+  } else if (*line == '-' && *(line + 1) == '=') {
+    line = skip_white(line + 2);
     op = MINUS;
-  } else if (*line     == '*' &&
-             *(line+1) == '=') {
-    line = skip_white(line+2);
+  } else if (*line == '*' && *(line + 1) == '=') {
+    line = skip_white(line + 2);
     op = TIMES;
-  } else if (*line     == '/' &&
-             *(line+1) == '=') {
-    line = skip_white(line+2);
+  } else if (*line == '/' && *(line + 1) == '=') {
+    line = skip_white(line + 2);
     op = DIVIDED_BY;
   } else if (*line == '=') {
-    line = skip_white(line+1);
+    line = skip_white(line + 1);
   } else {
     if (*line == '\0') {
       value = 0.0;
@@ -991,42 +955,43 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   if (op != NO_OPERATION) {
     float left;
     read_parameter(param_name, &left);
-    if (!execute_binary(&left, op, &value))
-      return NULL;
+    if (!execute_binary(&left, op, &value)) return NULL;
     value = left;
   } else {
     // see if this is a ternary operation '? :'
     if (*line == '?') {
       bool condition = (value != 0.0f);
-      line = skip_white(line+1);
+      line = skip_white(line + 1);
 
       endptr = gcodep_value(line, &value);
       if (endptr == NULL) {
-        gprintf(GLOG_SYNTAX_ERR,
-                "gcodep_set_parameter: expected value after '#%s=[%d] ? ' got '%s'\n",
-                log_name, line, condition);
+        gprintf(
+          GLOG_SYNTAX_ERR,
+          "gcodep_set_parameter: expected value after '#%s=[%d] ? ' got '%s'\n",
+          log_name, line, condition);
         return NULL;
       }
       line = skip_white(endptr);
       float true_value = value;
 
       if (*line == ':') {
-        line = skip_white(line+1);
+        line = skip_white(line + 1);
         endptr = gcodep_value(line, &value);
         if (endptr == NULL) {
           gprintf(GLOG_SYNTAX_ERR,
-                  "gcodep_set_parameter: expected value after '#%s=[%d] ? %f :' got '%s'\n",
+                  "gcodep_set_parameter: expected value after '#%s=[%d] ? %f "
+                  ":' got '%s'\n",
                   log_name, line, condition, true_value);
           return NULL;
         }
         line = skip_white(endptr);
 
-        if (condition)
-          value = true_value;
+        if (condition) value = true_value;
       } else {
-        gprintf(GLOG_SYNTAX_ERR,
-                "gcodep_set_parameter: expected ':' after '#%s=[%d] ? %f' got '%s'\n",
-                log_name, line, condition, true_value);
+        gprintf(
+          GLOG_SYNTAX_ERR,
+          "gcodep_set_parameter: expected ':' after '#%s=[%d] ? %f' got '%s'\n",
+          log_name, line, condition, true_value);
         return NULL;
       }
     }
@@ -1049,8 +1014,7 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
   float value = 0.0f;
   const char *endptr;
   endptr = gcodep_expression(line + 1, &value);
-  if (line == endptr || endptr == NULL)
-    return;
+  if (line == endptr || endptr == NULL) return;
 
   const bool condition = (value == 1.0f) ? true : false;
 
@@ -1075,11 +1039,9 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
     // see if there is an ELSE
     // (TODO: make these with control_parser_)
     while (*line != '\0') {
-      if (toupper(*line)     == 'E' &&
-          toupper(*(line+1)) == 'L' &&
-          toupper(*(line+2)) == 'S' &&
-          toupper(*(line+3)) == 'E') {
-        line = skip_white(line+4);
+      if (toupper(*line) == 'E' && toupper(*(line + 1)) == 'L' &&
+          toupper(*(line + 2)) == 'S' && toupper(*(line + 3)) == 'E') {
+        line = skip_white(line + 4);
         have_else = true;
         break;
       } else {
@@ -1088,9 +1050,8 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
     }
     if (have_else) {
       // ELSEIF
-      if (toupper(*line)     == 'I' &&
-          toupper(*(line+1)) == 'F') {
-        line = skip_white(line+2);
+      if (toupper(*line) == 'I' && toupper(*(line + 1)) == 'F') {
+        line = skip_white(line + 2);
         gcodep_conditional(line);
         return;
       }
@@ -1099,8 +1060,10 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
       if (*line == '#') {
         gcodep_set_parameter(++line);  // TODO: error handling ?
       } else {
-        gprintf(GLOG_SYNTAX_ERR, "expected '#' after IF [...] THEN ... ELSE "
-                "got '%s'\n", line);
+        gprintf(GLOG_SYNTAX_ERR,
+                "expected '#' after IF [...] THEN ... ELSE "
+                "got '%s'\n",
+                line);
         return;
       }
     }
@@ -1108,33 +1071,32 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
 }
 
 void GCodeParser::Impl::gcodep_while_end() {
-    int loops = 0;
-    while (1) {
-      const char *line = while_condition_.c_str();
-      const char *endptr;
-      float value;
-      // the '[' was already parsed
-      endptr = gcodep_expression(line, &value);
-      if (endptr == NULL) {
-        gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
-        return;
-      }
-      if (value == 0.0f)
-        break;
-
-      line = skip_white(endptr);
-      if (control_parse_.ExpectNext(&line, CK_DO)) {
-        std::vector<StringPiece> piece = SplitString(while_loop_, "\n");
-        for (size_t i=0; i < piece.size(); i++)
-          ParseBlock(while_owner_, piece[i].ToString().c_str(),
-                     while_err_stream_);
-      } else {
-        gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
-        return;
-      }
-      loops++;
+  int loops = 0;
+  while (1) {
+    const char *line = while_condition_.c_str();
+    const char *endptr;
+    float value;
+    // the '[' was already parsed
+    endptr = gcodep_expression(line, &value);
+    if (endptr == NULL) {
+      gprintf(GLOG_SYNTAX_ERR, "expected value got '%s'\n", line);
+      return;
     }
-    gprintf(GLOG_INFO, "Executed %d loops\n", loops);
+    if (value == 0.0f) break;
+
+    line = skip_white(endptr);
+    if (control_parse_.ExpectNext(&line, CK_DO)) {
+      std::vector<StringPiece> piece = SplitString(while_loop_, "\n");
+      for (size_t i = 0; i < piece.size(); i++)
+        ParseBlock(while_owner_, piece[i].ToString().c_str(),
+                   while_err_stream_);
+    } else {
+      gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
+      return;
+    }
+    loops++;
+  }
+  gprintf(GLOG_INFO, "Executed %d loops\n", loops);
 }
 
 void GCodeParser::Impl::gcodep_while_do(const char *line) {
@@ -1155,27 +1117,23 @@ void GCodeParser::Impl::gcodep_while_start(const char *line) {
     gprintf(GLOG_SYNTAX_ERR, "expected '[' after WHILE got '%s'\n", line);
     return;
   }
-  line = skip_white(line+1);
+  line = skip_white(line + 1);
 
   while_condition_ = line;
   while_loop_ = "";
-  do_while_= true;
+  do_while_ = true;
 }
 
 // Parse next letter/number pair.
 // Returns the remaining line or NULL if end reached.
 const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
-  int line_num, const char *line,
-  char *letter, float *value,
-  FILE *err_stream)
-{
+  int line_num, const char *line, char *letter, float *value,
+  FILE *err_stream) {
   // TODO: error callback when we have errors with messages.
-  if (line == NULL)
-    return NULL;
+  if (line == NULL) return NULL;
   line = skip_white(line);
 
-  if (*line == '\0' || *line == ';' || *line == '%')
-    return NULL;
+  if (*line == '\0' || *line == ';' || *line == '%') return NULL;
 
   if (do_while_) {
     gcodep_while_do(line);
@@ -1183,8 +1141,7 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
   }
 
   if (*line == '(') {  // Comment between words; e.g. G0(move) X1(this axis)
-    while (*line && *line != ')')
-      line++;
+    while (*line && *line != ')') line++;
     line = skip_white(line + 1);
     if (*line == '\0') return NULL;
   }
@@ -1203,8 +1160,7 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
   if (*line == '#') {  // parameter set without a letter
     line++;
     endptr = gcodep_set_parameter(line);
-    if (endptr == NULL)
-      return NULL;
+    if (endptr == NULL) return NULL;
 
     // recursive call to parse the letter/number pair
     line = endptr;
@@ -1218,15 +1174,14 @@ const char *GCodeParser::Impl::gcodep_parse_pair_with_linenumber(
     return NULL;
   }
   // If this line has a checksum, we ignore it. In fact, the line is done.
-  if (*letter == '*')
-    return NULL;
+  if (*letter == '*') return NULL;
   line = skip_white(line);
 
   endptr = gcodep_value(line, value);
   if (endptr == NULL) {
     gprintf(GLOG_SYNTAX_ERR,
-            "Letter '%c' is not followed by a number but '%s'\n",
-            *letter, line);
+            "Letter '%c' is not followed by a number but '%s'\n", *letter,
+            line);
     return NULL;
   }
   line = endptr;
@@ -1241,8 +1196,7 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   const char *remaining_line;
   while ((remaining_line = gparse_pair(line, &axis_l, &dummy))) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
-    if (axis == GCODE_NUM_AXES)
-      break;  //  Possibly start of new command.
+    if (axis == GCODE_NUM_AXES) break;  //  Possibly start of new command.
     homing_flags |= (1 << axis);
     line = remaining_line;
   }
@@ -1281,7 +1235,7 @@ void GCodeParser::Impl::InitCoordSystems() {
   }
 
   if (!read_parameter("5220", &value) || value < 1 || value > 9) {
-    value = 1;     // If not set or invalid, force G54
+    value = 1;  // If not set or invalid, force G54
     store_parameter("5220", value);
   }
 
@@ -1290,8 +1244,8 @@ void GCodeParser::Impl::InitCoordSystems() {
 
   current_origin_ = &coord_system_[coord_system];
   inform_origin_offset_change(kCoordinateSystemNames[coord_system]);
-  Log_debug("Using Coordinate system #5220=%d: %s",
-            coord_system + 1, kCoordinateSystemNames[coord_system]);
+  Log_debug("Using Coordinate system #5220=%d: %s", coord_system + 1,
+            kCoordinateSystemNames[coord_system]);
 }
 
 // Set coordinate system data
@@ -1308,13 +1262,14 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   float value;
   const char *remaining_line;
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
-    if (letter == 'L') l_val = (int)value;
-    else if (letter == 'P') p_val = (int)value;
+    if (letter == 'L')
+      l_val = (int)value;
+    else if (letter == 'P')
+      p_val = (int)value;
     else {
       const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
       const float unit_val = value * unit_to_mm_factor_;
-      if (axis == GCODE_NUM_AXES)
-        break;  //  Possibly start of new command.
+      if (axis == GCODE_NUM_AXES) break;  //  Possibly start of new command.
       coords[axis] = unit_val;
       have_val[axis] = true;
     }
@@ -1330,19 +1285,21 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   }
 
   if (p_val < 1 || p_val > 9) {
-    gprintf(GLOG_SEMANTIC_ERR, "G10 L2 P%d - coordinate system P-value needs "
-            "to be between P1..P9\n", p_val);
+    gprintf(GLOG_SEMANTIC_ERR,
+            "G10 L2 P%d - coordinate system P-value needs "
+            "to be between P1..P9\n",
+            p_val);
     return line;
   }
 
-  const int cs = p_val - 1;   // Target coordinate system.
+  const int cs = p_val - 1;  // Target coordinate system.
 
   // Update coordinate system with values that changed.
   for (GCodeParserAxis a : AllAxes()) {
     if (!have_val[a]) continue;
     coord_system_[cs][a] = modal_absolute_g90_
-      ? machine_origin_[a] + coords[a]
-      : coord_system_[cs][a] + coords[a];
+                             ? machine_origin_[a] + coords[a]
+                             : coord_system_[cs][a] + coords[a];
   }
 
   // Now update the parameters
@@ -1382,18 +1339,30 @@ void GCodeParser::Impl::change_coord_system(float sub_command) {
   case 57: coord_system = 4; break;
   case 58: coord_system = 5; break;
   case 59:
-    if (sub_command == 59.0f) { coord_system = 6; break; }
-    if (sub_command == 59.1f) { coord_system = 7; break; }
-    if (sub_command == 59.2f) { coord_system = 8; break; }
-    if (sub_command == 59.3f) { coord_system = 9; break; }
+    if (sub_command == 59.0f) {
+      coord_system = 6;
+      break;
+    }
+    if (sub_command == 59.1f) {
+      coord_system = 7;
+      break;
+    }
+    if (sub_command == 59.2f) {
+      coord_system = 8;
+      break;
+    }
+    if (sub_command == 59.3f) {
+      coord_system = 9;
+      break;
+    }
     // fallthru
   default:
     gprintf(GLOG_SYNTAX_ERR, "invalid coordinate system %.1f\n", sub_command);
     return;
   }
   store_parameter("5220", coord_system);
-  current_origin_ = &coord_system_[coord_system-1];
-  inform_origin_offset_change(kCoordinateSystemNames[coord_system-1]);
+  current_origin_ = &coord_system_[coord_system - 1];
+  inform_origin_offset_change(kCoordinateSystemNames[coord_system - 1]);
 }
 
 // Set relative coordinate system
@@ -1407,24 +1376,20 @@ const char *GCodeParser::Impl::handle_G92(float sub_command, const char *line) {
     while ((remaining_line = gparse_pair(line, &axis_l, &value))) {
       const float unit_val = value * unit_to_mm_factor_;
       const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
-      if (axis == GCODE_NUM_AXES)
-        break;    // Possibly start of new command.
+      if (axis == GCODE_NUM_AXES) break;  // Possibly start of new command.
       // This sets the given value to be the new zero.
-      global_offset_g92_[axis] = (axes_pos_[axis] - unit_val) -
-        current_origin()[axis];
+      global_offset_g92_[axis] =
+        (axes_pos_[axis] - unit_val) - current_origin()[axis];
 
       line = remaining_line;
     }
     set_current_offset(global_offset_g92_, "G92");
-  }
-  else if (sub_command == 92.1f) {   // Reset
+  } else if (sub_command == 92.1f) {  // Reset
     reset_G92();
     set_current_offset(global_offset_g92_, "");
-  }
-  else if (sub_command == 92.2f) {   // Suspend
+  } else if (sub_command == 92.2f) {  // Suspend
     set_current_offset(kZeroOffset, "");
-  }
-  else if (sub_command == 92.3f) {   // Restore
+  } else if (sub_command == 92.3f) {  // Restore
     set_current_offset(global_offset_g92_, "G92");
   }
   return line;
@@ -1432,13 +1397,13 @@ const char *GCodeParser::Impl::handle_G92(float sub_command, const char *line) {
 
 // Set a parameter on a callback that takes exacly one float.
 const char *GCodeParser::Impl::set_param(char param_letter,
-                                         EventValueSetter setter,
-                                         float factor, const char *line) {
+                                         EventValueSetter setter, float factor,
+                                         const char *line) {
   char letter;
   float value;
   const char *remaining_line = gparse_pair(line, &letter, &value);
   if (remaining_line != NULL && letter == param_letter) {
-    (callbacks()->*setter)(factor * value);   // TODO
+    (callbacks()->*setter)(factor * value);  // TODO
     return remaining_line;
   }
   return line;
@@ -1448,7 +1413,8 @@ static float f_param_to_feedrate(const float unit_value) {
   return unit_value / 60.0f;  // feedrates are units per minute.
 }
 
-const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) {
+const char *GCodeParser::Impl::handle_move(const char *line,
+                                           bool force_change) {
   char axis_l;
   float value;
   bool any_change = force_change;
@@ -1462,11 +1428,9 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
     if (axis_l == 'F') {
       feedrate = f_param_to_feedrate(unit_value);
       any_change = true;
-    }
-    else if (axis_l == 'S') {
+    } else if (axis_l == 'S') {
       callbacks()->change_spindle_speed(value);
-    }
-    else {
+    } else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
         break;  // Invalid axis: possibly start of new command.
@@ -1499,12 +1463,11 @@ const char *GCodeParser::Impl::handle_move(const char *line, bool force_change) 
 // If the value of the radius argument is negative, that means [NCMS,
 // page 21] that an arc larger than a semicircle is to be made.
 // Otherwise, an arc of a semicircle or less is made.
-static bool arc_radius_to_center(float start1, float start2,
-                                 float end1, float end2,
-                                 float radius, bool is_cw,
+static bool arc_radius_to_center(float start1, float start2, float end1,
+                                 float end2, float radius, bool is_cw,
                                  float *center1, float *center2) {
   if (end1 == start1 && end2 == start2)
-    return false;               // start point same as end point
+    return false;  // start point same as end point
 
   const float abs_radius = fabs(radius);
   const float mid1 = (end1 + start1) / 2.0f;
@@ -1512,9 +1475,9 @@ static bool arc_radius_to_center(float start1, float start2,
 
   float half_length = hypotf(mid1 - end1, mid2 - end2);
   if ((half_length / abs_radius) > (1 + 1e-6))
-    return false;               // radius to small to reach end point
+    return false;  // radius to small to reach end point
   if ((half_length / abs_radius) > (1 - 1e-6))
-    half_length = abs_radius;   // allow a small error for semicircle
+    half_length = abs_radius;  // allow a small error for semicircle
 
   float theta;
   if ((is_cw && radius > 0) || (!is_cw && radius < 0))
@@ -1603,32 +1566,27 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
         return line;
       }
       break;
-    default:
-      return line;  // invalid plane
+    default: return line;  // invalid plane
     }
   } else if (have_r) {
     bool have_center;
     switch (arc_normal_) {
     case AXIS_Z:
-      have_center = arc_radius_to_center(axes_pos_[AXIS_X], axes_pos_[AXIS_Y],
-                                         target[AXIS_X], target[AXIS_Y],
-                                         radius, is_cw,
-                                         &offset[AXIS_X], &offset[AXIS_Y]);
+      have_center = arc_radius_to_center(
+        axes_pos_[AXIS_X], axes_pos_[AXIS_Y], target[AXIS_X], target[AXIS_Y],
+        radius, is_cw, &offset[AXIS_X], &offset[AXIS_Y]);
       break;
     case AXIS_X:
-      have_center = arc_radius_to_center(axes_pos_[AXIS_Y], axes_pos_[AXIS_Z],
-                                         target[AXIS_Y], target[AXIS_Z],
-                                         radius, is_cw,
-                                         &offset[AXIS_Y], &offset[AXIS_Z]);
+      have_center = arc_radius_to_center(
+        axes_pos_[AXIS_Y], axes_pos_[AXIS_Z], target[AXIS_Y], target[AXIS_Z],
+        radius, is_cw, &offset[AXIS_Y], &offset[AXIS_Z]);
       break;
     case AXIS_Y:
-      have_center = arc_radius_to_center(axes_pos_[AXIS_X], axes_pos_[AXIS_Z],
-                                         target[AXIS_X], target[AXIS_Z],
-                                         radius, is_cw,
-                                         &offset[AXIS_X], &offset[AXIS_Z]);
+      have_center = arc_radius_to_center(
+        axes_pos_[AXIS_X], axes_pos_[AXIS_Z], target[AXIS_X], target[AXIS_Z],
+        radius, is_cw, &offset[AXIS_X], &offset[AXIS_Z]);
       break;
-    default:
-      return line;  // invalid plane
+    default: return line;  // invalid plane
     }
     if (!have_center) {
       gprintf(GLOG_SYNTAX_ERR, "handle_arc: unable to handle radius\n");
@@ -1642,8 +1600,8 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   absolute_center[AXIS_X] += offset[AXIS_X];
   absolute_center[AXIS_Y] += offset[AXIS_Y];
   absolute_center[AXIS_Z] += offset[AXIS_Z];
-  if (callbacks()->arc_move(feedrate, arc_normal_, is_cw,
-                            axes_pos_, absolute_center, target))
+  if (callbacks()->arc_move(feedrate, arc_normal_, is_cw, axes_pos_,
+                            absolute_center, target))
     axes_pos_ = target;
   return line;
 }
@@ -1703,7 +1661,8 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
 //
 // G5.2 ...  G5.3 (NURBS Block)
 // Not currently supported.
-const char *GCodeParser::Impl::handle_spline(float sub_command, const char *line) {
+const char *GCodeParser::Impl::handle_spline(float sub_command,
+                                             const char *line) {
   if (arc_normal_ != AXIS_Z) {
     gprintf(GLOG_SEMANTIC_ERR, "handle_spline: not in XY plane\n");
     return NULL;
@@ -1809,9 +1768,12 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
   const char *remaining_line;
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
     const float unit_value = value * unit_to_mm_factor_;
-    if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
-    else if (letter == 'Z') probe_thickness = value * unit_to_mm_factor_;
-    else break;
+    if (letter == 'F')
+      feedrate = f_param_to_feedrate(unit_value);
+    else if (letter == 'Z')
+      probe_thickness = value * unit_to_mm_factor_;
+    else
+      break;
     line = remaining_line;
   }
   // Probe for the travel endstop
@@ -1820,8 +1782,8 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
     axes_pos_[AXIS_Z] = probed_pos;
     // Doing implicit G92 here. Is this what we want ? Later, this might
     // be part of tool-offset or something.
-    global_offset_g92_[AXIS_Z] = (axes_pos_[AXIS_Z] - probe_thickness)
-      - current_origin()[AXIS_Z];
+    global_offset_g92_[AXIS_Z] =
+      (axes_pos_[AXIS_Z] - probe_thickness) - current_origin()[AXIS_Z];
     set_current_offset(global_offset_g92_, "G30");
   }
   return line;
@@ -1835,8 +1797,7 @@ const char *GCodeParser::Impl::handle_M111(const char *line) {
     const char *remaining_line;
     // Read all the 'S' parameters. Well, we expect exactly one.
     while ((remaining_line = gparse_pair(line, &letter, &value))) {
-      if (letter != 'S')
-        break;  // possibly next command.
+      if (letter != 'S') break;  // possibly next command.
       level = (int)value;
       line = remaining_line;
     }
@@ -1848,8 +1809,8 @@ const char *GCodeParser::Impl::handle_M111(const char *line) {
 }
 
 // Note: changes here should be documented in G-code.md as well.
-void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
-                                   const char *line, FILE *err_stream) {
+void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
+                                   FILE *err_stream) {
   if (debug_level_ & DEBUG_PARSER) {
     Log_debug("GCodeParser| %s", line);
   }
@@ -1867,15 +1828,21 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
     have_first_spline_ = false;
     bool processed_command = true;
     if (letter == 'G') {
-      switch ((int) value) {
-      case  0: modal_g0_g1_ = 0; line = handle_move(line, false); break;
-      case  1: modal_g0_g1_ = 1; line = handle_move(line, false); break;
-      case  2: line = handle_arc(line, true); break;
-      case  3: line = handle_arc(line, false); break;
-      case  4: line = set_param('P', &GCodeParser::EventReceiver::dwell,
-                                1.0f, line);
+      switch ((int)value) {
+      case 0:
+        modal_g0_g1_ = 0;
+        line = handle_move(line, false);
         break;
-      case  5:
+      case 1:
+        modal_g0_g1_ = 1;
+        line = handle_move(line, false);
+        break;
+      case 2: line = handle_arc(line, true); break;
+      case 3: line = handle_arc(line, false); break;
+      case 4:
+        line = set_param('P', &GCodeParser::EventReceiver::dwell, 1.0f, line);
+        break;
+      case 5:
         have_first_spline_ = last_spline;
         line = handle_spline(value, line);
         break;
@@ -1887,19 +1854,22 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
       case 21: unit_to_mm_factor_ = 1.0f; break;
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
-      case 54: case 55: case 56: case 57: case 58: case 59:
-        change_coord_system(value);
-        break;
+      case 54:
+      case 55:
+      case 56:
+      case 57:
+      case 58:
+      case 59: change_coord_system(value); break;
       case 70: unit_to_mm_factor_ = 25.4f; break;
       case 71: unit_to_mm_factor_ = 1.0f; break;
-      case 90: case 91: handle_G90_G91(value);  break;
+      case 90:
+      case 91: handle_G90_G91(value); break;
       case 92: line = handle_G92(value, line); break;
       default: line = callbacks()->unprocessed(letter, value, line); break;
       }
-    }
-    else if (letter == 'M') {
-      switch ((int) value) {
-      case  2: finish_program_and_reset(); break;
+    } else if (letter == 'M') {
+      switch ((int)value) {
+      case 2: finish_program_and_reset(); break;
       case 17: callbacks()->motors_enable(true); break;
       case 18: callbacks()->motors_enable(false); break;
       case 24: callbacks()->wait_for_start(); break;
@@ -1907,12 +1877,13 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
       case 82: axis_is_absolute_[AXIS_E] = true; break;
       case 83: axis_is_absolute_[AXIS_E] = false; break;
       case 84: callbacks()->motors_enable(false); break;
-      case 104: line = set_param('S',
-                                 &GCodeParser::EventReceiver::set_temperature,
-                                 1.0f, line);
+      case 104:
+        line = set_param('S', &GCodeParser::EventReceiver::set_temperature,
+                         1.0f, line);
         break;
-      case 106: line = set_param('S', &GCodeParser::EventReceiver::set_fanspeed,
-                                 1.0f, line);
+      case 106:
+        line =
+          set_param('S', &GCodeParser::EventReceiver::set_fanspeed, 1.0f, line);
         break;
       case 107: callbacks()->set_fanspeed(0); break;
       case 109:
@@ -1930,18 +1901,15 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
       case 501: config_.LoadParams(); break;
       default: line = callbacks()->unprocessed(letter, value, line); break;
       }
-    }
-    else if (letter == 'F') {
+    } else if (letter == 'F') {
       // Feedrate is sometimes used in absence of a move command.
       const float unit_value = value * unit_to_mm_factor_;
       const float feedrate = f_param_to_feedrate(unit_value);
       callbacks()->coordinated_move(feedrate, axes_pos_);  // No move, just feed
-    }
-    else if (letter == 'N') {
+    } else if (letter == 'N') {
       // Line number? Yeah, ignore for now :)
       processed_command = false;
-    }
-    else {
+    } else {
       const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
       if (axis == GCODE_NUM_AXES) {
         line = callbacks()->unprocessed(letter, value, line);
@@ -1965,18 +1933,15 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner,
 }
 
 GCodeParser::GCodeParser(const Config &config, EventReceiver *parse_events)
-  : impl_(new Impl(config, parse_events)) {
-}
-GCodeParser::~GCodeParser() {
-  delete impl_;
-}
+    : impl_(new Impl(config, parse_events)) {}
+GCodeParser::~GCodeParser() { delete impl_; }
 void GCodeParser::ParseBlock(const char *line, FILE *err_stream) {
   impl_->ParseBlock(this, line, err_stream);
 }
 
 bool GCodeParser::ReadFile(FILE *input_gcode_stream, FILE *err_stream) {
   if (input_gcode_stream == nullptr) return false;
-  char buffer[8192];   // "8kB ought to be enough for everybody"
+  char buffer[8192];  // "8kB ought to be enough for everybody"
   while (fgets(buffer, sizeof(buffer), input_gcode_stream) != nullptr) {
     impl_->ParseBlock(this, buffer, err_stream);
   }
@@ -1992,8 +1957,7 @@ bool GCodeParser::ReadFile(FILE *input_gcode_stream, FILE *err_stream) {
 
 int GCodeParser::error_count() const { return impl_->error_count(); }
 
-const char *GCodeParser::ParsePair(const char *line,
-                                   char *letter, float *value,
+const char *GCodeParser::ParsePair(const char *line, char *letter, float *value,
                                    FILE *err_stream) {
   return impl_->gcodep_parse_pair_with_linenumber(-1, line, letter, value,
                                                   err_stream);

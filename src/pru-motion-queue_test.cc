@@ -5,21 +5,18 @@
  * retrieved.
  *
  */
-#include "motion-queue.h"
-
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
-
 #include "common/container.h"
 #include "common/logging.h"
-
-#include "segment-queue.h"
-#include "pru-hardware-interface.h"
 #include "hardware-mapping.h"
+#include "motion-queue.h"
 #include "motor-interface-constants.h"
+#include "pru-hardware-interface.h"
+#include "segment-queue.h"
 
 // PRU-side mock implementation of the ring buffer.
 struct MockPRUCommunication {
@@ -28,7 +25,7 @@ struct MockPRUCommunication {
 } __attribute__((packed));
 
 class MockPRUInterface : public PruHardwareInterface {
-public:
+ public:
   MockPRUInterface() : execution_index_(QUEUE_LEN - 1) { mmap = NULL; }
   ~MockPRUInterface() { free(mmap); }
 
@@ -38,8 +35,8 @@ public:
   bool Shutdown() { return true; }
 
   bool AllocateSharedMem(void **pru_mmap, const size_t size) {
-    mmap = (struct MockPRUCommunication *) malloc(size);
-    *pru_mmap = (void *) mmap;
+    mmap = (struct MockPRUCommunication *)malloc(size);
+    *pru_mmap = (void *)mmap;
     bzero(*pru_mmap, size);
     return true;
   }
@@ -47,19 +44,19 @@ public:
   void SimRun(int num_exec, const uint32_t loops_left,
               bool last_not_executed = true) {
     // Simulate the execution of num_exec motion segments
-    for (int i=0; i < num_exec; ++i) {
+    for (int i = 0; i < num_exec; ++i) {
       execution_index_ = (execution_index_ + 1) % QUEUE_LEN;
       assert(mmap->ring_buffer[execution_index_].state != STATE_EMPTY);
       mmap->ring_buffer[execution_index_].state = STATE_EMPTY;
     }
-    if (last_not_executed || loops_left ) {
+    if (last_not_executed || loops_left) {
       mmap->ring_buffer[execution_index_].state = STATE_FILLED;
     }
     mmap->status.index = execution_index_;
     mmap->status.counter = loops_left;
   }
 
-private:
+ private:
   struct MockPRUCommunication *mmap;
   unsigned int execution_index_;
 };
@@ -68,7 +65,7 @@ TEST(PruMotionQueue, status_init) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
@@ -77,7 +74,7 @@ TEST(PruMotionQueue, single_exec) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
@@ -90,7 +87,7 @@ TEST(PruMotionQueue, full_exec) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
@@ -103,7 +100,7 @@ TEST(PruMotionQueue, single_exec_some_loops) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
@@ -118,7 +115,7 @@ TEST(PruMotionQueue, one_round_queue) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   struct MotionSegment segment = {};
   segment.state = STATE_FILLED;
@@ -139,7 +136,7 @@ TEST(PruMotionQueue, exec_index_lt_queue_pos) {
   MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
-  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface*) &pru_interface);
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
   struct MotionSegment segment = {};
   for (int i = 0; i < QUEUE_LEN; ++i) {

@@ -20,19 +20,20 @@
 #ifndef _BEAGLEG_CONTAINER_H_
 #define _BEAGLEG_CONTAINER_H_
 
-#include <strings.h>
-#include <string.h>
 #include <assert.h>
+#include <string.h>
+#include <strings.h>
+
 #include <initializer_list>
 
 // Fixed array of POD types (that can be zeroed with bzero()).
-// Allows to have the index be a specific type (typically an enum instad of int).
-// Use for compile-defined small arrays, such as for axes and motors.
+// Allows to have the index be a specific type (typically an enum instad of
+// int). Use for compile-defined small arrays, such as for axes and motors.
 template <typename T, int N, typename IDX = int>
 class FixedArray {
-public:
-  typedef T* iterator;
-  typedef const T* const_iterator;
+ public:
+  typedef T *iterator;
+  typedef const T *const_iterator;
 
   FixedArray() { zero(); }
   FixedArray(const std::initializer_list<T> &in_list) {
@@ -42,17 +43,21 @@ public:
       data_[i] = *it;
     }
   }
-  FixedArray(const FixedArray<T,N,IDX> &other) { CopyFrom(other); }
+  FixedArray(const FixedArray<T, N, IDX> &other) { CopyFrom(other); }
 
-  FixedArray<T,N,IDX> &operator= (const FixedArray<T,N,IDX> &other) {
-    CopyFrom(other); return *this;
+  FixedArray<T, N, IDX> &operator=(const FixedArray<T, N, IDX> &other) {
+    CopyFrom(other);
+    return *this;
   }
-  T &operator[] (IDX i) { assert((int)i < N); return data_[(int)i]; }
-  const T & operator[] (IDX i) const {
+  T &operator[](IDX i) {
     assert((int)i < N);
     return data_[(int)i];
   }
-  bool operator== (const FixedArray<T,N,IDX> &other) const {
+  const T &operator[](IDX i) const {
+    assert((int)i < N);
+    return data_[(int)i];
+  }
+  bool operator==(const FixedArray<T, N, IDX> &other) const {
     return memcmp(data_, other.data_, sizeof(data_)) == 0;
   }
 
@@ -66,10 +71,9 @@ public:
   const_iterator begin() const { return data_; }
   const_iterator end() const { return data_ + N; }
 
-private:
-  void CopyFrom(const FixedArray<T,N,IDX> &other) {
-    if (data_ != other.data_)
-      memcpy(data_, other.data_, sizeof(data_));
+ private:
+  void CopyFrom(const FixedArray<T, N, IDX> &other) {
+    if (data_ != other.data_) memcpy(data_, other.data_, sizeof(data_));
   }
 
   T data_[N];
@@ -78,18 +82,16 @@ private:
 // A simple fixed size, compile-time allocated deque.
 template <typename T, int CAPACITY>
 class RingDeque {
-public:
+ public:
   RingDeque() : write_pos_(0), read_pos_(0) {
     // intentionally not initializing memory to better see if users do.
   }
 
-  size_t size() const {
-    return (write_pos_ + CAPACITY - read_pos_) % CAPACITY;
-  }
+  size_t size() const { return (write_pos_ + CAPACITY - read_pos_) % CAPACITY; }
 
   // Add a new element and return pointer to it.
   // Element is not initialized.
-  T* append() {
+  T *append() {
     assert(size() < CAPACITY - 1);
     T *result = buffer_ + write_pos_;
     write_pos_ = (write_pos_ + 1) % CAPACITY;
@@ -97,13 +99,13 @@ public:
   }
 
   // Return the content relative to the read position.
-  T* operator [] (size_t pos) {
+  T *operator[](size_t pos) {
     assert(size() > pos);
     return &buffer_[(read_pos_ + pos) % CAPACITY];
   }
 
   // Return last inserted position
-  T* back() {
+  T *back() {
     assert(size() > 0);
     return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
   }
@@ -118,26 +120,25 @@ public:
     write_pos_ = (write_pos_ + CAPACITY - 1) % CAPACITY;
   }
 
-private:
+ private:
   unsigned write_pos_;
   unsigned read_pos_;
   T buffer_[CAPACITY];
 };
 
-
 // This class provides a way to iterate over enumeration values. Assumes enum
 // values to be contiguous.
-template<typename T, T first_val, T after_last_val>
+template <typename T, T first_val, T after_last_val>
 class EnumIterable {
-public:
+ public:
   class const_iterator {
-  public:
+   public:
     const_iterator(T value) : val_(value) {}
-    T operator* () const { return val_; }
-    void operator++ () { val_ = static_cast<T>(val_ + 1); }
-    bool operator!= (const const_iterator& other) { return other.val_ != val_; }
+    T operator*() const { return val_; }
+    void operator++() { val_ = static_cast<T>(val_ + 1); }
+    bool operator!=(const const_iterator &other) { return other.val_ != val_; }
 
-  private:
+   private:
     T val_;
   };
 

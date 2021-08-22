@@ -35,17 +35,23 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <string>
 #include <map>
+#include <string>
 
 #include "common/container.h"
 
 // Axis supported by this parser.
 // Sequence matters, as these determine the 52xx variables
 enum GCodeParserAxis {
-  AXIS_X, AXIS_Y, AXIS_Z,
-  AXIS_A, AXIS_B, AXIS_C,
-  AXIS_U, AXIS_V, AXIS_W,
+  AXIS_X,
+  AXIS_Y,
+  AXIS_Z,
+  AXIS_A,
+  AXIS_B,
+  AXIS_C,
+  AXIS_U,
+  AXIS_V,
+  AXIS_W,
   AXIS_E,
   GCODE_NUM_AXES
 };
@@ -79,7 +85,7 @@ inline bool is_rotational_axis(GCodeParserAxis axis) {
 // The parser neesds a configuration and an implementation of the EventReceiver
 // that processes the callbacks coming from the parser.
 class GCodeParser {
-public:
+ public:
   class EventReceiver;
   struct Config;
 
@@ -125,7 +131,7 @@ public:
   // Number of errors seen.
   int error_count() const;
 
-private:
+ private:
   class Impl;
   Impl *impl_;
 };
@@ -152,7 +158,7 @@ struct GCodeParser::Config {
   // only supports integer variables, but we allow arbitrary variable names.
   ParamMap *parameters;
 
-private:
+ private:
   const std::string paramfile;
 };
 
@@ -168,7 +174,7 @@ private:
 //
 // Also see ../G-code.md
 class GCodeParser::EventReceiver {
-public:
+ public:
   virtual ~EventReceiver() {}
   // Start program. Use for initialization. Informs about gcode parser so that
   // it is possible to call ParsePair().
@@ -224,22 +230,26 @@ public:
   // The value represents the actual position reached within the machine
   // cube for the queried axis (in mm).
   virtual bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
-                          float *probed_position) { return false; }
+                          float *probed_position) {
+    return false;
+  }
 
   // TODO: M3/M4 should be dealt with in the parser.
-  //TODOvirtual void set_spindle_on(bool ccw, float value) {}
-  //TODOvirtual void set_spindle_off() {}
+  // TODOvirtual void set_spindle_on(bool ccw, float value) {}
+  // TODOvirtual void set_spindle_off() {}
 
   // Change of spindle speed in the current mode.
   // This might be part of a G0/G1 code.
   virtual void change_spindle_speed(float value) {}
 
-  virtual void set_speed_factor(float factor) = 0;// M220 feedrate factor 0..1
-  virtual void set_fanspeed(float value) = 0;     // M106, M107: speed 0...255
-  virtual void set_temperature(float degrees_c)=0; // M104, M109: Set temp. in Celsius
+  virtual void set_speed_factor(float factor) = 0;  // M220 feedrate factor 0..1
+  virtual void set_fanspeed(float value) = 0;       // M106, M107: speed 0...255
+  virtual void set_temperature(
+    float degrees_c) = 0;                 // M104, M109: Set temp. in Celsius
   virtual void wait_temperature() = 0;    // M109, M116: Wait for temp. reached.
-  virtual void dwell(float time_ms) = 0;     // G4: dwell for milliseconds.
-  virtual void motors_enable(bool enable) = 0;   // M17, M84, M18: Switch on/off motors
+  virtual void dwell(float time_ms) = 0;  // G4: dwell for milliseconds.
+  virtual void motors_enable(
+    bool enable) = 0;  // M17, M84, M18: Switch on/off motors
 
   // Give receiver an opportunity to modify a target coordinate, e.g. clamp
   // ranges before executing a G0/G1 move to prevent hitting a range-check
@@ -262,7 +272,7 @@ public:
   virtual bool coordinated_move(float feed_mm_p_sec,
                                 const AxesRegister &absolute_pos) = 0;  // G1
   virtual bool rapid_move(float feed_mm_p_sec,
-                          const AxesRegister &absolute_pos) = 0;        // G0
+                          const AxesRegister &absolute_pos) = 0;  // G0
 
   // G2, G3
   // Arc in a circular motion from current position around the "center"
@@ -277,19 +287,16 @@ public:
   // TODO(hzeller): We could probably generalize this by having a
   //  'normal vector' instead of normal_axis + clockwise. This would allow for
   //  arbitrarily placed arcs in space (but there is no GCode for it).
-  virtual bool arc_move(float feed_mm_p_sec,
-                        GCodeParserAxis normal_axis, bool clockwise,
-                        const AxesRegister &start,
-                        const AxesRegister &center,
-                        const AxesRegister &end);
+  virtual bool arc_move(float feed_mm_p_sec, GCodeParserAxis normal_axis,
+                        bool clockwise, const AxesRegister &start,
+                        const AxesRegister &center, const AxesRegister &end);
 
   // G5, G5.1
   // Move in a cubic spine from absolute "start" to "end" given the absolute
   // control points "cp1" and "cp2".
   // The default implementation linearlizes curve and calls coordinated_move()
   // with the segments.
-  virtual bool spline_move(float feed_mm_p_sec,
-                           const AxesRegister &start,
+  virtual bool spline_move(float feed_mm_p_sec, const AxesRegister &start,
                            const AxesRegister &cp1, const AxesRegister &cp2,
                            const AxesRegister &end);
 

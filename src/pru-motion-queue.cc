@@ -20,20 +20,18 @@
 // Implementation of the MotionQueue interfacing the PRU.
 // We are using some shared memory between CPU and PRU to communicate.
 
-#include "motion-queue.h"
-
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
-#include <strings.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "common/logging.h"
-
 #include "generic-gpio.h"
-#include "pwm-timer.h"
 #include "hardware-mapping.h"
+#include "motion-queue.h"
 #include "pru-hardware-interface.h"
+#include "pwm-timer.h"
 
 using internal::QueueStatus;
 
@@ -54,22 +52,23 @@ static void DumpMotionSegment(volatile const struct MotionSegment *e,
   if (e->state == STATE_EXIT) {
     Log_debug("enqueue[%02td]: EXIT", e - pru_data->ring_buffer);
   } else {
-    MotionSegment copy = (MotionSegment&) *e;
+    MotionSegment copy = (MotionSegment &)*e;
     std::string line;
-    line = StringPrintf("enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
-                        e - pru_data->ring_buffer, copy.direction_bits,
-                        copy.loops_accel, copy.loops_travel, copy.loops_decel,
-                        copy.loops_accel + copy.loops_travel + copy.loops_decel);
+    line =
+      StringPrintf("enqueue[%02td]: dir:0x%02x s:(%5d + %5d + %5d) = %5d ",
+                   e - pru_data->ring_buffer, copy.direction_bits,
+                   copy.loops_accel, copy.loops_travel, copy.loops_decel,
+                   copy.loops_accel + copy.loops_travel + copy.loops_decel);
 
     if (copy.hires_accel_cycles > 0) {
       line += StringPrintf("accel : %5.0fHz (%d loops);",
-                           TIMER_FREQUENCY /
-                           (2.0*(copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT)),
+                           TIMER_FREQUENCY / (2.0 * (copy.hires_accel_cycles >>
+                                                     DELAY_CYCLE_SHIFT)),
                            copy.hires_accel_cycles >> DELAY_CYCLE_SHIFT);
     }
     if (copy.travel_delay_cycles > 0) {
       line += StringPrintf("travel: %5.0fHz (%d loops);",
-                           TIMER_FREQUENCY / (2.0*copy.travel_delay_cycles),
+                           TIMER_FREQUENCY / (2.0 * copy.travel_delay_cycles),
                            copy.travel_delay_cycles);
     }
 #if 0
@@ -98,7 +97,7 @@ void PRUMotionQueue::ClearPRUAbort(unsigned int idx) {
 
 int PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
   // Get data from the PRU
-  const struct QueueStatus status = *(struct QueueStatus*) &pru_data_->status;
+  const struct QueueStatus status = *(struct QueueStatus *)&pru_data_->status;
   const unsigned int last_insert_index = RingbufferOffset(queue_pos_, -1);
   if (head_item_progress) {
     *head_item_progress = status.counter;
@@ -115,9 +114,10 @@ int PRUMotionQueue::GetPendingElements(uint32_t *head_item_progress) {
 
 // Stop gap for compiler attempting to be overly clever when copying between
 // host and PRU memory.
-static void unaligned_memcpy(volatile void *dest, const void *src, size_t size) {
-  volatile char *d = (volatile char*) dest;
-  const char *s = (char*) src;
+static void unaligned_memcpy(volatile void *dest, const void *src,
+                             size_t size) {
+  volatile char *d = (volatile char *)dest;
+  const char *s = (char *)src;
   const volatile char *end = d + size;
   while (d < end) {
     *d++ = *s++;
@@ -180,8 +180,7 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
 PRUMotionQueue::~PRUMotionQueue() {}
 
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
-  : hardware_mapping_(hw),
-    pru_interface_(pru) {
+    : hardware_mapping_(hw), pru_interface_(pru) {
   const bool success = Init();
   // For now, we just assert-fail here, if things fail.
   // Typically hardware-doomed event anyway.
@@ -190,10 +189,9 @@ PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
 
 bool PRUMotionQueue::Init() {
   MotorEnable(false);  // motors off initially.
-  if (!pru_interface_->Init())
-    return false;
+  if (!pru_interface_->Init()) return false;
 
-  if (!pru_interface_->AllocateSharedMem((void **) &pru_data_,
+  if (!pru_interface_->AllocateSharedMem((void **)&pru_data_,
                                          sizeof(*pru_data_)))
     return false;
 

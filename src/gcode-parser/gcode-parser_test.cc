@@ -3,19 +3,18 @@
  */
 #include "gcode-parser.h"
 
+#include <gtest/gtest.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <math.h>
-
-#include <gtest/gtest.h>
 
 #include "common/string-util.h"
 
 // 'home' position of our simulated machine. Arbitrary values.
-#define HOME_X 123
-#define HOME_Y 456
-#define HOME_Z 789
+#define HOME_X         123
+#define HOME_Y         456
+#define HOME_Z         789
 #define PROBE_POSITION 42
 
 namespace {
@@ -33,7 +32,7 @@ enum {
 };
 
 class ParseTester : public GCodeParser::EventReceiver {
-public:
+ public:
   ParseTester() : feedrate(-1) {
     bzero(call_count, sizeof(call_count));
     GCodeParser::Config config;
@@ -47,9 +46,7 @@ public:
   }
   ~ParseTester() override { delete parser_; }
 
-  float get_parameter(int num) {
-    return parameters_[StringPrintf("%d", num)];
-  }
+  float get_parameter(int num) { return parameters_[StringPrintf("%d", num)]; }
 
   float get_parameter(const std::string &name) {
     return parameters_[ToLower(name)];
@@ -77,7 +74,8 @@ public:
   }
 
   void motors_enable(bool enable) final { Count(CALL_motors_enable); }
-  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) override {
+  bool coordinated_move(float feed_mm_p_sec,
+                        const AxesRegister &axes) override {
     Count(CALL_coordinated_move);
     abs_pos = axes;
     feedrate = feed_mm_p_sec;
@@ -101,14 +99,14 @@ public:
   void wait_temperature() final {}
   void dwell(float ms) final {}
 
-public:
+ public:
   // public counters.
   int call_count[NUM_COUNTED_CALLS];
-  AxesRegister abs_pos;         // last coordinates we got from a move.
-  AxesRegister parser_offset;   // current offset in the parser
+  AxesRegister abs_pos;        // last coordinates we got from a move.
+  AxesRegister parser_offset;  // current offset in the parser
   float feedrate;
 
-private:
+ private:
   void Count(int what) { call_count[what]++; }
   GCodeParser::Config::ParamMap parameters_;
   GCodeParser *parser_;
@@ -143,14 +141,14 @@ TEST(GCodeParserTest, simple_move) {
 
   // If we move one axis, the others are still at the origin.
   EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(HOME_Y,       counter.abs_pos[AXIS_Y]);
-  EXPECT_EQ(HOME_Z,       counter.abs_pos[AXIS_Z]);
+  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
 
   counter.TestParseLine("G1 X10 Y10 Z-20");
   EXPECT_EQ(2, counter.call_count[CALL_coordinated_move]);
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
-  EXPECT_EQ(HOME_Y + 10,  counter.abs_pos[AXIS_Y]);
-  EXPECT_EQ(HOME_Z - 20,  counter.abs_pos[AXIS_Z]);
+  EXPECT_EQ(HOME_Y + 10, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z - 20, counter.abs_pos[AXIS_Z]);
 }
 
 TEST(GCodeParserTest, setting_feedrate) {
@@ -177,7 +175,7 @@ TEST(GCodeParserTest, ParsingComments) {
   ParseTester counter;
 
   EXPECT_TRUE(counter.TestParseLine(
-                "G1 X10 (This is some comment) Y11 Z12 ; end of line"));
+    "G1 X10 (This is some comment) Y11 Z12 ; end of line"));
   EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
 
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
@@ -236,7 +234,7 @@ TEST(GCodeParserTest, InvalidNumbers) {
 TEST(GCodeParserTest, absolute_relative) {
   ParseTester counter;
 
-  counter.TestParseLine("G90");   // absolute mode.
+  counter.TestParseLine("G90");  // absolute mode.
 
   counter.TestParseLine("G1 X10 Y11 Z12");
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
@@ -249,7 +247,7 @@ TEST(GCodeParserTest, absolute_relative) {
   EXPECT_EQ(HOME_Y + 21, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 22, counter.abs_pos[AXIS_Z]);
 
-  counter.TestParseLine("G91");   // Now, go in relative mode.
+  counter.TestParseLine("G91");  // Now, go in relative mode.
 
   counter.TestParseLine("G1 X5 Y6 Z7");
   EXPECT_EQ(HOME_X + 20 + 5, counter.abs_pos[AXIS_X]);
@@ -273,13 +271,13 @@ TEST(GCodeParserTest, set_origin_G92) {
   EXPECT_EQ(HOME_Y, counter.parser_offset[AXIS_Y]);
   EXPECT_EQ(HOME_Z, counter.parser_offset[AXIS_Z]);
 
-  counter.TestParseLine("G92 X5 Y7");     // Tool left bottom of it.
+  counter.TestParseLine("G92 X5 Y7");  // Tool left bottom of it.
 
   // New offset within machine cube.
   EXPECT_EQ(HOME_X + 100 - 5, counter.parser_offset[AXIS_X]);
   EXPECT_EQ(HOME_Y + 100 - 7, counter.parser_offset[AXIS_Y]);
 
-  counter.TestParseLine("G1 X12 Y17");    // Move relative to that
+  counter.TestParseLine("G1 X12 Y17");  // Move relative to that
 
   // Final position.
   EXPECT_EQ(HOME_X + 100 - 5 + 12, counter.abs_pos[AXIS_X]);
@@ -292,29 +290,29 @@ TEST(GCodeParserTest, set_origin_G92) {
   EXPECT_EQ(HOME_X + 100 - 5 + 12 - 3 + 1, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 100 - 7 + 17 - 4 + 1, counter.abs_pos[AXIS_Y]);
 
-  counter.TestParseLine("G92.2");      // Suspend.
+  counter.TestParseLine("G92.2");  // Suspend.
   counter.TestParseLine("G1 X1 Y1");
   EXPECT_EQ(HOME_X + 1, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 1, counter.abs_pos[AXIS_Y]);
 
   // Only set one axis now, that way we see that the new axis is modified
   // and the original axis is pulled out of the G92 store again.
-  counter.TestParseLine("G92 X0");     // Set again. Modify Current G92.
+  counter.TestParseLine("G92 X0");  // Set again. Modify Current G92.
   counter.TestParseLine("G1 X1 Y1");
   EXPECT_EQ(HOME_X + 1 + 1, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 100 - 7 + 17 - 4 + 1, counter.abs_pos[AXIS_Y]);
 
-  counter.TestParseLine("G92.2");      // Suspend.
+  counter.TestParseLine("G92.2");  // Suspend.
   counter.TestParseLine("G1 X1 Y1");
   EXPECT_EQ(HOME_X + 1, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 1, counter.abs_pos[AXIS_Y]);
 
-  counter.TestParseLine("G92.3");      // Restore.
+  counter.TestParseLine("G92.3");  // Restore.
   counter.TestParseLine("G1 X7 Y8");
   EXPECT_EQ(HOME_X + 1 + 7, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 100 - 7 + 17 - 4 + 8, counter.abs_pos[AXIS_Y]);
 
-  counter.TestParseLine("G92.1");      // Reset. Back relative to machine.
+  counter.TestParseLine("G92.1");  // Reset. Back relative to machine.
   counter.TestParseLine("G1 X1 Y1");
   EXPECT_EQ(HOME_X + 1, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 1, counter.abs_pos[AXIS_Y]);
@@ -384,17 +382,20 @@ TEST(GCodeParserTest, numeric_parameters) {
   EXPECT_EQ(HOME_Z + 350, counter.abs_pos[AXIS_Z]);
 
   // test invalid parameter parsing
-  EXPECT_FALSE(counter.TestParseLine("#"));          // expected value after '#'
-  EXPECT_FALSE(counter.TestParseLine("#G1 X20"));    // unknown unary
-  EXPECT_FALSE(counter.TestParseLine("#5400=100"));  // unsupported parameter number
-  EXPECT_FALSE(counter.TestParseLine("#1="));        // expected value after '#1='
-  EXPECT_FALSE(counter.TestParseLine("#1=G1 X10"));  // expected value after '#1='
+  EXPECT_FALSE(counter.TestParseLine("#"));        // expected value after '#'
+  EXPECT_FALSE(counter.TestParseLine("#G1 X20"));  // unknown unary
+  EXPECT_FALSE(
+    counter.TestParseLine("#5400=100"));       // unsupported parameter number
+  EXPECT_FALSE(counter.TestParseLine("#1="));  // expected value after '#1='
+  EXPECT_FALSE(
+    counter.TestParseLine("#1=G1 X10"));  // expected value after '#1='
   EXPECT_NE(HOME_X + 10, counter.abs_pos[AXIS_X]);
 
   // Parameter #0 is special: we can read it, but we can't set it.
   EXPECT_TRUE(counter.TestParseLine("G1 X#0"));
   EXPECT_EQ(HOME_X + 0, counter.abs_pos[AXIS_X]);
-  EXPECT_FALSE(counter.TestParseLine("#0=42"));      // writing unsupported parameter number
+  EXPECT_FALSE(
+    counter.TestParseLine("#0=42"));  // writing unsupported parameter number
   EXPECT_EQ(0, counter.get_parameter(0));
 
   // test indexed parameters
@@ -411,8 +412,8 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
   ParseTester counter;
 
   EXPECT_TRUE(counter.TestParseLine("#foo=25"));
-  EXPECT_TRUE(counter.TestParseLine("#BAR=50"));  // Store case insensitive
-  EXPECT_TRUE(counter.TestParseLine("#<b a z>=75")); // <> with spaces.
+  EXPECT_TRUE(counter.TestParseLine("#BAR=50"));      // Store case insensitive
+  EXPECT_TRUE(counter.TestParseLine("#<b a z>=75"));  // <> with spaces.
 
   EXPECT_FALSE(counter.TestParseLine("#<b a z=1"));  // bracket not closed.
 
@@ -426,27 +427,27 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
   EXPECT_EQ(HOME_Y + 50, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 75, counter.abs_pos[AXIS_Z]);
 
-  EXPECT_TRUE(counter.TestParseLine(
-                "G1 #foo=100 #bar=200 #baz=300 X#foo Y#bar Z#baz"));
+  EXPECT_TRUE(
+    counter.TestParseLine("G1 #foo=100 #bar=200 #baz=300 X#foo Y#bar Z#baz"));
   EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 200, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 300, counter.abs_pos[AXIS_Z]);
 
   // As long as we have '#' as delimiter, we can get rid of many spaces.
-  EXPECT_TRUE(counter.TestParseLine(
-                "G1#foo=150#bar=250#baz=350X#foo Y#bar Z#baz"));
+  EXPECT_TRUE(
+    counter.TestParseLine("G1#foo=150#bar=250#baz=350X#foo Y#bar Z#baz"));
   EXPECT_EQ(HOME_X + 150, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 250, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 350, counter.abs_pos[AXIS_Z]);
 
   // But of course, when used in coordinates that are followed by other letters,
   // without spaces as delimiter it won't work
-  EXPECT_FALSE(counter.TestParseLine(
-                 "G1 #foo=150#bar=250#baz=350X#fooY#barZ#baz"));
+  EXPECT_FALSE(
+    counter.TestParseLine("G1 #foo=150#bar=250#baz=350X#fooY#barZ#baz"));
 
   // If there is the <> delimiter, things can be squished together again.
-  EXPECT_TRUE(counter.TestParseLine(
-                "G1 #foo=160#bar=260#baz=360X#<foo>Y#<bar>Z#<baz>"));
+  EXPECT_TRUE(
+    counter.TestParseLine("G1 #foo=160#bar=260#baz=360X#<foo>Y#<bar>Z#<baz>"));
   EXPECT_EQ(HOME_X + 160, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 260, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z + 360, counter.abs_pos[AXIS_Z]);
@@ -470,16 +471,16 @@ TEST(GCodeParserTest, alphanumeric_parameters) {
 
 TEST(GCodeParserTest, CoordinateSystemNamesRepresentedIn5220) {
   ParseTester counter;
-  const char *coord_systems[9] = { "G54", "G55", "G56", "G57", "G58", "G59",
-                                   "G59.1", "G59.2", "G59.3" };
+  const char *coord_systems[9] = {"G54", "G55",   "G56",   "G57",  "G58",
+                                  "G59", "G59.1", "G59.2", "G59.3"};
   for (int i = 0; i < 9; ++i) {
     EXPECT_TRUE(counter.TestParseLine(coord_systems[i]));
-    EXPECT_EQ(i+1, counter.get_parameter(5220));
+    EXPECT_EQ(i + 1, counter.get_parameter(5220));
   }
 
   // this one should fail as we attempt to choose an invalid coordinate system.
   EXPECT_FALSE(counter.TestParseLine("G59.4"));
-  EXPECT_EQ(9, counter.get_parameter(5220));     // kept at prev. coord system.
+  EXPECT_EQ(9, counter.get_parameter(5220));  // kept at prev. coord system.
 }
 
 TEST(GCodeParserTest, SetCoordinateSystemG10) {
@@ -553,33 +554,31 @@ TEST(GCodeParserTest, SetCoordinateSystemG10_G90_G91) {
 }
 
 class ArcTester : public ParseTester {
-public:
+ public:
   bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) final {
     ParseTester::coordinated_move(feed_mm_p_sec, axes);
-    if (!expect_radius_)
-      return true;  // Not checking for circleness yet.
+    if (!expect_radius_) return true;  // Not checking for circleness yet.
     // Radius seen in the plane.
     switch (normal_axis_) {
     case AXIS_Z: {
-      const float normal_rz = hypotf(axes[AXIS_X] - center_[AXIS_X],
-                                     axes[AXIS_Y] - center_[AXIS_Y]);
+      const float normal_rz =
+        hypotf(axes[AXIS_X] - center_[AXIS_X], axes[AXIS_Y] - center_[AXIS_Y]);
       EXPECT_NEAR(radius_, normal_rz, 0.001);
       break;
     }
     case AXIS_Y: {
-      const float normal_ry = hypotf(axes[AXIS_X] - center_[AXIS_X],
-                                     axes[AXIS_Z] - center_[AXIS_Z]);
+      const float normal_ry =
+        hypotf(axes[AXIS_X] - center_[AXIS_X], axes[AXIS_Z] - center_[AXIS_Z]);
       EXPECT_NEAR(radius_, normal_ry, 0.001);
       break;
     }
     case AXIS_X: {
-      const float normal_rx = hypotf(axes[AXIS_Y] - center_[AXIS_Y],
-                                     axes[AXIS_Z] - center_[AXIS_Z]);
+      const float normal_rx =
+        hypotf(axes[AXIS_Y] - center_[AXIS_Y], axes[AXIS_Z] - center_[AXIS_Z]);
       EXPECT_NEAR(radius_, normal_rx, 0.001);
       break;
     }
-    default:
-      break;
+    default: break;
     }
     return true;
   }
@@ -592,7 +591,7 @@ public:
     expect_radius_ = true;
   }
 
-private:
+ private:
   AxesRegister center_;
   float radius_;
   GCodeParserAxis normal_axis_;
@@ -814,22 +813,28 @@ TEST(GCodeParserTest, Conditional) {
 
   // Test IF/THEN/ELSEIF/THEN/ELSE
   EXPECT_TRUE(counter.TestParseLine("#1=-100"));
-  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_TRUE(counter.TestParseLine(
+    "IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
   EXPECT_EQ(-1, counter.get_parameter(2));
   EXPECT_TRUE(counter.TestParseLine("#1=0"));
-  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_TRUE(counter.TestParseLine(
+    "IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
   EXPECT_EQ(0, counter.get_parameter(2));
   EXPECT_TRUE(counter.TestParseLine("#1=100"));
-  EXPECT_TRUE(counter.TestParseLine("IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
+  EXPECT_TRUE(counter.TestParseLine(
+    "IF [#1<0] THEN #2=-1 ELSEIF [#1==0] THEN #2=0 ELSE #2=1"));
   EXPECT_EQ(1, counter.get_parameter(2));
 
   // Test error conditions
   EXPECT_TRUE(counter.TestParseLine("#1=1"));
-  EXPECT_FALSE(counter.TestParseLine("IF"));                        // expected '[' after IF got ''
-  EXPECT_FALSE(counter.TestParseLine("IF [#1=1]"));                 // unknown operator '=0]'
-  EXPECT_FALSE(counter.TestParseLine("IF [#1==1]"));                // unsupported IF [...]
-  EXPECT_FALSE(counter.TestParseLine("IF [#1==1] THEN"));           // expected '#' after IF [...] THEN got ''
-  EXPECT_FALSE(counter.TestParseLine("IF [#1==0] THEN #2=1 ELSE")); // expected '#' after IF [...] THEN ... ELSE got ''
+  EXPECT_FALSE(counter.TestParseLine("IF"));  // expected '[' after IF got ''
+  EXPECT_FALSE(counter.TestParseLine("IF [#1=1]"));   // unknown operator '=0]'
+  EXPECT_FALSE(counter.TestParseLine("IF [#1==1]"));  // unsupported IF [...]
+  EXPECT_FALSE(counter.TestParseLine(
+    "IF [#1==1] THEN"));  // expected '#' after IF [...] THEN got ''
+  EXPECT_FALSE(counter.TestParseLine(
+    "IF [#1==0] THEN #2=1 ELSE"));  // expected '#' after IF [...] THEN ... ELSE
+                                    // got ''
 
   // SIDE-CASES - these are not syntaxed correctly but will not error
 

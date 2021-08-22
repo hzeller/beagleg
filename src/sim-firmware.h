@@ -17,12 +17,12 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "motion-queue.h"
-
 #include <stdio.h>
 
+#include "motion-queue.h"
+
 class SimFirmwareQueue : public MotionQueue {
-public:
+ public:
   SimFirmwareQueue(FILE *out, int relevant_motors = MOTION_MOTOR_COUNT);
   ~SimFirmwareQueue() override;
 
@@ -31,12 +31,11 @@ public:
   void MotorEnable(bool on) final {}
   void Shutdown(bool flush_queue) final {}
   int GetPendingElements(uint32_t *head_item_progress) final {
-    if (head_item_progress)
-      *head_item_progress = 0;
+    if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
 
-private:
+ private:
   class Averager;
 
   FILE *const out_;

@@ -2,16 +2,14 @@
  */
 #include "planner.h"
 
+#include <gtest/gtest.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 
-#include <gtest/gtest.h>
-
-#include "gcode-parser/gcode-parser.h"
 #include "common/logging.h"
-
 #include "gcode-machine-control.h"
+#include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"
 #include "segment-queue.h"
 
@@ -23,7 +21,7 @@
 static void InitTestConfig(struct MachineControlConfig *c) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
-    const GCodeParserAxis axis = (GCodeParserAxis) i;
+    const GCodeParserAxis axis = (GCodeParserAxis)i;
     c->steps_per_mm[axis] = steps_per_mm;
     // We do different steps/mm to detect problems when going between
     // euclidian space and step-space.
@@ -37,9 +35,8 @@ static void InitTestConfig(struct MachineControlConfig *c) {
 }
 
 class FakeMotorOperations : public SegmentQueue {
-public:
-  FakeMotorOperations(const MachineControlConfig &config)
-    : config_(config) {}
+ public:
+  FakeMotorOperations(const MachineControlConfig &config) : config_(config) {}
 
   bool Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
@@ -90,7 +87,7 @@ public:
 
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }
 
-private:
+ private:
   // Convert speeds in segments back to speed in euklidian space to have
   // something useful to relate to.
   // Out of convenience, return back the length of the segment in euclid space
@@ -99,18 +96,18 @@ private:
     const float dx = seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
     const float dy = seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz = seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
-    const float hypotenuse = sqrtf(dx*dx + dy*dy + dz*dz);
+    const float hypotenuse = sqrtf(dx * dx + dy * dy + dz * dz);
     GCodeParserAxis defining_axis = AXIS_X;
     for (int i = AXIS_Y; i < AXIS_Z; ++i) {
-      const GCodeParserAxis a = (GCodeParserAxis) i;
+      const GCodeParserAxis a = (GCodeParserAxis)i;
       if (abs(seg->steps[a]) > abs(seg->steps[defining_axis]))
         defining_axis = a;
     }
 
     // The hypotenuse is faster than each of the sides, so its speed is
     // proportionally larger.
-    const float defining_side_len
-      = fabsf(seg->steps[defining_axis] / config_.steps_per_mm[defining_axis]);
+    const float defining_side_len =
+      fabsf(seg->steps[defining_axis] / config_.steps_per_mm[defining_axis]);
     const float correction = hypotenuse / defining_side_len;
 
     // Go from steps/sec back to to mm/sec and apply correction to be back in
@@ -127,14 +124,14 @@ private:
 };
 
 class PlannerHarness {
-public:
+ public:
   // If angle or config is not set, assumes default. Takes ownership of
   // config.
-  PlannerHarness(float threshold_angle = 0,
-                 float speed_tune_angle = 0,
+  PlannerHarness(float threshold_angle = 0, float speed_tune_angle = 0,
                  MachineControlConfig *config = NULL)
-    : config_(config ? config : new MachineControlConfig()),
-      motor_ops_(*config_), finished_(false) {
+      : config_(config ? config : new MachineControlConfig()),
+        motor_ops_(*config_),
+        finished_(false) {
     if (!config) {
       InitTestConfig(config_);
       config_->threshold_angle = threshold_angle;
@@ -151,8 +148,9 @@ public:
   }
 
   void Enqueue(const AxesRegister &target, float feed) {
-    assert(!finished_);   // Can only call if segments() has not been called.
-    //fprintf(stderr, "NewPos: (%.1f, %.1f)\n", target[AXIS_X], target[AXIS_Y]);
+    assert(!finished_);  // Can only call if segments() has not been called.
+    // fprintf(stderr, "NewPos: (%.1f, %.1f)\n", target[AXIS_X],
+    // target[AXIS_Y]);
     planner_->Enqueue(target, feed);
   }
 
@@ -164,7 +162,7 @@ public:
     return motor_ops_.segments();
   }
 
-private:
+ private:
   MachineControlConfig *config_;
   FakeMotorOperations motor_ops_;
   HardwareMapping simulated_hardware_;
@@ -174,7 +172,7 @@ private:
 
 // Conditions that we expect in all moves.
 static void VerifyCommonExpectations(
-      const std::vector<LinearSegmentSteps> &segments) {
+  const std::vector<LinearSegmentSteps> &segments) {
   ASSERT_GT((int)segments.size(), 1) << "Expected more than one segment";
 
   // Some basic assumption: something is moving.
@@ -182,14 +180,14 @@ static void VerifyCommonExpectations(
 
   // At the begin and end of our travel, we have zero speed.
   EXPECT_EQ(0, segments[0].v0);
-  EXPECT_EQ(0, segments[segments.size()-1].v1);
+  EXPECT_EQ(0, segments[segments.size() - 1].v1);
 
   // The joining speeds between segments match.
-  for (size_t i = 0; i < segments.size()-1; ++i) {
+  for (size_t i = 0; i < segments.size() - 1; ++i) {
     // Let's determine the speed in euclidian space.
 #if 1
-    EXPECT_EQ(segments[i].v1, segments[i+1].v0)
-      << "Joining speed between " << i << " and " << (i+1);
+    EXPECT_EQ(segments[i].v1, segments[i + 1].v0)
+      << "Joining speed between " << i << " and " << (i + 1);
 #endif
   }
 }
@@ -251,13 +249,13 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
 static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
                                      GCodeParserAxis slowAxis) {
   const float kClampFeedrate = 10.0;
-  const float kFastFactor = 17;   // Faster axis is faster by this much.
+  const float kFastFactor = 17;  // Faster axis is faster by this much.
   MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
-  config->max_feedrate[AXIS_X] = (AXIS_X == slowAxis)
-    ? kClampFeedrate : kClampFeedrate * kFastFactor;
-  config->max_feedrate[AXIS_Y] = (AXIS_Y == slowAxis)
-    ? kClampFeedrate : kClampFeedrate * kFastFactor;
+  config->max_feedrate[AXIS_X] =
+    (AXIS_X == slowAxis) ? kClampFeedrate : kClampFeedrate * kFastFactor;
+  config->max_feedrate[AXIS_Y] =
+    (AXIS_Y == slowAxis) ? kClampFeedrate : kClampFeedrate * kFastFactor;
 
   // We want to force one of these to be the defining axis. Since both will
   // travel the same distance, we can achieve that by having one of the axis
@@ -284,10 +282,11 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   EXPECT_EQ(constant_speed_section.v0, constant_speed_section.v1);
 
   // Get the step speed of the axis we're interested in.
-  float step_speed_of_interest = constant_speed_section.v0
-    * constant_speed_section.steps[slowAxis]
-    / constant_speed_section.steps[defining_axis];
-  fprintf(stderr, "Defining axis: %c speed: defining %.1f ; "
+  float step_speed_of_interest = constant_speed_section.v0 *
+                                 constant_speed_section.steps[slowAxis] /
+                                 constant_speed_section.steps[defining_axis];
+  fprintf(stderr,
+          "Defining axis: %c speed: defining %.1f ; "
           "slow axis %c speed %.1f\n",
           gcodep_axis2letter(defining_axis), constant_speed_section.v0,
           gcodep_axis2letter(slowAxis), step_speed_of_interest);
@@ -359,7 +358,7 @@ TEST(PlannerTest, CornerMove_90Degrees) {
 void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   const float kSpeedTuneAngle = 0.0f;
   // Essentially, we go around the circle as starting segments.
-  for (float angle = 0; angle < 360; angle += threshold/2) {
+  for (float angle = 0; angle < 360; angle += threshold / 2) {
     std::vector<LinearSegmentSteps> segments =
       DoAngleMove(threshold, kSpeedTuneAngle, angle, testing_angle);
 
@@ -386,7 +385,7 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
       if (i > 0) {
         EXPECT_GT(segments[i].v0, 0) << "At angle " << angle;
       }
-      if (i < segments.size()-1) {
+      if (i < segments.size() - 1) {
         EXPECT_GT(segments[i].v1, 0) << "At angle " << angle;
       }
     }

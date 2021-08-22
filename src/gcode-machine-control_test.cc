@@ -9,14 +9,12 @@
  */
 #include "gcode-machine-control.h"
 
+#include <gtest/gtest.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <gtest/gtest.h>
-
-#include "gcode-parser/gcode-parser.h"
 #include "common/logging.h"
-
+#include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"
 #include "segment-queue.h"
 
@@ -26,10 +24,10 @@
 static void init_test_config(struct MachineControlConfig *c,
                              HardwareMapping *hmap) {
   for (int i = 0; i <= AXIS_Z; ++i) {
-    const GCodeParserAxis axis = (GCodeParserAxis) i;
-    c->steps_per_mm[axis] = 100;  // step/mm
+    const GCodeParserAxis axis = (GCodeParserAxis)i;
+    c->steps_per_mm[axis] = 100;   // step/mm
     c->acceleration[axis] = 1000;  // mm/s^2
-    c->max_feedrate[axis] = (i+1) * 1000;
+    c->max_feedrate[axis] = (i + 1) * 1000;
   }
   c->threshold_angle = 0;
   c->speed_tune_angle = 0;
@@ -38,9 +36,9 @@ static void init_test_config(struct MachineControlConfig *c,
 
 namespace {
 class MockMotorOps : public SegmentQueue {
-public:
+ public:
   MockMotorOps(const LinearSegmentSteps *expected)
-    : expect_(expected), current_(expected), errors_(0) {}
+      : expect_(expected), current_(expected), errors_(0) {}
 
   ~MockMotorOps() {
     EXPECT_EQ(0, errors_);
@@ -59,11 +57,12 @@ public:
   void MotorEnable(bool on) final {}
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
-  void SetExternalPosition(int axis, int steps) final { }
+  void SetExternalPosition(int axis, int steps) final {}
 
-private:
+ private:
   // Helpers to compare and print MotorMovements.
-  static void PrintMovement(const char *msg, const struct LinearSegmentSteps *m) {
+  static void PrintMovement(const char *msg,
+                            const struct LinearSegmentSteps *m) {
     printf("%s: v0=%.1f -> v1=%.1f {%d, %d, %d}", msg, m->v0, m->v1,
            m->steps[0], m->steps[1], m->steps[2]);
   }
@@ -71,8 +70,7 @@ private:
   void ExpectEq(const struct LinearSegmentSteps *expected,
                 const struct LinearSegmentSteps &reality,
                 int info_segment_number) {
-    if (expected->v0 != reality.v0 ||
-        expected->v1 != reality.v1 ||
+    if (expected->v0 != reality.v0 || expected->v1 != reality.v1 ||
         expected->steps[0] != reality.steps[0] ||
         expected->steps[1] != reality.steps[1] ||
         expected->steps[2] != reality.steps[2]) {
@@ -89,7 +87,7 @@ private:
 
   int errors_;
 };
-}
+}  // namespace
 
 class Harness {
  public:
@@ -98,16 +96,14 @@ class Harness {
   Harness(const LinearSegmentSteps *expected) : expect_motor_ops_(expected) {
     struct MachineControlConfig config;
     init_test_config(&config, &hardware_);
-    machine_control = GCodeMachineControl::Create(config, &expect_motor_ops_,
-                                                  &hardware_,
-                                                  nullptr,   // spindle
-                                                  nullptr);  // msg-stream
+    machine_control =
+      GCodeMachineControl::Create(config, &expect_motor_ops_, &hardware_,
+                                  nullptr,   // spindle
+                                  nullptr);  // msg-stream
     assert(machine_control != nullptr);
   }
 
-  ~Harness() {
-    delete machine_control;
-  }
+  ~Harness() { delete machine_control; }
 
   GCodeParser::EventReceiver *gcode_emit() {
     return machine_control->ParseEventReceiver();
@@ -120,7 +116,7 @@ class Harness {
 
 TEST(GCodeMachineControlTest, initial_feedrate_not_set) {
   static const struct LinearSegmentSteps expected[] = {
-    { 0.0, 0.0, END_SENTINEL, {}},
+    {0.0, 0.0, END_SENTINEL, {}},
   };
 
   // Move to pos 100, do not set the feedrate.
@@ -194,7 +190,6 @@ TEST(GCodeMachineControlTest, speed_clamping) {
   harness.gcode_emit()->motors_enable(false);  // finish movement.
 }
 
-
 // If we have two line segments in a straight line and one is slower than the
 // other, slow down the first segment at the end to the travel speed of the
 // next segment.
@@ -214,7 +209,7 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
   // Move to pos 100, then 200, first with speed 100, then speed 50
   AxesRegister coordinates;
   coordinates[AXIS_X] = 100;
-  harness.gcode_emit()->coordinated_move(100, coordinates); // 100mm/s
+  harness.gcode_emit()->coordinated_move(100, coordinates);  // 100mm/s
 
   // second half, less speed.
   coordinates[AXIS_X] = 200;

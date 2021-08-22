@@ -27,18 +27,19 @@
 #include <unistd.h>
 
 #include "common/logging.h"
-
+#include "config-parser.h"
 #include "determine-print-stats.h"
 #include "gcode-machine-control.h"
-#include "config-parser.h"
 
 int usage(const char *prog) {
-  fprintf(stderr, "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
+  fprintf(stderr,
+          "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
           "Options:\n"
           "\t-c <config>       : Machine config\n"
           "\t-f <factor>       : Speedup-factor for feedrate.\n"
           "\t-H                : Toggle print header line\n"
-          "Use filename '-' for stdin.\n", prog);
+          "Use filename '-' for stdin.\n",
+          prog);
   return 1;
 }
 
@@ -50,13 +51,9 @@ static void print_file_stats(const char *filename, int indentation,
   if (determine_print_stats(fd, config, msg_out, &result)) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s %10.0f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f",
-           indentation, filename,
-           result.total_time_seconds,
-           result.x_min, result.x_max,
-           result.y_min, result.y_max,
-           result.z_min, result.z_max,
-           result.last_z_extruding,
-           result.filament_len);
+           indentation, filename, result.total_time_seconds, result.x_min,
+           result.x_max, result.y_min, result.y_max, result.z_min, result.z_max,
+           result.last_z_extruding, result.filament_len);
     printf("\n");
   } else {
     printf("#%s not-processed\n", filename);
@@ -66,7 +63,7 @@ static void print_file_stats(const char *filename, int indentation,
 int main(int argc, char *argv[]) {
   struct MachineControlConfig config;
 
-  float factor = 1.0;        // print speed factor.
+  float factor = 1.0;  // print speed factor.
   char print_header = 1;
   const char *config_file = NULL;
   const char *msg_out_file = "/dev/null";
@@ -74,26 +71,18 @@ int main(int argc, char *argv[]) {
   int opt;
   while ((opt = getopt(argc, argv, "c:f:Hv")) != -1) {
     switch (opt) {
-    case 'c':
-      config_file = strdup(optarg);
-      break;
+    case 'c': config_file = strdup(optarg); break;
     case 'f':
       factor = (float)atof(optarg);
       if (factor <= 0) return usage(argv[0]);
       break;
-    case 'H':
-      print_header = !print_header;
-      break;
-    case 'v':
-      msg_out_file = "/dev/stderr";
-      break;
-    default:
-      return usage(argv[0]);
+    case 'H': print_header = !print_header; break;
+    case 'v': msg_out_file = "/dev/stderr"; break;
+    default: return usage(argv[0]);
     }
   }
 
-  if (optind >= argc)
-    return usage(argv[0]);
+  if (optind >= argc) return usage(argv[0]);
 
   if (!config_file) {
     fprintf(stderr, "Expected config file -c <config>\n");
@@ -109,7 +98,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   if (!config.ConfigureFromFile(&config_parser)) {
-    fprintf(stderr, "Exiting. Parse error in configuration file '%s'\n", config_file);
+    fprintf(stderr, "Exiting. Parse error in configuration file '%s'\n",
+            config_file);
     return 1;
   }
 
@@ -122,16 +112,15 @@ int main(int argc, char *argv[]) {
     config.homing_trigger[i] = HardwareMapping::TRIGGER_NONE;
   }
 
-  int longest_filename = strlen("#[filename]"); // table header
+  int longest_filename = strlen("#[filename]");  // table header
   for (int i = optind; i < argc; ++i) {
     int len = strlen(argv[i]);
     if (len > longest_filename) longest_filename = len;
   }
   if (print_header) {
     printf("%-*s %10s %7s %7s %7s %7s %7s %7s %7s %7s\n", longest_filename,
-           "#[filename]", "time",
-           "min_x", "max_x", "min_y", "max_y", "min_z", "max_z",
-           "z-last", "filament-mm");
+           "#[filename]", "time", "min_x", "max_x", "min_y", "max_y", "min_z",
+           "max_z", "z-last", "filament-mm");
   }
   for (int i = optind; i < argc; ++i) {
     print_file_stats(argv[i], longest_filename, msg_out, config);

@@ -19,12 +19,12 @@
 
 #include "config-parser.h"
 
+#include <assert.h>
+#include <ctype.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-
-#include <assert.h>
-#include <ctype.h>
 
 #include "common/logging.h"
 #include "common/string-util.h"
@@ -46,7 +46,7 @@ static double ParseDoubleExpression(const char *input, double fallback,
     input = *end;
     double operand;
     if (*input == '(') {
-      operand = ParseDoubleExpression(input+1, 1.0, end);
+      operand = ParseDoubleExpression(input + 1, 1.0, end);
       if (**end != ')') {
         fprintf(stderr, "Mismatching parenthesis in '%s'\n", full_expr);
         return fallback;
@@ -71,15 +71,13 @@ bool ConfigParser::Reader::ParseString(const std::string &value,
   return true;
 }
 
-bool ConfigParser::Reader::ParseInt(const std::string &value,
-                                    int *result) {
+bool ConfigParser::Reader::ParseInt(const std::string &value, int *result) {
   char *end;
   *result = strtol(value.c_str(), &end, 10);
   return *end == '\0';
 }
 
-bool ConfigParser::Reader::ParseBool(const std::string &value,
-                                     bool *result) {
+bool ConfigParser::Reader::ParseBool(const std::string &value, bool *result) {
   if (value == "1" || value == "yes" || value == "true") {
     *result = true;
     return true;
@@ -131,8 +129,7 @@ void ConfigParser::SetContent(StringPiece content) {
 // Modifies source.
 static StringPiece NextLine(StringPiece *source) {
   StringPiece result;
-  if (source->length() == 0)
-    return result;
+  if (source->length() == 0) return result;
   const StringPiece::iterator start = source->begin();
   StringPiece::iterator endline = start;
   for (/**/; endline != source->end(); ++endline) {
@@ -141,7 +138,7 @@ static StringPiece NextLine(StringPiece *source) {
         (*endline == '#' || *endline == '\r' || *endline == '\n')) {
       result.assign(start, endline - start);
     }
-    if (*endline == '\n') { // ... but we wait until \n to reposition source
+    if (*endline == '\n') {  // ... but we wait until \n to reposition source
       source->assign(endline + 1, source->length() - (endline - start) - 1);
       return result;
     }
@@ -159,8 +156,7 @@ static std::string CanonicalizeName(const StringPiece s) {
 bool ConfigParser::EmitConfigValues(Reader *reader) {
   // The first pass collects all the parse errors and emits them. Later on,
   // we refuse to run another time.
-  if (!parse_success_)
-    return false;
+  if (!parse_success_) return false;
   bool success = true;
   bool current_section_interested = false;
   std::string current_section;
@@ -170,8 +166,7 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
   for (/**/; line.data() != NULL; line = NextLine(&content_data)) {
     ++line_no;
     line = TrimWhitespace(line);
-    if (line.empty())
-      continue;
+    if (line.empty()) continue;
 
     // Sections start with '['
     if (line[0] == '[') {
@@ -184,9 +179,9 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
 
       const StringPiece section = line.substr(1, line.length() - 2);
       current_section = CanonicalizeName(section);
-      current_section_interested = reader->SeenSection(line_no, current_section);
-    }
-    else {
+      current_section_interested =
+        reader->SeenSection(line_no, current_section);
+    } else {
       StringPiece::iterator eq_pos = std::find(line.begin(), line.end(), '=');
       if (eq_pos == line.end()) {
         reader->ReportError(line_no, "name=value pair expected.");
@@ -194,18 +189,17 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
         continue;
       }
       if (current_section_interested) {
-        const std::string name = CanonicalizeName(
-          StringPiece(line.begin(), eq_pos - line.begin()));
-        const StringPiece value_piece
-          = TrimWhitespace(StringPiece(eq_pos + 1, line.end() - eq_pos - 1));
+        const std::string name =
+          CanonicalizeName(StringPiece(line.begin(), eq_pos - line.begin()));
+        const StringPiece value_piece =
+          TrimWhitespace(StringPiece(eq_pos + 1, line.end() - eq_pos - 1));
         std::string value = value_piece.ToString();
         bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {
           reader->ReportError(
             line_no,
             StringPrintf("In section [%s]: Couldn't handle '%s = %s'",
-                         current_section.c_str(),
-                         name.c_str(), value.c_str()));
+                         current_section.c_str(), name.c_str(), value.c_str()));
         }
         success &= could_parse;
       }

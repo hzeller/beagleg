@@ -20,8 +20,9 @@
 #define _BEAGLEG_LINEBUF_READER_H
 
 #include <stddef.h>
-#include <functional>
 #include <unistd.h>
+
+#include <functional>
 
 // Tokenizes a non-contiguous sequence of incoming data into lines.
 //
@@ -41,7 +42,7 @@
 //   }
 // }
 class LinebufReader {
-public:
+ public:
   // A function to read from some data source. Similar to read(2), it gets
   // a buffer and a maximums size it can write to and returns the number
   // of bytes it has actually written.
@@ -66,9 +67,7 @@ public:
   // The tpical way this will be called: with a file descriptor that has some
   // bytes ready.
   ssize_t Update(int fd) {
-    return Update([fd](char *buf, size_t len) {
-            return read(fd, buf, len);
-           });
+    return Update([fd](char *buf, size_t len) { return read(fd, buf, len); });
   }
 
   // Return a current line if it is available. The line is a nul terminated
@@ -96,7 +95,7 @@ public:
   // Currently stored in buffer.
   size_t size() const { return content_end_ - content_start_; }
 
-private:
+ private:
   const size_t len_;
   char *const buffer_start_;
   const char *const buffer_end_;

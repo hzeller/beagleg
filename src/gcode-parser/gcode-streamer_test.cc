@@ -1,36 +1,36 @@
 /* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
-* (c) 2018 Leonardo Romor <leonardo.romor@gmail.com>
-*
-* This file is part of BeagleG. http://github.com/hzeller/beagleg
-*
-* BeagleG is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* BeagleG is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * (c) 2018 Leonardo Romor <leonardo.romor@gmail.com>
+ *
+ * This file is part of BeagleG. http://github.com/hzeller/beagleg
+ *
+ * BeagleG is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * BeagleG is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+ */
+#include "gcode-streamer.h"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <memory>
-#include <gtest/gtest.h>
-#include <gmock/gmock.h>
 
 #include "common/fd-mux.h"
 #include "common/logging.h"
 #include "gcode-parser/gcode-parser.h"
-#include "gcode-streamer.h"
 
 class MockStream {
-public:
-
+ public:
   MockStream() : fd_{-1, -1} {
     if (pipe(fd_) < 0) {
       perror("pipe()");
@@ -47,22 +47,23 @@ public:
 
   void CloseSender() { close(fd_[SENDING_FD]); }
 
-private:
+ private:
   enum { RECEIVING_FD, SENDING_FD };
   int fd_[2];
 };
 
 class StreamTester : public GCodeParser::EventReceiver {
-public:
+ public:
   StreamTester()
-    : parser_(new GCodeParser(GCodeParser::Config(), this)),
-      streamer_(new GCodeStreamer(&event_server_, parser_.get(), this)),
-      stream_mock_(NULL) {}
+      : parser_(new GCodeParser(GCodeParser::Config(), this)),
+        streamer_(new GCodeStreamer(&event_server_, parser_.get(), this)),
+        stream_mock_(NULL) {}
 
   bool OpenStream() {
     assert(stream_mock_ == NULL);
     stream_mock_ = new MockStream();
-    return streamer_->ConnectStream(stream_mock_->GetReceiverFiledescriptor(), NULL);
+    return streamer_->ConnectStream(stream_mock_->GetReceiverFiledescriptor(),
+                                    NULL);
   }
 
   void CloseStream() {
@@ -71,13 +72,9 @@ public:
     stream_mock_ = NULL;
   }
 
-  void SendString(const char *line) {
-    stream_mock_->SendData(line);
-  }
+  void SendString(const char *line) { stream_mock_->SendData(line); }
 
-  void Cycle() {
-    event_server_.SingleCycle(0);
-  }
+  void Cycle() { event_server_.SingleCycle(0); }
 
   MOCK_METHOD1(gcode_start, void(GCodeParser *parser));
   MOCK_METHOD1(gcode_finished, void(bool end_of_stream));
@@ -92,14 +89,17 @@ public:
   void wait_temperature() override {}
   void dwell(float time_ms) override {}
   void motors_enable(bool enable) override {}
-  bool rapid_move(float feed_mm_p_sec,
-                  const AxesRegister &axes) override { return true;}
+  bool rapid_move(float feed_mm_p_sec, const AxesRegister &axes) override {
+    return true;
+  }
   const char *unprocessed(char letter, float value,
-                          const char *rest_of_line) override { return NULL; }
+                          const char *rest_of_line) override {
+    return NULL;
+  }
 
-private:
+ private:
   class MockFDMultiplexer : public FDMultiplexer {
-  public:
+   public:
     friend class StreamTester;
   };
 
@@ -121,20 +121,20 @@ TEST(Streaming, two_consecutive_connections) {
   EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
   EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   tester.OpenStream();
-  tester.SendString("G1X200F1000"); // Write incomplete move command
+  tester.SendString("G1X200F1000");  // Write incomplete move command
   tester.CloseStream();
-  tester.Cycle(); // Loop to read
-  tester.Cycle(); // Loop to close
+  tester.Cycle();  // Loop to read
+  tester.Cycle();  // Loop to close
 
   // Second connection
   EXPECT_CALL(tester, gcode_start(_)).Times(0);
   EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
   EXPECT_CALL(tester, gcode_finished(_)).Times(1);
-  tester.OpenStream(); // Re open the stream
-  tester.SendString("G1X200F1000\n"); // Receive a complete string
+  tester.OpenStream();                 // Re open the stream
+  tester.SendString("G1X200F1000\n");  // Receive a complete string
   tester.CloseStream();
-  tester.Cycle(); // Loop to read
-  tester.Cycle(); // Loop to close
+  tester.Cycle();  // Loop to read
+  tester.Cycle();  // Loop to close
 }
 
 // Generic check that during stream, all the necessary callbacks are called in
@@ -150,26 +150,26 @@ TEST(Streaming, basic_stream) {
   }
   tester.OpenStream();
   tester.SendString("G1X200F1000\nG1X200F1000\n");
-  tester.Cycle(); // First loop reads the lines
+  tester.Cycle();  // First loop reads the lines
 
   EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
   EXPECT_CALL(tester, input_idle(_)).Times(0);
   tester.SendString("G1X200F1000\n");
-  tester.Cycle(); // Loop and read another line
+  tester.Cycle();  // Loop and read another line
 
   EXPECT_CALL(tester, input_idle(true)).Times(1);
-  tester.SendString("G1X200F1000");   // Send incomplete line
-  tester.Cycle(); // First loop reads, but since it's not a line,
-                  // we are not parsing anything
-  tester.Cycle(); // Timeout, input idle
+  tester.SendString("G1X200F1000");  // Send incomplete line
+  tester.Cycle();  // First loop reads, but since it's not a line,
+                   // we are not parsing anything
+  tester.Cycle();  // Timeout, input idle
 
   EXPECT_CALL(tester, input_idle(false)).Times(1);
-  tester.Cycle(); // Second idle timeout
+  tester.Cycle();  // Second idle timeout
 
   EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(1);
   EXPECT_CALL(tester, gcode_finished(_)).Times(1);
   tester.CloseStream();
-  tester.Cycle(); // Wait the stream to close
+  tester.Cycle();  // Wait the stream to close
 }
 
 int main(int argc, char *argv[]) {

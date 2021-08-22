@@ -24,7 +24,7 @@
 #include <functional>
 
 #if 0
-#  include "logging.h"
+#include "logging.h"
 #endif
 
 #include "gcode-parser.h"
@@ -42,23 +42,35 @@
 // Small arc segments increase accuracy, though might create some
 // CPU load. With 0.1mm arc segments, we can generate about 90 meter/second
 // of arcs with the BeagleBone Black CPU. Sufficient :)
-#define MM_PER_ARC_SEGMENT      0.1
+#define MM_PER_ARC_SEGMENT 0.1
 
 // Generate an arc. Input is the
-static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
-                    bool is_cw,                        // 0 CCW, 1 CW
-                    AxesRegister *position_out,   // start position. Will be updated.
-                    const AxesRegister &center,     // Offset to center.
-                    const AxesRegister &target,     // Target position.
-                    std::function<bool(const AxesRegister&)> segment_output) {
+static bool arc_gen(
+  enum GCodeParserAxis normal_axis,  // Normal axis
+  bool is_cw,                        // 0 CCW, 1 CW
+  AxesRegister *position_out,        // start position. Will be updated.
+  const AxesRegister &center,        // Offset to center.
+  const AxesRegister &target,        // Target position.
+  std::function<bool(const AxesRegister &)> segment_output) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
   switch (normal_axis) {
-  case AXIS_Z: plane[0] = AXIS_X; plane[1] = AXIS_Y; plane[2] = AXIS_Z; break;
-  case AXIS_X: plane[0] = AXIS_Y; plane[1] = AXIS_Z; plane[2] = AXIS_X; break;
-  case AXIS_Y: plane[0] = AXIS_X; plane[1] = AXIS_Z; plane[2] = AXIS_Y; break;
-  default:
-    return true;   // Invalid axis (ignore move).
+  case AXIS_Z:
+    plane[0] = AXIS_X;
+    plane[1] = AXIS_Y;
+    plane[2] = AXIS_Z;
+    break;
+  case AXIS_X:
+    plane[0] = AXIS_Y;
+    plane[1] = AXIS_Z;
+    plane[2] = AXIS_X;
+    break;
+  case AXIS_Y:
+    plane[0] = AXIS_X;
+    plane[1] = AXIS_Z;
+    plane[2] = AXIS_Y;
+    break;
+  default: return true;  // Invalid axis (ignore move).
   }
 
   // Alias reference for readable use with [] operator
@@ -75,7 +87,8 @@ static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
   const float rt_0 = target[plane[0]] - center_0;
   const float rt_1 = target[plane[1]] - center_1;
 
-  float r_0 = -offset[plane[0]]; // Radius vector from center to current location
+  float r_0 =
+    -offset[plane[0]];  // Radius vector from center to current location
   float r_1 = -offset[plane[1]];
 
 #if 0
@@ -87,19 +100,20 @@ static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
 #endif
 
   // CCW angle between position and target from circle center.
-  float angular_travel = atan2(r_0*rt_1 - r_1*rt_0, r_0*rt_0 + r_1*rt_1);
+  float angular_travel =
+    atan2(r_0 * rt_1 - r_1 * rt_0, r_0 * rt_0 + r_1 * rt_1);
   if (is_cw) {
-    if (angular_travel >= 0) angular_travel -= 2*M_PI;
+    if (angular_travel >= 0) angular_travel -= 2 * M_PI;
   } else {
-    if (angular_travel <= 0) angular_travel += 2*M_PI;
+    if (angular_travel <= 0) angular_travel += 2 * M_PI;
   }
 
   // Find the distance for this gcode in the axes we care.
-  const float mm_of_travel = hypotf(angular_travel*radius, fabs(linear_travel));
+  const float mm_of_travel =
+    hypotf(angular_travel * radius, fabs(linear_travel));
 
   // We don't care about non-XYZ moves (e.g. extruder)
-  if (mm_of_travel < 0.00001)
-    return true; // (ignore move)
+  if (mm_of_travel < 0.00001) return true;  // (ignore move)
 
   // Figure out how many segments for this gcode
   const int segments = floorf(mm_of_travel / MM_PER_ARC_SEGMENT);
@@ -107,7 +121,7 @@ static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
   const float theta_per_segment = angular_travel / segments;
   const float linear_per_segment = linear_travel / segments;
 
-  for (int i = 1; i < segments; i++) { // Increment (segments-1)
+  for (int i = 1; i < segments; i++) {  // Increment (segments-1)
     const float cos_Ti = cosf(i * theta_per_segment);
     const float sin_Ti = sinf(i * theta_per_segment);
     r_0 = -offset[plane[0]] * cos_Ti + offset[plane[1]] * sin_Ti;
@@ -129,8 +143,7 @@ static bool arc_gen(enum GCodeParserAxis normal_axis,  // Normal axis
   return segment_output(position);
 }
 
-static AxesRegister calc_bezier_point(float t,
-                                      const AxesRegister &p0,
+static AxesRegister calc_bezier_point(float t, const AxesRegister &p0,
                                       const AxesRegister &p1,
                                       const AxesRegister &p2,
                                       const AxesRegister &p3) {
@@ -141,22 +154,21 @@ static AxesRegister calc_bezier_point(float t,
   const float ttt = tt * t;
 
   AxesRegister p = p0;
-  p[AXIS_X] = uuu * p0[AXIS_X];               // first term
+  p[AXIS_X] = uuu * p0[AXIS_X];  // first term
   p[AXIS_Y] = uuu * p0[AXIS_Y];
   p[AXIS_X] += (3.0f * uu * t * p1[AXIS_X]);  // second term
   p[AXIS_Y] += (3.0f * uu * t * p1[AXIS_Y]);
   p[AXIS_X] += (3.0f * u * tt * p2[AXIS_X]);  // third term
   p[AXIS_Y] += (3.0f * u * tt * p2[AXIS_Y]);
-  p[AXIS_X] += (ttt * p3[AXIS_X]);            // forth term
+  p[AXIS_X] += (ttt * p3[AXIS_X]);  // forth term
   p[AXIS_Y] += (ttt * p3[AXIS_Y]);
   return p;
 }
 
-static bool spline_gen(const AxesRegister &start,
-                       const AxesRegister &cp1,
-                       const AxesRegister &cp2,
-                       const AxesRegister &target,
-                std::function<bool(const AxesRegister& pos)> segment_output) {
+static bool spline_gen(
+  const AxesRegister &start, const AxesRegister &cp1, const AxesRegister &cp2,
+  const AxesRegister &target,
+  std::function<bool(const AxesRegister &pos)> segment_output) {
 #if 0
   Log_debug("spline_gen: start:%.3f,%.3f cp1:%.3f,%.3f cp2:%.3f,%.3f end:%.3f,%.3f\n",
             position[AXIS_X], position[AXIS_Y],
@@ -166,7 +178,8 @@ static bool spline_gen(const AxesRegister &start,
 #endif
 
   for (float t = 0; t < 1; t += 0.01f) {
-    if (!segment_output(calc_bezier_point(t, start, cp1, cp2, target))) return false;
+    if (!segment_output(calc_bezier_point(t, start, cp1, cp2, target)))
+      return false;
   }
   return segment_output(target);
 }
@@ -178,10 +191,10 @@ bool GCodeParser::EventReceiver::arc_move(float feed_mm_p_sec,
                                           const AxesRegister &center,
                                           const AxesRegister &end) {
   AxesRegister position = start;
-  return arc_gen(normal_axis, clockwise, &position,
-                 center, end, [this, feed_mm_p_sec](const AxesRegister &pos) {
-                                return coordinated_move(feed_mm_p_sec, pos);
-                });
+  return arc_gen(normal_axis, clockwise, &position, center, end,
+                 [this, feed_mm_p_sec](const AxesRegister &pos) {
+                   return coordinated_move(feed_mm_p_sec, pos);
+                 });
 }
 
 bool GCodeParser::EventReceiver::spline_move(float feed_mm_p_sec,

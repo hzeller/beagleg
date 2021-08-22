@@ -22,7 +22,7 @@
 #include <gtest/gtest.h>
 
 enum MyKeywords {
-  NO_KEYWORD,    // the equivalent of 'not found' needs to be first
+  NO_KEYWORD,  // the equivalent of 'not found' needs to be first
   KEYWORD_IF,
   KEYWORD_ELSE,
   KEYWORD_ELSEIF,
@@ -31,69 +31,69 @@ enum MyKeywords {
 };
 
 TEST(SimpleLexerTest, SimpleKeywordMatching) {
-    SimpleLexer<MyKeywords> lexer;
-    lexer.AddKeyword("if",     KEYWORD_IF);
-    lexer.AddKeyword("else",   KEYWORD_ELSE);
-    lexer.AddKeyword("elseif", KEYWORD_ELSEIF);
-    lexer.AddKeyword("<",      KEYWORD_LT);
-    lexer.AddKeyword("<=",     KEYWORD_LE);
+  SimpleLexer<MyKeywords> lexer;
+  lexer.AddKeyword("if", KEYWORD_IF);
+  lexer.AddKeyword("else", KEYWORD_ELSE);
+  lexer.AddKeyword("elseif", KEYWORD_ELSEIF);
+  lexer.AddKeyword("<", KEYWORD_LT);
+  lexer.AddKeyword("<=", KEYWORD_LE);
 
-    const char *word = "nothing";
-    EXPECT_EQ(NO_KEYWORD, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("nothing"), word);
+  const char *word = "nothing";
+  EXPECT_EQ(NO_KEYWORD, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("nothing"), word);
 
-    word = "elsx";
-    EXPECT_EQ(NO_KEYWORD, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("elsx"), word);
+  word = "elsx";
+  EXPECT_EQ(NO_KEYWORD, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("elsx"), word);
 
-    word = "else";
-    EXPECT_EQ(KEYWORD_ELSE, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string(""), word);
+  word = "else";
+  EXPECT_EQ(KEYWORD_ELSE, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string(""), word);
 
-    word = "elsefoo";
-    EXPECT_EQ(KEYWORD_ELSE, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("foo"), word);
+  word = "elsefoo";
+  EXPECT_EQ(KEYWORD_ELSE, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("foo"), word);
 
-    word = "elseifbar";
-    EXPECT_EQ(KEYWORD_ELSEIF, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("bar"), word);
+  word = "elseifbar";
+  EXPECT_EQ(KEYWORD_ELSEIF, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("bar"), word);
 
-    word = "<";
-    EXPECT_EQ(KEYWORD_LT, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string(""), word);
+  word = "<";
+  EXPECT_EQ(KEYWORD_LT, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string(""), word);
 
-    word = "<=";
-    EXPECT_EQ(KEYWORD_LE, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string(""), word);
+  word = "<=";
+  EXPECT_EQ(KEYWORD_LE, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string(""), word);
 
-    word = "<hello";
-    EXPECT_EQ(KEYWORD_LT, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("hello"), word);
+  word = "<hello";
+  EXPECT_EQ(KEYWORD_LT, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("hello"), word);
 }
 
 TEST(SimpleLexerTest, ParserEatsWhitespaceAround) {
-    SimpleLexer<MyKeywords> lexer;
-    lexer.AddKeyword("if",     KEYWORD_IF);
+  SimpleLexer<MyKeywords> lexer;
+  lexer.AddKeyword("if", KEYWORD_IF);
 
-    const char *word = "  \n\rif  nextthing";
-    EXPECT_EQ(KEYWORD_IF, lexer.MatchNext(&word));
-    EXPECT_EQ(std::string("nextthing"), word);
+  const char *word = "  \n\rif  nextthing";
+  EXPECT_EQ(KEYWORD_IF, lexer.MatchNext(&word));
+  EXPECT_EQ(std::string("nextthing"), word);
 }
 
 TEST(SimpleLexerTest, ReverseMapping) {
-    SimpleLexer<MyKeywords> lexer;
-    // Alternative keywords for the same enum value. The first is remembered
-    // as canonical keyword for the ToString() method.
-    lexer.AddKeyword("elseif", KEYWORD_ELSEIF);
-    lexer.AddKeyword("elsif",  KEYWORD_ELSEIF);
-    lexer.AddKeyword("<",      KEYWORD_LT);
-    lexer.AddKeyword("LT",     KEYWORD_LT);
+  SimpleLexer<MyKeywords> lexer;
+  // Alternative keywords for the same enum value. The first is remembered
+  // as canonical keyword for the ToString() method.
+  lexer.AddKeyword("elseif", KEYWORD_ELSEIF);
+  lexer.AddKeyword("elsif", KEYWORD_ELSEIF);
+  lexer.AddKeyword("<", KEYWORD_LT);
+  lexer.AddKeyword("LT", KEYWORD_LT);
 
-    EXPECT_EQ(std::string("elseif"), lexer.AsString(KEYWORD_ELSEIF));
-    EXPECT_EQ(std::string("<"), lexer.AsString(KEYWORD_LT));
-    EXPECT_EQ(NULL, lexer.AsString(KEYWORD_IF));
+  EXPECT_EQ(std::string("elseif"), lexer.AsString(KEYWORD_ELSEIF));
+  EXPECT_EQ(std::string("<"), lexer.AsString(KEYWORD_LT));
+  EXPECT_EQ(NULL, lexer.AsString(KEYWORD_IF));
 
-    EXPECT_EQ(std::string("?"), lexer.AsString(NO_KEYWORD));
+  EXPECT_EQ(std::string("?"), lexer.AsString(NO_KEYWORD));
 }
 
 int main(int argc, char *argv[]) {

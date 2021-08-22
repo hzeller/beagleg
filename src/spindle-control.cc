@@ -22,18 +22,17 @@
 
 #include "spindle-control.h"
 
-#include <stdlib.h>
-#include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <termios.h>
 #include <time.h>
-#include <errno.h>
+#include <unistd.h>
 
 #include <memory>
 
 #include "common/logging.h"
 #include "common/string-util.h"
-
 #include "config-parser.h"
 #include "hardware-mapping.h"
 
@@ -80,15 +79,15 @@ SpindleConfig::SpindleConfig() {
 
 namespace {
 class SpindleConfigReader : public ConfigParser::Reader {
-public:
+ public:
   SpindleConfigReader(SpindleConfig *config) : config_(config) {}
 
   bool SeenSection(int line_no, const std::string &section_name) final {
     return (section_name == "spindle");  // The only section we deal with.
   }
 
-  bool SeenNameValue(int line_no,
-                     const std::string &name, const std::string &value) final {
+  bool SeenNameValue(int line_no, const std::string &name,
+                     const std::string &value) final {
     // clang-format off
 #define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
     ACCEPT_VALUE("type",           String, &config_->type);
@@ -104,20 +103,20 @@ public:
     // clang-format on
 
     ReportError(line_no, StringPrintf("Unexpected configuration option "
-                                      "'%s' in spindle section", name.c_str()));
+                                      "'%s' in spindle section",
+                                      name.c_str()));
     return false;
   }
 
-private:
+ private:
   SpindleConfig *const config_;
 };
 
-
 // Convenience base-class for all our spindles.
 class BaseSpindle : public Spindle {
-public:
+ public:
   BaseSpindle(const SpindleConfig &config, HardwareMapping *hardware_mapping)
-    : config_(config), hardware_mapping_(hardware_mapping) {}
+      : config_(config), hardware_mapping_(hardware_mapping) {}
 
   virtual bool Init() { return true; }
   virtual void On(bool ccw, int rpm) = 0;
@@ -130,7 +129,7 @@ public:
     hardware_mapping_->SetAuxOutputs();
   }
 
-protected:
+ protected:
   const SpindleConfig config_;
   HardwareMapping *const hardware_mapping_;
 
@@ -140,9 +139,9 @@ protected:
 };
 
 class PWMSpindle : public BaseSpindle {
-public:
+ public:
   PWMSpindle(const SpindleConfig &config, HardwareMapping *hardware_mapping)
-    : BaseSpindle(config, hardware_mapping) {
+      : BaseSpindle(config, hardware_mapping) {
     Log_debug("PWMSpindle");
   }
 
@@ -150,11 +149,12 @@ public:
   static bool CheckRequiredHardware(const SpindleConfig &config,
                                     const HardwareMapping *hw) {
     bool success = true;
-    if (!hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE)
-        && !hw->HasPWMMapping(HardwareMapping::NamedOutput::SPINDLE_SPEED)) {
+    if (!hw->HasAuxMapping(HardwareMapping::NamedOutput::SPINDLE) &&
+        !hw->HasPWMMapping(HardwareMapping::NamedOutput::SPINDLE_SPEED)) {
       // We want to have at least one of these.
-      Log_info("No 'spindle' Aux pin configured to turn on spindle or "
-               "'spindle-speed' PWM output to control its speed.");
+      Log_info(
+        "No 'spindle' Aux pin configured to turn on spindle or "
+        "'spindle-speed' PWM output to control its speed.");
       success = false;
     }
     if (config.allow_ccw &&
@@ -181,7 +181,8 @@ public:
     if (ccw != is_ccw_) ramp_down();
 
     // set the spindle direction
-    set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE_DIRECTION, ccw);
+    set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE_DIRECTION,
+                           ccw);
     is_ccw_ = ccw;
 
     // ramp the spindle to the target speed
@@ -192,8 +193,8 @@ public:
       if ((epsilon < 0 && duty_cycle_ < target) ||
           (epsilon > 0 && duty_cycle_ > target))
         duty_cycle_ = target;
-      hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::SPINDLE_SPEED,
-                                      duty_cycle_);
+      hardware_mapping_->SetPWMOutput(
+        HardwareMapping::NamedOutput::SPINDLE_SPEED, duty_cycle_);
       sleep_ms(kRampDelayMs);
     }
 
@@ -204,8 +205,8 @@ public:
     }
 
     Log_debug("PWMSpindle: on %s at %d RPM (duty_cycle: %f)",
-              ccw ? "ccw" : "cw",
-              (int)(config_.max_rpm * duty_cycle_), duty_cycle_);
+              ccw ? "ccw" : "cw", (int)(config_.max_rpm * duty_cycle_),
+              duty_cycle_);
   }
 
   void Off() final {
@@ -216,22 +217,22 @@ public:
     Log_debug("PWMSpindle: off");
   }
 
-private:
+ private:
   void ramp_down() {
     while (duty_cycle_ > 0) {
       if (duty_cycle_ >= kRampEpsilon)
         duty_cycle_ -= kRampEpsilon;
       else
         duty_cycle_ = 0;
-      hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::SPINDLE_SPEED,
-                                      duty_cycle_);
+      hardware_mapping_->SetPWMOutput(
+        HardwareMapping::NamedOutput::SPINDLE_SPEED, duty_cycle_);
       sleep_ms(kRampDelayMs);
     }
   }
 };
 
 class PololuSMCSpindle : public BaseSpindle {
-private:
+ private:
   // clang-format off
   enum {
     // Command codes
@@ -337,10 +338,10 @@ private:
   };
   // clang-format on
 
-public:
+ public:
   PololuSMCSpindle(const SpindleConfig &config,
                    HardwareMapping *hardware_mapping)
-    : BaseSpindle(config, hardware_mapping) {
+      : BaseSpindle(config, hardware_mapping) {
     fd_ = open(config.port.c_str(), O_RDWR | O_NOCTTY);
     Log_debug("PololuSMCSpindle: port %s  (fd = %d)", config.port.c_str(), fd_);
   }
@@ -376,8 +377,9 @@ public:
 
     int id, major, minor;
     get_version(&id, &major, &minor);
-    Log_debug("PololuSMCSpindle: initialized  ProductID:0x%04x  Firmware:%d.%d\n",
-              id, major, minor);
+    Log_debug(
+      "PololuSMCSpindle: initialized  ProductID:0x%04x  Firmware:%d.%d\n", id,
+      major, minor);
 
     set_motor_limit(SYMMERIC_LIMIT_MAX_ACCEL, config_.max_accel);
     set_motor_limit(SYMMERIC_LIMIT_MAX_DECEL, config_.max_decel);
@@ -442,7 +444,7 @@ public:
     Log_debug("PololuSMCSpindle: off");
   }
 
-private:
+ private:
   void exit_safe_start() {
     check_errors(ERRORS_OCCURED);
     const unsigned char command = CMD_EXIT_SAFE_START;
@@ -474,31 +476,21 @@ private:
     switch (id) {
     case SYMMERIC_LIMIT_MAX_SPEED:
     case FORWARD_LIMIT_MAX_SPEED:
-    case REVERSE_LIMIT_MAX_SPEED:
-      name = "Max Speed";
-      break;
+    case REVERSE_LIMIT_MAX_SPEED: name = "Max Speed"; break;
 
     case SYMMERIC_LIMIT_MAX_ACCEL:
     case FORWARD_LIMIT_MAX_ACCEL:
-    case REVERSE_LIMIT_MAX_ACCEL:
-      name = "Max Accel";
-      break;
+    case REVERSE_LIMIT_MAX_ACCEL: name = "Max Accel"; break;
 
     case SYMMERIC_LIMIT_MAX_DECEL:
     case FORWARD_LIMIT_MAX_DECEL:
-    case REVERSE_LIMIT_MAX_DECEL:
-      name = "Max Decel";
-      break;
+    case REVERSE_LIMIT_MAX_DECEL: name = "Max Decel"; break;
 
     case SYMMERIC_LIMIT_BRAKE_DURATION:
     case FORWARD_LIMIT_BRAKE_DURATION:
-    case REVERSE_LIMIT_BRAKE_DURATION:
-      name = "Brake Duration";
-      break;
+    case REVERSE_LIMIT_BRAKE_DURATION: name = "Brake Duration"; break;
 
-    default:
-      Log_error("Invalid motor limit id (%d)\n", id);
-      return;
+    default: Log_error("Invalid motor limit id (%d)\n", id); return;
     }
 
     unsigned char command[4];
@@ -512,29 +504,33 @@ private:
     receive(response, 1);
 
     switch (response[0]) {
-    case 0:
-      Log_debug("  %s limit set to %d\n", name, val);
-      break;
+    case 0: Log_debug("  %s limit set to %d\n", name, val); break;
     case 1:
-      Log_debug("  Unable to set %s forward limit to %d because of Hard Motor Limit settings\n",
-                name, val);
+      Log_debug(
+        "  Unable to set %s forward limit to %d because of Hard Motor Limit "
+        "settings\n",
+        name, val);
       break;
     case 2:
-      Log_debug("  Unable to set %s reverse limit to %d because of Hard Motor Limit settings\n",
-                name, val);
+      Log_debug(
+        "  Unable to set %s reverse limit to %d because of Hard Motor Limit "
+        "settings\n",
+        name, val);
       break;
     case 3:
-      Log_debug("  Unable to set %s forward and reverse limits %d because of Hard Motor Limit settings\n",
-                name, val);
+      Log_debug(
+        "  Unable to set %s forward and reverse limits %d because of Hard "
+        "Motor Limit settings\n",
+        name, val);
       break;
     }
   }
 
-  // Reads a variable from the SMC and returns it as a number between 0 and 65535.
-  // The 'id' must be one of Variable Ids listed in the class definition.
+  // Reads a variable from the SMC and returns it as a number between 0 and
+  // 65535. The 'id' must be one of Variable Ids listed in the class definition.
   // For variables that are actually signed, additional processing is required.
   int get_variable(unsigned char id) {
-    unsigned char command[2] = { CMD_GET_VARIABLE, id };
+    unsigned char command[2] = {CMD_GET_VARIABLE, id};
     send(command, sizeof(command));
     unsigned char response[2];
     receive(response, sizeof(response));
@@ -553,22 +549,18 @@ private:
         Log_debug("    Safe-Start Violation\n");
       if (errors & ERROR_STATUS_REQUIRED_CHANNEL_INVALID)
         Log_debug("    Required Channel Invalid\n");
-      if (errors & ERROR_STATUS_SERIAL_ERROR)
-        Log_debug("    Serial Error\n");
+      if (errors & ERROR_STATUS_SERIAL_ERROR) Log_debug("    Serial Error\n");
       if (errors & ERROR_STATUS_COMMAND_TIMEOUT)
         Log_debug("    Command Timeout\n");
       if (errors & ERROR_STATUS_LIMIT_KILL_SWITCH)
         Log_debug("    Limit/Kill Switch\n");
-      if (errors & ERROR_STATUS_LOW_VIN)
-        Log_debug("    Low VIN\n");
-      if (errors & ERROR_STATUS_HIGH_VIN)
-        Log_debug("    High VIN\n");
+      if (errors & ERROR_STATUS_LOW_VIN) Log_debug("    Low VIN\n");
+      if (errors & ERROR_STATUS_HIGH_VIN) Log_debug("    High VIN\n");
       if (errors & ERROR_STATUS_OVER_TEMPERATURE)
         Log_debug("    Over Temperature\n");
       if (errors & ERROR_STATUS_MOTOR_DRIVER_ERROR)
         Log_debug("    Motor Driver Error\n");
-      if (errors & ERROR_STATUS_ERR_LINE_HIGH)
-        Log_debug("    ERR Line High\n");
+      if (errors & ERROR_STATUS_ERR_LINE_HIGH) Log_debug("    ERR Line High\n");
     }
   }
 
@@ -585,8 +577,9 @@ private:
       decel = get_variable(MAX_DECELERATION_REVERSE);
       brake = get_variable(BRAKE_DURATION_REVERSE);
     }
-    Log_debug("  %s max speed: %d max accel: %d max decel: %d brake duration: %d\n",
-              forward ? "Forward" : "Reverse", speed, accel, decel, brake);
+    Log_debug(
+      "  %s max speed: %d max accel: %d max decel: %d brake duration: %d\n",
+      forward ? "Forward" : "Reverse", speed, accel, decel, brake);
   }
 
   void send(const void *buf, int count) {
@@ -594,7 +587,8 @@ private:
     if (sent == -1)
       perror("PololuSMCSpindle: send() error");
     else if (sent != count)
-      Log_debug("PololuSMCSpindle: send() short write %d of %d bytes", sent, count);
+      Log_debug("PololuSMCSpindle: send() short write %d of %d bytes", sent,
+                count);
   }
 
   void receive(void *buf, int count) {
@@ -602,7 +596,8 @@ private:
     if (got == -1)
       perror("PololuSMCSpindle: receive() error");
     else if (got != count)
-      Log_debug("PololuSMCSpindle: receive() short read %d of %d bytes", got, count);
+      Log_debug("PololuSMCSpindle: receive() short read %d of %d bytes", got,
+                count);
   }
 
   int fd_;
@@ -620,19 +615,17 @@ Spindle *Spindle::CreateFromConfig(const SpindleConfig &config,
   if (config.type == "simple-pwm" &&
       PWMSpindle::CheckRequiredHardware(config, hardware_mapping)) {
     spindle.reset(new PWMSpindle(config, hardware_mapping));
-  }
-  else if (config.type == "pololu-smc" &&
-           PololuSMCSpindle::CheckRequiredHardware(config, hardware_mapping)) {
+  } else if (config.type == "pololu-smc" &&
+             PololuSMCSpindle::CheckRequiredHardware(config,
+                                                     hardware_mapping)) {
     spindle.reset(new PololuSMCSpindle(config, hardware_mapping));
-  }
-  else {
+  } else {
     Log_info("No spindle.");
     // TODO: return a dummy spindle to avoid testing for nullptr everywhere?
     return nullptr;
   }
 
-  if (!spindle->Init())
-    return nullptr;
+  if (!spindle->Init()) return nullptr;
 
   Log_debug("  max_rpm      : %d", config.max_rpm);
   Log_debug("  max_accel    : %d", config.max_accel);

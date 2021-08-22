@@ -22,10 +22,9 @@
 
 #include <stdint.h>
 
-#include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "common/string-util.h"
+#include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "segment-queue.h"
-
 
 class ConfigParser;
 struct LinearSegmentSteps;
@@ -68,47 +67,47 @@ struct LinearSegmentSteps;
 // An object of this class can be used to just simulate hardare access if
 // InitializeHardware() is not called.
 class HardwareMapping {
-public:
+ public:
   // Some anonymous sets of constexpr, here represented as enum as we don't
   // have constexpr in this version of c++ yet.
   enum {
-    NUM_SWITCHES      =  9,
-    NUM_BOOL_OUTPUTS  = 16,
-    NUM_PWM_OUTPUTS   =  4,
-    NUM_MOTORS        =  8
+    NUM_SWITCHES = 9,
+    NUM_BOOL_OUTPUTS = 16,
+    NUM_PWM_OUTPUTS = 4,
+    NUM_MOTORS = 8
   };
 
   // A register containing all the necessary bits.
   typedef uint16_t AuxBitmap;
-  typedef uint8_t  MotorBitmap;
+  typedef uint8_t MotorBitmap;
 
   typedef GCodeParserAxis LogicAxis;  // This is provided by the gcode parser.
 
   enum AxisTrigger {
-    TRIGGER_NONE = 0x00,   // None of the Axis is triggering
-    TRIGGER_MIN  = 0x01,   // Min position of axis is triggering
-    TRIGGER_MAX  = 0x02,   // Max position of axis is triggering
-    TRIGGER_ANY  = 0x03    // Any of the axis is triggering
+    TRIGGER_NONE = 0x00,  // None of the Axis is triggering
+    TRIGGER_MIN = 0x01,   // Min position of axis is triggering
+    TRIGGER_MAX = 0x02,   // Max position of axis is triggering
+    TRIGGER_ANY = 0x03    // Any of the axis is triggering
   };
 
   enum class NamedOutput {
-    MIST,              // M7 = on; M9 = off
-    FLOOD,             // M8 = on; M9 = off
-    VACUUM,            // M10 = on; M11 = off
-    SPINDLE,           // M3/M4 = on; M5 = off
+    MIST,     // M7 = on; M9 = off
+    FLOOD,    // M8 = on; M9 = off
+    VACUUM,   // M10 = on; M11 = off
+    SPINDLE,  // M3/M4 = on; M5 = off
     SPINDLE_SPEED,
-    SPINDLE_DIRECTION, // M4 = on; M3/M5 = off
-    COOLER,            // M245 = on; M246 = off
-    CASE_LIGHTS,       // M355 S1 = on; M355 S0 = off
-    FAN,               // M106 Sn (set pwm or on if n > 0); M107 = off
+    SPINDLE_DIRECTION,  // M4 = on; M3/M5 = off
+    COOLER,             // M245 = on; M246 = off
+    CASE_LIGHTS,        // M355 S1 = on; M355 S0 = off
+    FAN,                // M106 Sn (set pwm or on if n > 0); M107 = off
     HOTEND,
     HEATEDBED,
-    POINTER,           // M64 Px = on; M65 Px = off
-    LED,               // toggles on/off with M42 while waiting for start switch
-    ATX_POWER,         // M80 = on; M81 = off
-    ESTOP,             // M0 = on; M999 = off
+    POINTER,    // M64 Px = on; M65 Px = off
+    LED,        // toggles on/off with M42 while waiting for start switch
+    ATX_POWER,  // M80 = on; M81 = off
+    ESTOP,      // M0 = on; M999 = off
 
-    NUM_OUTPUTS   // last.
+    NUM_OUTPUTS  // last.
   };
 
   HardwareMapping();
@@ -209,8 +208,8 @@ public:
   // motors in the LinearSegmentSteps
   void AssignMotorSteps(LogicAxis axis, int steps, LinearSegmentSteps *out);
 
-  // Returns the number of step for the requested logic axis from the physical status,
-  // or 0 if it is not mapped
+  // Returns the number of step for the requested logic axis from the physical
+  // status, or 0 if it is not mapped
   int GetAxisSteps(LogicAxis axis, const PhysicalStatus &status);
 
   // -- Switch access
@@ -224,8 +223,8 @@ public:
   // Returns true if endstop for given axis has been reached.
   // "expected_trigger" can be any of MIN/MAX to test for that
   // particular end-trigger or ANY if we don't care which end is affected.
-  // If an requested trigger is asked that is not returned in AvailableAxisSwitch(),
-  // this will always return false.
+  // If an requested trigger is asked that is not returned in
+  // AvailableAxisSwitch(), this will always return false.
   bool TestAxisSwitch(LogicAxis axis, AxisTrigger requested_trigger);
 
   // Returns true if the E-Stop input is active.
@@ -252,14 +251,15 @@ public:
   // logic axis.
   std::string DebugMotorString(LogicAxis axis);
 
-private:
+ private:
   class ConfigReader;
 
   // A GPIO Definition contains the relevant information to address a particular
   // hardware pin.
   typedef uint32_t GPIODefinition;
 
-  // Converts the human readable name of an output to the enumeration if possible.
+  // Converts the human readable name of an output to the enumeration if
+  // possible.
   static bool NameToOutput(StringPiece str, NamedOutput *result);
   static const char *OutputToName(NamedOutput output);
 
@@ -275,15 +275,18 @@ private:
   void ResetHardware();  // Initialize to a safe state.
 
   // Mapping of logical outputs to hardware outputs.
-  FixedArray<AuxBitmap, (int)NamedOutput::NUM_OUTPUTS, NamedOutput> output_to_aux_bits_;
-  FixedArray<GPIODefinition, (int)NamedOutput::NUM_OUTPUTS, NamedOutput> output_to_pwm_gpio_;
+  FixedArray<AuxBitmap, (int)NamedOutput::NUM_OUTPUTS, NamedOutput>
+    output_to_aux_bits_;
+  FixedArray<GPIODefinition, (int)NamedOutput::NUM_OUTPUTS, NamedOutput>
+    output_to_pwm_gpio_;
 
-    // "axis_to_driver": Which axis is mapped to which physical output drivers.
+  // "axis_to_driver": Which axis is mapped to which physical output drivers.
   // This allows to have a logical axis (e.g. X, Y, Z) output to any physical
   // or a set of multiple drivers (mirroring).
   // Bitmap of drivers output should go.
   FixedArray<MotorBitmap, GCODE_NUM_AXES> axis_to_driver_;
-  FixedArray<int, NUM_MOTORS> driver_flip_;  // 1 or -1 for for individual driver
+  FixedArray<int, NUM_MOTORS>
+    driver_flip_;  // 1 or -1 for for individual driver
 
   FixedArray<int, GCODE_NUM_AXES> axis_to_min_endstop_;
   FixedArray<int, GCODE_NUM_AXES> axis_to_max_endstop_;
@@ -296,7 +299,7 @@ private:
   bool estop_state_;
   bool motors_enabled_;
 
-  AuxBitmap aux_bits_;       // Set via M42 or various other settings.
+  AuxBitmap aux_bits_;  // Set via M42 or various other settings.
 
   bool is_hardware_initialized_;
 };

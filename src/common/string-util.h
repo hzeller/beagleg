@@ -19,26 +19,25 @@
 #ifndef _BEAGLEG_STRING_UTIL_H
 #define _BEAGLEG_STRING_UTIL_H
 
-#include <string>
-#include <vector>
-#include <ostream>
-
-#include <string.h>
-
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
+
+#include <ostream>
+#include <string>
+#include <vector>
 
 // Define this with empty, if you're not using gcc.
-#define PRINTF_FMT_CHECK(fmt_pos, args_pos)             \
-  __attribute__ ((format (printf, fmt_pos, args_pos)))
+#define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
+  __attribute__((format(printf, fmt_pos, args_pos)))
 
 // A StringPiece essentially points at a chunk of data of a particular
 // length. Pointer + length.
 // It allows to have keep cheap substrings of strings without copy while still
 // have a type-safe, length-aware piece of string.
 class StringPiece {
-public:
-  typedef const char* iterator;
+ public:
+  typedef const char *iterator;
 
   StringPiece() : data_(NULL), len_(0) {}
   StringPiece(const char *data, size_t len) : data_(data), len_(len) {}
@@ -50,16 +49,14 @@ public:
     assert(pos + len <= len_);
     return StringPiece(data_ + pos, len);
   }
-  StringPiece substr(size_t pos) const {
-    return substr(pos, length() - pos);
-  }
+  StringPiece substr(size_t pos) const { return substr(pos, length() - pos); }
 
   void assign(const char *data, size_t len) {
     data_ = data;
     len_ = len;
   }
 
-  bool operator == (const StringPiece &other) const {
+  bool operator==(const StringPiece &other) const {
     if (len_ != other.len_) return false;
     if (data_ == other.data_) return true;
     return strncmp(data_, other.data_, len_) == 0;
@@ -75,12 +72,12 @@ public:
 
   std::string ToString() const { return std::string(data_, len_); }
 
-private:
+ private:
   const char *data_;
   size_t len_;
 };
 
-inline std::ostream& operator << (std::ostream &o, const StringPiece &s) {
+inline std::ostream &operator<<(std::ostream &o, const StringPiece &s) {
   o << s.ToString();
   return o;
 }
@@ -106,4 +103,4 @@ std::vector<StringPiece> SplitString(const StringPiece &s,
 long ParseDecimal(const StringPiece &s, long fallback);
 
 #undef PRINTF_FMT_CHECK
-#endif // _BEAGLEG_STRING_UTIL_H
+#endif  // _BEAGLEG_STRING_UTIL_H

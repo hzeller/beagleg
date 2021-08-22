@@ -47,8 +47,8 @@
 #include "hardware-mapping.h"
 #include "motion-queue-motor-operations.h"
 #include "motion-queue.h"
-#include "segment-queue.h"
 #include "pru-hardware-interface.h"
+#include "segment-queue.h"
 #include "sim-audio-out.h"
 #include "sim-firmware.h"
 #include "spindle-control.h"
@@ -57,41 +57,57 @@ static int usage(const char *prog, const char *msg) {
   if (msg) {
     fprintf(stderr, "\033[1m\033[31m%s\033[0m\n\n", msg);
   }
-  fprintf(stderr, "Usage: %s [options] [<gcode-filename>]\n"
-          "Options:\n", prog);
   fprintf(stderr,
-          "  -c, --config <config-file> : Configuration file. (Required)\n"
-          "  -p, --port <port>          : Listen on this TCP port for GCode.\n"
-          "  -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).\n"
-          "  -l, --logfile <logfile>    : Logfile to use. If empty, messages go to syslog (Default: /dev/stderr).\n"
-          "      --param <paramfile>    : Parameter file to use.\n"
-          "  -d, --daemon               : Run as daemon.\n"
-          "      --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to this (default: daemon:daemon)\n"
-          "      --help                 : Display this help text and exit.\n"
-          "\nMostly for testing and debugging:\n"
-          "  -f <factor>                : Feedrate speed factor (Default 1.0).\n"
-          "  -n                         : Dryrun; don't send to motors, no GPIO or PRU needed (Default: off).\n"
-          // -N dry-run with simulation output; mostly for development, so not mentioned here.
-          // -W <wav-file>  dry run for development: output wav file.
-          "  -P                         : Verbose: Show some more debug output (Default: off).\n"
-          "  -S                         : Synchronous: don't queue (Default: off).\n"
-          "      --allow-m111           : Allow changing the debug level with M111 (Default: off).\n"
-          "\nSegment acceleration tuning:\n"
-          "     --threshold-angle       : Specifies the threshold angle used for segment acceleration (Default: 10 degrees).\n"
-          "     --speed-tune-angle      : Specifies the angle used for proportional speed-tuning. (Default: 60 degrees)\n\n"
-          "                               The --threshold-angle + --speed-tune-angle must be less than 90 degrees.\n"
-          "\nConfiguration file overrides:\n"
-          "     --homing-required       : Require homing before any moves (require-homing = yes).\n"
-          "     --nohoming-required     : (Opposite of above^): Don't require homing before any moves (require-homing = no).\n"
-          "     --norange-check         : Disable machine limit checks. (range-check = no).\n");
+          "Usage: %s [options] [<gcode-filename>]\n"
+          "Options:\n",
+          prog);
+  fprintf(
+    stderr,
+    "  -c, --config <config-file> : Configuration file. (Required)\n"
+    "  -p, --port <port>          : Listen on this TCP port for GCode.\n"
+    "  -b, --bind-addr <bind-ip>  : Bind to this IP (Default: 0.0.0.0).\n"
+    "  -l, --logfile <logfile>    : Logfile to use. If empty, messages go to "
+    "syslog (Default: /dev/stderr).\n"
+    "      --param <paramfile>    : Parameter file to use.\n"
+    "  -d, --daemon               : Run as daemon.\n"
+    "      --priv <uid>[:<gid>]   : After opening GPIO: drop privileges to "
+    "this (default: daemon:daemon)\n"
+    "      --help                 : Display this help text and exit.\n"
+    "\nMostly for testing and debugging:\n"
+    "  -f <factor>                : Feedrate speed factor (Default 1.0).\n"
+    "  -n                         : Dryrun; don't send to motors, no GPIO or "
+    "PRU needed (Default: off).\n"
+    // -N dry-run with simulation output; mostly for development, so not
+    // mentioned here. -W <wav-file>  dry run for development: output wav file.
+    "  -P                         : Verbose: Show some more debug output "
+    "(Default: off).\n"
+    "  -S                         : Synchronous: don't queue (Default: off).\n"
+    "      --allow-m111           : Allow changing the debug level with M111 "
+    "(Default: off).\n"
+    "\nSegment acceleration tuning:\n"
+    "     --threshold-angle       : Specifies the threshold angle used for "
+    "segment acceleration (Default: 10 degrees).\n"
+    "     --speed-tune-angle      : Specifies the angle used for proportional "
+    "speed-tuning. (Default: 60 degrees)\n\n"
+    "                               The --threshold-angle + --speed-tune-angle "
+    "must be less than 90 degrees.\n"
+    "\nConfiguration file overrides:\n"
+    "     --homing-required       : Require homing before any moves "
+    "(require-homing = yes).\n"
+    "     --nohoming-required     : (Opposite of above^): Don't require homing "
+    "before any moves (require-homing = no).\n"
+    "     --norange-check         : Disable machine limit checks. (range-check "
+    "= no).\n");
   return 1;
 }
 
 static int fyi_option_gone(const char *prog) {
-  fprintf(stderr,
-          "Options for machine settings have been removed in favor of a configuration file.\n"
-          "Provide it with -c <config-file>.\n"
-          "See https://github.com/hzeller/beagleg/blob/master/sample.config\n\n");
+  fprintf(
+    stderr,
+    "Options for machine settings have been removed in favor of a "
+    "configuration file.\n"
+    "Provide it with -c <config-file>.\n"
+    "See https://github.com/hzeller/beagleg/blob/master/sample.config\n\n");
   return usage(prog, NULL);
 }
 
@@ -112,8 +128,8 @@ static bool drop_privileges(StringPiece privs) {
       return false;
     }
     if (setresgid(g->gr_gid, g->gr_gid, g->gr_gid) != 0) {
-      Log_error("Couldn't drop group privs to '%s' (gid %d): %s",
-                name.c_str(), g->gr_gid, strerror(errno));
+      Log_error("Couldn't drop group privs to '%s' (gid %d): %s", name.c_str(),
+                g->gr_gid, strerror(errno));
       return false;
     }
   }
@@ -125,8 +141,8 @@ static bool drop_privileges(StringPiece privs) {
     return false;
   }
   if (setresuid(p->pw_uid, p->pw_uid, p->pw_uid) != 0) {
-    Log_error("Couldn't drop user privs to '%s' (uid %d): %s",
-              name.c_str(), p->pw_uid, strerror(errno));
+    Log_error("Couldn't drop user privs to '%s' (uid %d): %s", name.c_str(),
+              p->pw_uid, strerror(errno));
     return false;
   }
 
@@ -165,10 +181,9 @@ static int open_server(const char *bind_addr, int port) {
   serv_addr.sin_port = htons(port);
   int on = 1;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  if (bind(s, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-    Log_error("Trouble binding to %s:%d: %s",
-              bind_addr ? bind_addr : "0.0.0.0", port,
-              strerror(errno));
+  if (bind(s, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    Log_error("Trouble binding to %s:%d: %s", bind_addr ? bind_addr : "0.0.0.0",
+              port, strerror(errno));
     return -1;
   }
   return s;
@@ -180,8 +195,8 @@ static int open_server(const char *bind_addr, int port) {
 // are just FYI information for nicer log-messages.
 static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
                              GCodeMachineControl *machine,
-                             GCodeStreamer *streamer,
-                             const char *bind_addr, int port) {
+                             GCodeStreamer *streamer, const char *bind_addr,
+                             int port) {
   if (listen(listen_socket, 2) < 0) {
     Log_error("listen(fd=%d) failed: %s", listen_socket, strerror(errno));
     return;
@@ -190,47 +205,49 @@ static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
   Log_info("Ready to accept GCode-connections on %s:%d",
            bind_addr ? bind_addr : "0.0.0.0", port);
 
-  event_server->RunOnReadable(listen_socket,
-                              [listen_socket,machine,streamer]() {
-    struct sockaddr_in client;
-    socklen_t socklen = sizeof(client);
-    int connection = accept(listen_socket, (struct sockaddr*) &client, &socklen);
-    if (connection < 0) {
-      Log_error("accept(): %s", strerror(errno));
-      return true;
-    }
+  event_server->RunOnReadable(
+    listen_socket, [listen_socket, machine, streamer]() {
+      struct sockaddr_in client;
+      socklen_t socklen = sizeof(client);
+      int connection =
+        accept(listen_socket, (struct sockaddr *)&client, &socklen);
+      if (connection < 0) {
+        Log_error("accept(): %s", strerror(errno));
+        return true;
+      }
 
-    // We need to set the fd to non blocking in order to avoid
-    // blocking reads caused by spurious situations in Linux.
-    // http://man7.org/linux/man-pages/man2/select.2.html#BUGS
-    const int flags = fcntl(connection, F_GETFL, 0);
-    if (flags < 0) {
-      Log_error("fcntl(): %s", strerror(errno));
-      return true;
-    }
-    if (fcntl(connection, F_SETFL, flags | O_NONBLOCK) < 0) {
-      Log_error("fcntl(): %s", strerror(errno));
-      return true;
-    }
+      // We need to set the fd to non blocking in order to avoid
+      // blocking reads caused by spurious situations in Linux.
+      // http://man7.org/linux/man-pages/man2/select.2.html#BUGS
+      const int flags = fcntl(connection, F_GETFL, 0);
+      if (flags < 0) {
+        Log_error("fcntl(): %s", strerror(errno));
+        return true;
+      }
+      if (fcntl(connection, F_SETFL, flags | O_NONBLOCK) < 0) {
+        Log_error("fcntl(): %s", strerror(errno));
+        return true;
+      }
 
-    if (streamer->IsStreaming()) {
-      // For now, only one. Though we could have multiple.
-      dprintf(connection, "// Sorry, can only handle one connection at a time."
-              "There is only one machine after all.\n");
-      close(connection);
+      if (streamer->IsStreaming()) {
+        // For now, only one. Though we could have multiple.
+        dprintf(connection,
+                "// Sorry, can only handle one connection at a time."
+                "There is only one machine after all.\n");
+        close(connection);
+        return true;
+      }
+
+      char ip_buffer[INET_ADDRSTRLEN];
+      const char *print_ip =
+        inet_ntop(AF_INET, &client.sin_addr, ip_buffer, sizeof(ip_buffer));
+      Log_info("Accepting new connection from %s\n", print_ip);
+
+      FILE *msg_stream = fdopen(connection, "w");
+      machine->SetMsgOut(msg_stream);
+      streamer->ConnectStream(connection, msg_stream);
       return true;
-    }
-
-    char ip_buffer[INET_ADDRSTRLEN];
-    const char *print_ip = inet_ntop(AF_INET, &client.sin_addr,
-                                     ip_buffer, sizeof(ip_buffer));
-    Log_info("Accepting new connection from %s\n", print_ip);
-
-    FILE *msg_stream = fdopen(connection, "w");
-    machine->SetMsgOut(msg_stream);
-    streamer->ConnectStream(connection, msg_stream);
-    return true;
-  });
+    });
 }
 
 // THIS IS A SAMPLE ONLY at this point. We need to come up with a proper
@@ -249,47 +266,55 @@ static void run_status_server(const char *bind_addr, int port,
 
   Log_info("Starting experimental status server on port %d", port);
 
-  event_server->RunOnReadable(
-    listen_socket, [listen_socket, machine, event_server]() {
-      struct sockaddr_in client;
-      socklen_t socklen = sizeof(client);
-      int conn = accept(listen_socket, (struct sockaddr*) &client, &socklen);
-      if (conn < 0) {
-        Log_error("accept(): %s", strerror(errno));
-        return true;
-      }
+  event_server->RunOnReadable(listen_socket, [listen_socket, machine,
+                                              event_server]() {
+    struct sockaddr_in client;
+    socklen_t socklen = sizeof(client);
+    int conn = accept(listen_socket, (struct sockaddr *)&client, &socklen);
+    if (conn < 0) {
+      Log_error("accept(): %s", strerror(errno));
+      return true;
+    }
 
-      event_server->RunOnReadable(conn, [conn, machine]() {
-          char query;
-          if (read(conn, &query, 1) <= 0) {
-            close(conn);
-            return false;
-          }
-          if (query == 'p') {
-            AxesRegister pos;
-            machine->GetCurrentPosition(&pos);
-            // JSON {"x_axis":fval, "y_axis":fval, "z-axis":fval, "note":"experimental"}
-            dprintf(conn, "{\"x_axis\":%.3f, \"y_axis\":%.3f, "
-                    "\"z_axis\":%.3f, \"note\":\"experimental\"}\n",
-                    pos[AXIS_X], pos[AXIS_Y], pos[AXIS_Z]);
-          }
-          if (query == 's') {
-            GCodeMachineControl::EStopState estop_status = machine->GetEStopStatus();
-	    GCodeMachineControl::HomingState home_status = machine->GetHomeStatus();
-            // JSON {"estop":"status", "homed":"status", "motors":bool}
-            dprintf(conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
-                    estop_status == GCodeMachineControl::EStopState::NONE ? "none" :
-                    estop_status == GCodeMachineControl::EStopState::SOFT ? "soft" :
-                    estop_status == GCodeMachineControl::EStopState::HARD ? "hard" : "unknown",
-                    home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no" :
-                    home_status == GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED ? "maybe" :
-                    home_status == GCodeMachineControl::HomingState::HOMED ? "yes" : "unknown",
-		    machine->GetMotorsEnabled() ? "true" : "false");
-          }
-          return true;
-        });
+    event_server->RunOnReadable(conn, [conn, machine]() {
+      char query;
+      if (read(conn, &query, 1) <= 0) {
+        close(conn);
+        return false;
+      }
+      if (query == 'p') {
+        AxesRegister pos;
+        machine->GetCurrentPosition(&pos);
+        // JSON {"x_axis":fval, "y_axis":fval, "z-axis":fval,
+        // "note":"experimental"}
+        dprintf(conn,
+                "{\"x_axis\":%.3f, \"y_axis\":%.3f, "
+                "\"z_axis\":%.3f, \"note\":\"experimental\"}\n",
+                pos[AXIS_X], pos[AXIS_Y], pos[AXIS_Z]);
+      }
+      if (query == 's') {
+        GCodeMachineControl::EStopState estop_status =
+          machine->GetEStopStatus();
+        GCodeMachineControl::HomingState home_status = machine->GetHomeStatus();
+        // JSON {"estop":"status", "homed":"status", "motors":bool}
+        dprintf(
+          conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
+          estop_status == GCodeMachineControl::EStopState::NONE   ? "none"
+          : estop_status == GCodeMachineControl::EStopState::SOFT ? "soft"
+          : estop_status == GCodeMachineControl::EStopState::HARD ? "hard"
+                                                                  : "unknown",
+          home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no"
+          : home_status ==
+              GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED
+            ? "maybe"
+          : home_status == GCodeMachineControl::HomingState::HOMED ? "yes"
+                                                                   : "unknown",
+          machine->GetMotorsEnabled() ? "true" : "false");
+      }
       return true;
     });
+    return true;
+  });
 }
 
 // Create an absolute filename from a path, without the file not needed
@@ -372,8 +397,8 @@ int main(int argc, char *argv[]) {
   config.speed_tune_angle = 60;
   FILE *wav_output = nullptr;
   int opt;
-  while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:W:",
-                            long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, "p:b:SPnNf:l:dc:W:", long_options,
+                            NULL)) != -1) {
     switch (opt) {
     case 'f':
       config.speed_factor = (float)atof(optarg);
@@ -386,21 +411,11 @@ int main(int argc, char *argv[]) {
     case OPT_SET_SPEED_TUNE_ANGLE:
       config.speed_tune_angle = (float)atof(optarg);
       break;
-    case OPT_REQUIRE_HOMING:
-      require_homing = true;
-      break;
-    case OPT_DONT_REQUIRE_HOMING:
-      dont_require_homing = true;
-      break;
-    case OPT_DISABLE_RANGE_CHECK:
-      disable_range_check = true;
-      break;
-    case OPT_DISABLE_ACK_OK:
-      config.acknowledge_lines = false;
-      break;
-    case 'n':
-      dry_run = true;
-      break;
+    case OPT_REQUIRE_HOMING: require_homing = true; break;
+    case OPT_DONT_REQUIRE_HOMING: dont_require_homing = true; break;
+    case OPT_DISABLE_RANGE_CHECK: disable_range_check = true; break;
+    case OPT_DISABLE_ACK_OK: config.acknowledge_lines = false; break;
+    case 'n': dry_run = true; break;
     case 'N':
       dry_run = true;
       simulation_output = true;
@@ -409,47 +424,27 @@ int main(int argc, char *argv[]) {
       dry_run = true;
       wav_output = fopen(optarg, "w");
       break;
-    case 'P':
-      config.debug_print = true;
-      break;
-    case 'S':
-      config.synchronous = true;
-      break;
+    case 'P': config.debug_print = true; break;
+    case 'S': config.synchronous = true; break;
     case OPT_LOOP:
-      Log_error("--loop has been removed. Did you use it ? "
-                "Let beagleg-dev@googlegroups.com know");
+      Log_error(
+        "--loop has been removed. Did you use it ? "
+        "Let beagleg-dev@googlegroups.com know");
       break;
-    case 'p':
-      listen_port = atoi(optarg);
-      break;
-    case OPT_STATUS_SERVER:
-      status_server_port = atoi(optarg);
-      break;
-    case 'b':
-      bind_addr = strdup(optarg);
-      break;
-    case 'l':
-      logfile = strdup(optarg);
-      break;
-    case OPT_PARAM_FILE:
-      paramfile = MakeAbsoluteFile(optarg);
-      break;
-    case 'd':
-      as_daemon = true;
-      break;
+    case 'p': listen_port = atoi(optarg); break;
+    case OPT_STATUS_SERVER: status_server_port = atoi(optarg); break;
+    case 'b': bind_addr = strdup(optarg); break;
+    case 'l': logfile = strdup(optarg); break;
+    case OPT_PARAM_FILE: paramfile = MakeAbsoluteFile(optarg); break;
+    case 'd': as_daemon = true; break;
     case 'c':
-      config_file = realpath(optarg, NULL); // realpath() -> abs path if exists
+      config_file = realpath(optarg, NULL);  // realpath() -> abs path if exists
       if (!config_file)
         config_file = strdup(optarg);  // Not existing. Report issue later.
       break;
-    case OPT_PRIVS:
-      privs = strdup(optarg);
-      break;
-    case OPT_ENABLE_M111:
-      allow_m111 = true;
-      break;
-    case OPT_HELP:
-      return usage(argv[0], NULL);
+    case OPT_PRIVS: privs = strdup(optarg); break;
+    case OPT_ENABLE_M111: allow_m111 = true; break;
+    case OPT_HELP: return usage(argv[0], NULL);
     default:
       // Deprecated, or unknown, option
       return fyi_option_gone(argv[0]);
@@ -457,30 +452,36 @@ int main(int argc, char *argv[]) {
   }
 
   if (config.threshold_angle + config.speed_tune_angle >= 90) {
-    return usage(argv[0], "--threshold-angle + --speed-tune-angle must be < 90 degrees.");
+    return usage(
+      argv[0], "--threshold-angle + --speed-tune-angle must be < 90 degrees.");
   }
 
   if (require_homing && dont_require_homing) {
-    return usage(argv[0], "Choose one: --homing-required or --nohoming-required.");
+    return usage(argv[0],
+                 "Choose one: --homing-required or --nohoming-required.");
   }
 
   const bool has_filename = (optind < argc);
-  if (! (has_filename ^ (listen_port > 0))) {
+  if (!(has_filename ^ (listen_port > 0))) {
     return usage(argv[0], "Choose one: <gcode-filename> or --port <port>.");
   }
 
   // As daemon, we use whatever the user chose as logfile
   // (including nothing->syslog). Interactive, nothing means stderr.
   Log_init(as_daemon ? logfile : (logfile == NULL ? "/dev/stderr" : logfile));
-  Log_info("BeagleG " BEAGLEG_VERSION " startup; "
-           CAPE_NAME " hardware interface.");
+  Log_info("BeagleG " BEAGLEG_VERSION " startup; " CAPE_NAME
+           " hardware interface.");
 
   if (config.threshold_angle > 0) {
     const double deg2rad = M_PI / 180.0;
     const double min_speed_adj = std::cos(config.speed_tune_angle * deg2rad);
-    const double max_speed_adj = std::cos((config.threshold_angle + config.speed_tune_angle) * deg2rad);
-    Log_debug("Speed-tuning from %.2f to %.2f for angles +/-%.2f degrees (speed-tune @ %.2f degrees)\n",
-              min_speed_adj, max_speed_adj, config.threshold_angle, config.speed_tune_angle);
+    const double max_speed_adj =
+      std::cos((config.threshold_angle + config.speed_tune_angle) * deg2rad);
+    Log_debug(
+      "Speed-tuning from %.2f to %.2f for angles +/-%.2f degrees (speed-tune @ "
+      "%.2f degrees)\n",
+      min_speed_adj, max_speed_adj, config.threshold_angle,
+      config.speed_tune_angle);
   }
 
   // If reading from file: don't print 'ok' for every line.
@@ -505,7 +506,8 @@ int main(int argc, char *argv[]) {
 
   HardwareMapping hardware_mapping;
   if (!hardware_mapping.ConfigureFromFile(&config_parser)) {
-    Log_error("Exiting. Couldn't initialize hardware mapping (%s)", config_file);
+    Log_error("Exiting. Couldn't initialize hardware mapping (%s)",
+              config_file);
     return 1;
   }
 
@@ -521,7 +523,7 @@ int main(int argc, char *argv[]) {
   // ... other configurations that read from that file.
 
   // Handle command line configuration overrides.
-  if (require_homing)      config.require_homing = true;
+  if (require_homing) config.require_homing = true;
   if (dont_require_homing) config.require_homing = false;
   if (disable_range_check) config.range_check = false;
 
@@ -550,7 +552,8 @@ int main(int argc, char *argv[]) {
   if (dry_run) {
     // The backend
     if (simulation_output) {
-      motion_backend = new SimFirmwareQueue(stdout, 3); // TODO: derive from cfg
+      motion_backend =
+        new SimFirmwareQueue(stdout, 3);  // TODO: derive from cfg
     } else if (wav_output) {
       motion_backend = new SimFirmwareAudioQueue(wav_output);
     } else {
@@ -558,8 +561,9 @@ int main(int argc, char *argv[]) {
     }
   } else {
     if (!hardware_mapping.InitializeHardware()) {
-      Log_error("Exiting. (Just testing ? "
-                "Use the dryrun option -n to not write to GPIO).");
+      Log_error(
+        "Exiting. (Just testing ? "
+        "Use the dryrun option -n to not write to GPIO).");
       return 1;
     }
     pru_hw_interface = new UioPrussInterface();
@@ -577,12 +581,11 @@ int main(int argc, char *argv[]) {
   }
   Log_info("BeagleG running with PID %d", getpid());
 
-  MotionQueueMotorOperations motor_operations(&hardware_mapping, motion_backend);
+  MotionQueueMotorOperations motor_operations(&hardware_mapping,
+                                              motion_backend);
 
-  GCodeMachineControl *machine_control
-    = GCodeMachineControl::Create(config, &motor_operations,
-                                  &hardware_mapping, spindle.get(),
-                                  stderr);
+  GCodeMachineControl *machine_control = GCodeMachineControl::Create(
+    config, &motor_operations, &hardware_mapping, spindle.get(), stderr);
   if (machine_control == NULL) {
     Log_error("Exiting. Cannot initialize machine control.");
     return 1;
@@ -594,23 +597,22 @@ int main(int argc, char *argv[]) {
   parser_cfg.LoadParams();
 
   machine_control->GetHomePos(&parser_cfg.machine_origin);
-  GCodeParser *parser = new GCodeParser(parser_cfg,
-                                        machine_control->ParseEventReceiver());
-  GCodeStreamer *streamer =
-    new GCodeStreamer(&event_server, parser,
-                      machine_control->ParseEventReceiver());
+  GCodeParser *parser =
+    new GCodeParser(parser_cfg, machine_control->ParseEventReceiver());
+  GCodeStreamer *streamer = new GCodeStreamer(
+    &event_server, parser, machine_control->ParseEventReceiver());
   int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
     send_file_to_machine(machine_control, streamer, filename);
   } else {
-    run_gcode_server(listen_socket, &event_server, machine_control,
-                     streamer,  bind_addr, listen_port);
+    run_gcode_server(listen_socket, &event_server, machine_control, streamer,
+                     bind_addr, listen_port);
   }
 
   if (status_server_port > 0 && !has_filename) {
-    run_status_server(bind_addr, status_server_port,
-                      &event_server, machine_control);
+    run_status_server(bind_addr, status_server_port, &event_server,
+                      machine_control);
   }
 
   event_server.Loop();  // Run service until Ctrl-C or all sockets closed.
@@ -622,8 +624,9 @@ int main(int argc, char *argv[]) {
 
   const bool caught_signal = (ret == 1);
   if (caught_signal) {
-    Log_info("Caught signal: immediate exit. "
-             "Skipping potential remaining queue.");
+    Log_info(
+      "Caught signal: immediate exit. "
+      "Skipping potential remaining queue.");
   }
   motion_backend->Shutdown(!caught_signal);
 

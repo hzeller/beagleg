@@ -27,8 +27,8 @@
 void Log_init(const char *filename);
 
 // Define this with empty, if you're not using gcc.
-#define PRINTF_FMT_CHECK(fmt_pos, args_pos)             \
-  __attribute__ ((format (printf, fmt_pos, args_pos)))
+#define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
+  __attribute__((format(printf, fmt_pos, args_pos)))
 
 void Log_debug(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 void Log_info(const char *format, ...) PRINTF_FMT_CHECK(1, 2);

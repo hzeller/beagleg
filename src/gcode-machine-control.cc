@@ -18,7 +18,8 @@
  */
 
 // TODO: this is somewhat work-in-progress.
-// TODO: after the transition from C to C++, there are still some C-isms in here.
+// TODO: after the transition from C to C++, there are still some C-isms in
+// here.
 
 #include "gcode-machine-control.h"
 
@@ -31,47 +32,42 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
+#include "adc.h"
 #include "common/container.h"
 #include "common/logging.h"
 #include "common/string-util.h"
 #include "gcode-parser/gcode-parser.h"
-
-#include "adc.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"
-#include "segment-queue.h"
 #include "planner.h"
 #include "pwm-timer.h"
+#include "segment-queue.h"
 #include "spindle-control.h"
 
 // In case we get a zero feedrate, send this frequency to motors instead.
 #define ZERO_FEEDRATE_OVERRIDE_HZ 5
 
-#define VERSION_STRING "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG "    \
+#define VERSION_STRING                          \
+  "PROTOCOL_VERSION:0.1 FIRMWARE_NAME:BeagleG " \
   "CAPE:" CAPE_NAME " FIRMWARE_URL:http%3A//github.com/hzeller/beagleg"
 
 // The GCode control implementation. Essentially we are a state machine
 // driven by the events we get from the gcode parsing.
 // We implement the event receiver interface directly.
 class GCodeMachineControl::Impl : public GCodeParser::EventReceiver {
-public:
+ public:
   // Create Impl. It is not fully initialized yet, call Init()
-  Impl(const MachineControlConfig &config,
-       SegmentQueue *motor_ops,
-       HardwareMapping *hardware_mapping,
-       Spindle *spindle,
-       FILE *msg_stream);
+  Impl(const MachineControlConfig &config, SegmentQueue *motor_ops,
+       HardwareMapping *hardware_mapping, Spindle *spindle, FILE *msg_stream);
 
   // Initialize. Only if this succeeds, we have a properly initialized
   // object.
   bool Init();
 
-  ~Impl() {
-    delete planner_;
-  }
+  ~Impl() { delete planner_; }
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
@@ -91,7 +87,7 @@ public:
   void wait_for_start() final;
   void go_home(AxisBitmap_t axis_bitmap) final;
   bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
-                          float *probed_position) final;
+                  float *probed_position) final;
   void set_speed_factor(float factor) final;    // M220 feedrate factor 0..1
   void set_fanspeed(float value) final;         // M106, M107: speed 0...255
   void set_temperature(float degrees_c) final;  // M104, M109: Set in Celsius
@@ -103,7 +99,7 @@ public:
   bool rapid_move(float feed_mm_p_sec, const AxesRegister &target) final;
   const char *unprocessed(char letter, float value, const char *) final;
 
-private:
+ private:
   bool in_estop();
   void set_estop(bool hard);
   bool clear_estop();
@@ -118,8 +114,8 @@ private:
   const char *special_commands(char letter, float value, const char *);
   float acceleration_for_move(const int *axis_steps,
                               enum GCodeParserAxis defining_axis);
-  int move_to_endstop(enum GCodeParserAxis axis,
-                      float feedrate, HardwareMapping::AxisTrigger trigger);
+  int move_to_endstop(enum GCodeParserAxis axis, float feedrate,
+                      HardwareMapping::AxisTrigger trigger);
   int move_to_probe(enum GCodeParserAxis axis, float feedrate, const int dir,
                     int max_steps);
   void home_axis(enum GCodeParserAxis axis);
@@ -132,7 +128,7 @@ private:
   // Print to msg_stream.
   void mprintf(const char *format, ...);
 
-private:
+ private:
   const struct MachineControlConfig cfg_;
   SegmentQueue *const motor_ops_;
   HardwareMapping *const hardware_mapping_;
@@ -143,41 +139,40 @@ private:
   GCodeParser *parser_ = nullptr;
 
   // Derived configuration
-  float g0_feedrate_mm_per_sec_;         // Highest of all axes; used for G0
-                                         // (will be trimmed if needed)
-  AxisBitmap_t axis_clamped_;            // All axes that are clamped to range
+  float g0_feedrate_mm_per_sec_;  // Highest of all axes; used for G0
+                                  // (will be trimmed if needed)
+  AxisBitmap_t axis_clamped_;     // All axes that are clamped to range
   // Current machine configuration
-  AxesRegister coordinate_display_origin_; // parser tells us
+  AxesRegister coordinate_display_origin_;  // parser tells us
   std::string coordinate_display_origin_name_;
-  float current_feedrate_mm_per_sec_;    // Set via Fxxx and remembered
-  float prog_speed_factor_;              // Speed factor set by program (M220)
+  float current_feedrate_mm_per_sec_;  // Set via Fxxx and remembered
+  float prog_speed_factor_;            // Speed factor set by program (M220)
   time_t next_auto_disable_motor_;
   time_t next_auto_disable_fan_;
-  bool pause_enabled_;                  // Enabled via M120, disabled via M121
+  bool pause_enabled_;  // Enabled via M120, disabled via M121
 
   GCodeMachineControl::HomingState homing_state_;
 };
 
-static inline int round2int(float x) { return (int) roundf(x); }
+static inline int round2int(float x) { return (int)roundf(x); }
 
 GCodeMachineControl::Impl::Impl(const MachineControlConfig &config,
                                 SegmentQueue *motor_ops,
                                 HardwareMapping *hardware_mapping,
-                                Spindle *spindle,
-                                FILE *msg_stream)
-  : cfg_(config),
-    motor_ops_(motor_ops),
-    hardware_mapping_(hardware_mapping),
-    spindle_(spindle),
-    msg_stream_(msg_stream),
-    parser_(NULL),
-    g0_feedrate_mm_per_sec_(-1),
-    current_feedrate_mm_per_sec_(-1),
-    prog_speed_factor_(1),
-    homing_state_(GCodeMachineControl::HomingState::NEVER_HOMED) {
-    pause_enabled_ = cfg_.enable_pause;
-    next_auto_disable_motor_ = -1;
-    next_auto_disable_fan_ = -1;
+                                Spindle *spindle, FILE *msg_stream)
+    : cfg_(config),
+      motor_ops_(motor_ops),
+      hardware_mapping_(hardware_mapping),
+      spindle_(spindle),
+      msg_stream_(msg_stream),
+      parser_(NULL),
+      g0_feedrate_mm_per_sec_(-1),
+      current_feedrate_mm_per_sec_(-1),
+      prog_speed_factor_(1),
+      homing_state_(GCodeMachineControl::HomingState::NEVER_HOMED) {
+  pause_enabled_ = cfg_.enable_pause;
+  next_auto_disable_motor_ = -1;
+  next_auto_disable_fan_ = -1;
 }
 
 // The actual initialization. Can fail, hence we make it a separate method.
@@ -192,8 +187,8 @@ bool GCodeMachineControl::Impl::Init() {
     }
     // Permissible hard override. We want to keep cfg_ const for most of the
     // places, so writing here in Init() is permissible.
-    const_cast<MachineControlConfig&>(cfg_).steps_per_mm[axis]
-                                           = fabsf(cfg_.steps_per_mm[axis]);
+    const_cast<MachineControlConfig &>(cfg_).steps_per_mm[axis] =
+      fabsf(cfg_.steps_per_mm[axis]);
     if (cfg_.max_feedrate[axis] < 0) {
       Log_error("Invalid negative feedrate %.1f for axis %c\n",
                 cfg_.max_feedrate[axis], gcodep_axis2letter(axis));
@@ -204,10 +199,10 @@ bool GCodeMachineControl::Impl::Init() {
           cfg_.max_probe_feedrate[axis] > cfg_.max_feedrate[axis]) {
         // Permissible hard override. We want to keep cfg_ const for most of the
         // places, so writing here in Init() is permissible.
-        const_cast<MachineControlConfig&>(cfg_).max_probe_feedrate[axis]
-                                             = cfg_.max_feedrate[axis];
-         Log_debug("Probe feedrate clamped to %.1f for axis %c\n",
-                   cfg_.max_probe_feedrate[axis], gcodep_axis2letter(axis));
+        const_cast<MachineControlConfig &>(cfg_).max_probe_feedrate[axis] =
+          cfg_.max_feedrate[axis];
+        Log_debug("Probe feedrate clamped to %.1f for axis %c\n",
+                  cfg_.max_probe_feedrate[axis], gcodep_axis2letter(axis));
       }
     }
     if (cfg_.acceleration[axis] < 0) {
@@ -228,20 +223,24 @@ bool GCodeMachineControl::Impl::Init() {
 
   // Check if things are plausible: we only allow one home endstop per axis.
   for (const GCodeParserAxis axis : AllAxes()) {
-    const HardwareMapping::AxisTrigger homing_trigger = cfg_.homing_trigger[axis];
+    const HardwareMapping::AxisTrigger homing_trigger =
+      cfg_.homing_trigger[axis];
     if (homing_trigger == HardwareMapping::TRIGGER_NONE) {
       continue;
     }
     if (homing_trigger == HardwareMapping::TRIGGER_ANY) {
-      Log_error("Error: There can only be one home-origin for axis %c, "
-                "but both min/max are set for homing.\n",
-                gcodep_axis2letter(axis));
+      Log_error(
+        "Error: There can only be one home-origin for axis %c, "
+        "but both min/max are set for homing.\n",
+        gcodep_axis2letter(axis));
       ++error_count;
       continue;
     }
     if ((hardware_mapping_->AvailableAxisSwitch(axis) & homing_trigger) == 0) {
-      Log_error("Error: There is no switch associated in [switch-mapping] "
-                "for the home origin of axis %c", gcodep_axis2letter(axis));
+      Log_error(
+        "Error: There is no switch associated in [switch-mapping] "
+        "for the home origin of axis %c",
+        gcodep_axis2letter(axis));
       ++error_count;
     }
   }
@@ -280,32 +279,30 @@ bool GCodeMachineControl::Impl::Init() {
       }
       hardware_mapping_->AddMotorMapping(axis, new_motor, false);
     }
-    if (!hardware_mapping_->HasMotorFor(axis))
-      continue;
-    const bool is_error = (cfg_.steps_per_mm[axis] <= 0
-                           || cfg_.max_feedrate[axis] <= 0);
+    if (!hardware_mapping_->HasMotorFor(axis)) continue;
+    const bool is_error =
+      (cfg_.steps_per_mm[axis] <= 0 || cfg_.max_feedrate[axis] <= 0);
     // Some generic useful output
     std::string line;
     const char *unit = is_rotational_axis(axis) ? "° " : "mm";
-    line = StringPrintf("%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s ",
-                        gcodep_axis2letter(axis),
-                        hardware_mapping_->DebugMotorString(axis).c_str(),
-                        cfg_.max_feedrate[axis], unit,
-                        cfg_.acceleration[axis], unit,
-                        cfg_.steps_per_mm[axis], unit);
+    line = StringPrintf(
+      "%c axis: Motor %-4s|%5.1f%s/s, %7.1f%s/s^2, %9.4f steps/%s ",
+      gcodep_axis2letter(axis),
+      hardware_mapping_->DebugMotorString(axis).c_str(),
+      cfg_.max_feedrate[axis], unit, cfg_.acceleration[axis], unit,
+      cfg_.steps_per_mm[axis], unit);
     if (cfg_.move_range_mm[axis] > 0) {
-      line += StringPrintf("[ range %5.1f%s ] ", cfg_.move_range_mm[axis], unit);
+      line +=
+        StringPrintf("[ range %5.1f%s ] ", cfg_.move_range_mm[axis], unit);
     } else {
       line += "[ unknown range ] ";
     }
     if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MIN) != 0) {
       line += StringPrintf("|<-HOME@min; ");
-      if (hardware_mapping_->HasProbeSwitch(axis))
-        line += "PROBE@max->|; ";
-    }
-    else if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MAX) != 0) {
-      if (hardware_mapping_->HasProbeSwitch(axis))
-        line += "|<-PROBE@min; ";
+      if (hardware_mapping_->HasProbeSwitch(axis)) line += "PROBE@max->|; ";
+    } else if ((cfg_.homing_trigger[axis] & HardwareMapping::TRIGGER_MAX) !=
+               0) {
+      if (hardware_mapping_->HasProbeSwitch(axis)) line += "|<-PROBE@min; ";
       line += StringPrintf("HOME@max->|; ");
     }
     if (hardware_mapping_->HasProbeSwitch(axis)) {
@@ -313,25 +310,23 @@ bool GCodeMachineControl::Impl::Init() {
                            cfg_.max_probe_feedrate[axis], unit);
     }
 
-    if (axis_clamped_ & (1 << axis))
-      line += " [clamped to range]";
+    if (axis_clamped_ & (1 << axis)) line += " [clamped to range]";
 
-    if (!cfg_.range_check)
-      line += " Limit checks disabled!";
+    if (!cfg_.range_check) line += " Limit checks disabled!";
 
     Log_debug("%s", line.c_str());
 
     if (is_error) {
-      Log_error("ERROR: Motor %s configured for axis '%c', but invalid "
-                "feedrate or steps/%s.",
-                hardware_mapping_->DebugMotorString(axis).c_str(),
-                gcodep_axis2letter(axis), unit);
+      Log_error(
+        "ERROR: Motor %s configured for axis '%c', but invalid "
+        "feedrate or steps/%s.",
+        hardware_mapping_->DebugMotorString(axis).c_str(),
+        gcodep_axis2letter(axis), unit);
       ++error_count;
     }
   }
 
-  if (error_count)
-    return false;
+  if (error_count) return false;
 
   planner_ = new Planner(&cfg_, hardware_mapping_, motor_ops_);
   return true;
@@ -356,7 +351,8 @@ void GCodeMachineControl::Impl::motors_enable(bool b) {
   planner_->BringPathToHalt();
   motor_ops_->MotorEnable(b);
   if (!b && homing_state_ == GCodeMachineControl::HomingState::HOMED) {
-    homing_state_ = GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED;
+    homing_state_ =
+      GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED;
   }
 }
 void GCodeMachineControl::Impl::gcode_block_done() {
@@ -373,11 +369,12 @@ void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   float duty_cycle = speed / 255.0;
   // The fan can be mapped to an aux and/or pwm signal
   set_output_flags(HardwareMapping::NamedOutput::FAN, duty_cycle > 0.0);
-  hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::FAN, duty_cycle);
+  hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::FAN,
+                                  duty_cycle);
 }
 
 // number of checks to ensure the pause switch is inactive
-#define PAUSE_ACTIVE_DETECT	2
+#define PAUSE_ACTIVE_DETECT 2
 
 void GCodeMachineControl::Impl::wait_for_start() {
   // Interlock: can't start while wait is still active.
@@ -466,7 +463,7 @@ const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
                                                       const char *remaining) {
   if (!spindle_) return remaining;
   int spindle_rpm = -1;
-  const char* after_pair;
+  const char *after_pair;
   char letter;
   float value;
 
@@ -474,9 +471,12 @@ const char *GCodeMachineControl::Impl::set_spindle_on(bool is_ccw,
   planner_->BringPathToHalt();
   for (;;) {
     after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
-    if (after_pair == NULL) break;
-    else if (letter == 'S') spindle_rpm = round2int(value);
-    else break;
+    if (after_pair == NULL)
+      break;
+    else if (letter == 'S')
+      spindle_rpm = round2int(value);
+    else
+      break;
     remaining = after_pair;
   }
   if (spindle_rpm >= 0) spindle_->On(is_ccw, spindle_rpm);
@@ -495,7 +495,8 @@ const char *GCodeMachineControl::Impl::unprocessed(char letter, float value,
   return special_commands(letter, value, remaining);
 }
 
-const char *GCodeMachineControl::Impl::special_commands(char letter, float value,
+const char *GCodeMachineControl::Impl::special_commands(char letter,
+                                                        float value,
                                                         const char *remaining) {
   // Only M commands are handled here
   if (letter != 'M') return remaining;
@@ -541,10 +542,11 @@ const char *GCodeMachineControl::Impl::special_commands(char letter, float value
   return remaining;
 }
 
-const char *GCodeMachineControl::Impl::aux_bit_commands(
-  char letter, float value, const char *remaining) {
+const char *GCodeMachineControl::Impl::aux_bit_commands(char letter,
+                                                        float value,
+                                                        const char *remaining) {
   const int m_code = (int)value;
-  const char* after_pair;
+  const char *after_pair;
 
   /* clang-format off */
   switch (m_code) {
@@ -653,17 +655,15 @@ void GCodeMachineControl::Impl::mprint_current_position() {
 #else
     "X:%.3f Y:%.3f Z:%.3f E:%.3f",
 #endif
-          current_pos[AXIS_X] - origin[AXIS_X],
-          current_pos[AXIS_Y] - origin[AXIS_Y],
-          current_pos[AXIS_Z] - origin[AXIS_Z],
-          current_pos[AXIS_E] - origin[AXIS_E]);
+    current_pos[AXIS_X] - origin[AXIS_X], current_pos[AXIS_Y] - origin[AXIS_Y],
+    current_pos[AXIS_Z] - origin[AXIS_Z], current_pos[AXIS_E] - origin[AXIS_E]);
   mprintf(
 #if M114_DEBUG
     " [ABS. MACHINE CUBE X:%.6f Y:%.6f Z:%.6f]",
 #else
     " [ABS. MACHINE CUBE X:%.3f Y:%.3f Z:%.3f]",
 #endif
-          current_pos[AXIS_X], current_pos[AXIS_Y], current_pos[AXIS_Z]);
+    current_pos[AXIS_X], current_pos[AXIS_Y], current_pos[AXIS_Z]);
 
   // Coordinate system. Always printed, even if empty to have a predictable
   // format.
@@ -674,7 +674,8 @@ void GCodeMachineControl::Impl::mprint_current_position() {
     mprintf(" (Unsure: machine never homed!)\n");
     break;
   case GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED:
-    mprintf(" (Lower confidence: motor power off at least once after homing)\n");
+    mprintf(
+      " (Lower confidence: motor power off at least once after homing)\n");
     break;
   case GCodeMachineControl::HomingState::HOMED:
     mprintf(" (confident: machine was homed)\n");
@@ -685,23 +686,26 @@ void GCodeMachineControl::Impl::mprint_current_position() {
 void GCodeMachineControl::Impl::mprint_endstop_status() {
   bool any_endstops_found = false;
   for (const GCodeParserAxis axis : AllAxes()) {
-    HardwareMapping::AxisTrigger triggers = hardware_mapping_->AvailableAxisSwitch(axis);
+    HardwareMapping::AxisTrigger triggers =
+      hardware_mapping_->AvailableAxisSwitch(axis);
     if ((triggers & HardwareMapping::TRIGGER_MIN) != 0) {
-      mprintf("%c_min:%s:%s ",
-              tolower(gcodep_axis2letter(axis)),
-              cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MIN
-              ? "home" : "limit",
-              hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MIN)
-              ? "TRIGGERED" : "open");
+      mprintf(
+        "%c_min:%s:%s ", tolower(gcodep_axis2letter(axis)),
+        cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MIN ? "home"
+                                                                  : "limit",
+        hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MIN)
+          ? "TRIGGERED"
+          : "open");
       any_endstops_found = true;
     }
     if ((triggers & HardwareMapping::TRIGGER_MAX) != 0) {
-      mprintf("%c_max:%s:%s ",
-              tolower(gcodep_axis2letter(axis)),
-              cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MAX
-              ? "home" : "limit",
-              hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MAX)
-              ? "TRIGGERED" : "open");
+      mprintf(
+        "%c_max:%s:%s ", tolower(gcodep_axis2letter(axis)),
+        cfg_.homing_trigger[axis] == HardwareMapping::TRIGGER_MAX ? "home"
+                                                                  : "limit",
+        hardware_mapping_->TestAxisSwitch(axis, HardwareMapping::TRIGGER_MAX)
+          ? "TRIGGERED"
+          : "open");
       any_endstops_found = true;
     }
   }
@@ -714,8 +718,7 @@ void GCodeMachineControl::Impl::mprint_endstop_status() {
 
 void GCodeMachineControl::Impl::gcode_start(GCodeParser *parser) {
   parser_ = parser;
-  if (cfg_.auto_fan_pwm > 0)
-    set_fanspeed(cfg_.auto_fan_pwm);
+  if (cfg_.auto_fan_pwm > 0) set_fanspeed(cfg_.auto_fan_pwm);
 }
 
 void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
@@ -726,53 +729,56 @@ void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
 }
 
 bool GCodeMachineControl::Impl::test_homing_status_ok() {
-  if (!cfg_.require_homing)
-    return true;
+  if (!cfg_.require_homing) return true;
   if (homing_state_ > GCodeMachineControl::HomingState::NEVER_HOMED)
     return true;
   mprintf("// ERROR: please home machine first (G28).\n");
   return false;
 }
 
-bool GCodeMachineControl::Impl::test_within_machine_limits(const AxesRegister &axes) {
-  if (!cfg_.range_check)
-    return true;
+bool GCodeMachineControl::Impl::test_within_machine_limits(
+  const AxesRegister &axes) {
+  if (!cfg_.range_check) return true;
 
   for (const GCodeParserAxis i : AllAxes()) {
     // Min range ...
     if (axes[i] < 0) {
       // Machine cube must be in positive range.
       if (coordinate_display_origin_[i] != 0) {
-        mprintf("// ERROR outside machine limit: Axis %c < min allowed "
-                "%+.1fmm in current coordinate system. Ignoring move!\n",
-                gcodep_axis2letter(i), -coordinate_display_origin_[i]);
+        mprintf(
+          "// ERROR outside machine limit: Axis %c < min allowed "
+          "%+.1fmm in current coordinate system. Ignoring move!\n",
+          gcodep_axis2letter(i), -coordinate_display_origin_[i]);
       } else {
         // No relative G92 or similar set. Display in simpler form.
-        mprintf("// ERROR outside machine limit: Axis %c < 0. "
-                "Ignoring move!\n", gcodep_axis2letter(i));
+        mprintf(
+          "// ERROR outside machine limit: Axis %c < 0. "
+          "Ignoring move!\n",
+          gcodep_axis2letter(i));
       }
       return false;
     }
 
     // Max range ..
-    if (cfg_.move_range_mm[i] <= 0)
-      continue;  // max range not configured.
+    if (cfg_.move_range_mm[i] <= 0) continue;  // max range not configured.
     const float max_limit = cfg_.move_range_mm[i];
     if (axes[i] > max_limit) {
       // Machine cube must be within machine limits if defined.
       if (coordinate_display_origin_[i] != 0) {
         // We have a different origin, so display coordinate relative to that.
-        mprintf("// ERROR outside machine limit: Axis %c %.1fmm > max allowed %+.1fmm "
-                "in current coordinate system (=%.1fmm machine absolute). "
-                "Ignoring move!\n",
-                gcodep_axis2letter(i),
-                axes[i] - coordinate_display_origin_[i],
-                max_limit - coordinate_display_origin_[i], max_limit);
+        mprintf(
+          "// ERROR outside machine limit: Axis %c %.1fmm > max allowed "
+          "%+.1fmm "
+          "in current coordinate system (=%.1fmm machine absolute). "
+          "Ignoring move!\n",
+          gcodep_axis2letter(i), axes[i] - coordinate_display_origin_[i],
+          max_limit - coordinate_display_origin_[i], max_limit);
       } else {
         // No relative G92 or similar set. Display in simpler form.
-        mprintf("// ERROR outside machine limit: Axis %c = %.1f > %.1fmm. "
-                "Ignoring move!\n", gcodep_axis2letter(i),
-                axes[i], max_limit);
+        mprintf(
+          "// ERROR outside machine limit: Axis %c = %.1f > %.1fmm. "
+          "Ignoring move!\n",
+          gcodep_axis2letter(i), axes[i], max_limit);
       }
       return false;
     }
@@ -785,13 +791,11 @@ void GCodeMachineControl::Impl::clamp_to_range(AxisBitmap_t affected,
   // Due diligence: only clamp if all affected axes are actually configured.
   // Otherwise we might end up in undesirable positions with partial clamps.
   // (Right now, only Z-Axis is allowed in fact, see Init()).
-  if ((affected & axis_clamped_) != affected)
-    return;
+  if ((affected & axis_clamped_) != affected) return;
 
   AxesRegister &axes = *mutable_axes;
   for (const GCodeParserAxis i : AllAxes()) {
-    if ((axis_clamped_ & (1 << i)) == 0)
-      continue;
+    if ((axis_clamped_ & (1 << i)) == 0) continue;
     if (axes[i] < 0) {
       mprintf("// WARNING clamping Axis %c move %.1f to %.1fmm\n",
               gcodep_axis2letter(i), axes[i], 0);
@@ -809,10 +813,8 @@ void GCodeMachineControl::Impl::clamp_to_range(AxisBitmap_t affected,
 
 bool GCodeMachineControl::Impl::coordinated_move(float feed,
                                                  const AxesRegister &axis) {
-  if (!test_homing_status_ok())
-    return false;
-  if (!test_within_machine_limits(axis))
-    return false;
+  if (!test_homing_status_ok()) return false;
+  if (!test_within_machine_limits(axis)) return false;
   if (feed > 0) {
     current_feedrate_mm_per_sec_ = cfg_.speed_factor * feed;
   }
@@ -830,10 +832,8 @@ bool GCodeMachineControl::Impl::coordinated_move(float feed,
 
 bool GCodeMachineControl::Impl::rapid_move(float feed,
                                            const AxesRegister &axis) {
-  if (!test_homing_status_ok())
-    return false;
-  if (!test_within_machine_limits(axis))
-    return false;
+  if (!test_homing_status_ok()) return false;
+  if (!test_within_machine_limits(axis)) return false;
   float rapid_feed = g0_feedrate_mm_per_sec_;
   const float given = cfg_.speed_factor * prog_speed_factor_ * feed;
   if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
@@ -851,13 +851,14 @@ void GCodeMachineControl::Impl::dwell(float value) {
   if (hardware_mapping_->IsHardwareSimulated()) {
     if (value > 999.0) {
       // Let some interactive user know that they can't expect dwell time here.
-      mprintf("// FYI: hardware simulated. All dwelling is immediate.\n", value);
+      mprintf("// FYI: hardware simulated. All dwelling is immediate.\n",
+              value);
     }
   } else {
     // TODO: this needs to wait in the event multiplexer.
     // Since we might need pretty high precision (see rpt2pnp), this can't
     // just be quantized to 50ms.
-    usleep((int) (value * 1000));
+    usleep((int)(value * 1000));
   }
 
   if (!check_for_estop()) {
@@ -892,7 +893,7 @@ void GCodeMachineControl::Impl::input_idle(bool is_first) {
 
 void GCodeMachineControl::Impl::set_speed_factor(float value) {
   if (value < 0) {
-    value = 1.0f + value;   // M220 S-10 interpreted as: 90%
+    value = 1.0f + value;  // M220 S-10 interpreted as: 90%
   }
   if (value < 0.005) {
     mprintf("// M220: Not accepting speed factors < 0.5%% (got %.1f%%)\n",
@@ -903,14 +904,14 @@ void GCodeMachineControl::Impl::set_speed_factor(float value) {
 }
 
 // Moves to endstop and returns how many steps it moved in the process.
-int GCodeMachineControl::Impl::move_to_endstop(enum GCodeParserAxis axis,
-                                               float feedrate,
-                                               HardwareMapping::AxisTrigger trigger) {
+int GCodeMachineControl::Impl::move_to_endstop(
+  enum GCodeParserAxis axis, float feedrate,
+  HardwareMapping::AxisTrigger trigger) {
   if (hardware_mapping_->IsHardwareSimulated())
     return 0;  // There are no switches to trigger, so pretend we stopped.
 
-  const float kHomingMM = 0.5;                    // TODO: make configurable?
-  const float kBackoffMM = kHomingMM / 10.0;      // TODO: make configurable?
+  const float kHomingMM = 0.5;                // TODO: make configurable?
+  const float kBackoffMM = kHomingMM / 10.0;  // TODO: make configurable?
 
   int total_movement = 0;
   const int dir = trigger == HardwareMapping::TRIGGER_MIN ? -1 : 1;
@@ -937,13 +938,12 @@ int GCodeMachineControl::Impl::move_to_probe(enum GCodeParserAxis axis,
   if (hardware_mapping_->IsHardwareSimulated())
     return 0;  // There are no switches to trigger, so pretend we stopped.
 
-  const float kProbeMM = 0.05;                   // TODO: make configurable?
+  const float kProbeMM = 0.05;  // TODO: make configurable?
 
   int total_movement = 0;
   float v0 = 0;
   float v1 = feedrate;
-  if (v1 > cfg_.max_probe_feedrate[axis])
-    v1 = cfg_.max_probe_feedrate[axis];
+  if (v1 > cfg_.max_probe_feedrate[axis]) v1 = cfg_.max_probe_feedrate[axis];
   while (!hardware_mapping_->TestProbeSwitch()) {
     total_movement += planner_->DirectDrive(axis, dir * kProbeMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.
@@ -961,10 +961,10 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   const HardwareMapping::AxisTrigger trigger = cfg_.homing_trigger[axis];
   if (trigger == HardwareMapping::TRIGGER_NONE)
     return;  // TODO: warn that there is no swich ? Should we pretend go back?
-  const float home_pos = ((trigger == HardwareMapping::TRIGGER_MAX)
-                          ? cfg_.move_range_mm[axis]
-                          : 0.0f);
-  const float kHomingSpeed = 15; // mm/sec  (make configurable ?)
+  const float home_pos =
+    ((trigger == HardwareMapping::TRIGGER_MAX) ? cfg_.move_range_mm[axis]
+                                               : 0.0f);
+  const float kHomingSpeed = 15;  // mm/sec  (make configurable ?)
 
   planner_->BringPathToHalt();
   move_to_endstop(axis, kHomingSpeed, trigger);
@@ -976,8 +976,7 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   if (!clear_estop()) return;
   for (const char axis_letter : cfg_.home_order) {
     const enum GCodeParserAxis axis = gcodep_letter2axis(axis_letter);
-    if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis)))
-      continue;
+    if (axis == GCODE_NUM_AXES || !(axes_bitmap & (1 << axis))) continue;
     home_axis(axis);
   }
   if (check_for_estop()) return;
@@ -987,8 +986,7 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
 bool GCodeMachineControl::Impl::probe_axis(float feedrate,
                                            enum GCodeParserAxis axis,
                                            float *probe_result) {
-  if (!test_homing_status_ok())
-    return false;
+  if (!test_homing_status_ok()) return false;
 
   planner_->BringPathToHalt();
 
@@ -1018,21 +1016,14 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   return true;
 }
 
-GCodeMachineControl::GCodeMachineControl(Impl *impl) : impl_(impl) {
-}
-GCodeMachineControl::~GCodeMachineControl() {
-  delete impl_;
-}
+GCodeMachineControl::GCodeMachineControl(Impl *impl) : impl_(impl) {}
+GCodeMachineControl::~GCodeMachineControl() { delete impl_; }
 
-GCodeMachineControl* GCodeMachineControl::Create(
-  const MachineControlConfig &config,
-  SegmentQueue *motor_ops,
-  HardwareMapping *hardware_mapping,
-  Spindle *spindle,
-  FILE *msg_stream)
-{
-  Impl *result = new Impl(config, motor_ops,
-                          hardware_mapping, spindle, msg_stream);
+GCodeMachineControl *GCodeMachineControl::Create(
+  const MachineControlConfig &config, SegmentQueue *motor_ops,
+  HardwareMapping *hardware_mapping, Spindle *spindle, FILE *msg_stream) {
+  Impl *result =
+    new Impl(config, motor_ops, hardware_mapping, spindle, msg_stream);
   if (!result->Init()) {
     delete result;
     return NULL;
@@ -1045,7 +1036,8 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = impl_->config().homing_trigger[axis];
     (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
-      ? impl_->config().move_range_mm[axis] : 0;
+                          ? impl_->config().move_range_mm[axis]
+                          : 0;
   }
 }
 

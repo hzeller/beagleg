@@ -19,29 +19,27 @@
 
 #include "linebuf-reader.h"
 
-#include <string>
-#include <memory>
 #include <gtest/gtest.h>
+
+#include <memory>
+#include <string>
 
 // Raw lines that we use as samples
 constexpr int kSampleLineCount = 4;
 const char *kSampleLines[kSampleLineCount + 1] = {
-  "This is a short line", //
-  "This is another, longer line", //
-  "",   // Emtpy line
-  "",
-  nullptr
-};
+  "This is a short line",          //
+  "This is another, longer line",  //
+  "",                              // Emtpy line
+  "", nullptr};
 
 class InputStreamSimulator {
-public:
+ public:
   InputStreamSimulator(size_t chunk_size, const char *endline)
-    : chunk_size_(chunk_size), longest_line_len_(0), read_pos_(0) {
+      : chunk_size_(chunk_size), longest_line_len_(0), read_pos_(0) {
     for (const char *line : kSampleLines) {
       if (line == nullptr) break;
       buffer_.append(line).append(endline);
-      if (strlen(line) > longest_line_len_)
-        longest_line_len_ = strlen(line);
+      if (strlen(line) > longest_line_len_) longest_line_len_ = strlen(line);
     }
   }
 
@@ -58,7 +56,7 @@ public:
   size_t longest_line_len() { return longest_line_len_; }
   int remaining() { return buffer_.length() - read_pos_; }
 
-private:
+ private:
   const size_t chunk_size_;
   size_t longest_line_len_;
   std::string buffer_;
@@ -66,20 +64,19 @@ private:
 };
 
 // Parametrize tests with different end line characters
-class LinebufReaderTest : public ::testing::TestWithParam<const char*> {
-};
+class LinebufReaderTest : public ::testing::TestWithParam<const char *> {};
 
 TEST_P(LinebufReaderTest, LargeChunkReading) {
   LinebufReader reader;
-  InputStreamSimulator input(10000, GetParam());  // reading large chunks of data.
+  InputStreamSimulator input(10000,
+                             GetParam());  // reading large chunks of data.
   // Here, we expect that everything essentially shows up with the first
   // read. Also we assume that everything fits into the reader buffer.
 
   // TODO(hzeller): there must be a better way to pass a member function call
   // through std::functional than wrapping it in a lambda
-  reader.Update([&input](char *buf, size_t size) {
-      return input.Read(buf, size);
-    });
+  reader.Update(
+    [&input](char *buf, size_t size) { return input.Read(buf, size); });
   EXPECT_EQ(0, input.remaining());
   EXPECT_EQ(std::string(kSampleLines[0]), reader.ReadAndConsumeLine());
   EXPECT_EQ(std::string(kSampleLines[1]), reader.ReadAndConsumeLine());
@@ -96,9 +93,8 @@ TEST_P(LinebufReaderTest, SmallChunkReading) {
   while (input.remaining() > 0) {
     // TODO(hzeller): there must be a better way to pass a member function call
     // through std::functional than wrapping it in a lambda
-    reader.Update([&input](char *buf, size_t size) {
-        return input.Read(buf, size);
-      });
+    reader.Update(
+      [&input](char *buf, size_t size) { return input.Read(buf, size); });
     const char *potential_line = reader.ReadAndConsumeLine();
     if (potential_line != nullptr) {
       fprintf(stderr, "Got line: '%s'\n", potential_line);
@@ -122,9 +118,8 @@ TEST_P(LinebufReaderTest, TightBufferReading) {
   while (input.remaining() > 0) {
     // TODO(hzeller): there must be a better way to pass a member function call
     // through std::functional than wrapping it in a lambda
-    reader.Update([&input](char *buf, size_t size) {
-        return input.Read(buf, size);
-      });
+    reader.Update(
+      [&input](char *buf, size_t size) { return input.Read(buf, size); });
     const char *potential_line = reader.ReadAndConsumeLine();
     if (potential_line != nullptr) {
       EXPECT_EQ(std::string(kSampleLines[expected_next_sample]),
@@ -135,8 +130,7 @@ TEST_P(LinebufReaderTest, TightBufferReading) {
   EXPECT_EQ(kSampleLineCount, expected_next_sample);
 }
 
-INSTANTIATE_TEST_SUITE_P(PortableEndLineTests,
-                         LinebufReaderTest,
+INSTANTIATE_TEST_SUITE_P(PortableEndLineTests, LinebufReaderTest,
                          ::testing::Values("\n", "\r", "\r\n"));
 
 // TODO(hzeller): more testing

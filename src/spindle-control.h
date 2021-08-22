@@ -44,7 +44,7 @@ struct SpindleConfig {
 };
 
 class Spindle {
-public:
+ public:
   // Factory for a spindle given the configuration. Returns an instance
   // of a spindle if it can be created given the available hardware-mapping.
   // Otherwise, returns nullptr and might info-log why it couldn't create a
@@ -54,10 +54,10 @@ public:
 
   virtual ~Spindle() {}
 
-   // Turn spindle on clockwise (M3) or counterclockwise (M4) at speed (Sxx)
+  // Turn spindle on clockwise (M3) or counterclockwise (M4) at speed (Sxx)
   virtual void On(bool ccw, int rpm) = 0;
 
-   // Turn spindle off (M5)
+  // Turn spindle off (M5)
   virtual void Off() = 0;
 };
 

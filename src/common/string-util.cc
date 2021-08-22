@@ -19,18 +19,17 @@
 
 #include "string-util.h"
 
-#include <algorithm>
-#include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
+
+#include <algorithm>
 
 StringPiece TrimWhitespace(const StringPiece &s) {
   StringPiece::iterator start = s.begin();
-  while (start < s.end() && isspace(*start))
-    start++;
+  while (start < s.end() && isspace(*start)) start++;
   StringPiece::iterator end = s.end() - 1;
-  while (end > start && isspace(*end))
-    end--;
+  while (end > start && isspace(*end)) end--;
   return StringPiece(start, end + 1 - start);
 }
 
@@ -77,9 +76,9 @@ long ParseDecimal(const StringPiece &s, long fallback) {
 
 static void vAppendf(std::string *str, const char *format, va_list ap) {
   const size_t orig_len = str->length();
-  const size_t space = 1024;   // there should be better ways to do this...
+  const size_t space = 1024;  // there should be better ways to do this...
   str->resize(orig_len + space);
-  int written = vsnprintf((char*)str->data() + orig_len, space, format, ap);
+  int written = vsnprintf((char *)str->data() + orig_len, space, format, ap);
   str->resize(orig_len + written);
 }
 

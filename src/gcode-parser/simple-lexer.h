@@ -20,10 +20,10 @@
 #include <vector>
 
 class SimpleLexerBase {
-public:
+ public:
   ~SimpleLexerBase();
 
-protected:
+ protected:
   SimpleLexerBase();
   // Add a keyword and the corresponding value it should be associated with.
   // "value" needs to be > 0.
@@ -31,14 +31,14 @@ protected:
   int ConsumeKeyword(const char **input);
   const char *ReverseMapToString(int value);
 
-private:
+ private:
   class Node;
-  typedef std::map<int, const char*> KeywordMap;
+  typedef std::map<int, const char *> KeywordMap;
 
   void AddKeywordAtNode(Node *node, const char *keyword, int value);
 
   Node *root_;
-  std::vector<Node*> to_delete_;
+  std::vector<Node *> to_delete_;
   KeywordMap keyword_mappings_;
 };
 
@@ -49,7 +49,7 @@ private:
 // Only requirement: The Enum needs to map value zero (0) to 'invalid keyword'.
 template <typename Enum>
 class SimpleLexer : public SimpleLexerBase {
-public:
+ public:
   // Register a keyword and the corresponding value it should be associated
   // with. The "value" needs to be > 0 (as 0 means 'no keyword').
   // The keyword is remembered for the AsString() function. If multiple

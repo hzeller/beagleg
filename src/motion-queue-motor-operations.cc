@@ -27,13 +27,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
+
 #include <deque>
 
 #include "common/logging.h"
-
-#include "motor-interface-constants.h"
-#include "motion-queue.h"
 #include "hardware-mapping.h"
+#include "motion-queue.h"
+#include "motor-interface-constants.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2
@@ -45,12 +45,13 @@
 // accumulate too much error.
 #define MAX_STEPS_PER_SEGMENT (65535 / LOOPS_PER_STEP)
 
-// TODO: don't store this singleton like, but keep in user_data of the MotorOperations
-static float hardware_frequency_limit_ = 1e6;    // Don't go over 1 Mhz
+// TODO: don't store this singleton like, but keep in user_data of the
+// MotorOperations
+static float hardware_frequency_limit_ = 1e6;  // Don't go over 1 Mhz
 
-static inline float sq(float x) { return x * x; }  // square a number
+static inline float sq(float x) { return x * x; }     // square a number
 static inline double sqd(double x) { return x * x; }  // square a number
-static inline int round2int(float x) { return (int) roundf(x); }
+static inline int round2int(float x) { return (int)roundf(x); }
 
 // Clip speed to maximum we can reach with hardware.
 static float clip_hardware_frequency_limit(float v) {
@@ -59,8 +60,9 @@ static float clip_hardware_frequency_limit(float v) {
 
 static float calcAccelerationCurveValueAt(int index, float acceleration) {
   // counter_freq * sqrt(2 / accleration)
-  const float accel_factor = TIMER_FREQUENCY
-    * (sqrtf(LOOPS_PER_STEP * 2.0f / acceleration)) / LOOPS_PER_STEP;
+  const float accel_factor = TIMER_FREQUENCY *
+                             (sqrtf(LOOPS_PER_STEP * 2.0f / acceleration)) /
+                             LOOPS_PER_STEP;
   // The approximation is pretty far off in the first step; adjust.
   const float c0 = (index == 0) ? accel_factor * 0.67605f : accel_factor;
   return c0 * (sqrtf(index + 1) - sqrtf(index));
@@ -89,11 +91,11 @@ static char test_acceleration_ok(float acceleration) {
 
 // Used to keep track of useful attributes of a motion segment's target move.
 struct HistoryPositionInfo {
-  HistoryPositionInfo () : position_steps(0), sign(1) {}
-  int position_steps; // Absolute position at the end of the move.
-  uint32_t fraction;  // 1/0xffffffff-th of the difference between the previous
-                      // step and now.
-  signed char sign;   // Sense of the move.
+  HistoryPositionInfo() : position_steps(0), sign(1) {}
+  int position_steps;  // Absolute position at the end of the move.
+  uint32_t fraction;   // 1/0xffffffff-th of the difference between the previous
+                       // step and now.
+  signed char sign;    // Sense of the move.
 };
 
 // Store the required informations needed to backtrack the absolute position.
@@ -102,11 +104,11 @@ struct MotionQueueMotorOperations::HistorySegment {
   unsigned short aux_bits;
 };
 
-MotionQueueMotorOperations::
-MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend)
-  : hardware_mapping_(hw),
-    backend_(backend),
-    shadow_queue_(new std::deque<struct HistorySegment>()) {
+MotionQueueMotorOperations::MotionQueueMotorOperations(HardwareMapping *hw,
+                                                       MotionQueue *backend)
+    : hardware_mapping_(hw),
+      backend_(backend),
+      shadow_queue_(new std::deque<struct HistorySegment>()) {
   // Initialize the history queue.
   shadow_queue_->push_front({});
 }
@@ -115,8 +117,8 @@ MotionQueueMotorOperations::~MotionQueueMotorOperations() {
   delete shadow_queue_;
 }
 
-bool MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param,
-                                                 int defining_axis_steps) {
+bool MotionQueueMotorOperations::EnqueueInternal(
+  const LinearSegmentSteps &param, int defining_axis_steps) {
   struct MotionSegment new_element = {};
   new_element.direction_bits = 0;
 
@@ -156,17 +158,21 @@ bool MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
     new_element.loops_accel = new_element.loops_decel = 0;
     new_element.loops_travel = total_loops;
     const float travel_speed = clip_hardware_frequency_limit(param.v0);
-    new_element.travel_delay_cycles = round2int(TIMER_FREQUENCY / (LOOPS_PER_STEP * travel_speed));
+    new_element.travel_delay_cycles =
+      round2int(TIMER_FREQUENCY / (LOOPS_PER_STEP * travel_speed));
   } else if (param.v0 < param.v1) {
     // acclereate
-    new_element.loops_travel = new_element.loops_decel = new_element.travel_delay_cycles = 0;
+    new_element.loops_travel = new_element.loops_decel =
+      new_element.travel_delay_cycles = 0;
     new_element.loops_accel = total_loops;
 
     // v1 = v0 + a*t -> t = (v1 - v0)/a
     // s = a/2 * t^2 + v0 * t; subsitution t from above.
     // a = (v1^2-v0^2)/(2*s)
-    float acceleration = (sq(param.v1) - sq(param.v0)) / (2.0f * defining_axis_steps);
-    //fprintf(stderr, "M-OP HZ: defining=%d ; accel=%.2f\n", defining_axis_steps, acceleration);
+    float acceleration =
+      (sq(param.v1) - sq(param.v0)) / (2.0f * defining_axis_steps);
+    // fprintf(stderr, "M-OP HZ: defining=%d ; accel=%.2f\n",
+    // defining_axis_steps, acceleration);
     // If we accelerated from zero to our first speed, this is how many steps
     // we needed. We need to go this index into our taylor series.
     const int accel_loops_from_zero =
@@ -174,21 +180,28 @@ bool MotionQueueMotorOperations::EnqueueInternal(const LinearSegmentSteps &param
 
     new_element.accel_series_index = accel_loops_from_zero;
     new_element.hires_accel_cycles =
-      round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
+      round2int((1 << DELAY_CYCLE_SHIFT) *
+                calcAccelerationCurveValueAt(new_element.accel_series_index,
+                                             acceleration));
   } else {  // v0 > v1
     // decelerate
-    new_element.loops_travel = new_element.loops_accel = new_element.travel_delay_cycles = 0;
+    new_element.loops_travel = new_element.loops_accel =
+      new_element.travel_delay_cycles = 0;
     new_element.loops_decel = total_loops;
 
-    float acceleration = (sq(param.v0) - sq(param.v1)) / (2.0f * defining_axis_steps);
-    //fprintf(stderr, "M-OP HZ: defining=%d ; decel=%.2f\n", defining_axis_steps, acceleration);
+    float acceleration =
+      (sq(param.v0) - sq(param.v1)) / (2.0f * defining_axis_steps);
+    // fprintf(stderr, "M-OP HZ: defining=%d ; decel=%.2f\n",
+    // defining_axis_steps, acceleration);
     // We are into the taylor sequence this value up and reduce from there.
     const int accel_loops_from_zero =
       round2int(LOOPS_PER_STEP * (sq(param.v0 - 0) / (2.0f * acceleration)));
 
     new_element.accel_series_index = accel_loops_from_zero;
     new_element.hires_accel_cycles =
-      round2int((1 << DELAY_CYCLE_SHIFT) * calcAccelerationCurveValueAt(new_element.accel_series_index, acceleration));
+      round2int((1 << DELAY_CYCLE_SHIFT) *
+                calcAccelerationCurveValueAt(new_element.accel_series_index,
+                                             acceleration));
   }
 
   new_element.aux = param.aux_bits;
@@ -217,7 +230,7 @@ bool MotionQueueMotorOperations::GetPhysicalStatus(PhysicalStatus *status) {
     steps *= pos_info.fraction;
     steps += max_fraction - 1;
     steps /= max_fraction;
-    status->pos_steps[i] = pos_info.position_steps - pos_info.sign * (int) steps;
+    status->pos_steps[i] = pos_info.position_steps - pos_info.sign * (int)steps;
   }
   status->aux_bits = hs.aux_bits;
   return true;
@@ -269,23 +282,24 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
     shadow_queue_->push_front(history_segment);
 
     ret = backend_->Enqueue(&empty_element);
-  }
-  else if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
+  } else if (defining_axis_steps > MAX_STEPS_PER_SEGMENT) {
     // We have more steps that we can enqueue in one chunk, so let's cut
     // it in pieces.
-    const double a = (sqd(param.v1) - sqd(param.v0))/(2.0*defining_axis_steps);
+    const double a =
+      (sqd(param.v1) - sqd(param.v0)) / (2.0 * defining_axis_steps);
     const int divisions = (defining_axis_steps / MAX_STEPS_PER_SEGMENT) + 1;
     int64_t hires_steps_per_div[BEAGLEG_NUM_MOTORS];
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       // (+1 to fix rounding trouble in the LSB)
-      hires_steps_per_div[i] = ((int64_t)param.steps[i] << 32)/divisions + 1;
+      hires_steps_per_div[i] = ((int64_t)param.steps[i] << 32) / divisions + 1;
     }
 
     struct LinearSegmentSteps previous = {}, accumulator = {}, output;
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
-    double previous_speed = param.v0;   // speed calculation in double
+    double previous_speed = param.v0;  // speed calculation in double
 
-    output.aux_bits = param.aux_bits;  // use the original Aux bits for all segments
+    output.aux_bits =
+      param.aux_bits;  // use the original Aux bits for all segments
     for (int d = 0; d < divisions; ++d) {
       for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
         hires_step_accumulator[i] += hires_steps_per_div[i];

@@ -1,21 +1,21 @@
 /* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
-* (c) 2018 Leonardo Romor <leonardo.romor@gmail.com>
-*
-* This file is part of BeagleG. http://github.com/hzeller/beagleg
-*
-* BeagleG is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* BeagleG is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * (c) 2018 Leonardo Romor <leonardo.romor@gmail.com>
+ *
+ * This file is part of BeagleG. http://github.com/hzeller/beagleg
+ *
+ * BeagleG is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * BeagleG is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "gcode-streamer.h"
 
 #include <fcntl.h>
@@ -25,14 +25,16 @@
 
 GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
                              GCodeParser::EventReceiver *parse_events)
-  : event_server_(event_server), parser_(parser), parse_events_(parse_events),
-    is_processing_(false), connection_fd_(-1), lines_processed_(0) {
+    : event_server_(event_server),
+      parser_(parser),
+      parse_events_(parse_events),
+      is_processing_(false),
+      connection_fd_(-1),
+      lines_processed_(0) {
   // Let's start the input idle tasklet
   // TODO: the lifetime implications are a bit problematic as we need to
   // outlive the Loop() of the event server.
-  event_server_->RunOnIdle([this](){
-    return Timeout();
-  });
+  event_server_->RunOnIdle([this]() { return Timeout(); });
 }
 
 bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
@@ -48,9 +50,7 @@ bool GCodeStreamer::ConnectStream(int fd, FILE *msg_stream) {
   connection_fd_ = fd;
   lines_processed_ = 0;
 
-  event_server_->RunOnReadable(connection_fd_, [this](){
-    return ReadData();
-  });
+  event_server_->RunOnReadable(connection_fd_, [this]() { return ReadData(); });
   return true;
 }
 

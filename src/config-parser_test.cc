@@ -19,35 +19,35 @@
 
 #include "config-parser.h"
 
-#include <iostream>
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <iostream>
 
 using ::testing::Return;
 
 namespace {
 class MockConfigReader : public ConfigParser::Reader {
-public:
+ public:
   MOCK_METHOD2(SeenSection, bool(int line_no, const std::string &section_name));
-  MOCK_METHOD3(SeenNameValue, bool(int line_no,
-                                   const std::string &name,
+  MOCK_METHOD3(SeenNameValue, bool(int line_no, const std::string &name,
                                    const std::string &value));
   MOCK_METHOD2(ReportError, void(int line_no, const std::string &msg));
 };
 
-} // namespace
+}  // namespace
 
 TEST(ConfigParserTest, BasicParser) {
   ConfigParser p;
-  p.SetContent(" [ SOME-section ]\n"
-               " # just comment\n"
-               "\n\n"
-               " some line = bar  # foo\n"
-               "another line = x\r\n"
-               "  something = unfinished-line");
+  p.SetContent(
+    " [ SOME-section ]\n"
+    " # just comment\n"
+    "\n\n"
+    " some line = bar  # foo\n"
+    "another line = x\r\n"
+    "  something = unfinished-line");
   MockConfigReader events;
-  EXPECT_CALL(events, SeenSection(1, "some-section"))
-    .WillOnce(Return(true));
+  EXPECT_CALL(events, SeenSection(1, "some-section")).WillOnce(Return(true));
   EXPECT_CALL(events, SeenNameValue(5, "some line", "bar"))
     .WillOnce(Return(true));
   EXPECT_CALL(events, SeenNameValue(6, "another line", "x"))
@@ -59,8 +59,9 @@ TEST(ConfigParserTest, BasicParser) {
 
 TEST(ConfigParserTest, ErrorReporting) {
   ConfigParser p;
-  p.SetContent(" incomplete line\n"
-               "[ incomplete-section \n");
+  p.SetContent(
+    " incomplete line\n"
+    "[ incomplete-section \n");
 
   MockConfigReader events;
   EXPECT_CALL(events, ReportError(1, "name=value pair expected."));

@@ -27,11 +27,11 @@
 // The config parser reads a configuration file and passes tokenized
 // values to a ConfigParser::Reader.
 class ConfigParser {
-public:
+ public:
   // A reader has to be implemented by a subsystem that needs configuration
   // from the file.
   class Reader {
-  public:
+   public:
     virtual ~Reader() {}
 
     // Inform about new section. If the Reader is interested in
@@ -42,13 +42,12 @@ public:
     // in the current section. Returns 'true' if it could deal with the
     // name/value, 'false' if there was an error and the configuration should
     // be deemed invalid.
-    virtual bool SeenNameValue(int line_no,
-                               const std::string &name,
+    virtual bool SeenNameValue(int line_no, const std::string &name,
                                const std::string &value) = 0;
 
     virtual void ReportError(int line_no, const std::string &msg);
 
-  protected:
+   protected:
     // Convenience functions that can be used in derived readers.
     // All the Accept() functions are done in the way that they always return
     // 'true' if the expected name is not matched, otherwise they return the
@@ -93,8 +92,8 @@ public:
   // Reader-ownership is not taken over.
   bool EmitConfigValues(Reader *reader);
 
-private:
+ private:
   std::string content_;
   bool parse_success_;
 };
-#endif // _BEAGLEG_CONFIG_PARSER_H
+#endif  // _BEAGLEG_CONFIG_PARSER_H

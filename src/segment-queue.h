@@ -19,26 +19,24 @@
 #ifndef _BEAGLEG_MOTOR_OPERATIONS_H_
 #define _BEAGLEG_MOTOR_OPERATIONS_H_
 
-enum {
-  BEAGLEG_NUM_MOTORS = 8
-};
+enum { BEAGLEG_NUM_MOTORS = 8 };
 
 // The movement command send to the segment queue either changes speed, or
 // provides a steady speed. Already low-level broken down for motors.
 struct LinearSegmentSteps {
   // Speed is steps/s. If initial speed and final speed differ, the motor will
-  // accelerate or decelerate to reach the final speed within the given number of
-  // alotted steps of the axis with the most number of steps; all other axes are
-  // scaled accordingly. Uses jerk-settings to increase/decrease acceleration;
-  // the acceleration is zero at the end of the move.
-  float v0;     // initial speed
-  float v1;     // final speed
+  // accelerate or decelerate to reach the final speed within the given number
+  // of alotted steps of the axis with the most number of steps; all other axes
+  // are scaled accordingly. Uses jerk-settings to increase/decrease
+  // acceleration; the acceleration is zero at the end of the move.
+  float v0;  // initial speed
+  float v1;  // final speed
 
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.
-  unsigned short aux_bits;   // Aux-bits to switch.
+  unsigned short aux_bits;  // Aux-bits to switch.
 
-  int steps[BEAGLEG_NUM_MOTORS]; // Steps for axis. Negative for reverse.
+  int steps[BEAGLEG_NUM_MOTORS];  // Steps for axis. Negative for reverse.
 };
 
 // Struct used to return data about the currently executed steps
@@ -49,7 +47,7 @@ struct PhysicalStatus {
 };
 
 class SegmentQueue {
-public:
+ public:
   virtual ~SegmentQueue() {}
 
   // Enqueue a coordinated move command.

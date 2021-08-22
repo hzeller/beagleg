@@ -24,11 +24,10 @@
 #include <stdlib.h>
 #include <strings.h>
 
-#include "gcode-parser/gcode-parser.h"
-
 #include "gcode-machine-control.h"
-#include "segment-queue.h"
+#include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"
+#include "segment-queue.h"
 #include "spindle-control.h"
 
 namespace {
@@ -36,11 +35,10 @@ namespace {
 // recorded, then further delegated to an original GCodeParser::Events
 // receiver
 class StatsCollectingEventDelegator : public GCodeParser::EventReceiver {
-public:
+ public:
   StatsCollectingEventDelegator(BeagleGPrintStats *stats,
                                 GCodeParser::EventReceiver *delegatee)
-    : stats_(stats), delegatee_(delegatee) {
-  }
+      : stats_(stats), delegatee_(delegatee) {}
 
   // GCodeParser::EventReceiver callbacks
   void gcode_start(GCodeParser *p) final { delegatee_->gcode_start(p); }
@@ -48,19 +46,21 @@ public:
 
   // GCode parser event receivers, that forward calls to the delegate
   // but also determine relevant height information.
-  void set_speed_factor(float f) final { delegatee_->set_speed_factor(f);  }
+  void set_speed_factor(float f) final { delegatee_->set_speed_factor(f); }
   void set_temperature(float f) final { delegatee_->set_temperature(f); }
-  void set_fanspeed(float speed) final { delegatee_->set_fanspeed(speed);  }
+  void set_fanspeed(float speed) final { delegatee_->set_fanspeed(speed); }
   void wait_temperature() final { delegatee_->wait_temperature(); }
   void motors_enable(bool b) final { delegatee_->motors_enable(b); }
-  void go_home(AxisBitmap_t axes) final { /* ignore */ }
-  void inform_origin_offset(const AxesRegister& axes, const char *n) final {
+  void go_home(AxisBitmap_t axes) final { /* ignore */
+  }
+  void inform_origin_offset(const AxesRegister &axes, const char *n) final {
     delegatee_->inform_origin_offset(axes, n);
   }
 
   void dwell(float value) final {
     stats_->total_time_seconds += value / 1000.0f;
-    // We call the original dell() with zero time as we don't want to spend _real_ time.
+    // We call the original dell() with zero time as we don't want to spend
+    // _real_ time.
     delegatee_->dwell(0);
   }
 
@@ -77,7 +77,7 @@ public:
     return delegatee_->unprocessed(letter, value, remain);
   }
 
-private:
+ private:
   static inline void set_min_max(float value, float *min, float *max) {
     if (value < *min) *min = value;
     if (value > *max) *max = value;
@@ -97,20 +97,19 @@ private:
 };
 
 class StatsSegmentQueue : public SegmentQueue {
-public:
+ public:
   StatsSegmentQueue(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
   bool Enqueue(const LinearSegmentSteps &param) final {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       int steps = abs(param.steps[i]);
-      if (steps > max_steps)
-        max_steps = steps;
+      if (steps > max_steps) max_steps = steps;
     }
 
     // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t
     print_stats_->total_time_seconds += 2 * max_steps / (param.v0 + param.v1);
-    //printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param.v0, param.v1, max_steps);
+    // printf("HZ:v0=%7.1f v1=%7.1f steps=%d\n", param.v0, param.v1, max_steps);
     return true;
   }
 
@@ -119,14 +118,13 @@ public:
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int pos) final {}
 
-private:
+ private:
   BeagleGPrintStats *const print_stats_;
 };
-}
+}  // namespace
 
 bool determine_print_stats(int input_fd, const MachineControlConfig &config,
-                           FILE *msg_out,
-                           struct BeagleGPrintStats *result) {
+                           FILE *msg_out, struct BeagleGPrintStats *result) {
   bzero(result, sizeof(*result));
   result->x_min = 1e7;
   result->y_min = 1e7;
@@ -137,22 +135,20 @@ bool determine_print_stats(int input_fd, const MachineControlConfig &config,
   // We do that by intercepting the motor operations by replacing the
   // implementation with our own.
   StatsSegmentQueue stats_motor_ops(result);
-  GCodeMachineControl *machine_control
-    = GCodeMachineControl::Create(config, &stats_motor_ops,
-                                  &hardware, nullptr, nullptr);
-  if (!machine_control)
-    return false;
+  GCodeMachineControl *machine_control = GCodeMachineControl::Create(
+    config, &stats_motor_ops, &hardware, nullptr, nullptr);
+  if (!machine_control) return false;
 
   // We intercept gcode events to update some stats, then pass on to
   // machine event receiver.
-  StatsCollectingEventDelegator
-    stats_event_receiver(result, machine_control->ParseEventReceiver());
+  StatsCollectingEventDelegator stats_event_receiver(
+    result, machine_control->ParseEventReceiver());
   GCodeParser::Config parser_cfg;
   GCodeParser::Config::ParamMap parameters;
   parser_cfg.parameters = &parameters;
   GCodeParser parser(parser_cfg, &stats_event_receiver);
-  const bool success = parser.ReadFile(fdopen(input_fd, "r"), msg_out)
-    && parser.error_count() == 0;
+  const bool success = parser.ReadFile(fdopen(input_fd, "r"), msg_out) &&
+                       parser.error_count() == 0;
   delete machine_control;
   return success;
 }

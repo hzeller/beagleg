@@ -21,8 +21,8 @@
 
 #include <math.h>
 #include <stdint.h>
-#include <strings.h>
 #include <stdio.h>
+#include <strings.h>
 
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
@@ -30,17 +30,14 @@
 #define LOOPS_PER_STEP (1 << 1)
 
 static constexpr unsigned char kWavHeader[] = {
-  0x52, 0x49, 0x46, 0x46,
-    0xff, 0xff, 0xff, 0xff,
-    0x57, 0x41, 0x56, 0x45, 0x66, 0x6D, 0x74, 0x20, 0x10,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x44, 0xAC,
-    0x00, 0x00, 0x10, 0xB1, 0x02, 0x00, 0x04, 0x00, 0x10,
-    0x00, 0x64, 0x61, 0x74, 0x61,
-    0xff, 0xff, 0xff, 0xff,
-    };
+  0x52, 0x49, 0x46, 0x46, 0xff, 0xff, 0xff, 0xff, 0x57, 0x41, 0x56,
+  0x45, 0x66, 0x6D, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00,
+  0x02, 0x00, 0x44, 0xAC, 0x00, 0x00, 0x10, 0xB1, 0x02, 0x00, 0x04,
+  0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0xff, 0xff, 0xff, 0xff,
+};
 
 class SimFirmwareAudioQueue::AudioWriter {
-public:
+ public:
   AudioWriter(FILE *out) : out_(out) {
     fwrite(kWavHeader, sizeof(kWavHeader), 1, out_);
   }
@@ -64,15 +61,15 @@ public:
     struct sample_t {
       int16_t left;
       int16_t right;
-    } sample = { (int16_t) ((channel_values & 0b01) ? 16000 : -16000),
-                 (int16_t) ((channel_values & 0b10) ? 16000 : -16000) };
+    } sample = {(int16_t)((channel_values & 0b01) ? 16000 : -16000),
+                (int16_t)((channel_values & 0b10) ? 16000 : -16000)};
     const uint32_t target_sample = until_time * kSampleRate;
     for (/**/; current_sample_ < target_sample; ++current_sample_) {
       fwrite(&sample, sizeof(sample), 1, out_);
     }
   }
 
-private:
+ private:
   static constexpr int kSampleRate = 44100;
   uint32_t current_sample_ = 0;
   uint8_t last_channel_values_ = 0;
@@ -89,16 +86,11 @@ static struct HardwareState state;
 
 // Default mapping of our motors to axis in typical test-setups.
 // Should match Motor-Mapping in config file.
-enum {
-  X_MOTOR = 0,
-  Y_MOTOR = 1,
-  Z_MOTOR = 2
-};
+enum { X_MOTOR = 0, Y_MOTOR = 1, Z_MOTOR = 2 };
 
 // This simulates what happens in the PRU. For testing purposes.
 bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
-  if (segment->state == STATE_EXIT)
-    return true;
+  if (segment->state == STATE_EXIT) return true;
 
   // For each segment, we start with a fresh motor state.
   bzero(&state, sizeof(state));
@@ -119,7 +111,8 @@ bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
 
     if (segment->loops_accel > 0) {
       if (segment->accel_series_index != 0) {
-        const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
+        const uint32_t divident =
+          (segment->hires_accel_cycles << 1) + remainder;
         const uint32_t divisor = (segment->accel_series_index << 2) + 1;
         segment->hires_accel_cycles -= (divident / divisor);
         remainder = divident % divisor;
@@ -127,12 +120,10 @@ bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
       ++segment->accel_series_index;
       --segment->loops_accel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
-    }
-    else if (segment->loops_travel > 0) {
+    } else if (segment->loops_travel > 0) {
       delay_loops = segment->travel_delay_cycles;
       --segment->loops_travel;
-    }
-    else if (segment->loops_decel > 0) {
+    } else if (segment->loops_decel > 0) {
       const uint32_t divident = (segment->hires_accel_cycles << 1) + remainder;
       const uint32_t divisor = (segment->accel_series_index << 2) - 1;
       segment->hires_accel_cycles += (divident / divisor);
@@ -140,8 +131,7 @@ bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
       --segment->accel_series_index;
       --segment->loops_decel;
       delay_loops = segment->hires_accel_cycles >> DELAY_CYCLE_SHIFT;
-    }
-    else {
+    } else {
       break;  // done.
     }
 
@@ -153,9 +143,6 @@ bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
 }
 
 SimFirmwareAudioQueue::SimFirmwareAudioQueue(FILE *out)
-  : writer_(new AudioWriter(out)) {
-}
+    : writer_(new AudioWriter(out)) {}
 
-SimFirmwareAudioQueue::~SimFirmwareAudioQueue() {
-  delete writer_;
-}
+SimFirmwareAudioQueue::~SimFirmwareAudioQueue() { delete writer_; }

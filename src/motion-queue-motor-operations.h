@@ -26,8 +26,9 @@
 #include "segment-queue.h"
 
 class MotionQueueMotorOperations : public SegmentQueue {
-public:
-  // Initialize motor operations, sending planned results into the motion backend.
+ public:
+  // Initialize motor operations, sending planned results into the motion
+  // backend.
   MotionQueueMotorOperations(HardwareMapping *hw, MotionQueue *backend);
   ~MotionQueueMotorOperations() override;
 
@@ -37,7 +38,7 @@ public:
   bool GetPhysicalStatus(PhysicalStatus *status) final;
   void SetExternalPosition(int axis, int pos) final;
 
-private:
+ private:
   bool EnqueueInternal(const LinearSegmentSteps &param,
                        int defining_axis_steps);
 
@@ -48,4 +49,4 @@ private:
   std::deque<struct HistorySegment> *shadow_queue_;
 };
 
-#endif // MOTION_QUEUE_MOTOR_OPERATIONS_H
+#endif  // MOTION_QUEUE_MOTOR_OPERATIONS_H

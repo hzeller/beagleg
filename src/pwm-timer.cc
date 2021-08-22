@@ -17,16 +17,16 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pwm-timer.h"
+
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/mman.h>
+#include <unistd.h>
 
 #include "common/logging.h"
-
-#include "pwm-timer.h"
 
 /* clang-format off */
 // Memory space mapped to the Clock Module registers
@@ -101,22 +101,23 @@ struct pwm_timer_data {
   char running;
 };
 
-struct pwm_timer_data timers[4] = { {}, {}, {}, {} };
+struct pwm_timer_data timers[4] = {{}, {}, {}, {}};
 
 static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
   struct pwm_timer_data *timer = NULL;
   switch (gpio_def) {
-  case PIN_P8_7:  timer = &timers[0]; break; // TIMER4
-  case PIN_P8_9:  timer = &timers[1]; break; // TIMER5
-  case PIN_P8_10: timer = &timers[2]; break; // TIMER6
-  case PIN_P8_8:  timer = &timers[3]; break; // TIMER7
-  case GPIO_NOT_MAPPED:  return NULL;  // Explicitly not mapped.
+  case PIN_P8_7: timer = &timers[0]; break;   // TIMER4
+  case PIN_P8_9: timer = &timers[1]; break;   // TIMER5
+  case PIN_P8_10: timer = &timers[2]; break;  // TIMER6
+  case PIN_P8_8: timer = &timers[3]; break;   // TIMER7
+  case GPIO_NOT_MAPPED: return NULL;          // Explicitly not mapped.
   default:
-    Log_info("Unsupported PWM pin mapped. "
-             "Only Timer PIN_P8_{7,8,9,10} supported");
-    return NULL;               // unsupported pin
+    Log_info(
+      "Unsupported PWM pin mapped. "
+      "Only Timer PIN_P8_{7,8,9,10} supported");
+    return NULL;  // unsupported pin
   }
-  if (!timer->regs) return NULL;             // unmapped timer
+  if (!timer->regs) return NULL;  // unmapped timer
   return timer;
 }
 
@@ -125,17 +126,18 @@ void pwm_timer_start(uint32_t gpio_def, bool start) {
   if (!timer) return;
 
   if (!start || !timer->pwm_freq || !timer->duty_cycle) {
-    timer->regs[TCLR/4] = 0;                              // stop timer
+    timer->regs[TCLR / 4] = 0;  // stop timer
     timer->running = 0;
   } else {
-    timer->regs[TCLR/4] = (TCLR_ST |                       // start timer
-                           TCLR_AR |                       // auto-reload
-                           TCLR_PTV(timer->ptv)  |         // prescale value
-                           ((timer->pre) ? TCLR_PRE : 0) | // enable prescale if necessary
-                           TCLR_CE |                       // compare mode enabled
-                           TCLR_TRG_OVF_MAT |              // trigger on overflow and match
-                           TCLR_PT                         // PWM toggle mode
-                           );
+    timer->regs[TCLR / 4] =
+      (TCLR_ST |                        // start timer
+       TCLR_AR |                        // auto-reload
+       TCLR_PTV(timer->ptv) |           // prescale value
+       ((timer->pre) ? TCLR_PRE : 0) |  // enable prescale if necessary
+       TCLR_CE |                        // compare mode enabled
+       TCLR_TRG_OVF_MAT |               // trigger on overflow and match
+       TCLR_PT                          // PWM toggle mode
+      );
     timer->running = 1;
   }
 }
@@ -150,7 +152,8 @@ void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle) {
     pwm_timer_start(gpio_def, 0);
   } else {
     uint32_t start = TIMER_OVERFLOW - timer->resolution;
-    uint32_t dc = TIMER_OVERFLOW - ((uint32_t)(timer->resolution * (1.0 - duty_cycle)));
+    uint32_t dc =
+      TIMER_OVERFLOW - ((uint32_t)(timer->resolution * (1.0 - duty_cycle)));
 
     // TLDR and TMAR must be at least 2 less than the overflow
     if (TIMER_OVERFLOW - start <= 2) start = TIMER_OVERFLOW - 2;
@@ -159,14 +162,15 @@ void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle) {
     // TMAR must be at least 2 less than the TLDR
     if (dc - start <= 2) start = dc - 2;
 
-    timer->regs[TCRR/4] = start;
-    timer->regs[TLDR/4] = start;
-    timer->regs[TMAR/4] = dc;
+    timer->regs[TCRR / 4] = start;
+    timer->regs[TLDR / 4] = start;
+    timer->regs[TMAR / 4] = dc;
   }
   timer->duty_cycle = duty_cycle;
 }
 
-static void pwm_timer_calc_resolution(struct pwm_timer_data *timer, int pwm_freq) {
+static void pwm_timer_calc_resolution(struct pwm_timer_data *timer,
+                                      int pwm_freq) {
   float pwm_period = 1.0 / pwm_freq;
   uint64_t resolution = 0;
   int ratio;
@@ -217,26 +221,30 @@ void pwm_timer_set_freq(uint32_t gpio_def, int pwm_freq) {
 static void pwm_timers_ena_clk(volatile uint32_t *cm, uint32_t reg, int timer) {
   uint32_t val;
 
-  val = cm[reg/4];
+  val = cm[reg / 4];
   if (val & IDLEST_MASK) {
     Log_debug("Enabling TIMER%d clock", timer);
     val |= MODULEMODE_ENABLE;
-    cm[reg/4] = val;
+    cm[reg / 4] = val;
     do {
-      val = cm[reg/4];
+      val = cm[reg / 4];
     } while (val & IDLEST_MASK);
   }
 }
 
 static volatile uint32_t *map_port(int fd, size_t length, off_t offset) {
-  return (volatile uint32_t*) mmap(0, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
+  return (volatile uint32_t *)mmap(0, length, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED, fd, offset);
 }
 
 static int pwm_timers_enable_clocks(int fd) {
   volatile uint32_t *cm;
 
   cm = map_port(fd, CM_SIZE, CM_BASE);
-  if (cm == MAP_FAILED) { perror("mmap() CM"); return 0; }
+  if (cm == MAP_FAILED) {
+    perror("mmap() CM");
+    return 0;
+  }
 
   // Enable the timer clocks
   pwm_timers_ena_clk(cm, CM_PER_TIMER4_CLKCTRL, 4);
@@ -245,12 +253,12 @@ static int pwm_timers_enable_clocks(int fd) {
   pwm_timers_ena_clk(cm, CM_PER_TIMER7_CLKCTRL, 7);
 
   // Set all the timer input clocks to 24MHz
-  cm[CLKSEL_TIMER4_CLK/4] = CLKSEL_CLK_M_OSC;
-  cm[CLKSEL_TIMER5_CLK/4] = CLKSEL_CLK_M_OSC;
-  cm[CLKSEL_TIMER6_CLK/4] = CLKSEL_CLK_M_OSC;
-  cm[CLKSEL_TIMER7_CLK/4] = CLKSEL_CLK_M_OSC;
+  cm[CLKSEL_TIMER4_CLK / 4] = CLKSEL_CLK_M_OSC;
+  cm[CLKSEL_TIMER5_CLK / 4] = CLKSEL_CLK_M_OSC;
+  cm[CLKSEL_TIMER6_CLK / 4] = CLKSEL_CLK_M_OSC;
+  cm[CLKSEL_TIMER7_CLK / 4] = CLKSEL_CLK_M_OSC;
 
-  munmap((void*)cm, CM_SIZE);
+  munmap((void *)cm, CM_SIZE);
   return 1;
 }
 
@@ -261,25 +269,39 @@ bool pwm_timers_map() {
   memset(timers, 0x00, sizeof(*timers));
 
   fd = open("/dev/mem", O_RDWR);
-  if (fd == -1) { perror("open()"); return ret; }
+  if (fd == -1) {
+    perror("open()");
+    return ret;
+  }
 
-  if (!pwm_timers_enable_clocks(fd))    goto exit;
+  if (!pwm_timers_enable_clocks(fd)) goto exit;
 
   timers[0].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER4_BASE);
-  if (timers[0].regs == MAP_FAILED) { perror("mmap() TIMER4"); goto exit; }
+  if (timers[0].regs == MAP_FAILED) {
+    perror("mmap() TIMER4");
+    goto exit;
+  }
   timers[1].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER5_BASE);
-  if (timers[1].regs == MAP_FAILED) { perror("mmap() TIMER5"); goto exit; }
+  if (timers[1].regs == MAP_FAILED) {
+    perror("mmap() TIMER5");
+    goto exit;
+  }
   timers[2].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER6_BASE);
-  if (timers[2].regs == MAP_FAILED) { perror("mmap() TIMER6"); goto exit; }
+  if (timers[2].regs == MAP_FAILED) {
+    perror("mmap() TIMER6");
+    goto exit;
+  }
   timers[3].regs = map_port(fd, TIMER_MMAP_SIZE, TIMER7_BASE);
-  if (timers[3].regs == MAP_FAILED) { perror("mmap() TIMER7"); goto exit; }
+  if (timers[3].regs == MAP_FAILED) {
+    perror("mmap() TIMER7");
+    goto exit;
+  }
 
   ret = true;
 
- exit:
+exit:
   close(fd);
-  if (!ret)
-    pwm_timers_unmap();
+  if (!ret) pwm_timers_unmap();
   return ret;
 }
 
@@ -287,7 +309,7 @@ void pwm_timers_unmap() {
   int i;
   for (i = 0; i < 4; i++) {
     struct pwm_timer_data *timer = &timers[i];
-    if (timer->regs) munmap((void*)timer->regs, TIMER_MMAP_SIZE);
+    if (timer->regs) munmap((void *)timer->regs, TIMER_MMAP_SIZE);
     timer->regs = NULL;
   }
 }

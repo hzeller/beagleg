@@ -21,17 +21,16 @@
 // Implementation of the hardware interface of the PRU using the uio_pruss
 // driver from the bone line kernel.
 
-#include "pru-hardware-interface.h"
-
 #include <assert.h>
 #include <errno.h>
 #include <pruss_intc_mapping.h>
 #include <prussdrv.h>
 #include <stdio.h>
-#include <strings.h>
 #include <string.h>
+#include <strings.h>
 
 #include "common/logging.h"
+#include "pru-hardware-interface.h"
 
 // Generated PRU code from motor-interface-pru.p
 #include "motor-interface-pru_bin.h"
@@ -40,13 +39,13 @@
 #define PRU_NUM 0
 
 #if PRU_NUM == 0
-#  define PRU_DATARAM PRUSS0_PRU0_DATARAM
-#  define PRU_INSTRUCTIONRAM PRUSS0_PRU0_IRAM
-#  define PRU_ARM_INTERRUPT PRU0_ARM_INTERRUPT
+#define PRU_DATARAM        PRUSS0_PRU0_DATARAM
+#define PRU_INSTRUCTIONRAM PRUSS0_PRU0_IRAM
+#define PRU_ARM_INTERRUPT  PRU0_ARM_INTERRUPT
 #elif PRU_NUM == 1
-#  define PRU_DATARAM PRUSS0_PRU1_DATARAM
-#  define PRU_INSTRUCTIONRAM PRUSS0_PRU1_IRAM
-#  define PRU_ARM_INTERRUPT PRU1_ARM_INTERRUPT
+#define PRU_DATARAM        PRUSS0_PRU1_DATARAM
+#define PRU_INSTRUCTIONRAM PRUSS0_PRU1_IRAM
+#define PRU_ARM_INTERRUPT  PRU1_ARM_INTERRUPT
 #endif
 
 bool UioPrussInterface::Init() {
