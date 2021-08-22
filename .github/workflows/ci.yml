@@ -1,0 +1,34 @@
+name: 'main'
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    name: Install Dependencies and Build
+    steps:
+    - name: Prepare
+      run: |
+        sudo apt-get update -qq
+        sudo apt install -y g++
+
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Configure shell
+      # Since we're not compiling on the Beaglebone, disable arm specifics
+      run: |
+        echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
+
+    - name: Build
+      run: |
+        make
+
+    - name: Test
+      run: |
+        make test
