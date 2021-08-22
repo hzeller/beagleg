@@ -114,9 +114,13 @@ local-valgrind-tests: $(UNITTEST_BINARIES)
 test: local-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test || exit 1; done
 
-coverage:
-	LDFLAGS="-fprofile-arcs -ftest-coverage" BEAGLEG_OPT_CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" make test
-	gcovr -r . --html --html-details -e ".*_test.cc" -p -o coverage.html
+beagleg.coverage:
+	LDFLAGS="-fprofile-arcs -ftest-coverage" BEAGLEG_OPT_CFLAGS="-O0 -g -fprofile-arcs -ftest-coverage" $(MAKE) test
+	lcov --no-external --capture --directory . --output-file beagleg.coverage
+
+
+coverage-html: beagleg.coverage
+	genhtml --output-directory coverage beagleg.coverage
 
 valgrind-test: local-valgrind-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test || exit 1; done
