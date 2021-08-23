@@ -605,6 +605,7 @@ TEST(GCodeParserTest, arc_generation) {
     counter.TestParseLine("G1 X100 Y0");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
     counter.TestParseLine("G2 X100 Y0 I-100 J0");
+    counter.TestParseLine("G2 X100 Y0 R100");
   }
   {
     ArcTester counter;
@@ -612,6 +613,7 @@ TEST(GCodeParserTest, arc_generation) {
     counter.TestParseLine("G1 X100 Y0");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Y, 100.0f);
     counter.TestParseLine("G2 X100 Y0 I-100 J0");
+    counter.TestParseLine("G2 X100 Y0 R100");
   }
   {
     ArcTester counter;
@@ -619,6 +621,7 @@ TEST(GCodeParserTest, arc_generation) {
     counter.TestParseLine("G1 X100 Y0");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_X, 100.0f);
     counter.TestParseLine("G2 X100 Y0 I-100 J0");
+    counter.TestParseLine("G2 X100 Y0 R100");
   }
 }
 
@@ -806,10 +809,12 @@ TEST(GCodeParserTest, Conditional) {
   EXPECT_TRUE(counter.TestParseLine("IF [#1 < 0] THEN #2=1 ELSE #2=0"));
   EXPECT_TRUE(counter.TestParseLine("IF [#1 == 0] THEN #3=1 ELSE #3=0"));
   EXPECT_TRUE(counter.TestParseLine("IF [#1 > 0] THEN #4=1 ELSE #4=0"));
+  EXPECT_TRUE(counter.TestParseLine("IF [#1 != 0] THEN #5=1 ELSE #5=0"));
   EXPECT_EQ(-1, counter.get_parameter(1));
   EXPECT_EQ(1, counter.get_parameter(2));
   EXPECT_EQ(0, counter.get_parameter(3));
   EXPECT_EQ(0, counter.get_parameter(4));
+  EXPECT_EQ(1, counter.get_parameter(5));
 
   // Test IF/THEN/ELSEIF/THEN/ELSE
   EXPECT_TRUE(counter.TestParseLine("#1=-100"));
