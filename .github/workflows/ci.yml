@@ -15,7 +15,7 @@ jobs:
     - name: Prepare
       run: |
         sudo apt-get update -qq
-        sudo apt install -y g++ googletest
+        sudo apt install -y g++ googletest valgrind
 
     - uses: actions/checkout@v2
       with:
@@ -34,6 +34,10 @@ jobs:
     - name: Test
       run: |
         make test
+
+    - name: Valgrind Test
+      run: |
+        BEAGLEG_OPT_CFLAGS="-O3 -g" make valgrind-test
 
   Coverage:
     runs-on: ubuntu-latest

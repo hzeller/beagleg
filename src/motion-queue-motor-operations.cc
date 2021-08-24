@@ -91,7 +91,7 @@ static char test_acceleration_ok(float acceleration) {
 
 // Used to keep track of useful attributes of a motion segment's target move.
 struct HistoryPositionInfo {
-  HistoryPositionInfo() : position_steps(0), sign(1) {}
+  HistoryPositionInfo() : position_steps(0), fraction(0), sign(1) {}
   int position_steps;  // Absolute position at the end of the move.
   uint32_t fraction;   // 1/0xffffffff-th of the difference between the previous
                        // step and now.

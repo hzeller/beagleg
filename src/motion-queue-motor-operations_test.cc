@@ -56,7 +56,7 @@ TEST(RealtimePosition, init_pos) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   PhysicalStatus status;
-  motor_operations.GetPhysicalStatus(&status);
+  ASSERT_TRUE(motor_operations.GetPhysicalStatus(&status));
   const int expected[BEAGLEG_NUM_MOTORS] = {0, 0, 0, 0, 0, 0, 0, 0};
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 }
