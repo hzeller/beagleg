@@ -120,6 +120,7 @@ beagleg.coverage: FORCE
 
 coverage-html: beagleg.coverage
 	genhtml --output-directory coverage beagleg.coverage
+	@echo "Output in $(realpath coverage)/index.html"
 
 valgrind-test: local-valgrind-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test || exit 1; done
