@@ -1,5 +1,4 @@
-/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
- */
+/* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*- */
 #include "planner.h"
 
 #include <gtest/gtest.h>
@@ -18,67 +17,26 @@
 #define SPEED_STEP_FACTOR 4
 
 // Helper function for implementing ASSERT_NEAR.
-testing::AssertionResult DoubleNearAbsRelPredFormat(const char* expr1,
-                                                    const char* expr2,
-                                                    const char* abs_error_expr,
-                                                    const char* rel_error_expr,
-                                                    double val1,
-                                                    double val2,
-                                                    double abs_error,
+testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
+                                                    const char *expr2,
+                                                    const char *rel_error_expr,
+                                                    double val1, double val2,
                                                     double rel_error) {
   const double diff = fabs(val1 - val2);
-
   const double fmax = std::max(fabs(val1), fabs(val2));
-  const bool is_relative = (diff <= rel_error * fmax);
-  const bool is_absolute = diff <= abs_error;
-
-  // Find the value which is closest to zero.
-  const double min_abs = std::min(fabs(val1), fabs(val2));
-  // Find the distance to the next double from that value.
-  const double epsilon =
-      nextafter(min_abs, std::numeric_limits<double>::infinity()) - min_abs;
-  // Detect the case where abs_error is so small that EXPECT_NEAR is
-  // effectively the same as EXPECT_EQUAL, and give an informative error
-  // message so that the situation can be more easily understood without
-  // requiring exotic floating-point knowledge.
-  // Don't do an epsilon check if abs_error is zero because that implies
-  // that an equality check was actually intended.
-  if (!(std::isnan)(val1) && !(std::isnan)(val2) && abs_error > 0 &&
-      abs_error < epsilon && !is_relative) {
-    return testing::AssertionFailure()
-           << "The difference between " << expr1 << " and " << expr2 << " is "
-           << diff << ", where\n"
-           << expr1 << " evaluates to " << val1 << ",\n"
-           << expr2 << " evaluates to " << val2 << ".\nThe abs_error parameter "
-           << abs_error_expr << " evaluates to " << abs_error
-           << " which is smaller than the minimum distance between doubles for "
-              "numbers of this magnitude which is "
-           << epsilon
-           << ", thus making this EXPECT_NEAR check equivalent to "
-              "EXPECT_EQUAL. Consider using EXPECT_DOUBLE_EQ instead.";
-  }
-
-  if (is_relative || is_absolute)
-    return testing::AssertionSuccess();
+  if (diff <= rel_error * fmax) return testing::AssertionSuccess();
 
   return testing::AssertionFailure()
-      << "The difference between " << expr1 << " and " << expr2
-      << " is " << diff << ", which exceeds " << abs_error_expr
-      << " + " << rel_error_expr << " * max(abs(" << expr1
-      << "), abs(" << expr2 << ")), where\n"
-      << expr1 << " evaluates to " << val1 << ",\n"
-      << expr2 << " evaluates to " << val2 << ",\n"
-      << abs_error_expr << " evaluates to " << abs_error << ", and\n"
-      << rel_error_expr << " evaluates to " << rel_error << ".";
+         << "The difference between " << expr1 << " and " << expr2 << " is "
+         << diff << ", which exceeds " << rel_error_expr << " * max(abs("
+         << expr1 << "), abs(" << expr2 << ")), where\n"
+         << expr1 << " evaluates to " << val1 << ",\n"
+         << expr2 << " evaluates to " << val2 << ",\n"
+         << rel_error_expr << " evaluates to " << rel_error << ".";
 }
 
-#define EXPECT_NEAR_ABS_AND_REL(val1, val2, abs_error, rel_error)\
-  EXPECT_PRED_FORMAT4(DoubleNearAbsRelPredFormat, \
-                      val1, val2, abs_error, rel_error)
-
-#define ASSERT_NEAR_ABS_AND_REL(val1, val2, abs_error, rel_error)\
-  ASSERT_PRED_FORMAT4(DoubleNearAbsRelPredFormat, \
-                      val1, val2, abs_error, rel_error)
+#define EXPECT_NEAR_REL(val1, val2, abs_error, rel_error) \
+  EXPECT_PRED_FORMAT3(DoubleNearAbsRelPredFormat, val1, val2, rel_error)
 
 // Set up config that they are the same for all the tests.
 static void InitTestConfig(struct MachineControlConfig *c) {
@@ -316,8 +274,7 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
                                      GCodeParserAxis slowAxis) {
   const float kClampFeedrate = 10.0;
   const float kFastFactor = 17;  // Faster axis is faster by this much.
-  const float kRelativeError = 0.1;
-  const float kAbsoluteError = 0;
+  const float kRelativeError = 0.001;
 
   MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
@@ -328,10 +285,12 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
 
   // We set the slow axis acceleration to be kFastFactor times slower
   const float kClampAcceleration = 100;
-  config->acceleration[AXIS_X] =
-    (AXIS_X == slowAxis) ? kClampAcceleration : kClampAcceleration * kFastFactor;
-  config->acceleration[AXIS_Y] =
-    (AXIS_Y == slowAxis) ? kClampAcceleration : kClampAcceleration * kFastFactor;
+  config->acceleration[AXIS_X] = (AXIS_X == slowAxis)
+                                   ? kClampAcceleration
+                                   : kClampAcceleration * kFastFactor;
+  config->acceleration[AXIS_Y] = (AXIS_Y == slowAxis)
+                                   ? kClampAcceleration
+                                   : kClampAcceleration * kFastFactor;
 
   // We want to force one of these to be the defining axis. Since both will
   // travel the same distance, we can achieve that by having one of the axis
@@ -357,8 +316,8 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   const LinearSegmentSteps &constant_speed_section = plantest.segments()[1];
   EXPECT_EQ(constant_speed_section.v0, constant_speed_section.v1);
 
-  const float slow_axis_ratio =
-    (float) constant_speed_section.steps[slowAxis] / constant_speed_section.steps[defining_axis];
+  const float slow_axis_ratio = (float)constant_speed_section.steps[slowAxis] /
+                                constant_speed_section.steps[defining_axis];
 
   // Get the step speed of the axis we're interested in.
   float step_speed_of_interest = constant_speed_section.v0 * slow_axis_ratio;
@@ -366,23 +325,25 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   // Get the acceleration segment accel.
   const LinearSegmentSteps &constant_accel_section = plantest.segments()[0];
   EXPECT_TRUE(constant_accel_section.v0 < constant_accel_section.v1);
-  const double step_accel_of_interest = (sqd(constant_accel_section.v1) - sqd(constant_accel_section.v0)) * slow_axis_ratio
-    / (2.0 * constant_accel_section.steps[defining_axis]);
+  const double step_accel_of_interest =
+    (sqd(constant_accel_section.v1) - sqd(constant_accel_section.v0)) *
+    slow_axis_ratio / (2.0 * constant_accel_section.steps[defining_axis]);
 
   fprintf(stderr,
           "Defining axis: %c speed: defining %.1f ; "
           "slow axis %c speed %.1f, accel %.1f\n",
           gcodep_axis2letter(defining_axis), constant_speed_section.v0,
-          gcodep_axis2letter(slowAxis), step_speed_of_interest, step_accel_of_interest);
+          gcodep_axis2letter(slowAxis), step_speed_of_interest,
+          step_accel_of_interest);
 
   // We have reached the maximum speed we can do. This is, because one of
   // our axes reached its maximum speed it can do. So we expect that axis
   // (the slow axis) to go at exactly the speed it is to be clamped to.
-  EXPECT_NEAR_ABS_AND_REL(kClampFeedrate * config->steps_per_mm[slowAxis],
-                          step_speed_of_interest, kAbsoluteError, kRelativeError);
+  EXPECT_NEAR_REL(kClampFeedrate * config->steps_per_mm[slowAxis],
+                  step_speed_of_interest, kAbsoluteError, kRelativeError);
 
   // Same for accel.
-  EXPECT_NEAR_ABS_AND_REL(kClampAcceleration * config->steps_per_mm[slowAxis],
+  EXPECT_NEAR_REL(kClampAcceleration * config->steps_per_mm[slowAxis],
                   step_accel_of_interest, kAbsoluteError, kRelativeError);
 }
 
