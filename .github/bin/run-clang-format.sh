@@ -7,7 +7,7 @@ FORMAT_OUT=${TMPDIR:-/tmp}/clang-format-diff.out
 #   output as well as last step, then we can exclude less
 #   files here.
 find src -name "*.h" -o -name "*.cc"  \
-    | xargs clang-format -i \
+    | xargs clang-format-11 -i \
             --style="{BasedOnStyle: Google,\
                       ContinuationIndentWidth: 2, \
                       IndentPPDirectives: None,\

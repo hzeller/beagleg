@@ -82,7 +82,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install clang-format
+        sudo apt-get install clang-format-11
         clang-format --version
 
     - name: Run formatting style check
