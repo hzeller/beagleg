@@ -35,7 +35,7 @@ testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
          << rel_error_expr << " evaluates to " << rel_error << ".";
 }
 
-#define EXPECT_NEAR_REL(val1, val2, abs_error, rel_error) \
+#define EXPECT_NEAR_REL(val1, val2, rel_error) \
   EXPECT_PRED_FORMAT3(DoubleNearAbsRelPredFormat, val1, val2, rel_error)
 
 // Set up config that they are the same for all the tests.
@@ -274,7 +274,7 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
                                      GCodeParserAxis slowAxis) {
   const float kClampFeedrate = 10.0;
   const float kFastFactor = 17;  // Faster axis is faster by this much.
-  const float kRelativeError = 0.001;
+  const float kAllowedRelativeError = 0.001;
 
   MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
@@ -340,11 +340,11 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
   // our axes reached its maximum speed it can do. So we expect that axis
   // (the slow axis) to go at exactly the speed it is to be clamped to.
   EXPECT_NEAR_REL(kClampFeedrate * config->steps_per_mm[slowAxis],
-                  step_speed_of_interest, kAbsoluteError, kRelativeError);
+                  step_speed_of_interest, kAllowedRelativeError);
 
   // Same for accel.
   EXPECT_NEAR_REL(kClampAcceleration * config->steps_per_mm[slowAxis],
-                  step_accel_of_interest, kAbsoluteError, kRelativeError);
+                  step_accel_of_interest, kAllowedRelativeError);
 }
 
 // We test all combinations of defining axis and which shall be the slow axis.

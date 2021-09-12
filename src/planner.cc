@@ -71,14 +71,12 @@ static float clamp_defining_axis_limit(const int *axes_steps,
                                        const FloatAxisConfig &steps_per_mm) {
   float new_defining_axis_limit = axes_limits_mm[defining_axis];
   for (const GCodeParserAxis i : AllAxes()) {
+    if (axes_steps[i] == 0) continue;
     const float ratio =
       std::fabs((1.0 * axes_steps[i] * steps_per_mm[defining_axis]) /
                 (axes_steps[defining_axis] * steps_per_mm[i]));
-
-    const float projected_limit =
-      (ratio > 0) ? axes_limits_mm[i] / ratio : new_defining_axis_limit;
-    if (projected_limit < new_defining_axis_limit)
-      new_defining_axis_limit = projected_limit;
+    new_defining_axis_limit =
+      std::min(new_defining_axis_limit, axes_limits_mm[i] / ratio);
   }
   return new_defining_axis_limit * steps_per_mm[defining_axis];
 }
