@@ -52,6 +52,35 @@ struct AxisTarget {
 };
 }  // end anonymous namespace
 
+// Given the desired target speed(or acceleration) of the defining axis and the
+// steps to be performed on all axes, determine if we need to scale down as to
+// not exceed the individual maximum speed or acceleration constraints on any
+// axis. Return the new defining axis limit based on the euclidean motion
+// requested.
+//
+// Example with speed: given i the axis with the highest (relative) out of
+// bounds speed, what's the speed of the defining_axis so that every speed
+// respects i's bounds? We just need to project each speed to the defining
+// axis speed, and pick the smallest.
+//
+// We need to work in mm, since steps is not a uniform unit of space across
+// the different axes.
+static float clamp_defining_axis_limit(const int *axes_steps,
+                                       const FloatAxisConfig &axes_limits_mm,
+                                       enum GCodeParserAxis defining_axis,
+                                       const FloatAxisConfig &steps_per_mm) {
+  float new_defining_axis_limit = axes_limits_mm[defining_axis];
+  for (const GCodeParserAxis i : AllAxes()) {
+    if (axes_steps[i] == 0) continue;
+    const float ratio =
+      std::fabs((1.0 * axes_steps[i] * steps_per_mm[defining_axis]) /
+                (axes_steps[defining_axis] * steps_per_mm[i]));
+    new_defining_axis_limit =
+      std::min(new_defining_axis_limit, axes_limits_mm[i] / ratio);
+  }
+  return new_defining_axis_limit * steps_per_mm[defining_axis];
+}
+
 class Planner::Impl {
  public:
   Impl(const MachineControlConfig *config, HardwareMapping *hardware_mapping,
@@ -69,13 +98,6 @@ class Planner::Impl {
   bool machine_move(const AxesRegister &axis, float feedrate);
   void bring_path_to_halt();
 
-  float acceleration_for_move(const int *axis_steps,
-                              enum GCodeParserAxis defining_axis) {
-    return max_axis_accel_[defining_axis];
-    // TODO: we need to scale the acceleration if one of the other axes could't
-    // deal with it. Look at axis steps for that.
-  }
-
   // Avoid division by zero if there is no config defined for axis.
   double axis_delta_to_mm(const AxisTarget *pos, enum GCodeParserAxis axis) {
     if (cfg_->steps_per_mm[axis] != 0.0)
@@ -88,13 +110,6 @@ class Planner::Impl {
   void GetCurrentPosition(AxesRegister *pos);
   int DirectDrive(GCodeParserAxis axis, float distance, float v0, float v1);
   void SetExternalPosition(GCodeParserAxis axis, float pos);
-
-  // Given the desired target speed of the defining axis and the steps to be
-  // performed on all axes, determine if we need to scale down as to not exceed
-  // the individual maximum speed constraints on any axis. Return the new speed
-  // of the defining axis.
-  double clamp_to_limits(enum GCodeParserAxis defining_axis,
-                         const double target_value, const int *axis_steps);
 
  private:
   const struct MachineControlConfig *const cfg_;
@@ -286,25 +301,6 @@ void Planner::Impl::assign_steps_to_motors(struct LinearSegmentSteps *command,
   hardware_mapping_->AssignMotorSteps(axis, steps, command);
 }
 
-// Example with speed: given i the axis with the highest (relative) out of
-// bounds speed, what's the speed of the defining_axis so that every speed
-// respects i's bounds? The defining axis should be rescaled with this maximum
-// offset. offset = speed_limit[i] / speed[i]
-double Planner::Impl::clamp_to_limits(enum GCodeParserAxis defining_axis,
-                                      const double target_speed,
-                                      const int *axis_steps) {
-  double ratio, max_offset = 1, offset;
-  const FloatAxisConfig &max_axis_speed = cfg_->max_feedrate;
-  const FloatAxisConfig &steps_per_mm = cfg_->steps_per_mm;
-  for (const GCodeParserAxis i : AllAxes()) {
-    ratio = std::fabs((1.0 * axis_steps[i] * steps_per_mm[defining_axis]) /
-                      (axis_steps[defining_axis] * steps_per_mm[i]));
-    offset = ratio > 0 ? max_axis_speed[i] / (target_speed * ratio) : 1;
-    if (offset < max_offset) max_offset = offset;
-  }
-  return target_speed * max_offset;
-}
-
 double Planner::Impl::euclidian_speed(const struct AxisTarget *t) {
   double speed_factor = 1.0;
   if (t->len > 0) {
@@ -370,7 +366,10 @@ bool Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
 
   const int *axis_steps = target_pos->delta_steps;  // shortcut.
   const int abs_defining_axis_steps = abs(axis_steps[defining_axis]);
-  const double a = acceleration_for_move(axis_steps, defining_axis);
+
+  // Max acceleration in (steps/s^2)
+  const double a = clamp_defining_axis_limit(axis_steps, cfg_->acceleration,
+                                             defining_axis, cfg_->steps_per_mm);
   const double peak_speed =
     get_peak_speed(abs_defining_axis_steps, last_speed, next_speed, a);
   assert(peak_speed > 0);
@@ -384,10 +383,9 @@ bool Planner::Impl::move_machine_steps(const struct AxisTarget *last_pos,
 
   // Make sure the target feedrate for the move is clamped to what all the
   // moving axes can reach.
-  double target_feedrate =
-    target_pos->speed / cfg_->steps_per_mm[defining_axis];
-  target_feedrate = clamp_to_limits(defining_axis, target_feedrate, axis_steps);
-  target_pos->speed = target_feedrate * cfg_->steps_per_mm[defining_axis];
+  const double max_speed = clamp_defining_axis_limit(
+    axis_steps, cfg_->max_feedrate, defining_axis, cfg_->steps_per_mm);
+  if (max_speed < target_pos->speed) target_pos->speed = max_speed;
 
   const double accel_fraction =
     (last_speed < target_pos->speed)
