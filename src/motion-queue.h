@@ -86,7 +86,7 @@ namespace internal {
 struct QueueStatus {
   uint32_t counter : 24;  // remaining number of cycles to be performed
   uint32_t index   : 8;   // represent the executing slot [0 to QUEUE_LEN - 1]
-};
+} __attribute__((packed));
 }  // namespace internal
 
 typedef FixedArray<int, MOTION_MOTOR_COUNT> MotorsRegister;
