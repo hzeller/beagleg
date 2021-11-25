@@ -342,7 +342,7 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
     fmt = show_metric ? kMillimeterFormat : kInchFormat;
     measure = StringPrintf(fmt, show_metric ? min : min / 25.4);
     DrawText(measure, 0, size / 10, TextAlign::kCenter, size * 0.6,
-             [draw, size](bool d, float x, float y) { draw(d, -y, x); });
+             [draw](bool d, float x, float y) { draw(d, -y, x); });
     measure = StringPrintf(fmt, show_metric ? max : max / 25.4);
     DrawText(measure, 0, 0, TextAlign::kCenter, size * 0.6,
              [draw, size, width](bool d, float x, float y) {

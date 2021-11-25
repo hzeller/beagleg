@@ -72,7 +72,6 @@ class SimFirmwareAudioQueue::AudioWriter {
  private:
   static constexpr int kSampleRate = 44100;
   uint32_t current_sample_ = 0;
-  uint8_t last_channel_values_ = 0;
   FILE *const out_;
 };
 
