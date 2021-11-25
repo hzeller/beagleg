@@ -91,13 +91,13 @@ bool GCodeParser::Config::SaveParams() const {
   // sorted alphanumerically, which is not the same as numerically. So we
   // simply copy them to a temporary structure that sorts them numerically.
   std::map<int, float> numeric_params;
-  for (const auto name_value : *parameters) {
+  for (const auto& name_value : *parameters) {
     if (name_value.first.empty()) continue;    // Should not happen.
     if (!isdigit(name_value.first[0])) break;  // last one with digit.
     numeric_params[atoi(name_value.first.c_str())] = name_value.second;
   }
 
-  for (const auto num_value : numeric_params) {
+  for (const auto& num_value : numeric_params) {
     if (num_value.first == 0)
       continue;  // Never write this parameter. It should always be zero
     if (num_value.second != 0) {
@@ -108,7 +108,7 @@ bool GCodeParser::Config::SaveParams() const {
 
   // Now, all the non-numeric parmeters
   int start_alpha = pcount;
-  for (const auto name_value : *parameters) {
+  for (const auto& name_value : *parameters) {
     if (name_value.first.empty()) continue;      // Should not happen.
     if (isdigit(name_value.first[0])) continue;  // Numeric: already written
     if (name_value.first[0] != '_') continue;    // Only write global parameters
