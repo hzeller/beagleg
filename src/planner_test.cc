@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cfloat>
+#include <cstddef>
+
 #include "common/logging.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"
@@ -71,7 +74,7 @@ class FakeMotorOperations : public SegmentQueue {
       : config_(config) {}
 
   bool Enqueue(const LinearSegmentSteps &segment) final {
-#if 0
+#if 1
     // Prepare for printing.
 
     // Let's convert the velocities into Euclidian space again.
@@ -82,29 +85,34 @@ class FakeMotorOperations : public SegmentQueue {
     // that are created due to rounding of the accel/decel steps. They
     // should have speeds equal to the last v0.
     bool rounding_glitch = false;
-    if (abs(segment.steps[AXIS_X]) < 2 &&
-        abs(segment.steps[AXIS_Y]) < 2 &&
-        abs(segment.steps[AXIS_Z]) < 2 &&
-        segment.v0 == segment.v1)
+    if (abs(segment.steps[AXIS_X]) < 2 && abs(segment.steps[AXIS_Y]) < 2 &&
+        abs(segment.steps[AXIS_Z]) < 2 && segment.v0 == segment.v1)
       rounding_glitch = true;
 
     // Somewhat verbose, but useful :).
     // The values are calculated back back into actual distances from steps.
     // Speeds are in steps/sec to avoid displaying incorrect speeds for the
     // 'rounding_glitch'.
-    fprintf(stderr, "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
+    fprintf(stderr,
+            "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
             "len: %5.1f ; v: %8.1f -> %8.1f %s %s",
-            euclidian_speeds.steps[AXIS_X] / config_.steps_per_mm[AXIS_X],
-            euclidian_speeds.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-            euclidian_speeds.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
-            hypotenuse,
-            segment.v0, segment.v1,
-            (segment.v0 < segment.v1) ? "accel" :
-            (segment.v0 > segment.v1) ? "decel" : "move",
+            (config_.steps_per_mm[AXIS_X] != 0)
+              ? euclidian_speeds.steps[AXIS_X] / config_.steps_per_mm[AXIS_X]
+              : 0,
+            (config_.steps_per_mm[AXIS_Y] != 0)
+              ? euclidian_speeds.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y]
+              : 0,
+            (config_.steps_per_mm[AXIS_Z] != 0)
+              ? euclidian_speeds.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z]
+              : 0,
+            hypotenuse, segment.v0, segment.v1,
+            (segment.v0 < segment.v1)   ? "accel"
+            : (segment.v0 > segment.v1) ? "decel"
+                                        : "move",
             rounding_glitch ? "rounding GLITCH!" : "");
     if (!rounding_glitch)
-      fprintf(stderr, " ; v: %7.1f -> %7.1f",
-              euclidian_speeds.v0, euclidian_speeds.v1);
+      fprintf(stderr, " ; v: %7.1f -> %7.1f", euclidian_speeds.v0,
+              euclidian_speeds.v1);
     fprintf(stderr, "\n");
 #endif
 
@@ -125,9 +133,15 @@ class FakeMotorOperations : public SegmentQueue {
   // Out of convenience, return back the length of the segment in euclid space
   float FixEuclidSpeed(LinearSegmentSteps *seg) {
     // Real world coordinates
-    const float dx = seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
-    const float dy = seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
-    const float dz = seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
+    const float dx = (config_.steps_per_mm[AXIS_X] != 0)
+                       ? seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X]
+                       : 0;
+    const float dy = (config_.steps_per_mm[AXIS_Y] != 0)
+                       ? seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y]
+                       : 0;
+    const float dz = (config_.steps_per_mm[AXIS_Z] != 0)
+                       ? seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z]
+                       : 0;
     const float hypotenuse = sqrtf(dx * dx + dy * dy + dz * dz);
     GCodeParserAxis defining_axis = AXIS_X;
     for (int i = AXIS_Y; i < AXIS_Z; ++i) {
@@ -487,6 +501,116 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
       if (i < segments.size() - 1) {
         EXPECT_GT(segments[i].v1, 0) << "At angle " << angle;
       }
+    }
+  }
+}
+
+// Check the scenario in which we have two segment steps
+// at the same requested feedrate, but the acceleration is high
+// enough that the previous segment needs a forward pass as well.
+// Currently planned profile for an AxisTarget.
+//    |___________
+//    |   /¯\
+//    |  /   \ v2
+//    | /\    \
+// v0 |/__\____\_________
+//                       t
+TEST(PlannerTest, StraightLine_TwoSegmentsNeedsForwardPass) {}
+
+// Executing multiple short steps on a line should
+// should abide to the provided constraints.
+TEST(PlannerTest, StraightLine_LotsOfSteps) {
+  MachineControlConfig *config = new MachineControlConfig;
+  InitTestConfig(config);
+  PlannerHarness plantest(0, 0, config);
+  unsigned kNumSteps = 10;
+  AxesRegister pos = {};
+
+  for (unsigned i = 0; i < kNumSteps; ++i) {
+    pos[AXIS_X] += 1;
+    plantest.Enqueue(pos, 1000);
+  }
+#if 0
+  for (const auto segment : plantest.segments())
+    VerifySegmentConstraints(*config, segment);
+#endif
+}
+
+// If the queue is empty and we flush it,
+// the outputs segments shoud be a symmetric profile. Either a
+// isosceles trapezoid or a triangle.
+TEST(PlannerTest, StraightLine_SingleSegment) {
+  MachineControlConfig *config = NULL;
+  // Let's set a really high speed. We don't care about the maximum feedrate.
+  // We are going to specify that anyways for each requested segment.
+  const int kMaxFeedrateSteps = 999999;
+  const int kMaxAccelerationSteps = 100;
+  const float kFeedrate = 500;
+
+  // For this simple test we want to use a single axis.
+  const GCodeParserAxis axis = AXIS_X;
+
+  std::vector<LinearSegmentSteps> last_profile;
+
+  // Enqueue a target position.
+  {
+    config = new MachineControlConfig;
+    // Let's keep a 1to1 conversion rate
+    config->steps_per_mm[axis] = 1;
+    // We do different steps/mm to detect problems when going between
+    // euclidian space and step-space.
+    config->max_feedrate[axis] = kMaxFeedrateSteps;
+    config->acceleration[axis] = kMaxAccelerationSteps;  // mm/s^2
+    config->threshold_angle = 0;
+    config->speed_tune_angle = 0;
+    config->require_homing = false;
+
+    PlannerHarness plantest(0, 0, config);
+    AxesRegister pos = {};
+    pos[AXIS_X] = 100;
+    plantest.Enqueue(pos, kFeedrate);
+
+    const auto &segments = plantest.segments();
+    const size_t num_segments = segments.size();
+    EXPECT_TRUE(num_segments > 0);
+    EXPECT_EQ(segments[num_segments - 1].v1, 0);
+    last_profile = segments;
+  }
+
+  config = new MachineControlConfig;
+  config->steps_per_mm[axis] = 1;
+  config->max_feedrate[axis] = kMaxFeedrateSteps;
+  config->acceleration[axis] = kMaxAccelerationSteps;  // mm/s^2
+  config->threshold_angle = 0;
+  config->speed_tune_angle = 0;
+  config->require_homing = false;
+
+  // Enqueue it two times.
+  PlannerHarness plantest(0, 0, config);
+  AxesRegister pos = {};
+  pos[AXIS_X] = 100;
+  plantest.Enqueue(pos, kFeedrate);
+  pos[AXIS_X] *= 2;
+  plantest.Enqueue(pos, kFeedrate);
+
+  const auto &segments = plantest.segments();
+
+  const size_t num_segments = segments.size();
+  EXPECT_TRUE(num_segments > 0);
+  EXPECT_EQ(segments[num_segments - 1].v1, 0);
+
+  // Check that the original profile (with a single target position)
+  // should now be bigger than zero!
+  for (size_t i = 0; i < segments.size(); ++i) {
+    const LinearSegmentSteps &segment = segments[i];
+    if (i == 0) {
+      EXPECT_NEAR_REL(segment.v0, 0, 1e-3);
+      EXPECT_GE(segment.v1, 0);
+    } else if (i == segments.size() - 1) {
+      EXPECT_NEAR_REL(segment.v1, 0, 1e-3);
+      EXPECT_GE(segment.v0, 0);
+    } else {
+      EXPECT_GT(segment.v0, segment.v1);
     }
   }
 }
