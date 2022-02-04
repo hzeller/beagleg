@@ -107,223 +107,361 @@ static const std::map<std::string, const char *> kNamedViews = {
   // Dimetric ? Trimetric ?
 };
 
-namespace {
-extern const char *viridis_colors[];
-extern const char kPSHeader[];
-}  // namespace
-
-// Our classes generally work in two phases. Use some symbolic names here for
-// readability.
-enum class ProcessingStep { Init, Preprocess, GenerateOutput };
-
-// Simple gcode visualizer. Takes the gcode and shows its range.
-// Takes two passes: first determines the bounding box to show axes, second
-// draws within these.
-class GCodePrintVisualizer : public GCodeParser::EventReceiver {
+// Keep track of a range.
+class AxesRange {
  public:
-  GCodePrintVisualizer(FILE *file, const AxesRegister &machine_origin,
-                       const AxesRegister &move_range,
-                       const VisualizationOptions &options)
-      : file_(file), machine_origin_(machine_origin), opts_(options) {
-    if (!opts_.include_machine_bounding_box) {
-      // Make sure that we capture the true ranges of things.
-      // TODO: we can use this later to determine if such axis was used,
-      // e.g. by comparing max < min
-      min_[AXIS_X] = min_[AXIS_Y] = min_[AXIS_Z] = 1e6;
-      max_[AXIS_X] = max_[AXIS_Y] = max_[AXIS_Z] = -1e6;
-    } else {
-      RememberMinMax(move_range);
-    }
+  AxesRange() {
+    min_[AXIS_X] = min_[AXIS_Y] = min_[AXIS_Z] = 1e6;
+    max_[AXIS_X] = max_[AXIS_Y] = max_[AXIS_Z] = -1e6;
   }
 
-  // We have multiple passes to determine ranges first.
-  // Pass 1 - preparation, pass 2 - writing.
-  void SetPass(ProcessingStep p) { pass_ = p; }
-
-  void set_speed_factor(float f) final {}
-  void set_temperature(float f) final {}
-  void set_fanspeed(float speed) final {}
-  void wait_temperature() final {}
-  void motors_enable(bool b) final {}
-  void go_home(AxisBitmap_t axes) final {
-    if (pass_ == ProcessingStep::GenerateOutput) {
-      fprintf(file_, "%f %f %f moveto3d  %% G28\n", machine_origin_[AXIS_X],
-              machine_origin_[AXIS_Y], machine_origin_[AXIS_Z]);
-    }
-    if (opts_.include_machine_origin) RememberMinMax(machine_origin_);
-    just_homed_ = true;
+  // Update with a range we should cover at least.
+  void Update(const AxesRegister &axes) {
+    if (axes[AXIS_X] < min_[AXIS_X]) min_[AXIS_X] = axes[AXIS_X];
+    if (axes[AXIS_Y] < min_[AXIS_Y]) min_[AXIS_Y] = axes[AXIS_Y];
+    if (axes[AXIS_Z] < min_[AXIS_Z]) min_[AXIS_Z] = axes[AXIS_Z];
+    if (axes[AXIS_X] > max_[AXIS_X]) max_[AXIS_X] = axes[AXIS_X];
+    if (axes[AXIS_Y] > max_[AXIS_Y]) max_[AXIS_Y] = axes[AXIS_Y];
+    if (axes[AXIS_Z] > max_[AXIS_Z]) max_[AXIS_Z] = axes[AXIS_Z];
   }
 
-  void inform_origin_offset(const AxesRegister &axes, const char *n) final {
-    if (pass_ == ProcessingStep::GenerateOutput) {
-      ShowNamedOrigin(axes, n);
-#if 0
-      // Should we print an origin marker here ?
-      fprintf(stderr, "Got origin [%f,%f,%f] %s\n",
-              axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], n);
-#endif
-    }
-  }
-  void dwell(float value) final {}
-  bool rapid_move(float feed, const AxesRegister &axes) final {
-    return do_move(true, feed, axes);
+  void ZeroUnusedAxes() {
+    if (min_[AXIS_X] > max_[AXIS_X]) min_[AXIS_X] = max_[AXIS_X] = 0;
+    if (min_[AXIS_Y] > max_[AXIS_Y]) min_[AXIS_Y] = max_[AXIS_Y] = 0;
+    if (min_[AXIS_Z] > max_[AXIS_Z]) min_[AXIS_Z] = max_[AXIS_Z] = 0;
   }
 
-  bool coordinated_move(float feed, const AxesRegister &axes) final {
-    return do_move(false, feed, axes);
+  float midpoint(GCodeParserAxis axis) const {
+    return (max_[axis] + min_[axis]) / 2;
   }
 
-  bool do_move(bool rapid, float feed, const AxesRegister &axes) {
-    // It is possible to just say G1 F100 without any coordinates. But that
-    // causes a call to coordinated move. So if this happens right after a G28
-    // we would still include that coordinate even though we don't mean to.
-    // TODO: there needs to be a callback that just sets the feedrate.
-    if (!opts_.include_machine_origin && axes == machine_origin_) return true;
-    if (pass_ == ProcessingStep::Preprocess) {
-      RememberMinMax(axes);
-    } else {
-      if (rapid != last_move_rapid_) {
-        fprintf(file_, "%s switch-color %.3f setlinewidth %% %s move\n",
-                rapid ? "GcodeRapidMoveColor" : "GcodeMoveColor",
-                rapid ? 0.0 : GetDiagonalLength() / 1000.0,
-                rapid ? "G0 rapid" : "G1 coordinated");
-        last_move_rapid_ = rapid;
-      }
-      const bool not_show_after_home =
-        (just_homed_ && !opts_.include_machine_origin);
-      if (opts_.show_laser_burn && laser_max_ > laser_min_ &&
-          laser_intensity_ != last_laser_intensity_) {
-        const float scaled_intensity =
-          (laser_intensity_ - laser_min_) / (laser_max_ - laser_min_);
-        fprintf(file_, "%.2f setgray ", 1 - scaled_intensity);
-        last_laser_intensity_ = laser_intensity_;
-      }
-      fprintf(file_, "%.3f %.3f %.3f %s\n", axes[AXIS_X], axes[AXIS_Y],
-              axes[AXIS_Z],
-              not_show_after_home ? "moveto3d % post-G28" : "lineto3ds");
-      if (opts_.output_js_vertices)
-        fprintf(stdout, " [%.3f, %.3f, %.3f, %s],\n",  // ThreeJS
-                axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
-                rapid ? "true" : "false");
-    }
-    just_homed_ = false;
-    return true;
-  }
-
-  bool arc_move(float feed_mm_p_sec, GCodeParserAxis normal_axis,
-                bool clockwise, const AxesRegister &start,
-                const AxesRegister &center, const AxesRegister &end) final {
-    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
-      const float line_size = GetDiagonalLength() / 500.0;
-      fprintf(file_,
-              "stroke currentpoint3d\n"  // remember for after the place
-              "currentpoint3d gsave moveto3d\n\t "  // save restore
-              "[%.3f] 0 setdash %.3f setlinewidth "
-              "CurveHelpLinesColor setrgbcolor\n"
-              "\t%f %f %f lineto3d %f %f %f lineto3d stroke\n"
-              "\tgrestore %% end show radius\n"
-              "moveto3d %% go back to last currentpoint3d\n",
-              2 * line_size, line_size, center[AXIS_X], center[AXIS_Y],
-              center[AXIS_Z], end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
-    }
-    // Let the standard arc generation happen.
-    return EventReceiver::arc_move(feed_mm_p_sec, normal_axis, clockwise, start,
-                                   center, end);
-  }
-
-  bool spline_move(float feed_mm_p_sec, const AxesRegister &start,
-                   const AxesRegister &cp1, const AxesRegister &cp2,
-                   const AxesRegister &end) final {
-    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
-      const float line_size = GetDiagonalLength() / 500.0;
-      fprintf(file_,
-              "stroke currentpoint3d\n"  // remember for after the place
-              "currentpoint3d gsave moveto3d\n\t "  // save restore
-              "[%.3f] 0 setdash %.3f setlinewidth "
-              "CurveHelpLinesColor setrgbcolor\n"
-              "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
-              "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
-              "\tgrestore %% end show control points\n"
-              "moveto3d %% going back to last currentpoint3d\n",
-              2 * line_size, line_size, start[AXIS_X], start[AXIS_Y],
-              start[AXIS_Z],
-              // TODO(hzeller): are these points actually only 2D ?
-              cp1[AXIS_X], cp1[AXIS_Y], start[AXIS_Z], cp2[AXIS_X], cp2[AXIS_Y],
-              start[AXIS_Z], end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
-    }
-    return EventReceiver::spline_move(feed_mm_p_sec, start, cp1, cp2, end);
-  }
-
-  void gcode_command_done(char letter, float val) final {
-    // Remember if things were set to inch or metric, so that we can
-    // show dimensions in preferred units.
-    if (letter == 'G') {
-      if (val == 21 || val == 71) {
-        prefer_inch_ = false;
-      } else if (val == 20 || val == 70) {
-        prefer_inch_ = true;
-      }
-    }
-  }
-
-  void change_spindle_speed(float value) final {
-    // Hack to visualize brightness in lasing applications.
-    laser_intensity_ = value;
-    if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
-    if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
-  }
-
-  const char *unprocessed(char letter, float value, const char *remain) final {
-    return NULL;
-  }
-
-  void gcode_start(GCodeParser *parser) final {
-    if (pass_ == ProcessingStep::GenerateOutput) {
-      fprintf(file_, "\n%% -- Path generated from GCode.\n");
-      fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n",
-              GetDiagonalLength() / 1000.0);
-
-      if (opts_.include_machine_origin) {
-        fprintf(file_, "%f %f %f moveto3d  %% Machine origin but not homed.\n",
-                machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
-                machine_origin_[AXIS_Z]);
-      }
-
-      if (opts_.output_js_vertices) {
-        fprintf(stdout, "\n// x, y, z, is_rapid\nvar vertices = [\n");
-      }
-    }
-  }
-
-  void gcode_finished(bool end_of_stream) final {
-    if (pass_ == ProcessingStep::Preprocess) {
-      if (min_[AXIS_X] > max_[AXIS_X]) min_[AXIS_X] = max_[AXIS_X] = 0;
-      if (min_[AXIS_Y] > max_[AXIS_Y]) min_[AXIS_Y] = max_[AXIS_Y] = 0;
-      if (min_[AXIS_Z] > max_[AXIS_Z]) min_[AXIS_Z] = max_[AXIS_Z] = 0;
-    }
-    if (pass_ == ProcessingStep::GenerateOutput && end_of_stream) {
-      fprintf(file_, "stroke\n");
-      fprintf(file_, "%% -- Finished GCode Path.\n");
-
-      if (opts_.output_js_vertices) fprintf(stdout, "];\n");  // ThreeJS
-    }
-  }
-
-  void GetDimensions(float *x, float *y, float *width, float *height) {
-    *width = *height = GetDiagonalLength();
-    *x = -*width / 2;
-    *y = -*width / 2;
-  }
-
-  static float euclid_distance(float x, float y, float z) {
-    return sqrtf(x * x + y * y + z * z);
-  }
-
-  float GetDiagonalLength() {
+  float GetDiagonalLength() const {
     return euclid_distance(max_[AXIS_X] - min_[AXIS_X],
                            max_[AXIS_Y] - min_[AXIS_Y],
                            max_[AXIS_Z] - min_[AXIS_Z]);
   }
+
+  float min(GCodeParserAxis axis) const { return min_[axis]; }
+  float max(GCodeParserAxis axis) const { return max_[axis]; }
+
+ private:
+  static float euclid_distance(float x, float y, float z) {
+    return sqrtf(x * x + y * y + z * z);
+  }
+
+  AxesRegister min_;
+  AxesRegister max_;
+};
+
+class Device {
+ public:
+  Device(FILE *file) : file_(file) {}
+
+  void InitializeLineParameters(float line_width) {
+    fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n", line_width);
+  }
+
+  void DrawGrid(const AxesRange &r, float d) {
+    emit_comment("-- Grid");
+    fprintf(file_, "GcodeGridColor setrgbcolor 0 setlinewidth\n");
+    for (float x = start_grid(r.min(AXIS_X), d); x < r.max(AXIS_X); x += d) {
+      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n", x,
+              r.min(AXIS_Y), r.min(AXIS_Z), x, r.max(AXIS_Y), r.min(AXIS_Z));
+    }
+    for (float y = start_grid(r.min(AXIS_Y), d); y < r.max(AXIS_Y); y += d) {
+      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
+              r.min(AXIS_X), y, r.min(AXIS_Z), r.max(AXIS_X), y, r.min(AXIS_Z));
+    }
+    fprintf(file_, "stroke %% end grid\n");
+  }
+
+  void PrintModelFrame(const AxesRange &r, const VisualizationOptions &opts) {
+    const float size = r.GetDiagonalLength() / 30;
+
+    // The dash corresponds to 1mm in real coordinates only if flat projected.
+    // Maybe we want to adapt that for the projection ?
+    fprintf(file_, "gsave %.2f setlinewidth\n", size / 25);
+
+    // -- this should be a loop
+    fprintf(file_, "\n%% -- Dotted box around item\n");
+    // bottom plane, remaining.
+    fprintf(file_, "0.6 setgray [1] 0 setdash\n");
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.max(AXIS_X),
+            r.min(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X), r.max(AXIS_Y),
+            r.min(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.min(AXIS_X),
+            r.max(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X), r.max(AXIS_Y),
+            r.min(AXIS_Z));
+
+    // upper plane
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.min(AXIS_X),
+            r.min(AXIS_Y), r.max(AXIS_Z), r.min(AXIS_X), r.max(AXIS_Y),
+            r.max(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.max(AXIS_X),
+            r.min(AXIS_Y), r.max(AXIS_Z), r.max(AXIS_X), r.max(AXIS_Y),
+            r.max(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.min(AXIS_X),
+            r.min(AXIS_Y), r.max(AXIS_Z), r.max(AXIS_X), r.min(AXIS_Y),
+            r.max(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.min(AXIS_X),
+            r.max(AXIS_Y), r.max(AXIS_Z), r.max(AXIS_X), r.max(AXIS_Y),
+            r.max(AXIS_Z));
+
+    // corners
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.min(AXIS_X),
+            r.max(AXIS_Y), r.min(AXIS_Z), r.min(AXIS_X), r.max(AXIS_Y),
+            r.max(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.max(AXIS_X),
+            r.min(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X), r.min(AXIS_Y),
+            r.max(AXIS_Z));
+    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", r.max(AXIS_X),
+            r.max(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X), r.max(AXIS_Y),
+            r.max(AXIS_Z));
+
+    // Slightly thicker solid lines
+    fprintf(file_, "stroke [] 0 setdash %.2f setlinewidth\n", size / 20);
+
+    // Primary axes.
+    fprintf(file_, "\n%% -- Solid X/Y/Z marking min-axes...\n");
+    fprintf(file_,
+            "XAxisColor setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            r.min(AXIS_X), r.min(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X),
+            r.min(AXIS_Y), r.min(AXIS_Z));
+    fprintf(file_,
+            "YAxisColor setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            r.min(AXIS_X), r.min(AXIS_Y), r.min(AXIS_Z), r.min(AXIS_X),
+            r.max(AXIS_Y), r.min(AXIS_Z));
+    fprintf(file_,
+            "ZAxisColor setrgbcolor "
+            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
+            r.min(AXIS_X), r.min(AXIS_Y), r.min(AXIS_Z), r.min(AXIS_X),
+            r.min(AXIS_Y), r.max(AXIS_Z));
+
+    fprintf(file_, "grestore\n");
+
+    if (opts.output_js_vertices) {
+      fprintf(stdout, "var item_cube = [");
+      fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
+              r.min(AXIS_X), r.min(AXIS_Y), r.min(AXIS_Z), r.max(AXIS_X),
+              r.max(AXIS_Y), r.max(AXIS_Z));
+    }
+  }
+
+  void ShowMesaureLines(const AxesRange &r, bool prefer_inch,
+                        const VisualizationOptions &opts) {
+    fprintf(file_, "\n%% -- Measurement lines\n");
+    fprintf(file_, "/measurement-lines {\n");
+    const float size = opts.relative_font_size * r.GetDiagonalLength();
+    fprintf(file_, "    %.1f setlinewidth\n", size / 20);
+
+    // Various functions to draw into directon of the axis on given
+    // plane.
+    // TODO(hzeller): depending on view angle, we might choose different
+    // planes to draw stuff on.
+    auto x_xy_draw = [this, r, size](bool do_line, float x, float y) {
+      fprintf(file_, "    %.3f %.3f %.3f %s\n", r.min(AXIS_X) + x,
+              r.min(AXIS_Y) - 1.5 * size + y, r.min(AXIS_Z),
+              do_line ? "lineto3d" : "moveto3d");
+    };
+    auto y_xy_draw = [this, r, size](bool do_line, float x, float y) {
+      fprintf(file_, "    %.3f %.3f %.3f %s\n", r.min(AXIS_X) - y - 1.5 * size,
+              r.min(AXIS_Y) + x, r.min(AXIS_Z),
+              do_line ? "lineto3d" : "moveto3d");
+    };
+    auto z_yz_draw = [this, r, size](bool do_line, float x, float y) {
+      fprintf(file_, "     %.3f %.3f %.3f %s\n", r.min(AXIS_X),
+              r.max(AXIS_Y) + y + 1.5 * size, x + r.min(AXIS_Z),
+              do_line ? "lineto3d" : "moveto3d");
+    };
+#if 0
+    auto z_xz_draw = [this, size](bool do_line, float x, float y) {
+      fprintf(file_, "    %.3f %.3f %.3f %s\n",
+              r.min(AXIS_X)-y-1.5*size, r.max(AXIS_Y),
+              x + r.min(AXIS_Z),
+              do_line ? "lineto3d" : "moveto3d");
+    };
+#endif
+    if (!opts.show_title.empty()) {
+      fprintf(file_, "    %% -- Title '%s'\n", opts.show_title.c_str());
+      fprintf(file_, "    TitleColor setrgbcolor\n");
+      float text_size = size * 0.7;
+      const float text_width = TextWidth(opts.show_title, text_size);
+      const float max_x_space = (r.max(AXIS_X) - r.min(AXIS_X)) - 2 * size;
+      if (text_width > max_x_space) text_size *= max_x_space / text_width;
+      DrawText(opts.show_title, size, 0.3 * size, TextAlign::kLeft, text_size,
+               x_xy_draw);
+      fprintf(file_, "    stroke %% end title\n");
+    }
+    fprintf(file_, "    XAxisColor setrgbcolor               %% X-axis\n");
+    MeasureLine(r.min(AXIS_X), r.max(AXIS_X), size, !prefer_inch, x_xy_draw);
+    fprintf(file_, "    stroke\n\n    YAxisColor setrgbcolor      %% Y-Axis\n");
+    MeasureLine(r.min(AXIS_Y), r.max(AXIS_Y), size, !prefer_inch, y_xy_draw);
+    fprintf(file_, "    stroke\n\n    ZAxisColor setrgbcolor      %% Z-Axis\n");
+    MeasureLine(r.min(AXIS_Z), r.max(AXIS_Z), size, !prefer_inch, z_yz_draw);
+    fprintf(file_, "     stroke\n\n    0 0 0 setrgbcolor\n");
+    fprintf(file_, "} def\n");
+    fprintf(file_, "measurement-lines\n");
+  }
+
+  void ShowNamedOrigin(const AxesRegister &origin, const AxesRange &range,
+                       const VisualizationOptions &opts, const char *named) {
+    fprintf(file_, "\n%% -- Origin %s\n", named);
+    const float size = opts.relative_font_size * range.GetDiagonalLength() / 2;
+    fprintf(file_,
+            "currentpoint3d stroke gsave "
+            "GcodeOriginTextColor setrgbcolor 0 setlinewidth ");
+    DrawText(named, 0, size, TextAlign::kCenter, 1.5 * size,
+             [this, origin](bool d, float x, float y) {
+               fprintf(file_, "%.3f %.3f %.3f %s\n", origin[AXIS_X] + x,
+                       origin[AXIS_Y] + y, origin[AXIS_Z],
+                       d ? "lineto3d" : "moveto3d");
+             });
+    fprintf(file_, "stroke GcodeOriginMarkColor setrgbcolor\n");
+    const float x = origin[AXIS_X];
+    const float y = origin[AXIS_Y];
+    const float z = origin[AXIS_Z];
+
+    // Octagon with bottom-left quadrant filled.
+    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - size, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - 0.707 * size,
+            y - 0.707 * size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y - size, z);
+    fprintf(file_, "closepath fill\n");
+    // remaining part, non-filled.
+    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y - size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + 0.707 * size,
+            y - 0.707 * size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + size, y, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + 0.707 * size,
+            y + 0.707 * size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y + size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - 0.707 * size,
+            y + 0.707 * size, z);
+    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - size, y, z);
+    fprintf(file_, "stroke grestore moveto3d\n");
+  }
+
+  void ShowHomePos(const AxesRegister &origin, const AxesRange &range) {
+    fprintf(file_, "\n%% -- Machine home\n");
+    const float size = range.GetDiagonalLength() / 200;  // 0.5%
+    fprintf(file_,
+            "currentpoint3d stroke gsave "
+            "GcodeOriginMarkColor setrgbcolor %.3f setlinewidth ",
+            size);
+    fprintf(file_,
+            "XAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% X\n",
+            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
+            origin[AXIS_X] + 10 * size, origin[AXIS_Y], origin[AXIS_Z]);
+    fprintf(file_,
+            "YAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% Y\n",
+            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z], origin[AXIS_X],
+            origin[AXIS_Y] + 10 * size, origin[AXIS_Z]);
+    fprintf(file_,
+            "ZAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
+            "stroke %% Z\n",
+            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z], origin[AXIS_X],
+            origin[AXIS_Y], origin[AXIS_Z] + 10 * size);
+
+    fprintf(file_, "grestore moveto3d\n");
+  }
+
+  void PrintPostscriptBoundingBox(float margin_x, float margin_y, float scale,
+                                  float boundingbox_width, const AxesRange &r) {
+    // gs is notoriously bad in dealing with negative origin of the bounding
+    // box, so move everything up with the translation box.
+    const float range = 1.05 * r.GetDiagonalLength();
+    if (boundingbox_width > 0) {
+      scale = boundingbox_width / (range + margin_x);
+    }
+    const int bb_width = ToPoint(scale * (range + margin_x));
+    const int bb_height = ToPoint(scale * (range + margin_y));
+    fprintf(file_,
+            "%%!PS-Adobe-3.0 EPSF-3.0\n"
+            "%%%%BoundingBox: %d %d %d %d\n",
+            0, 0, bb_width, bb_height);
+    fprintf(file_,
+            "/per-page-setup {%.3f %.3f translate "
+            "72 25.4 div dup scale %.3f dup scale} def\n",
+            ToPoint(scale * (range + margin_x) / 2),
+            ToPoint(scale * (range + margin_y) / 2), scale);
+  }
+
+  void emit_comment(const char *comment) {
+    fprintf(file_, "\n%% %s\n", comment);
+  }
+  void moveto(float x, float y, float z, const char *comment = nullptr) {
+    fprintf(file_, "%f %f %f moveto3d%s%s\n", x, y, z, comment ? "  % " : "",
+            comment ? comment : "");
+  }
+  void lineto(float x, float y, float z, const char *comment = nullptr) {
+    fprintf(file_, "%.3f %.3f %.3f lineto3d %s%s\n", x, y, z,
+            comment ? "% " : "", comment ? comment : "");
+  }
+
+  void lineto_s(float x, float y, float z) {
+    fprintf(file_, "%.3f %.3f %.3f lineto3ds\n", x, y, z);
+  }
+
+  void switch_color(const char *color) {
+    fprintf(file_, "%s switch-color ", color);
+  }
+  void set_color(const char *color) {
+    fprintf(file_, "%s setrgbcolor ", color);
+  }
+
+  // Shows little dotted lines to indicate the radius.
+  void ShowArcHelpLines(const AxesRegister &center, const AxesRegister &end,
+                        const AxesRange &range) {
+    const float line_size = range.GetDiagonalLength() / 500.0;
+    fprintf(file_,
+            "stroke currentpoint3d\n"  // remember for after the place
+            "currentpoint3d gsave moveto3d\n\t "  // save restore
+            "[%.3f] 0 setdash %.3f setlinewidth "
+            "CurveHelpLinesColor setrgbcolor\n"
+            "\t%f %f %f lineto3d %f %f %f lineto3d stroke\n"
+            "\tgrestore %% end show radius\n"
+            "moveto3d %% go back to last currentpoint3d\n",
+            2 * line_size, line_size, center[AXIS_X], center[AXIS_Y],
+            center[AXIS_Z], end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
+  }
+
+  // Shows little dotted lines to indicate the control points.
+  void ShowSplineHelpLines(const AxesRegister &start, const AxesRegister &cp1,
+                           const AxesRegister &cp2, const AxesRegister &end,
+                           const AxesRange &range) {
+    const float line_size = range.GetDiagonalLength() / 500.0;
+    fprintf(file_,
+            "stroke currentpoint3d\n"  // remember for after the place
+            "currentpoint3d gsave moveto3d\n\t "  // save restore
+            "[%.3f] 0 setdash %.3f setlinewidth "
+            "CurveHelpLinesColor setrgbcolor\n"
+            "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
+            "\t%f %f %f moveto3d %f %f %f lineto3d stroke\n"
+            "\tgrestore %% end show control points\n"
+            "moveto3d %% going back to last currentpoint3d\n",
+            2 * line_size, line_size, start[AXIS_X], start[AXIS_Y],
+            start[AXIS_Z],
+            // TODO(hzeller): are these points actually only 2D ?
+            cp1[AXIS_X], cp1[AXIS_Y], start[AXIS_Z], cp2[AXIS_X], cp2[AXIS_Y],
+            start[AXIS_Z], end[AXIS_X], end[AXIS_Y], end[AXIS_Z]);
+  }
+
+  // TODO: needs better name, less Postscript-specific
+  void stroke() { fprintf(file_, "stroke\n"); }
+
+  void set_move_style(bool rapid, float line_width) {
+    fprintf(file_, "%s switch-color %.3f setlinewidth %% %s move\n",
+            rapid ? "GcodeRapidMoveColor" : "GcodeMoveColor",
+            rapid ? 0.0 : line_width, rapid ? "G0 rapid" : "G1 coordinated");
+  }
+
+  // Set intensity of line, e.g. for laser engraving.
+  void set_intensity(float value) { fprintf(file_, "%.2f setgray ", value); }
 
   void MeasureLine(float min, float max, float size, bool show_metric,
                    std::function<void(bool do_line, float c1, float c2)> draw) {
@@ -350,19 +488,96 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
              });
   }
 
-  void PrintHeader(float margin, float eye_distance, int animation_frames) {
-    fprintf(file_, "\n%% Center of display cube; origin of all rotations.\n");
-    fprintf(file_, "/center-x %.3f def %% [%.1f %.1f]\n",
-            (max_[AXIS_X] + min_[AXIS_X]) / 2, min_[AXIS_X], max_[AXIS_X]);
-    fprintf(file_, "/center-y %.3f def %% [%.1f %.1f]\n",
-            (max_[AXIS_Y] + min_[AXIS_Y]) / 2, min_[AXIS_Y], max_[AXIS_Y]);
-    fprintf(file_, "/center-z %.3f def %% [%.1f %.1f]\n",
-            (max_[AXIS_Z] + min_[AXIS_Z]) / 2, min_[AXIS_Z], max_[AXIS_Z]);
+  static const char *get_color_for_index(int index) {
+    return viridis_colors[index];
+  }
+
+  void PrintColorLegend(float x, float y, float width, float min_color_range,
+                        float max_color_range, float min_v, float max_v) {
+    const float barheight = 0.05 * width;
+    const float fontsize = barheight * 0.5;
+    y -= barheight;
+    fprintf(file_, "\n%% -- Color range visualization colorchart\n");
+    fprintf(file_, "gsave /Helvetica findfont %.2f scalefont setfont\n",
+            fontsize);
+    fprintf(file_, "0 setgray 0 setlinewidth\n");
+    fprintf(file_, "%.1f %.1f moveto (mm/s) show\n", x + width + 1,
+            y - fontsize / 2);
+    fprintf(file_,
+            "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto "
+            "(<=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+            x, y, barheight, min_color_range);
+
+    const int kLegendPartitions = 6;
+    for (int i = 1; i < kLegendPartitions; ++i) {
+      float val = i * (max_color_range - min_color_range) / kLegendPartitions;
+      float pos = i * width / kLegendPartitions;
+      fprintf(file_,
+              "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto "
+              "(%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+              x + pos, y, barheight, min_color_range + val);
+    }
+    fprintf(file_,
+            "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto"
+            "(>=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
+            x + width, y, barheight, max_color_range);
+
+    fprintf(file_, "\n%% -- paint gradient\n");
+    const float step = width / 256;
+    fprintf(file_, "%.3f setlinewidth %.1f %.1f moveto\n", barheight, x, y);
+    for (int i = 0; i < 256; ++i) {
+      // little overlap of 0.1, seems that the postscript interpreter otherwise
+      // might leave little gaps.
+      fprintf(file_,
+              "%s setrgbcolor %f 0.1 add 0 rlineto currentpoint stroke moveto "
+              "-0.1 0 rmoveto\n",
+              get_color_for_index(i), step);
+    }
+    fprintf(file_, "0 0 0 setrgbcolor  %% Done with gradient\n");
+
+    // Show min/max range.
+    fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
+            fontsize * 0.75);
+    fprintf(file_,
+            "%.1f %.1f moveto (max %.1f mm/s) dup "
+            "stringwidth pop neg 0 rmoveto show\n",
+            x + width + 1, y - barheight, max_v);
+    fprintf(file_, "%.1f %.1f moveto (min %.1f mm/s) show\n", x, y - barheight,
+            min_v);
+
+    fprintf(file_, "grestore\n");
+  }
+
+  void StartMachinePath(float tool_dia, const VisualizationOptions &opts) {
+    fprintf(file_, "\n%% -- Machine path. %s\n",
+            opts.show_speeds ? "Visualizing travel speeds" : "Simple.");
+    fprintf(file_,
+            "%% Note, larger tool diameters slow down "
+            "PostScript interpreters a lot!\n");
+    fprintf(file_, "/tool-diameter %.2f def\n\n", tool_dia);
+
+    fprintf(file_, "tool-diameter setlinewidth\n");
+    fprintf(file_, "0 0 0 moveto3d\n");
+    if (!opts.show_speeds) {
+      fprintf(file_, "MachineMoveColor setrgbcolor\n");
+    }
+    fprintf(file_, "1 setlinejoin\n");
+  }
+
+  void PrintHeader(const AxesRange &r, float margin, float eye_distance,
+                   int animation_frames) {
+    emit_comment("Center of display cube; origin of all rotations.");
+    fprintf(file_, "/center-x %.3f def %% [%.1f %.1f]\n", r.midpoint(AXIS_X),
+            r.min(AXIS_X), r.max(AXIS_X));
+    fprintf(file_, "/center-y %.3f def %% [%.1f %.1f]\n", r.midpoint(AXIS_Y),
+            r.min(AXIS_Y), r.max(AXIS_Y));
+    fprintf(file_, "/center-z %.3f def %% [%.1f %.1f]\n", r.midpoint(AXIS_Z),
+            r.min(AXIS_Z), r.max(AXIS_Z));
     // TODO(hzeller): this certainly needs to take scale and such into
     // account.
     fprintf(file_, "\n%% If larger than zero, shows perspective\n");
     fprintf(file_, "/perspective-eye-distance %.1f def\n",
-            eye_distance > 0 ? eye_distance + GetDiagonalLength() / 2 : -1);
+            eye_distance > 0 ? eye_distance + r.GetDiagonalLength() / 2 : -1);
 
     if (animation_frames > 0) {
       fprintf(file_, "%s", R"(
@@ -400,7 +615,7 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
       {"/ZAxisColor", "0.4 0.4 0.8"},
     };
 
-    fprintf(file_, "%% -- Color choices\n");
+    emit_comment("-- Color choices");
     for (auto c : kDefaultColors) {
       fprintf(file_, "%s { %s } def\n", c.color,
               fixed_color ? fixed_color : c.default_value);
@@ -408,253 +623,194 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
     fprintf(file_, "\n\n");
   }
 
+ private:
+  static const char kPSHeader[];
+  static const char *viridis_colors[];
+
   static float start_grid(float min_value, float grid) {
     const float offset = fmod(min_value, grid);
     const float start = min_value - offset;
     return start < min_value ? start + grid : start;
   }
-
-  void DrawGrid(float d) {
-    fprintf(file_, "\n%% -- Grid\n");
-    fprintf(file_, "GcodeGridColor setrgbcolor 0 setlinewidth\n");
-    for (float x = start_grid(min_[AXIS_X], d); x < max_[AXIS_X]; x += d) {
-      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n", x,
-              min_[AXIS_Y], min_[AXIS_Z], x, max_[AXIS_Y], min_[AXIS_Z]);
-    }
-    for (float y = start_grid(min_[AXIS_Y], d); y < max_[AXIS_Y]; y += d) {
-      fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
-              min_[AXIS_X], y, min_[AXIS_Z], max_[AXIS_X], y, min_[AXIS_Z]);
-    }
-    fprintf(file_, "stroke %% end grid\n");
-  }
-
-  void PrintModelFrame() {
-    const float size = GetDiagonalLength() / 30;
-
-    // The dash corresponds to 1mm in real coordinates only if flat projected.
-    // Maybe we want to adapt that for the projection ?
-    fprintf(file_, "gsave %.2f setlinewidth\n", size / 25);
-
-    // -- this should be a loop
-    fprintf(file_, "\n%% -- Dotted box around item\n");
-    // bottom plane, remaining.
-    fprintf(file_, "0.6 setgray [1] 0 setdash\n");
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", max_[AXIS_X],
-            min_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X], max_[AXIS_Y],
-            min_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", min_[AXIS_X],
-            max_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X], max_[AXIS_Y],
-            min_[AXIS_Z]);
-
-    // upper plane
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", min_[AXIS_X],
-            min_[AXIS_Y], max_[AXIS_Z], min_[AXIS_X], max_[AXIS_Y],
-            max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", max_[AXIS_X],
-            min_[AXIS_Y], max_[AXIS_Z], max_[AXIS_X], max_[AXIS_Y],
-            max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", min_[AXIS_X],
-            min_[AXIS_Y], max_[AXIS_Z], max_[AXIS_X], min_[AXIS_Y],
-            max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", min_[AXIS_X],
-            max_[AXIS_Y], max_[AXIS_Z], max_[AXIS_X], max_[AXIS_Y],
-            max_[AXIS_Z]);
-
-    // corners
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", min_[AXIS_X],
-            max_[AXIS_Y], min_[AXIS_Z], min_[AXIS_X], max_[AXIS_Y],
-            max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", max_[AXIS_X],
-            min_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X], min_[AXIS_Y],
-            max_[AXIS_Z]);
-    fprintf(file_, "%f %f %f moveto3d %f %f %f lineto3d\n", max_[AXIS_X],
-            max_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X], max_[AXIS_Y],
-            max_[AXIS_Z]);
-
-    // Slightly thicker solid lines
-    fprintf(file_, "stroke [] 0 setdash %.2f setlinewidth\n", size / 20);
-
-    // Primary axes.
-    fprintf(file_, "\n%% -- Solid X/Y/Z marking min-axes...\n");
-    fprintf(file_,
-            "XAxisColor setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X],
-            min_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_,
-            "YAxisColor setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z], min_[AXIS_X],
-            max_[AXIS_Y], min_[AXIS_Z]);
-    fprintf(file_,
-            "ZAxisColor setrgbcolor "
-            "%f %f %f moveto3d %f %f %f lineto3d stroke\n",
-            min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z], min_[AXIS_X],
-            min_[AXIS_Y], max_[AXIS_Z]);
-
-    fprintf(file_, "grestore\n");
-
-    if (opts_.output_js_vertices) {
-      fprintf(stdout, "var item_cube = [");
-      fprintf(stdout, "[%.3f, %.3f, %.3f], [%.3f, %.3f, %.3f]];\n",
-              min_[AXIS_X], min_[AXIS_Y], min_[AXIS_Z], max_[AXIS_X],
-              max_[AXIS_Y], max_[AXIS_Z]);
-    }
-  }
-
-  void ShowMesaureLines() {
-    fprintf(file_, "\n%% -- Measurement lines\n");
-    fprintf(file_, "/measurement-lines {\n");
-    const float size = opts_.relative_font_size * GetDiagonalLength();
-    fprintf(file_, "    %.1f setlinewidth\n", size / 20);
-
-    // Various functions to draw into directon of the axis on given
-    // plane.
-    // TODO(hzeller): depending on view angle, we might choose different
-    // planes to draw stuff on.
-    auto x_xy_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "    %.3f %.3f %.3f %s\n", min_[AXIS_X] + x,
-              min_[AXIS_Y] - 1.5 * size + y, min_[AXIS_Z],
-              do_line ? "lineto3d" : "moveto3d");
-    };
-    auto y_xy_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "    %.3f %.3f %.3f %s\n", min_[AXIS_X] - y - 1.5 * size,
-              min_[AXIS_Y] + x, min_[AXIS_Z],
-              do_line ? "lineto3d" : "moveto3d");
-    };
-    auto z_yz_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "     %.3f %.3f %.3f %s\n", min_[AXIS_X],
-              max_[AXIS_Y] + y + 1.5 * size, x + min_[AXIS_Z],
-              do_line ? "lineto3d" : "moveto3d");
-    };
-#if 0
-    auto z_xz_draw = [this, size](bool do_line, float x, float y) {
-      fprintf(file_, "    %.3f %.3f %.3f %s\n",
-              min_[AXIS_X]-y-1.5*size, max_[AXIS_Y],
-              x + min_[AXIS_Z],
-              do_line ? "lineto3d" : "moveto3d");
-    };
-#endif
-    if (!opts_.show_title.empty()) {
-      fprintf(file_, "    %% -- Title '%s'\n", opts_.show_title.c_str());
-      fprintf(file_, "    TitleColor setrgbcolor\n");
-      float text_size = size * 0.7;
-      const float text_width = TextWidth(opts_.show_title, text_size);
-      const float max_x_space = (max_[AXIS_X] - min_[AXIS_X]) - 2 * size;
-      if (text_width > max_x_space) text_size *= max_x_space / text_width;
-      DrawText(opts_.show_title, size, 0.3 * size, TextAlign::kLeft, text_size,
-               x_xy_draw);
-      fprintf(file_, "    stroke %% end title\n");
-    }
-    fprintf(file_, "    XAxisColor setrgbcolor               %% X-axis\n");
-    MeasureLine(min_[AXIS_X], max_[AXIS_X], size, !prefer_inch_, x_xy_draw);
-    fprintf(file_, "    stroke\n\n    YAxisColor setrgbcolor      %% Y-Axis\n");
-    MeasureLine(min_[AXIS_Y], max_[AXIS_Y], size, !prefer_inch_, y_xy_draw);
-    fprintf(file_, "    stroke\n\n    ZAxisColor setrgbcolor      %% Z-Axis\n");
-    MeasureLine(min_[AXIS_Z], max_[AXIS_Z], size, !prefer_inch_, z_yz_draw);
-    fprintf(file_, "     stroke\n\n    0 0 0 setrgbcolor\n");
-    fprintf(file_, "} def\n");
-    fprintf(file_, "measurement-lines\n");
-  }
-
-  void ShowNamedOrigin(const AxesRegister &origin, const char *named) {
-    fprintf(file_, "\n%% -- Origin %s\n", named);
-    const float size = opts_.relative_font_size * GetDiagonalLength() / 2;
-    fprintf(file_,
-            "currentpoint3d stroke gsave "
-            "GcodeOriginTextColor setrgbcolor 0 setlinewidth ");
-    DrawText(named, 0, size, TextAlign::kCenter, 1.5 * size,
-             [this, origin](bool d, float x, float y) {
-               fprintf(file_, "%.3f %.3f %.3f %s\n", origin[AXIS_X] + x,
-                       origin[AXIS_Y] + y, origin[AXIS_Z],
-                       d ? "lineto3d" : "moveto3d");
-             });
-    fprintf(file_, "stroke GcodeOriginMarkColor setrgbcolor\n");
-    const float x = origin[AXIS_X];
-    const float y = origin[AXIS_Y];
-    const float z = origin[AXIS_Z];
-
-    // Octagon with bottom-left quadrant filled.
-    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - size, y, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - 0.707 * size,
-            y - 0.707 * size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y - size, z);
-    fprintf(file_, "closepath fill\n");
-    // remaining part, non-filled.
-    fprintf(file_, "%.3f %.3f %.3f moveto3d\n", x, y - size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + 0.707 * size,
-            y - 0.707 * size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + size, y, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x + 0.707 * size,
-            y + 0.707 * size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x, y + size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - 0.707 * size,
-            y + 0.707 * size, z);
-    fprintf(file_, "%.3f %.3f %.3f lineto3d\n", x - size, y, z);
-    fprintf(file_, "stroke grestore moveto3d\n");
-  }
-
-  void ShowHomePos(const AxesRegister &origin) {
-    fprintf(file_, "\n%% -- Machine home\n");
-    const float size = GetDiagonalLength() / 200;  // 0.5%
-    fprintf(file_,
-            "currentpoint3d stroke gsave "
-            "GcodeOriginMarkColor setrgbcolor %.3f setlinewidth ",
-            size);
-    fprintf(file_,
-            "XAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
-            "stroke %% X\n",
-            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z],
-            origin[AXIS_X] + 10 * size, origin[AXIS_Y], origin[AXIS_Z]);
-    fprintf(file_,
-            "YAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
-            "stroke %% Y\n",
-            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z], origin[AXIS_X],
-            origin[AXIS_Y] + 10 * size, origin[AXIS_Z]);
-    fprintf(file_,
-            "ZAxisColor setrgbcolor %f %f %f moveto3d %f %f %f lineto3d "
-            "stroke %% Z\n",
-            origin[AXIS_X], origin[AXIS_Y], origin[AXIS_Z], origin[AXIS_X],
-            origin[AXIS_Y], origin[AXIS_Z] + 10 * size);
-
-    fprintf(file_, "grestore moveto3d\n");
-  }
-
-  void PrintPostscriptBoundingBox(float margin_x, float margin_y, float scale,
-                                  float boundingbox_width) {
-    // gs is notoriously bad in dealing with negative origin of the bounding
-    // box, so move everything up with the translation box.
-    const float range = 1.05 * GetDiagonalLength();
-    if (boundingbox_width > 0) {
-      scale = boundingbox_width / (range + margin_x);
-    }
-    const int bb_width = ToPoint(scale * (range + margin_x));
-    const int bb_height = ToPoint(scale * (range + margin_y));
-    fprintf(file_,
-            "%%!PS-Adobe-3.0 EPSF-3.0\n"
-            "%%%%BoundingBox: %d %d %d %d\n",
-            0, 0, bb_width, bb_height);
-    fprintf(file_,
-            "/per-page-setup {%.3f %.3f translate "
-            "72 25.4 div dup scale %.3f dup scale} def\n",
-            ToPoint(scale * (range + margin_x) / 2),
-            ToPoint(scale * (range + margin_y) / 2), scale);
-  }
-
- private:
-  void RememberMinMax(const AxesRegister &axes) {
-    if (axes[AXIS_X] < min_[AXIS_X]) min_[AXIS_X] = axes[AXIS_X];
-    if (axes[AXIS_Y] < min_[AXIS_Y]) min_[AXIS_Y] = axes[AXIS_Y];
-    if (axes[AXIS_Z] < min_[AXIS_Z]) min_[AXIS_Z] = axes[AXIS_Z];
-    if (axes[AXIS_X] > max_[AXIS_X]) max_[AXIS_X] = axes[AXIS_X];
-    if (axes[AXIS_Y] > max_[AXIS_Y]) max_[AXIS_Y] = axes[AXIS_Y];
-    if (axes[AXIS_Z] > max_[AXIS_Z]) max_[AXIS_Z] = axes[AXIS_Z];
-  }
-
   static float ToPoint(float mm) { return roundf(mm / 25.4 * 72); }
 
   FILE *const file_;
+};
+
+// Our classes generally work in two phases. Use some symbolic names here for
+// readability.
+enum class ProcessingStep { Init, Preprocess, GenerateOutput };
+
+// Simple gcode visualizer. Takes the gcode and shows its range.
+// Takes two passes: first determines the bounding box to show axes, second
+// draws within these.
+class GCodePrintVisualizer : public GCodeParser::EventReceiver {
+ public:
+  GCodePrintVisualizer(Device *device, const AxesRegister &machine_origin,
+                       const AxesRegister &move_range,
+                       const VisualizationOptions &options)
+      : device_(device), machine_origin_(machine_origin), opts_(options) {
+    if (opts_.include_machine_bounding_box) {
+      range_.Update(move_range);
+    }
+  }
+
+  const AxesRange &range() const { return range_; }
+  bool inch_system() const { return prefer_inch_; }
+
+  // We have multiple passes to determine ranges first.
+  // Pass 1 - preparation, pass 2 - writing.
+  void SetPass(ProcessingStep p) { pass_ = p; }
+
+  void set_speed_factor(float f) final {}
+  void set_temperature(float f) final {}
+  void set_fanspeed(float speed) final {}
+  void wait_temperature() final {}
+  void motors_enable(bool b) final {}
+  void go_home(AxisBitmap_t axes) final {
+    if (pass_ == ProcessingStep::GenerateOutput) {
+      device_->moveto(machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
+                      machine_origin_[AXIS_Z], "G28");
+    }
+    if (opts_.include_machine_origin) range_.Update(machine_origin_);
+    just_homed_ = true;
+  }
+
+  void inform_origin_offset(const AxesRegister &axes, const char *n) final {
+    if (pass_ == ProcessingStep::GenerateOutput) {
+      device_->ShowNamedOrigin(axes, range_, opts_, n);
+#if 0
+      // Should we print an origin marker here ?
+      fprintf(stderr, "Got origin [%f,%f,%f] %s\n",
+              axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], n);
+#endif
+    }
+  }
+  void dwell(float value) final {}
+  bool rapid_move(float feed, const AxesRegister &axes) final {
+    return do_move(true, feed, axes);
+  }
+
+  bool coordinated_move(float feed, const AxesRegister &axes) final {
+    return do_move(false, feed, axes);
+  }
+
+  bool do_move(bool rapid, float feed, const AxesRegister &axes) {
+    // It is possible to just say G1 F100 without any coordinates. But that
+    // causes a call to coordinated move. So if this happens right after a G28
+    // we would still include that coordinate even though we don't mean to.
+    // TODO: there needs to be a callback that just sets the feedrate.
+    if (!opts_.include_machine_origin && axes == machine_origin_) return true;
+    if (pass_ == ProcessingStep::Preprocess) {
+      range_.Update(axes);
+    } else {
+      if (rapid != last_move_rapid_) {
+        device_->set_move_style(rapid, range_.GetDiagonalLength() / 1000.0);
+        last_move_rapid_ = rapid;
+      }
+      const bool not_show_after_home =
+        (just_homed_ && !opts_.include_machine_origin);
+      if (opts_.show_laser_burn && laser_max_ > laser_min_ &&
+          laser_intensity_ != last_laser_intensity_) {
+        const float scaled_intensity =
+          (laser_intensity_ - laser_min_) / (laser_max_ - laser_min_);
+        device_->set_intensity(1 - scaled_intensity);
+        last_laser_intensity_ = laser_intensity_;
+      }
+      if (not_show_after_home) {
+        device_->moveto(axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z], "post-G28");
+      } else {
+        device_->lineto_s(axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z]);
+      }
+      if (opts_.output_js_vertices)
+        fprintf(stdout, " [%.3f, %.3f, %.3f, %s],\n",  // ThreeJS
+                axes[AXIS_X], axes[AXIS_Y], axes[AXIS_Z],
+                rapid ? "true" : "false");
+    }
+    just_homed_ = false;
+    return true;
+  }
+
+  bool arc_move(float feed_mm_p_sec, GCodeParserAxis normal_axis,
+                bool clockwise, const AxesRegister &start,
+                const AxesRegister &center, const AxesRegister &end) final {
+    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
+      device_->ShowArcHelpLines(center, end, range_);
+    }
+    // Let the standard arc generation happen.
+    return EventReceiver::arc_move(feed_mm_p_sec, normal_axis, clockwise, start,
+                                   center, end);
+  }
+
+  bool spline_move(float feed_mm_p_sec, const AxesRegister &start,
+                   const AxesRegister &cp1, const AxesRegister &cp2,
+                   const AxesRegister &end) final {
+    if (pass_ == ProcessingStep::GenerateOutput && opts_.show_ijk) {
+      device_->ShowSplineHelpLines(start, cp1, cp2, end, range_);
+    }
+    return EventReceiver::spline_move(feed_mm_p_sec, start, cp1, cp2, end);
+  }
+
+  void gcode_command_done(char letter, float val) final {
+    // Remember if things were set to inch or metric, so that we can
+    // show dimensions in preferred units.
+    if (letter == 'G') {
+      if (val == 21 || val == 71) {
+        prefer_inch_ = false;
+      } else if (val == 20 || val == 70) {
+        prefer_inch_ = true;
+      }
+    }
+  }
+
+  void change_spindle_speed(float value) final {
+    // Hack to visualize brightness in lasing applications.
+    laser_intensity_ = value;
+    if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
+    if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
+  }
+
+  const char *unprocessed(char letter, float value, const char *remain) final {
+    return NULL;
+  }
+
+  void gcode_start(GCodeParser *parser) final {
+    if (pass_ == ProcessingStep::GenerateOutput) {
+      device_->emit_comment("-- Path generated from GCode.");
+      device_->InitializeLineParameters(range_.GetDiagonalLength() / 1000.0);
+
+      if (opts_.include_machine_origin) {
+        device_->moveto(machine_origin_[AXIS_X], machine_origin_[AXIS_Y],
+                        machine_origin_[AXIS_Z],
+                        "Machine origin but not homed.");
+      }
+
+      if (opts_.output_js_vertices) {
+        fprintf(stdout, "\n// x, y, z, is_rapid\nvar vertices = [\n");
+      }
+    }
+  }
+
+  void gcode_finished(bool end_of_stream) final {
+    if (pass_ == ProcessingStep::Preprocess) {
+      range_.ZeroUnusedAxes();
+    }
+    if (pass_ == ProcessingStep::GenerateOutput && end_of_stream) {
+      device_->stroke();
+      device_->emit_comment("-- Finished GCode Path.");
+
+      if (opts_.output_js_vertices) fprintf(stdout, "];\n");  // ThreeJS
+    }
+  }
+
+  void GetDimensions(float *x, float *y, float *width, float *height) {
+    *width = *height = range_.GetDiagonalLength();
+    *x = -*width / 2;
+    *y = -*width / 2;
+  }
+
+ private:
+  Device *const device_;
   const AxesRegister machine_origin_;
   const VisualizationOptions opts_;
 
@@ -665,8 +821,7 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
   bool just_homed_ = true;
 
   float laser_min_ = 1e6, laser_max_ = -1e6;
-  AxesRegister min_;
-  AxesRegister max_;
+  AxesRange range_;
   ProcessingStep pass_ = ProcessingStep::Init;
   bool prefer_inch_ = false;
 };
@@ -678,22 +833,10 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 // parser spits out.
 class SegmentQueuePrinter : public SegmentQueue {
  public:
-  SegmentQueuePrinter(FILE *file, const MachineControlConfig &config,
+  SegmentQueuePrinter(Device *device, const MachineControlConfig &config,
                       float tool_dia, const VisualizationOptions &options)
-      : file_(file), config_(config), opts_(options) {
-    fprintf(file_, "\n%% -- Machine path. %s\n",
-            opts_.show_speeds ? "Visualizing travel speeds" : "Simple.");
-    fprintf(file_,
-            "%% Note, larger tool diameters slow down "
-            "PostScript interpreters a lot!\n");
-    fprintf(file_, "/tool-diameter %.2f def\n\n", tool_dia);
-
-    fprintf(file_, "tool-diameter setlinewidth\n");
-    fprintf(file_, "0 0 0 moveto3d\n");
-    if (!opts_.show_speeds) {
-      fprintf(file_, "MachineMoveColor setrgbcolor\n");
-    }
-    fprintf(file_, "1 setlinejoin\n");
+      : device_(device), config_(config), opts_(options) {
+    device_->StartMachinePath(tool_dia, options);
 
     if (opts_.output_js_vertices) {
       // TODO: this is wrong if the homing is on max.
@@ -704,9 +847,7 @@ class SegmentQueuePrinter : public SegmentQueue {
     }
   }
 
-  ~SegmentQueuePrinter() {
-    fprintf(file_, "stroke\n%% -- Finished Machine Path.\n");
-  }
+  ~SegmentQueuePrinter() { device_->stroke(); }
 
   void SetPass(ProcessingStep p) {
     pass_ = p;
@@ -801,6 +942,7 @@ class SegmentQueuePrinter : public SegmentQueue {
     const float dy_mm = param.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
     const float dz_mm = param.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
 
+    char comment[256];
     if (opts_.show_speeds) {
 #if SHOW_SPEED_DETAILS
       fprintf(file_, "%% dx:%f dy:%f dz:%f %s (speed: %.1f->%.1f)\n", dx_mm,
@@ -843,42 +985,45 @@ class SegmentQueuePrinter : public SegmentQueue {
           }
           assert(col_idx >= 0 && col_idx < 256);
           if (col_idx != last_color_index_) {
-            new_color = viridis_colors[col_idx];
+            new_color = Device::get_color_for_index(col_idx);
             last_color_index_ = col_idx;
           }
         } else {
           new_color = "OutOfRangeColor";
         }
         if (new_color) {
-          fprintf(file_, "%s switch-color ", new_color);
+          device_->switch_color(new_color);
         }
+
+        int pos = snprintf(
+          comment, sizeof(comment), "%.1f mm/s [%s]", v,
+          param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
+        if (i == 0) {
+          snprintf(comment + pos, sizeof(comment) - pos, " (%d,%d,%d)",
+                   param.steps[AXIS_X], param.steps[AXIS_Y],
+                   param.steps[AXIS_Z]);
+        }
+
 #define TO_ABS_AXIS(a)                                                    \
   (float(current_pos_[a]) + float((i + 1) * param.steps[a]) / segments) / \
     config_.steps_per_mm[a]
 
-        fprintf(file_, "%.3f %.3f %.3f lineto3d", TO_ABS_AXIS(AXIS_X),
-                TO_ABS_AXIS(AXIS_Y), TO_ABS_AXIS(AXIS_Z));
+        device_->lineto(TO_ABS_AXIS(AXIS_X), TO_ABS_AXIS(AXIS_Y),
+                        TO_ABS_AXIS(AXIS_Z), comment);
 #undef TO_ABS_AXIS
-
-        fprintf(file_, " %% %.1f mm/s [%s]", v,
-                param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
-        if (i == 0)
-          fprintf(file_, " (%d,%d,%d)", param.steps[AXIS_X],
-                  param.steps[AXIS_Y], param.steps[AXIS_Z]);
-        fprintf(file_, "\n");
       }
     } else {
       if (last_outside_machine_cube != is_valid_position) {
         // only print changes.
-        fprintf(file_, "%s setrgbcolor ",
-                is_valid_position ? "MachineMoveColor" : "OutOfRangeColor");
+        device_->set_color(is_valid_position ? "MachineMoveColor"
+                                             : "OutOfRangeColor");
         last_outside_machine_cube = is_valid_position;
       }
-      fprintf(file_, "%f %f %f lineto3d %% %d %d %d\n",
-              new_pos[AXIS_X] / config_.steps_per_mm[AXIS_X],
-              new_pos[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-              new_pos[AXIS_Z] / config_.steps_per_mm[AXIS_Z], new_pos[AXIS_X],
-              new_pos[AXIS_Y], new_pos[AXIS_Z]);
+      snprintf(comment, sizeof(comment), "%d %d %d", new_pos[AXIS_X],
+               new_pos[AXIS_Y], new_pos[AXIS_Z]);
+      device_->lineto(new_pos[AXIS_X] / config_.steps_per_mm[AXIS_X],
+                      new_pos[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
+                      new_pos[AXIS_Z] / config_.steps_per_mm[AXIS_Z], comment);
     }
 
     current_pos_ = new_pos;
@@ -895,71 +1040,21 @@ class SegmentQueuePrinter : public SegmentQueue {
   }
 
   void EmitMovetoPos() {
-    fprintf(file_, "%f %f %f moveto3d  %% Homing one or more axes.\n",
-            current_pos_[AXIS_X] / config_.steps_per_mm[AXIS_X],
-            current_pos_[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-            current_pos_[AXIS_Z] / config_.steps_per_mm[AXIS_Z]);
+    device_->moveto(current_pos_[AXIS_X] / config_.steps_per_mm[AXIS_X],
+                    current_pos_[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
+                    current_pos_[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
+                    "Homing one or more axes.");
   }
 
   void PrintColorLegend(float x, float y, float width) {
     assert(pass_ == ProcessingStep::GenerateOutput);
     if (min_color_range_ >= max_color_range_) return;
-    const float barheight = 0.05 * width;
-    const float fontsize = barheight * 0.5;
-    y -= barheight;
-    fprintf(file_, "\n%% -- Color range visualization colorchart\n");
-    fprintf(file_, "gsave /Helvetica findfont %.2f scalefont setfont\n",
-            fontsize);
-    fprintf(file_, "0 setgray 0 setlinewidth\n");
-    fprintf(file_, "%.1f %.1f moveto (mm/s) show\n", x + width + 1,
-            y - fontsize / 2);
-    fprintf(file_,
-            "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto "
-            "(<=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
-            x, y, barheight, min_color_range_);
-
-    const int kLegendPartitions = 6;
-    for (int i = 1; i < kLegendPartitions; ++i) {
-      float val = i * (max_color_range_ - min_color_range_) / kLegendPartitions;
-      float pos = i * width / kLegendPartitions;
-      fprintf(file_,
-              "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto "
-              "(%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
-              x + pos, y, barheight, min_color_range_ + val);
-    }
-    fprintf(file_,
-            "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto"
-            "(>=%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
-            x + width, y, barheight, max_color_range_);
-
-    fprintf(file_, "\n%% -- paint gradient\n");
-    const float step = width / 256;
-    fprintf(file_, "%.3f setlinewidth %.1f %.1f moveto\n", barheight, x, y);
-    for (int i = 0; i < 256; ++i) {
-      // little overlap of 0.1, seems that the postscript interpreter otherwise
-      // might leave little gaps.
-      fprintf(file_,
-              "%s setrgbcolor %f 0.1 add 0 rlineto currentpoint stroke moveto "
-              "-0.1 0 rmoveto\n",
-              viridis_colors[i], step);
-    }
-    fprintf(file_, "0 0 0 setrgbcolor  %% Done with gradient\n");
-
-    // Show min/max range.
-    fprintf(file_, "/Helvetica findfont %.1f scalefont setfont\n",
-            fontsize * 0.75);
-    fprintf(file_,
-            "%.1f %.1f moveto (max %.1f mm/s) dup "
-            "stringwidth pop neg 0 rmoveto show\n",
-            x + width + 1, y - barheight, max_v_);
-    fprintf(file_, "%.1f %.1f moveto (min %.1f mm/s) show\n", x, y - barheight,
-            min_v_);
-
-    fprintf(file_, "grestore\n");
+    device_->PrintColorLegend(x, y, width, min_color_range_, max_color_range_,
+                              min_v_, max_v_);
   }
 
  private:
-  FILE *const file_;
+  Device *const device_;
   const MachineControlConfig &config_;
   const VisualizationOptions opts_;
 
@@ -1245,22 +1340,26 @@ int main(int argc, char *argv[]) {
 
   FILE *const msg_stream = quiet ? fopen("/dev/null", "w") : stderr;
 
+  Device device(output_file);
+
   GCodeParser::Config::ParamMap parameters;  // TODO: read from file ?
   parser_cfg.parameters = &parameters;
 
-  GCodePrintVisualizer gcode_printer(output_file, parser_cfg.machine_origin,
+  GCodePrintVisualizer gcode_printer(&device, parser_cfg.machine_origin,
                                      machine_config.move_range_mm, vis_options);
   gcode_printer.SetPass(ProcessingStep::Preprocess);
   GCodeParser gcode_viz_parser(parser_cfg, &gcode_printer);
   ParseFile(&gcode_viz_parser, filename, msg_stream);
   Reset(&gcode_viz_parser, &gcode_printer);
 
-  gcode_printer.PrintPostscriptBoundingBox(
+  // TODO: combine.
+  device.PrintPostscriptBoundingBox(
     printMargin, printMargin + (vis_options.show_speeds ? 15 : 0), scale,
-    bounding_box_width_mm);
+    bounding_box_width_mm, gcode_printer.range());
 
-  gcode_printer.PrintHeader(printMargin, eye_distance, animation_frames);
-  gcode_printer.PrintColorChoice(nullptr);
+  device.PrintHeader(gcode_printer.range(), printMargin, eye_distance,
+                     animation_frames);
+  device.PrintColorChoice(nullptr);
 
   if (animation_frames > 0) {
     // In case we do animations, we want to stuff all the postscript in one
@@ -1278,10 +1377,12 @@ int main(int argc, char *argv[]) {
     fprintf(output_file, "%s\n", op.c_str());
   }
 
-  gcode_printer.PrintModelFrame();
-  if (grid > 0) gcode_printer.DrawGrid(grid);
-  if (show_dimensions) gcode_printer.ShowMesaureLines();
-
+  device.PrintModelFrame(gcode_printer.range(), vis_options);
+  if (grid > 0) device.DrawGrid(gcode_printer.range(), grid);
+  if (show_dimensions) {
+    device.ShowMesaureLines(gcode_printer.range(), gcode_printer.inch_system(),
+                            vis_options);
+  }
   if (config_file && show_machine_path) {
     machine_config.threshold_angle = threshold_angle;
     machine_config.speed_tune_angle = speed_tune_angle;
@@ -1293,7 +1394,7 @@ int main(int argc, char *argv[]) {
     // Non-initialized hardware mapping behaves like initialized
     HardwareMapping hardware;
 
-    SegmentQueuePrinter motor_operations_printer(output_file, machine_config,
+    SegmentQueuePrinter motor_operations_printer(&device, machine_config,
                                                  tool_diameter_mm, vis_options);
     GCodeMachineControl *machine_control =
       GCodeMachineControl::Create(machine_config, &motor_operations_printer,
@@ -1317,7 +1418,7 @@ int main(int argc, char *argv[]) {
       // unnecessarily small but somehow relate it to the maximum size of the
       // result.
       motor_operations_printer.SetColorSegmentLength(
-        gcode_printer.GetDiagonalLength() / 100);
+        gcode_printer.range().GetDiagonalLength() / 100);
       motor_operations_printer.SetPass(ProcessingStep::GenerateOutput);
       ParseFile(&parser, filename, msg_stream);
 
@@ -1330,7 +1431,7 @@ int main(int argc, char *argv[]) {
     delete machine_control;
   }
 
-  gcode_printer.ShowHomePos(parser_cfg.machine_origin);
+  device.ShowHomePos(parser_cfg.machine_origin, gcode_printer.range());
   if (show_gcode_path) {
     // We print the gcode on top of the colored machine visualization.
     gcode_printer.SetPass(ProcessingStep::GenerateOutput);
@@ -1380,11 +1481,10 @@ int main(int argc, char *argv[]) {
   return gcode_viz_parser.error_count() == 0 ? 0 : 1;
 }
 
-namespace {
 // Perceptually nice colormap. See:
 // https://bids.github.io/colormap/
 // https://github.com/BIDS/colormap/blob/master/colormaps.py
-const char *viridis_colors[] = {
+const char *Device::viridis_colors[] = {
   "0.267004 0.004874 0.329415", "0.268510 0.009605 0.335427",
   "0.269944 0.014625 0.341379", "0.271305 0.019942 0.347269",
   "0.272594 0.025563 0.353093", "0.273809 0.031497 0.358853",
@@ -1514,7 +1614,7 @@ const char *viridis_colors[] = {
   "0.964894 0.902323 0.123941", "0.974417 0.903590 0.130215",
   "0.983868 0.904867 0.136897", "0.993248 0.906157 0.143936"};
 
-const char kPSHeader[] = R"(
+const char Device::kPSHeader[] = R"(
 % Internal 3D currentpoint register.
 /last_x 0 def
 /last_y 0 def
@@ -1613,8 +1713,7 @@ const char kPSHeader[] = R"(
   /last_y exch def
   /last_x exch def
   last_x last_y last_z project2d lineto
- } def
-
+} def
 
 % a lineto with stroke, but keeping currentpoint
 /lineto3ds {
@@ -1623,7 +1722,7 @@ const char kPSHeader[] = R"(
   /last_x exch def
   last_x last_y last_z project2d lineto
   currentpoint stroke moveto
- } def
+} def
 
 /moveto3d-last {  % Useful after a stroke without having to push currentpoint3d
    last_x last_y last_z project2d moveto
@@ -1638,5 +1737,3 @@ const char kPSHeader[] = R"(
 1 setlinejoin
 
 )";
-
-}  // anonymous namespace
