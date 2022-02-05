@@ -34,7 +34,6 @@ jobs:
       run: |
         echo "ARM_COMPILE_FLAGS=" >> $GITHUB_ENV
         echo "CXX=${{ matrix.compiler }}" >> $GITHUB_ENV
-        echo "CXX=${{ matrix.compiler }}" >> $GITHUB_ENV
         echo "BEAGLEG_OPT_CFLAGS='-O${{ matrix.optimization }}' -Werror" >> $GITHUB_ENV
 
     - name: Build
