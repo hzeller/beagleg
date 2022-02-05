@@ -16,7 +16,7 @@ GTEST_INCLUDE=-I$(GTEST_SOURCE)/include -I$(GMOCK_SOURCE)/include
 # environment variable.
 BEAGLEG_OPT_CFLAGS?=-O3
 
-CFLAGS+=-Wall -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -I../
+CFLAGS+=-Wall -Wextra -W -Wno-unused-parameter -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -I../
 
 # See toplevel Makefile comment
 CXXFLAGS+=-std=c++11 $(CFLAGS)
@@ -58,7 +58,7 @@ valgrind-test: $(UNITTEST_BINARIES)
 	@$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) -MM $< > $@.d
 
 %_test.o: %_test.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX)  $(GTEST_INCLUDE) $(CXXFLAGS) -c  $< -o $@
+	$(CROSS_COMPILE)$(CXX)  $(GTEST_INCLUDE) -Wno-inconsistent-missing-override $(CXXFLAGS) -c  $< -o $@
 	@$(CROSS_COMPILE)$(CXX) $(GTEST_INCLUDE) $(CXXFLAGS) -MM $< > $@.d
 
 # Auto generated dependencies
