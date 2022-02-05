@@ -1,4 +1,4 @@
-name: Ubuntu Build
+name: CI
 
 on:
   push:
@@ -9,13 +9,20 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - g++
+          - clang++
+        optimization: [ 0, 1, 2, 3]
 
-    name: Build and Test
+    name: Test ${{matrix.compiler}} -O${{matrix.optimization}}
     steps:
     - name: Prepare
       run: |
         sudo apt-get update -qq
-        sudo apt install -y g++ googletest valgrind
+        sudo apt install -y g++ clang googletest valgrind
 
     - uses: actions/checkout@v2
       with:
@@ -25,7 +32,10 @@ jobs:
     - name: Configure shell
       # Since we're not compiling on the Beaglebone, disable arm specifics
       run: |
-        echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
+        echo "ARM_COMPILE_FLAGS=" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.compiler }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.compiler }}" >> $GITHUB_ENV
+        echo "BEAGLEG_OPT_CFLAGS='-O${{ matrix.optimization }}' -Werror" >> $GITHUB_ENV
 
     - name: Build
       run: |
@@ -37,7 +47,7 @@ jobs:
 
     - name: Valgrind Test
       run: |
-        BEAGLEG_OPT_CFLAGS="-O3 -g" make valgrind-test
+        make valgrind-test
 
   Coverage:
     runs-on: ubuntu-latest
