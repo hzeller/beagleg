@@ -96,3 +96,26 @@ jobs:
 
     - name: Run formatting style check
       run: ./.github/bin/run-clang-format.sh
+
+  ClangTidy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get install googletest bear clang-tidy-11
+
+    - name: Configure shell
+      # Since we're not compiling on the Beaglebone, disable arm specifics
+      run: |
+        echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
+
+    - name: Run clang tidy
+      run: ./.github/bin/run-clang-tidy.sh

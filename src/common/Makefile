@@ -40,10 +40,12 @@ all : $(GENLIB)
 $(GENLIB): $(OBJECTS)
 	$(AR) rcs $@ $^
 
-test: $(UNITTEST_BINARIES)
+test-binaries: $(UNITTEST_BINARIES)
+
+test: test-binaries
 	for test_bin in $(UNITTEST_BINARIES) ; do echo ; echo $$test_bin; ./$$test_bin || exit 1 ; done
 
-valgrind-test: $(UNITTEST_BINARIES)
+valgrind-test: test-binaries
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
 
 
