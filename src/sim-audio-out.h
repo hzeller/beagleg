@@ -25,7 +25,7 @@
 // to make smooth acceleration curves audible.
 class SimFirmwareAudioQueue : public MotionQueue {
  public:
-  SimFirmwareAudioQueue(FILE *out);
+  explicit SimFirmwareAudioQueue(FILE *out);
   ~SimFirmwareAudioQueue() override;
 
   bool Enqueue(MotionSegment *segment) final;

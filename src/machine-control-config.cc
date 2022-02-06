@@ -51,7 +51,8 @@ namespace {
 // Expermential. Work in progress.
 class MachineControlConfigReader : public ConfigParser::Reader {
  public:
-  MachineControlConfigReader(MachineControlConfig *config) : config_(config) {}
+  explicit MachineControlConfigReader(MachineControlConfig *config)
+      : config_(config) {}
 
   bool SeenSection(int line_no, const std::string &section_name) final {
     current_section_ = section_name;

@@ -360,7 +360,7 @@ bool HardwareMapping::TestProbeSwitch() {
 
 class HardwareMapping::ConfigReader : public ConfigParser::Reader {
  public:
-  ConfigReader(HardwareMapping *config) : config_(config) {}
+  explicit ConfigReader(HardwareMapping *config) : config_(config) {}
 
   bool SeenSection(int line_no, const std::string &section_name) final {
     current_section_ = section_name;

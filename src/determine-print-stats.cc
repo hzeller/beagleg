@@ -98,7 +98,7 @@ class StatsCollectingEventDelegator : public GCodeParser::EventReceiver {
 
 class StatsSegmentQueue : public SegmentQueue {
  public:
-  StatsSegmentQueue(BeagleGPrintStats *stats) : print_stats_(stats) {}
+  explicit StatsSegmentQueue(BeagleGPrintStats *stats) : print_stats_(stats) {}
 
   bool Enqueue(const LinearSegmentSteps &param) final {
     int max_steps = 0;

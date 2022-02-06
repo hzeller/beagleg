@@ -59,7 +59,8 @@ static inline double sqd(double x) { return x * x; }  // square a number
 
 class FakeMotorOperations : public SegmentQueue {
  public:
-  FakeMotorOperations(const MachineControlConfig &config) : config_(config) {}
+  explicit FakeMotorOperations(const MachineControlConfig &config)
+      : config_(config) {}
 
   bool Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
@@ -150,8 +151,8 @@ class PlannerHarness {
  public:
   // If angle or config is not set, assumes default. Takes ownership of
   // config.
-  PlannerHarness(float threshold_angle = 0, float speed_tune_angle = 0,
-                 MachineControlConfig *config = NULL)
+  explicit PlannerHarness(float threshold_angle = 0, float speed_tune_angle = 0,
+                          MachineControlConfig *config = NULL)
       : config_(config ? config : new MachineControlConfig()),
         motor_ops_(*config_),
         finished_(false) {

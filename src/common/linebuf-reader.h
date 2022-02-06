@@ -52,7 +52,7 @@ class LinebufReader {
 
   // The "buffer_size" determines the longest line we expect at maximum.
   // TODO(hzeller): right now, we don't gracefully deal with overlong lines.
-  LinebufReader(size_t buffer_size = 16384);
+  explicit LinebufReader(size_t buffer_size = 16384);
   ~LinebufReader();
 
   // Update content. It will be calling the ReadFun exactly once and updates

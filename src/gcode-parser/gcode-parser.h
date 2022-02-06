@@ -140,7 +140,8 @@ class GCodeParser {
 struct GCodeParser::Config {
   typedef std::map<std::string, float> ParamMap;
   Config() : parameters(NULL) {}
-  Config(const std::string &filename) : parameters(NULL), paramfile(filename) {}
+  explicit Config(const std::string &filename)
+      : parameters(NULL), paramfile(filename) {}
 
   bool LoadParams();
   bool SaveParams() const;

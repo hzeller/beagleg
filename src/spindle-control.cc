@@ -80,7 +80,7 @@ SpindleConfig::SpindleConfig() {
 namespace {
 class SpindleConfigReader : public ConfigParser::Reader {
  public:
-  SpindleConfigReader(SpindleConfig *config) : config_(config) {}
+  explicit SpindleConfigReader(SpindleConfig *config) : config_(config) {}
 
   bool SeenSection(int line_no, const std::string &section_name) final {
     return (section_name == "spindle");  // The only section we deal with.

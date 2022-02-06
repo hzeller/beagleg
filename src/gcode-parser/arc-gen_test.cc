@@ -36,7 +36,8 @@
 
 class TestArcAccumulator : public GCodeParser::EventReceiver {
  public:
-  TestArcAccumulator(const AxesRegister &start) : last_(start), total_len_(0) {}
+  explicit TestArcAccumulator(const AxesRegister &start)
+      : last_(start), total_len_(0) {}
 
   void gcode_start(GCodeParser *parser) final {}
   void go_home(AxisBitmap_t axis_bitmap) final {}

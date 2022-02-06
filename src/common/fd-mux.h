@@ -29,7 +29,7 @@
 // This needs a better name.
 class FDMultiplexer {
  public:
-  FDMultiplexer(unsigned idle_ms = 50) : idle_ms_(idle_ms) {}
+  explicit FDMultiplexer(unsigned idle_ms = 50) : idle_ms_(idle_ms) {}
 
   // Handlers for events from this multiplexer.
   // Returns true if we want to continue to be called in the future or false

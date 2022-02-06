@@ -42,8 +42,11 @@ class StringPiece {
   StringPiece() : data_(NULL), len_(0) {}
   StringPiece(const char *data, size_t len) : data_(data), len_(len) {}
 
-  StringPiece(const std::string &s) : data_(s.data()), len_(s.length()) {}
-  StringPiece(const char *str) : data_(str), len_(strlen(str)) {}
+  // We want implicit conversions from these types
+  StringPiece(const std::string &s)  // NOLINT
+      : data_(s.data()), len_(s.length()) {}
+  StringPiece(const char *str)  // NOLINT
+      : data_(str), len_(strlen(str)) {}
 
   StringPiece substr(size_t pos, size_t len) const {
     assert(pos + len <= len_);

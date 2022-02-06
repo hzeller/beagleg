@@ -38,7 +38,7 @@ static constexpr unsigned char kWavHeader[] = {
 
 class SimFirmwareAudioQueue::AudioWriter {
  public:
-  AudioWriter(FILE *out) : out_(out) {
+  explicit AudioWriter(FILE *out) : out_(out) {
     fwrite(kWavHeader, sizeof(kWavHeader), 1, out_);
   }
 

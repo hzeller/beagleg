@@ -128,7 +128,7 @@ class GCodeMachineControl {
 
   // The SegmentQueue struct provide the low-level motor control ops.
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
-  GCodeMachineControl(Impl *Impl);
+  explicit GCodeMachineControl(Impl *Impl);
 
   Impl *const impl_;  // opaque state.
 };

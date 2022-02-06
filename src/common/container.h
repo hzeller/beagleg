@@ -133,7 +133,7 @@ class EnumIterable {
  public:
   class const_iterator {
    public:
-    const_iterator(T value) : val_(value) {}
+    explicit const_iterator(T value) : val_(value) {}
     T operator*() const { return val_; }
     void operator++() { val_ = static_cast<T>(val_ + 1); }
     bool operator!=(const const_iterator &other) { return other.val_ != val_; }

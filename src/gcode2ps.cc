@@ -155,7 +155,7 @@ class AxesRange {
 
 class Device {
  public:
-  Device(FILE *file) : file_(file) {}
+  explicit Device(FILE *file) : file_(file) {}
 
   void InitializeLineParameters(float line_width) {
     fprintf(file_, "%.3f setlinewidth 0 0 0 setrgbcolor\n", line_width);
@@ -831,7 +831,7 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
 // speed range, second outputs PostScript with colored segments.
 // This also helps do determine if things line up properly with what the gcode
 // parser spits out.
-class SegmentQueuePrinter : public SegmentQueue {
+class SegmentQueuePrinter final : public SegmentQueue {
  public:
   SegmentQueuePrinter(Device *device, const MachineControlConfig &config,
                       float tool_dia, const VisualizationOptions &options)
@@ -847,7 +847,7 @@ class SegmentQueuePrinter : public SegmentQueue {
     }
   }
 
-  ~SegmentQueuePrinter() { device_->stroke(); }
+  ~SegmentQueuePrinter() final { device_->stroke(); }
 
   void SetPass(ProcessingStep p) {
     pass_ = p;

@@ -23,7 +23,8 @@
 
 class SimFirmwareQueue : public MotionQueue {
  public:
-  SimFirmwareQueue(FILE *out, int relevant_motors = MOTION_MOTOR_COUNT);
+  explicit SimFirmwareQueue(FILE *out,
+                            int relevant_motors = MOTION_MOTOR_COUNT);
   ~SimFirmwareQueue() override;
 
   bool Enqueue(MotionSegment *segment) final;

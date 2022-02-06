@@ -93,7 +93,8 @@ class Harness {
  public:
   // Initialize harness with the expected sequence of motor movements
   // and return the callback struct to receive simulated gcode calls.
-  Harness(const LinearSegmentSteps *expected) : expect_motor_ops_(expected) {
+  explicit Harness(const LinearSegmentSteps *expected)
+      : expect_motor_ops_(expected) {
     struct MachineControlConfig config;
     init_test_config(&config, &hardware_);
     machine_control =
