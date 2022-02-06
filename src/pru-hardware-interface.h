@@ -46,11 +46,11 @@ class PruHardwareInterface {
 
 class UioPrussInterface : public PruHardwareInterface {
  public:
-  bool Init();
-  bool AllocateSharedMem(void **pru_mmap, const size_t size);
-  bool StartExecution();
-  unsigned WaitEvent();
-  bool Shutdown();
+  bool Init() final;
+  bool AllocateSharedMem(void **pru_mmap, const size_t size) final;
+  bool StartExecution() final;
+  unsigned WaitEvent() final;
+  bool Shutdown() final;
 };
 
 #endif  // BEAGLEG_PRU_HARDWARE_INTERFACE_

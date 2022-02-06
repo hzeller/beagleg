@@ -127,16 +127,16 @@ class MotionQueue {
 // called.
 class HardwareMapping;
 struct PRUCommunication;
-class PRUMotionQueue : public MotionQueue {
+class PRUMotionQueue final : public MotionQueue {
  public:
   PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru);
-  ~PRUMotionQueue();
+  ~PRUMotionQueue() final;
 
-  bool Enqueue(MotionSegment *segment);
-  void WaitQueueEmpty();
-  void MotorEnable(bool on);
-  void Shutdown(bool flush_queue);
-  int GetPendingElements(uint32_t *head_item_progress);
+  bool Enqueue(MotionSegment *segment) final;
+  void WaitQueueEmpty() final;
+  void MotorEnable(bool on) final;
+  void Shutdown(bool flush_queue) final;
+  int GetPendingElements(uint32_t *head_item_progress) final;
 
  private:
   bool Init();
@@ -151,13 +151,13 @@ class PRUMotionQueue : public MotionQueue {
 };
 
 // Queue that does nothing. For testing purposes.
-class DummyMotionQueue : public MotionQueue {
+class DummyMotionQueue final : public MotionQueue {
  public:
-  bool Enqueue(MotionSegment *segment) { return true; }
-  void WaitQueueEmpty() {}
-  void MotorEnable(bool on) {}
-  void Shutdown(bool flush_queue) {}
-  int GetPendingElements(uint32_t *head_item_progress) {
+  bool Enqueue(MotionSegment *segment) final { return true; }
+  void WaitQueueEmpty() final {}
+  void MotorEnable(bool on) final {}
+  void Shutdown(bool flush_queue) final {}
+  int GetPendingElements(uint32_t *head_item_progress) final {
     if (head_item_progress) *head_item_progress = 0;
     return 1;
   }

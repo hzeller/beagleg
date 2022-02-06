@@ -119,8 +119,8 @@ class BaseSpindle : public Spindle {
       : config_(config), hardware_mapping_(hardware_mapping) {}
 
   virtual bool Init() { return true; }
-  virtual void On(bool ccw, int rpm) = 0;
-  virtual void Off() = 0;
+  void On(bool ccw, int rpm) override = 0;
+  void Off() override = 0;
 
   // Right now, this sets the output immediately, but we might want to do this
   // along with the move if this is a laser.
@@ -231,7 +231,7 @@ class PWMSpindle : public BaseSpindle {
   }
 };
 
-class PololuSMCSpindle : public BaseSpindle {
+class PololuSMCSpindle final : public BaseSpindle {
  private:
   // clang-format off
   enum {
@@ -346,7 +346,7 @@ class PololuSMCSpindle : public BaseSpindle {
     Log_debug("PololuSMCSpindle: port %s  (fd = %d)", config.port.c_str(), fd_);
   }
 
-  ~PololuSMCSpindle() {
+  ~PololuSMCSpindle() final {
     if (fd_) close(fd_);
   }
 
@@ -425,7 +425,7 @@ class PololuSMCSpindle : public BaseSpindle {
               ccw ? "ccw" : "cw", (int)(config_.max_rpm * duty_cycle), speed);
   }
 
-  void Off() {
+  void Off() final {
     if (fd_ == -1) return;
 
     const unsigned char command = CMD_STOP_MOTOR;

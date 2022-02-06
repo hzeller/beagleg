@@ -57,7 +57,7 @@
 // The GCode control implementation. Essentially we are a state machine
 // driven by the events we get from the gcode parsing.
 // We implement the event receiver interface directly.
-class GCodeMachineControl::Impl : public GCodeParser::EventReceiver {
+class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
  public:
   // Create Impl. It is not fully initialized yet, call Init()
   Impl(const MachineControlConfig &config, SegmentQueue *motor_ops,
@@ -67,7 +67,7 @@ class GCodeMachineControl::Impl : public GCodeParser::EventReceiver {
   // object.
   bool Init();
 
-  ~Impl() { delete planner_; }
+  ~Impl() final { delete planner_; }
 
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }

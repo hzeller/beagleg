@@ -27,14 +27,14 @@ struct MockPRUCommunication {
 class MockPRUInterface : public PruHardwareInterface {
  public:
   MockPRUInterface() : execution_index_(QUEUE_LEN - 1) { mmap = NULL; }
-  ~MockPRUInterface() { free(mmap); }
+  ~MockPRUInterface() final { free(mmap); }
 
-  bool Init() { return true; }
-  bool StartExecution() { return true; }
-  unsigned WaitEvent() { return 1; }
-  bool Shutdown() { return true; }
+  bool Init() final { return true; }
+  bool StartExecution() final { return true; }
+  unsigned WaitEvent() final { return 1; }
+  bool Shutdown() final { return true; }
 
-  bool AllocateSharedMem(void **pru_mmap, const size_t size) {
+  bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
     mmap = (struct MockPRUCommunication *)malloc(size);
     *pru_mmap = (void *)mmap;
     bzero(*pru_mmap, size);

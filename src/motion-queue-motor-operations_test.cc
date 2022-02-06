@@ -18,21 +18,21 @@
 #include "motion-queue.h"
 #include "segment-queue.h"
 
-class MockMotionQueue : public MotionQueue {
+class MockMotionQueue final : public MotionQueue {
  public:
   MockMotionQueue() : remaining_loops_(0), queue_size_(0) {}
 
-  bool Enqueue(MotionSegment *segment) {
+  bool Enqueue(MotionSegment *segment) final {
     remaining_loops_ =
       segment->loops_accel + segment->loops_travel + segment->loops_decel;
     queue_size_++;
     return true;
   }
 
-  void WaitQueueEmpty(){};
-  void MotorEnable(bool on){};
-  void Shutdown(bool flush_queue){};
-  int GetPendingElements(uint32_t *head_item_progress) {
+  void WaitQueueEmpty() final{};
+  void MotorEnable(bool on) final{};
+  void Shutdown(bool flush_queue) final{};
+  int GetPendingElements(uint32_t *head_item_progress) final {
     if (head_item_progress) *head_item_progress = remaining_loops_;
     return queue_size_;
   }

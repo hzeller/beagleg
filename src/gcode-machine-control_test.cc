@@ -35,12 +35,12 @@ static void init_test_config(struct MachineControlConfig *c,
 }
 
 namespace {
-class MockMotorOps : public SegmentQueue {
+class MockMotorOps final : public SegmentQueue {
  public:
-  MockMotorOps(const LinearSegmentSteps *expected)
+  explicit MockMotorOps(const LinearSegmentSteps *expected)
       : expect_(expected), current_(expected), errors_(0) {}
 
-  ~MockMotorOps() {
+  ~MockMotorOps() final {
     EXPECT_EQ(0, errors_);
     // Did we walk through all states ?
     EXPECT_EQ(END_SENTINEL, current_->aux_bits);  // reached end ?
