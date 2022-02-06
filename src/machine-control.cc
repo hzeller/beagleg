@@ -78,25 +78,31 @@ static int usage(const char *prog, const char *msg) {
     "  -n                         : Dryrun; don't send to motors, no GPIO or "
     "PRU needed (Default: off).\n"
     // -N dry-run with simulation output; mostly for development, so not
-    // mentioned here. -W <wav-file>  dry run for development: output wav file.
+    // mentioned here. -W <wav-file>  dry run for development: output wav
+    // file.
     "  -P                         : Verbose: Show some more debug output "
     "(Default: off).\n"
-    "  -S                         : Synchronous: don't queue (Default: off).\n"
+    "  -S                         : Synchronous: don't queue (Default: "
+    "off).\n"
     "      --allow-m111           : Allow changing the debug level with M111 "
     "(Default: off).\n"
     "\nSegment acceleration tuning:\n"
     "     --threshold-angle       : Specifies the threshold angle used for "
     "segment acceleration (Default: 10 degrees).\n"
-    "     --speed-tune-angle      : Specifies the angle used for proportional "
+    "     --speed-tune-angle      : Specifies the angle used for "
+    "proportional "
     "speed-tuning. (Default: 60 degrees)\n\n"
-    "                               The --threshold-angle + --speed-tune-angle "
+    "                               The --threshold-angle + "
+    "--speed-tune-angle "
     "must be less than 90 degrees.\n"
     "\nConfiguration file overrides:\n"
     "     --homing-required       : Require homing before any moves "
     "(require-homing = yes).\n"
-    "     --nohoming-required     : (Opposite of above^): Don't require homing "
+    "     --nohoming-required     : (Opposite of above^): Don't require "
+    "homing "
     "before any moves (require-homing = no).\n"
-    "     --norange-check         : Disable machine limit checks. (range-check "
+    "     --norange-check         : Disable machine limit checks. "
+    "(range-check "
     "= no).\n");
   return 1;
 }
@@ -478,7 +484,8 @@ int main(int argc, char *argv[]) {
     const double max_speed_adj =
       std::cos((config.threshold_angle + config.speed_tune_angle) * deg2rad);
     Log_debug(
-      "Speed-tuning from %.2f to %.2f for angles +/-%.2f degrees (speed-tune @ "
+      "Speed-tuning from %.2f to %.2f for angles +/-%.2f degrees "
+      "(speed-tune @ "
       "%.2f degrees)\n",
       min_speed_adj, max_speed_adj, config.threshold_angle,
       config.speed_tune_angle);

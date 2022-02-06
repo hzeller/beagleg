@@ -965,10 +965,10 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
 
       endptr = gcodep_value(line, &value);
       if (endptr == NULL) {
-        gprintf(
-          GLOG_SYNTAX_ERR,
-          "gcodep_set_parameter: expected value after '#%s=[%d] ? ' got '%s'\n",
-          log_name, line, condition);
+        gprintf(GLOG_SYNTAX_ERR,
+                "gcodep_set_parameter: expected value after '#%s=[%d] ? ' got "
+                "'%s'\n",
+                log_name, line, condition);
         return NULL;
       }
       line = skip_white(endptr);
@@ -988,10 +988,10 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
 
         if (condition) value = true_value;
       } else {
-        gprintf(
-          GLOG_SYNTAX_ERR,
-          "gcodep_set_parameter: expected ':' after '#%s=[%d] ? %f' got '%s'\n",
-          log_name, line, condition, true_value);
+        gprintf(GLOG_SYNTAX_ERR,
+                "gcodep_set_parameter: expected ':' after '#%s=[%d] ? %f' got "
+                "'%s'\n",
+                log_name, line, condition, true_value);
         return NULL;
       }
     }

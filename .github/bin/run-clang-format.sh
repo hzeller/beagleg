@@ -1,20 +1,10 @@
 #!/bin/bash
 
+set -e
+
 FORMAT_OUT=${TMPDIR:-/tmp}/clang-format-diff.out
 
-# Run on all files except the ones that are generated.
-# TODO: have generator scripts run clang-format on their
-#   output as well as last step, then we can exclude less
-#   files here.
-find src -name "*.h" -o -name "*.cc"  \
-    | xargs clang-format-11 -i \
-            --style="{BasedOnStyle: Google,\
-                      ContinuationIndentWidth: 2, \
-                      IndentPPDirectives: None,\
-                      AllowShortCaseLabelsOnASingleLine: true,\
-                      AlignConsecutiveBitFields: true,\
-                      AlignConsecutiveMacros: true,\
-                      IndentCaseLabels: false}"
+find src -name "*.h" -o -name "*.cc" | xargs clang-format-11 --verbose -i
 
 # Check if we got any diff, then print it out in in the CI.
 # TODO: make these suggested diffs in the pull request.

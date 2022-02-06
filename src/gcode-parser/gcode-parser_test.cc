@@ -838,8 +838,8 @@ TEST(GCodeParserTest, Conditional) {
   EXPECT_FALSE(counter.TestParseLine(
     "IF [#1==1] THEN"));  // expected '#' after IF [...] THEN got ''
   EXPECT_FALSE(counter.TestParseLine(
-    "IF [#1==0] THEN #2=1 ELSE"));  // expected '#' after IF [...] THEN ... ELSE
-                                    // got ''
+    "IF [#1==0] THEN #2=1 ELSE"));  // expected '#' after IF [...] THEN ...
+                                    // ELSE got ''
 
   // SIDE-CASES - these are not syntaxed correctly but will not error
 

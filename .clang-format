@@ -1,0 +1,11 @@
+# Use the Google style in this project.
+# https://google.github.io/styleguide/cppguide.html
+BasedOnStyle: Google
+
+# ... adapt to our local style.
+ContinuationIndentWidth: 2
+IndentPPDirectives: None
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveBitFields: true
+AlignConsecutiveMacros: true
+IndentCaseLabels: false
