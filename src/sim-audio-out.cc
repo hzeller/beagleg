@@ -92,7 +92,7 @@ bool SimFirmwareAudioQueue::Enqueue(MotionSegment *segment) {
   if (segment->state == STATE_EXIT) return true;
 
   // For each segment, we start with a fresh motor state.
-  bzero(&state, sizeof(state));
+  memset(&state, 0x00, sizeof(state));
 
   uint32_t remainder = 0;
 
