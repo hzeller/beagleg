@@ -37,7 +37,7 @@ class MockPRUInterface final : public PruHardwareInterface {
   bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
     mmap = (struct MockPRUCommunication *)malloc(size);
     *pru_mmap = (void *)mmap;
-    bzero(*pru_mmap, size);
+    memset(*pru_mmap, 0x00, size);
     return true;
   }
 

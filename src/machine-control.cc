@@ -439,16 +439,18 @@ int main(int argc, char *argv[]) {
       break;
     case 'p': listen_port = atoi(optarg); break;
     case OPT_STATUS_SERVER: status_server_port = atoi(optarg); break;
-    case 'b': bind_addr = strdup(optarg); break;
-    case 'l': logfile = strdup(optarg); break;
+    case 'b': bind_addr = strdup(optarg); break;  // NOLINT: leak ok.
+    case 'l': logfile = strdup(optarg); break;    // NOLINT: leak ok.
     case OPT_PARAM_FILE: paramfile = MakeAbsoluteFile(optarg); break;
     case 'd': as_daemon = true; break;
     case 'c':
       config_file = realpath(optarg, NULL);  // realpath() -> abs path if exists
-      if (!config_file)
-        config_file = strdup(optarg);  // Not existing. Report issue later.
+      if (!config_file) {
+        // Not existing. Report issue later.
+        config_file = strdup(optarg);  // NOLINT: leak ok.
+      }
       break;
-    case OPT_PRIVS: privs = strdup(optarg); break;
+    case OPT_PRIVS: privs = strdup(optarg); break;  // NOLINT: leak ok.
     case OPT_ENABLE_M111: allow_m111 = true; break;
     case OPT_HELP: return usage(argv[0], NULL);
     default:

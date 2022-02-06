@@ -408,7 +408,7 @@ TEST(PlannerTest, CornerMove_90Degrees) {
 void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   const float kSpeedTuneAngle = 0.0f;
   // Essentially, we go around the circle as starting segments.
-  for (float angle = 0; angle < 360; angle += threshold / 2) {
+  for (float angle = 0; angle < 360; angle += threshold / 2) {  // NOLINT
     std::vector<LinearSegmentSteps> segments =
       DoAngleMove(threshold, kSpeedTuneAngle, angle, testing_angle);
 

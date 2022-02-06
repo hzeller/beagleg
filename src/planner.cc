@@ -273,7 +273,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   // Initial machine position. We assume the homed position here, which is
   // wherever the endswitch is for each axis.
   struct AxisTarget *init_axis = planning_buffer_.append();
-  bzero(init_axis, sizeof(*init_axis));
+  memset(init_axis, 0x00, sizeof(*init_axis));
   for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
     const float home_pos =

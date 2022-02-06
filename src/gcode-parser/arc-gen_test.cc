@@ -108,7 +108,7 @@ TEST(ArcGenerator, HalfTurnAnyStartPosition_CCW) {
 static void testArcLength(bool clockwise, double start, double step,
                           double end) {
   // Varying arc-length.
-  for (double turn_angle = start; turn_angle <= end - step;
+  for (double turn_angle = start; turn_angle <= end - step;  // NOLINT
        turn_angle += step) {
     AxesRegister start, center, target;
 

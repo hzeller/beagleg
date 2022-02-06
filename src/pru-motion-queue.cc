@@ -120,7 +120,7 @@ static void unaligned_memcpy(volatile void *dest, const void *src,
   const char *s = (char *)src;
   const volatile char *end = d + size;
   while (d < end) {
-    *d++ = *s++;
+    *d++ = *s++;  // NOLINT
   }
 }
 

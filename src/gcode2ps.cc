@@ -804,7 +804,9 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
     }
   }
 
-  void GetDimensions(float *x, float *y, float *width, float *height) {
+  void GetDimensions(float *x, float *y,
+                     float *width,  // NOLINT: go home clang-tidy, you're drunk
+                     float *height) {
     *width = *height = range_.GetDiagonalLength();
     *x = -*width / 2;
     *y = -*width / 2;

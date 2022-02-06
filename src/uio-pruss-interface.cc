@@ -68,7 +68,7 @@ bool UioPrussInterface::AllocateSharedMem(void **pru_mmap, const size_t size) {
     Log_error("Couldn't map PRU memory.\n");
     return false;
   }
-  bzero(*pru_mmap, size);
+  memset(*pru_mmap, 0x00, size);
   return true;
 }
 

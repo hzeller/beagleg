@@ -177,7 +177,7 @@ static bool spline_gen(
             target[AXIS_X], target[AXIS_Y]);
 #endif
 
-  for (float t = 0; t < 1; t += 0.01f) {
+  for (float t = 0; t < 1; t += 0.01f) {  // NOLINT
     if (!segment_output(calc_bezier_point(t, start, cp1, cp2, target)))
       return false;
   }

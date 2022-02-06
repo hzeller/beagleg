@@ -107,9 +107,7 @@ plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using
 #define AVERAGE_RINBGUFFER_SIZE 10
 class SimFirmwareQueue::Averager {
  public:
-  Averager() : dt_sum_(0), pos_(0) {
-    bzero(&ringbuffer_, AVERAGE_RINBGUFFER_SIZE * sizeof(double));
-  }
+  Averager() {}
 
   double GetAcceleration() {
     if (pos_ < 2) return 0;
@@ -138,9 +136,9 @@ class SimFirmwareQueue::Averager {
   }
 
  private:
-  double ringbuffer_[AVERAGE_RINBGUFFER_SIZE];
-  double dt_sum_;
-  int pos_;
+  double ringbuffer_[AVERAGE_RINBGUFFER_SIZE] = {};
+  double dt_sum_ = 0;
+  int pos_ = 0;
 };
 
 struct HardwareState {
@@ -167,7 +165,7 @@ bool SimFirmwareQueue::Enqueue(MotionSegment *segment) {
   if (segment->state == STATE_EXIT) return true;
   // setting output direction according to segment->direction_bits;
 
-  bzero(&state, sizeof(state));
+  memset(&state, 0x00, sizeof(state));
 
   // For convenience, this is the relative speed of each motor.
   double motor_speeds[MOTION_MOTOR_COUNT];

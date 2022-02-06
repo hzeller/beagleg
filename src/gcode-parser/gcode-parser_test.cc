@@ -34,7 +34,6 @@ enum {
 class ParseTester : public GCodeParser::EventReceiver {
  public:
   ParseTester() : feedrate(-1) {
-    bzero(call_count, sizeof(call_count));
     GCodeParser::Config config;
     // some arbitrary machine origins to see that they are honored.
     config.machine_origin[AXIS_X] = HOME_X;
@@ -101,7 +100,7 @@ class ParseTester : public GCodeParser::EventReceiver {
 
  public:
   // public counters.
-  int call_count[NUM_COUNTED_CALLS];
+  int call_count[NUM_COUNTED_CALLS] = {};
   AxesRegister abs_pos;        // last coordinates we got from a move.
   AxesRegister parser_offset;  // current offset in the parser
   float feedrate;

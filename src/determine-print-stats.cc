@@ -125,7 +125,7 @@ class StatsSegmentQueue : public SegmentQueue {
 
 bool determine_print_stats(int input_fd, const MachineControlConfig &config,
                            FILE *msg_out, struct BeagleGPrintStats *result) {
-  bzero(result, sizeof(*result));
+  memset(result, 0x00, sizeof(*result));
   result->x_min = 1e7;
   result->y_min = 1e7;
   result->y_min = 1e7;
