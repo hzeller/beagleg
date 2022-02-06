@@ -31,9 +31,10 @@ Checks: >
   -readability-named-parameter,
   -readability-qualified-auto,
   -readability-redundant-access-specifiers,
+  -readability-uppercase-literal-suffix,
   -readability-use-anyofallof,
   google-*,
-  -google-readability-avoid-underscore-in-googletest-name
+  -google-readability-avoid-underscore-in-googletest-name,
   -google-readability-braces-around-statements,
   -google-readability-todo,
   performance-*,
