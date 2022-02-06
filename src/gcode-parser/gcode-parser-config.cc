@@ -32,8 +32,7 @@ bool GCodeParser::Config::LoadParams() {
   }
 
   // The default coordinate system at start-up is G54
-  ParamMap &param_map = *parameters;
-  param_map["5220"] = 1.0f;  // Only non-zero default.
+  (*parameters)["5220"] = 1.0f;  // Only non-zero default.  // NOLINT
 
   FILE *fp = fopen(paramfile.c_str(), "r");
   if (!fp) {
@@ -51,7 +50,7 @@ bool GCodeParser::Config::LoadParams() {
       // Technically, we should ignore parameters which are not coming in
       // order according to RS274NGC. But that sounds like a non-userfriendly
       // restriction.
-      param_map[name] = value;
+      (*parameters)[name] = value;  // NOLINT
       ++pcount;
     }
   }
