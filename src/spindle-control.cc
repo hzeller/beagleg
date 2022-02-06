@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <termios.h>
 #include <time.h>
@@ -412,10 +413,10 @@ class PololuSMCSpindle final : public BaseSpindle {
     if (is_off_) {
       // wait for the SMC to fully accelerate the motor
       sleep_ms(config_.on_delay_ms);
-      signed short actual = (signed short)get_variable(SPEED);
+      int16_t actual = static_cast<int16_t>(get_variable(SPEED));
       while (actual < speed) {
         sleep_ms(250);
-        actual = (signed short)get_variable(SPEED);
+        actual = static_cast<int16_t>(get_variable(SPEED));
       }
       is_off_ = false;
     }
@@ -433,10 +434,10 @@ class PololuSMCSpindle final : public BaseSpindle {
 
     // wait for the SMC to fully decelerate the motor
     sleep_ms(config_.off_delay_ms);
-    signed short speed = (signed short)get_variable(SPEED);
+    int16_t speed = static_cast<int16_t>(get_variable(SPEED));
     while (speed) {
       sleep_ms(250);
-      speed = (signed short)get_variable(SPEED);
+      speed = static_cast<int16_t>(get_variable(SPEED));
     };
 
     set_output_synchronous(HardwareMapping::NamedOutput::SPINDLE, false);

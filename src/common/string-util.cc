@@ -66,10 +66,10 @@ std::vector<StringPiece> SplitString(const StringPiece &s,
   return result;
 }
 
-long ParseDecimal(const StringPiece &s, long fallback) {
+int64_t ParseDecimal(const StringPiece &s, int64_t fallback) {
   std::string as_str = s.ToString();  // we need safe c-str()
   char *endptr = NULL;
-  long result = strtol(as_str.c_str(), &endptr, 10);
+  int64_t result = strtoll(as_str.c_str(), &endptr, 10);
   if (*endptr != '\0') return fallback;
   return result;
 }

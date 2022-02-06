@@ -103,7 +103,7 @@ std::vector<StringPiece> SplitString(const StringPiece &s,
                                      const StringPiece &separators);
 
 // Parse a decimal from a StringPiece.
-long ParseDecimal(const StringPiece &s, long fallback);
+int64_t ParseDecimal(const StringPiece &s, int64_t fallback);
 
 #undef PRINTF_FMT_CHECK
 #endif  // _BEAGLEG_STRING_UTIL_H

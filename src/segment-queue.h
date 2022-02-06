@@ -19,6 +19,8 @@
 #ifndef _BEAGLEG_MOTOR_OPERATIONS_H_
 #define _BEAGLEG_MOTOR_OPERATIONS_H_
 
+#include <stdint.h>
+
 enum { BEAGLEG_NUM_MOTORS = 8 };
 
 // The movement command send to the segment queue either changes speed, or
@@ -34,7 +36,7 @@ struct LinearSegmentSteps {
 
   // Bits that are set in parallel with the motor control that should be
   // set at the beginning of the motor movement.
-  unsigned short aux_bits;  // Aux-bits to switch.
+  uint16_t aux_bits;  // Aux-bits to switch.
 
   int steps[BEAGLEG_NUM_MOTORS];  // Steps for axis. Negative for reverse.
 };
@@ -43,7 +45,7 @@ struct LinearSegmentSteps {
 // and the status of the auxes.
 struct PhysicalStatus {
   int pos_steps[BEAGLEG_NUM_MOTORS];  // Absolute position in steps.
-  unsigned short aux_bits;            // Auxes status
+  uint16_t aux_bits;                  // Auxes status
 };
 
 class SegmentQueue {

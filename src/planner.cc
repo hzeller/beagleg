@@ -45,10 +45,10 @@ struct AxisTarget {
   // Derived values
   int delta_steps[GCODE_NUM_AXES];     // Difference to previous position.
   enum GCodeParserAxis defining_axis;  // index into defining axis.
-  double speed;             // (desired) speed in steps/s on defining axis.
-  unsigned short aux_bits;  // Auxillary bits in this segment; set with M42
-  double dx, dy, dz;        // 3D delta_steps in real units
-  double len;               // 3D length
+  double speed;       // (desired) speed in steps/s on defining axis.
+  uint16_t aux_bits;  // Auxillary bits in this segment; set with M42
+  double dx, dy, dz;  // 3D delta_steps in real units
+  double len;         // 3D length
 };
 }  // end anonymous namespace
 

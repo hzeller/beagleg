@@ -57,7 +57,11 @@ TEST(StringUtilTest, SplitString) {
 }
 
 TEST(StringUtilTest, ParseDecimal) {
-  StringPiece longer_string("4242");
+  // Make sure we can parse beyond 32 bit.
+  EXPECT_EQ(12345678901234LL, ParseDecimal("12345678901234", -1));
+
+  // Make sure we're not assumming a nul-byte at a particular point
+  StringPiece longer_string("4255");
   EXPECT_EQ(42, ParseDecimal(longer_string.substr(0, 2), -1));
 }
 

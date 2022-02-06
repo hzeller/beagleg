@@ -101,7 +101,7 @@ struct HistoryPositionInfo {
 // Store the required informations needed to backtrack the absolute position.
 struct MotionQueueMotorOperations::HistorySegment {
   HistoryPositionInfo pos_info[MOTION_MOTOR_COUNT];
-  unsigned short aux_bits;
+  uint16_t aux_bits;
 };
 
 MotionQueueMotorOperations::MotionQueueMotorOperations(HardwareMapping *hw,
