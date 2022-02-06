@@ -72,11 +72,11 @@ class MachineControlConfigReader : public ConfigParser::Reader {
   bool SeenNameValue(int line_no, const std::string &name,
                      const std::string &value) final {
 #define ACCEPT_VALUE(n, T, result) \
-  if (name != n) {                 \
+  if (name != (n)) {               \
   } else                           \
     return Parse##T(value, result)
 #define ACCEPT_EXPR(n, result) \
-  if (name != n) {             \
+  if (name != (n)) {           \
   } else                       \
     return ParseFloatExpr(value, result)
 

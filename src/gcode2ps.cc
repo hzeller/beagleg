@@ -1005,9 +1005,9 @@ class SegmentQueuePrinter final : public SegmentQueue {
                    param.steps[AXIS_Z]);
         }
 
-#define TO_ABS_AXIS(a)                                                    \
-  (float(current_pos_[a]) + float((i + 1) * param.steps[a]) / segments) / \
-    config_.steps_per_mm[a]
+#define TO_ABS_AXIS(a)                                                     \
+  ((float(current_pos_[a]) + float((i + 1) * param.steps[a]) / segments) / \
+   config_.steps_per_mm[a])
 
         device_->lineto(TO_ABS_AXIS(AXIS_X), TO_ABS_AXIS(AXIS_Y),
                         TO_ABS_AXIS(AXIS_Z), comment);

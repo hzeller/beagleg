@@ -89,7 +89,7 @@ class SpindleConfigReader : public ConfigParser::Reader {
   bool SeenNameValue(int line_no, const std::string &name,
                      const std::string &value) final {
     // clang-format off
-#define ACCEPT_VALUE(n, T, result) if (name != n) {} else return Parse##T(value, result)
+#define ACCEPT_VALUE(n, T, result) if (name != (n)) {} else return Parse##T(value, result)
     ACCEPT_VALUE("type",           String, &config_->type);
     ACCEPT_VALUE("port",           String, &config_->port);
     ACCEPT_VALUE("max-rpm",        Int,    &config_->max_rpm);
