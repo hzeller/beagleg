@@ -52,9 +52,7 @@ if [ -s ${TIDY_OUT} ]; then
     echo "::endgroup::"
 
     echo "::error::There were clang-tidy warnings. Please fix"
-    echo "::warning::This will be a CI failure soon. For now just FYI and waived until baseline is fixed."
-    exit 0
-    #exit 1  # not yet.
+    exit 1
 fi
 
 echo "No clang-tidy complaints.😎"
