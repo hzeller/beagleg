@@ -24,7 +24,7 @@ struct MockPRUCommunication {
   MotionSegment ring_buffer[QUEUE_LEN];
 } __attribute__((packed));
 
-class MockPRUInterface : public PruHardwareInterface {
+class MockPRUInterface final : public PruHardwareInterface {
  public:
   MockPRUInterface() : execution_index_(QUEUE_LEN - 1) { mmap = NULL; }
   ~MockPRUInterface() final { free(mmap); }
