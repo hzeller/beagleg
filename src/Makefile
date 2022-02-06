@@ -105,10 +105,13 @@ test-html: test-out/test.html
 test-out/test.html: gcode2ps test-create-html.sh testdata/*.gcode
 	./test-create-html.sh testdata/*.gcode
 
-local-tests: $(UNITTEST_BINARIES)
+test-binaries: $(UNITTEST_BINARIES)
+	for d in $(SUBDIRS) ; do $(MAKE) -C $$d test-binaries || exit 1; done
+
+local-tests: test-binaries
 	for test_bin in $(UNITTEST_BINARIES) ; do echo ; echo $$test_bin; ./$$test_bin || exit 1 ; done
 
-local-valgrind-tests: $(UNITTEST_BINARIES)
+local-valgrind-tests: test-binaries
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
 
 test: local-tests
