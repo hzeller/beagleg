@@ -1220,7 +1220,7 @@ void GCodeParser::Impl::InitCoordSystems() {
     bool set = false;
     int offset = i * 20;
     value = 0.0;
-    std::string coords = "";
+    std::string coords;
     for (GCodeParserAxis axis : AllAxes()) {
       read_parameter(StringPrintf("%d", 5221 + offset + axis), &value);
       coord_system_[i][axis] = machine_origin_[axis] + value;

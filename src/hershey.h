@@ -37,6 +37,6 @@ enum class TextAlign { kLeft, kCenter, kRight };
 // The function makes it independent of any output device and easy to
 // adapt in any environment.
 void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
-              std::function<void(bool do_line, float x, float y)> draw);
+              const std::function<void(bool do_line, float x, float y)>& draw);
 
 #endif  // _BEAGLEG_HERSHEY_H_
