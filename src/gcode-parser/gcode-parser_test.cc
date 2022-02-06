@@ -1,7 +1,7 @@
 /* -*- mode: c++; c-basic-offset: 2; indent-tabs-mode: nil; -*-
  * Test for gcode parser.
  */
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
 
 #include <gtest/gtest.h>
 #include <math.h>

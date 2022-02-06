@@ -23,11 +23,7 @@
 
 #include <functional>
 
-#if 0
-#include "logging.h"
-#endif
-
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
 
 // Arc generation based on smoothieware implementation
 // https://github.com/Smoothieware/Smoothieware.git

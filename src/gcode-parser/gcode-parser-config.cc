@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "common/logging.h"
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
 
 bool GCodeParser::Config::LoadParams() {
   if (paramfile.empty()) return false;

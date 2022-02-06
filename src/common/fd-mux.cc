@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "fd-mux.h"
+#include "common/fd-mux.h"
 
 #include <errno.h>
 #include <signal.h>
@@ -27,7 +27,7 @@
 
 #include <algorithm>
 
-#include "logging.h"
+#include "common/logging.h"
 
 // A signal that should trigger exiting the loop
 static volatile sig_atomic_t caught_exit_trigger_signal = 0;

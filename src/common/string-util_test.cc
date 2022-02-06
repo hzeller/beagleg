@@ -17,7 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "string-util.h"
+#include "common/string-util.h"
 
 #include <gtest/gtest.h>
 

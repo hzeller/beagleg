@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "gcode-streamer.h"
+#include "gcode-parser/gcode-streamer.h"
 
 #include <fcntl.h>
 #include <string.h>

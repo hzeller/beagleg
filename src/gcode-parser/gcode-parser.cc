@@ -23,7 +23,7 @@
 //  - Rotational axes are not dealt with properly at this point. E.g.
 //    degrees also get multiplied with imperial factors :)
 
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -41,7 +41,7 @@
 
 #include "common/logging.h"
 #include "common/string-util.h"
-#include "simple-lexer.h"
+#include "gcode-parser/simple-lexer.h"
 
 const AxisBitmap_t kAllAxesBitmap =
   ((1 << AXIS_X) | (1 << AXIS_Y) | (1 << AXIS_Z) |  //

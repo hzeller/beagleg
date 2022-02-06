@@ -16,9 +16,9 @@
  * You should have received a copy of the GNU General Public License
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "linebuf-reader.h"
+#include "common/linebuf-reader.h"
 
-#include "string-util.h"
+#include "common/string-util.h"
 
 LinebufReader::LinebufReader(size_t buffer_size)
     : len_(buffer_size),

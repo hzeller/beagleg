@@ -17,7 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "linebuf-reader.h"
+#include "common/linebuf-reader.h"
 
 #include <gtest/gtest.h>
 

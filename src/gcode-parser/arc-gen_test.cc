@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-#include "gcode-parser.h"
+#include "gcode-parser/gcode-parser.h"
 
 // Going around the circle for start-points with this step.
 #define TEST_ARC_STEP (2 * M_PI / 255)

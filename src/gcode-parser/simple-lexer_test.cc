@@ -17,7 +17,7 @@
  * along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "simple-lexer.h"
+#include "gcode-parser/simple-lexer.h"
 
 #include <gtest/gtest.h>
 
