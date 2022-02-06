@@ -175,10 +175,10 @@ class HardwareMapping {
   // with SetAuxOutput()).
   void UpdateAuxBits(int pin, bool is_on);
 
-  // Set logic output value to on/off for the particular logic output.
+  // Set logic output value to on/off for the particular named logic output.
   // Only updates the aux_bits_ does not set the output (can be done
   // with SetAuxOutput()).
-  void UpdateAuxBitmap(NamedOutput type, bool value);
+  void UpdateAuxBitmap(NamedOutput type, bool is_on);
 
   // Set the output according to the aux_bits_ immediately (unbuffered).
   // There are some cases in which this is necessary, but usually

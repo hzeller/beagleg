@@ -265,8 +265,8 @@ static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   return defining_axis_steps;
 }
 
-bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
-  const int defining_axis_steps = get_defining_axis_steps(param);
+bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &segment) {
+  const int defining_axis_steps = get_defining_axis_steps(segment);
   bool ret;
 
   if (defining_axis_steps == 0) {
@@ -275,10 +275,10 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
 
     // No move, but we still have to set the bits.
     struct MotionSegment empty_element = {};
-    empty_element.aux = param.aux_bits;
+    empty_element.aux = segment.aux_bits;
     empty_element.state = STATE_FILLED;
 
-    history_segment.aux_bits = param.aux_bits;
+    history_segment.aux_bits = segment.aux_bits;
     shadow_queue_->push_front(history_segment);
 
     ret = backend_->Enqueue(&empty_element);
@@ -286,20 +286,21 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
     // We have more steps that we can enqueue in one chunk, so let's cut
     // it in pieces.
     const double a =
-      (sqd(param.v1) - sqd(param.v0)) / (2.0 * defining_axis_steps);
+      (sqd(segment.v1) - sqd(segment.v0)) / (2.0 * defining_axis_steps);
     const int divisions = (defining_axis_steps / MAX_STEPS_PER_SEGMENT) + 1;
     int64_t hires_steps_per_div[BEAGLEG_NUM_MOTORS];
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       // (+1 to fix rounding trouble in the LSB)
-      hires_steps_per_div[i] = ((int64_t)param.steps[i] << 32) / divisions + 1;
+      hires_steps_per_div[i] =
+        ((int64_t)segment.steps[i] << 32) / divisions + 1;
     }
 
     struct LinearSegmentSteps previous = {}, accumulator = {}, output;
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
-    double previous_speed = param.v0;  // speed calculation in double
+    double previous_speed = segment.v0;  // speed calculation in double
 
     output.aux_bits =
-      param.aux_bits;  // use the original Aux bits for all segments
+      segment.aux_bits;  // use the original Aux bits for all segments
     for (int d = 0; d < divisions; ++d) {
       for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
         hires_step_accumulator[i] += hires_steps_per_div[i];
@@ -324,7 +325,7 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &param) {
       previous_speed = v1;
     }
   } else {
-    ret = EnqueueInternal(param, defining_axis_steps);
+    ret = EnqueueInternal(segment, defining_axis_steps);
   }
   // Shrink the queue and remove the elements that we are not interested
   // in anymore.

@@ -85,18 +85,19 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
   void gcode_block_done() final;
   void input_idle(bool is_first) final;
   void wait_for_start() final;
-  void go_home(AxisBitmap_t axis_bitmap) final;
+  void go_home(AxisBitmap_t axes_bitmap) final;
   bool probe_axis(float feed_mm_p_sec, enum GCodeParserAxis axis,
                   float *probed_position) final;
   void set_speed_factor(float factor) final;    // M220 feedrate factor 0..1
-  void set_fanspeed(float value) final;         // M106, M107: speed 0...255
+  void set_fanspeed(float speed) final;         // M106, M107: speed 0...255
   void set_temperature(float degrees_c) final;  // M104, M109: Set in Celsius
   void wait_temperature() final;                // M109, M116: Wait reached.
   void dwell(float time_ms) final;              // G4: dwell for milliseconds.
   void motors_enable(bool enable) final;        // M17,M84,M18: Switch motors.
   void clamp_to_range(AxisBitmap_t affected, AxesRegister *axes) final;
-  bool coordinated_move(float feed_mm_p_sec, const AxesRegister &target) final;
-  bool rapid_move(float feed_mm_p_sec, const AxesRegister &target) final;
+  bool coordinated_move(float feed_mm_p_sec,
+                        const AxesRegister &absolute_pos) final;
+  bool rapid_move(float feed_mm_p_sec, const AxesRegister &absolute_pos) final;
   const char *unprocessed(char letter, float value, const char *) final;
 
  private:
@@ -341,16 +342,16 @@ void GCodeMachineControl::Impl::mprintf(const char *format, ...) {
 }
 
 // Dummy implementations of callbacks not yet handled.
-void GCodeMachineControl::Impl::set_temperature(float f) {
-  mprintf("// BeagleG: set_temperature(%.1f) not implemented.\n", f);
+void GCodeMachineControl::Impl::set_temperature(float degrees_c) {
+  mprintf("// BeagleG: set_temperature(%.1f) not implemented.\n", degrees_c);
 }
 void GCodeMachineControl::Impl::wait_temperature() {
   mprintf("// BeagleG: wait_temperature() not implemented.\n");
 }
-void GCodeMachineControl::Impl::motors_enable(bool b) {
+void GCodeMachineControl::Impl::motors_enable(bool enable) {
   planner_->BringPathToHalt();
-  motor_ops_->MotorEnable(b);
-  if (!b && homing_state_ == GCodeMachineControl::HomingState::HOMED) {
+  motor_ops_->MotorEnable(enable);
+  if (!enable && homing_state_ == GCodeMachineControl::HomingState::HOMED) {
     homing_state_ =
       GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED;
   }
@@ -811,10 +812,10 @@ void GCodeMachineControl::Impl::clamp_to_range(AxisBitmap_t affected,
   }
 }
 
-bool GCodeMachineControl::Impl::coordinated_move(float feed,
-                                                 const AxesRegister &axis) {
+bool GCodeMachineControl::Impl::coordinated_move(
+  float feed, const AxesRegister &absolute_pos) {
   if (!test_homing_status_ok()) return false;
-  if (!test_within_machine_limits(axis)) return false;
+  if (!test_within_machine_limits(absolute_pos)) return false;
   if (feed > 0) {
     current_feedrate_mm_per_sec_ = cfg_.speed_factor * feed;
   }
@@ -824,41 +825,41 @@ bool GCodeMachineControl::Impl::coordinated_move(float feed,
   }
 
   float feedrate = prog_speed_factor_ * current_feedrate_mm_per_sec_;
-  if (!planner_->Enqueue(axis, feedrate)) {
+  if (!planner_->Enqueue(absolute_pos, feedrate)) {
     if (check_for_estop()) return false;
   }
   return true;
 }
 
 bool GCodeMachineControl::Impl::rapid_move(float feed,
-                                           const AxesRegister &axis) {
+                                           const AxesRegister &absolute_pos) {
   if (!test_homing_status_ok()) return false;
-  if (!test_within_machine_limits(axis)) return false;
+  if (!test_within_machine_limits(absolute_pos)) return false;
   float rapid_feed = g0_feedrate_mm_per_sec_;
   const float given = cfg_.speed_factor * prog_speed_factor_ * feed;
   if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
     current_feedrate_mm_per_sec_ = given;  // At least something for G1.
   }
-  if (!planner_->Enqueue(axis, given > 0 ? given : rapid_feed)) {
+  if (!planner_->Enqueue(absolute_pos, given > 0 ? given : rapid_feed)) {
     if (check_for_estop()) return false;
   }
   return true;
 }
 
-void GCodeMachineControl::Impl::dwell(float value) {
+void GCodeMachineControl::Impl::dwell(float time_ms) {
   planner_->BringPathToHalt();
   motor_ops_->WaitQueueEmpty();
   if (hardware_mapping_->IsHardwareSimulated()) {
-    if (value > 999.0) {
+    if (time_ms > 999.0) {
       // Let some interactive user know that they can't expect dwell time here.
       mprintf("// FYI: hardware simulated. All dwelling is immediate.\n",
-              value);
+              time_ms);
     }
   } else {
     // TODO: this needs to wait in the event multiplexer.
     // Since we might need pretty high precision (see rpt2pnp), this can't
     // just be quantized to 50ms.
-    usleep((int)(value * 1000));
+    usleep(static_cast<useconds_t>((time_ms * 1000)));
   }
 
   if (!check_for_estop()) {
@@ -891,16 +892,16 @@ void GCodeMachineControl::Impl::input_idle(bool is_first) {
   check_for_estop();
 }
 
-void GCodeMachineControl::Impl::set_speed_factor(float value) {
-  if (value < 0) {
-    value = 1.0f + value;  // M220 S-10 interpreted as: 90%
+void GCodeMachineControl::Impl::set_speed_factor(float factor) {
+  if (factor < 0) {
+    factor = 1.0f + factor;  // M220 S-10 interpreted as: 90%
   }
-  if (value < 0.005) {
+  if (factor < 0.005) {
     mprintf("// M220: Not accepting speed factors < 0.5%% (got %.1f%%)\n",
-            100.0f * value);
+            100.0f * factor);
     return;
   }
-  prog_speed_factor_ = value;
+  prog_speed_factor_ = factor;
 }
 
 // Moves to endstop and returns how many steps it moved in the process.
@@ -983,9 +984,9 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
   homing_state_ = GCodeMachineControl::HomingState::HOMED;
 }
 
-bool GCodeMachineControl::Impl::probe_axis(float feedrate,
+bool GCodeMachineControl::Impl::probe_axis(float feed_mm_p_sec,
                                            enum GCodeParserAxis axis,
-                                           float *probe_result) {
+                                           float *probed_position) {
   if (!test_homing_status_ok()) return false;
 
   planner_->BringPathToHalt();
@@ -1005,14 +1006,14 @@ bool GCodeMachineControl::Impl::probe_axis(float feedrate,
   HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
   const int dir = home_trigger == HardwareMapping::TRIGGER_MIN ? 1 : -1;
 
-  if (feedrate <= 0) feedrate = 20;
+  if (feed_mm_p_sec <= 0) feed_mm_p_sec = 20;
   int max_steps = abs(cfg_.move_range_mm[axis] * cfg_.steps_per_mm[axis]);
-  int total_steps = move_to_probe(axis, feedrate, dir, max_steps);
+  int total_steps = move_to_probe(axis, feed_mm_p_sec, dir, max_steps);
   float distance_moved = total_steps / cfg_.steps_per_mm[axis];
 
   const float new_pos = machine_pos[axis] + distance_moved;
   planner_->SetExternalPosition(axis, new_pos);
-  *probe_result = new_pos;
+  *probed_position = new_pos;
   return true;
 }
 
@@ -1020,10 +1021,10 @@ GCodeMachineControl::GCodeMachineControl(Impl *impl) : impl_(impl) {}
 GCodeMachineControl::~GCodeMachineControl() { delete impl_; }
 
 GCodeMachineControl *GCodeMachineControl::Create(
-  const MachineControlConfig &config, SegmentQueue *motor_ops,
+  const MachineControlConfig &config, SegmentQueue *segment_queue,
   HardwareMapping *hardware_mapping, Spindle *spindle, FILE *msg_stream) {
   Impl *result =
-    new Impl(config, motor_ops, hardware_mapping, spindle, msg_stream);
+    new Impl(config, segment_queue, hardware_mapping, spindle, msg_stream);
   if (!result->Init()) {
     delete result;
     return NULL;

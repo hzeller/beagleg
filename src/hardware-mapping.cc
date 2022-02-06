@@ -312,10 +312,10 @@ HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(
   return (AxisTrigger)result;  // Safe to cast: all within range.
 }
 
-bool HardwareMapping::TestSwitch(const int switch_number, bool def_result) {
-  if (!is_hardware_initialized_) return def_result;
+bool HardwareMapping::TestSwitch(const int switch_number, bool default_result) {
+  if (!is_hardware_initialized_) return default_result;
   GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
-  if (gpio_def == GPIO_NOT_MAPPED) return def_result;
+  if (gpio_def == GPIO_NOT_MAPPED) return default_result;
   bool state = get_gpio(gpio_def);
   int debounce = 0;
   for (;;) {

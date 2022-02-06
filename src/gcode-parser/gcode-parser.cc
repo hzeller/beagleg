@@ -206,7 +206,7 @@ class GCodeParser::Impl {
   const char *gcodep_operation_unary(const char *line, Operation *op);
   const char *gcodep_unary(const char *line, float *value);
 
-  bool execute_binary(float *left, Operation op, float *right);
+  bool execute_binary(float *left, Operation op, const float *right);
   const char *gcodep_operation(const char *line, Operation *op);
 
   const char *gcodep_expression(const char *line, float *value);
@@ -735,7 +735,7 @@ const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
 }
 
 bool GCodeParser::Impl::execute_binary(float *left, Operation op,
-                                       float *right) {
+                                       const float *right) {
   float val = *left;
   switch (op) {
   case POWER:

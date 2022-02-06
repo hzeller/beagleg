@@ -120,7 +120,7 @@ static int fyi_option_gone(const char *prog) {
 // Call with <uid>:<gid> string.
 static bool drop_privileges(StringPiece privs) {
   std::vector<StringPiece> pair = SplitString(privs, ":");
-  if (pair.size() < 1 || pair.size() > 2) {
+  if (pair.empty() || pair.size() > 2) {
     Log_error("Drop privileges: Require colon separated <uid>[:<gid>]");
     return false;
   }

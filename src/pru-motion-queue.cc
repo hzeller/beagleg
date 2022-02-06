@@ -124,12 +124,12 @@ static void unaligned_memcpy(volatile void *dest, const void *src,
   }
 }
 
-bool PRUMotionQueue::Enqueue(MotionSegment *element) {
-  const uint8_t state_to_send = element->state;
+bool PRUMotionQueue::Enqueue(MotionSegment *segment) {
+  const uint8_t state_to_send = segment->state;
   assert(state_to_send != STATE_EMPTY);  // forgot to set proper state ?
   // Initially, we copy everything with 'STATE_EMPTY', then flip the state
   // to avoid a race condition while copying.
-  element->state = STATE_EMPTY;
+  segment->state = STATE_EMPTY;
 
   queue_pos_ %= QUEUE_LEN;
   while (pru_data_->ring_buffer[queue_pos_].state != STATE_EMPTY) {
@@ -141,7 +141,7 @@ bool PRUMotionQueue::Enqueue(MotionSegment *element) {
   }
 
   volatile MotionSegment *queue_element = &pru_data_->ring_buffer[queue_pos_++];
-  unaligned_memcpy(queue_element, element, sizeof(*queue_element));
+  unaligned_memcpy(queue_element, segment, sizeof(*queue_element));
 
   // Fully initialized. Tell busy-waiting PRU by flipping the state.
   queue_element->state = state_to_send;

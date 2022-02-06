@@ -89,7 +89,7 @@ class GCodeMachineControl {
   // msg_stream, if non-NULL, sends back return messages on the GCode channel.
   // Returns NULL on failure.
   static GCodeMachineControl *Create(const MachineControlConfig &config,
-                                     SegmentQueue *motor_backend,
+                                     SegmentQueue *segment_queue,
                                      HardwareMapping *hardware_mapping,
                                      Spindle *spindle, FILE *msg_stream);
 

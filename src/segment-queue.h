@@ -76,7 +76,7 @@ class SegmentQueue {
   // Set absolute position of given axis as provided from some external
   // source (e.g. homing). This will allow accurate reporting of the
   // PhysicalStatus.
-  virtual void SetExternalPosition(int axis, int steps) = 0;
+  virtual void SetExternalPosition(int axis, int position_steps) = 0;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

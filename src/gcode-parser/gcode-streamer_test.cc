@@ -109,7 +109,9 @@ class StreamTester : public GCodeParser::EventReceiver {
   MockStream *stream_mock_;
 };
 
-using namespace ::testing;
+using testing::_;
+using testing::FloatEq;
+using testing::InSequence;
 
 // The new line is the "send" character. If we disconnect and the linebuffer
 // has not completed the last line, we should parse it anyway.

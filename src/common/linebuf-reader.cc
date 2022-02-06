@@ -20,8 +20,8 @@
 
 #include "string-util.h"
 
-LinebufReader::LinebufReader(size_t buf_size)
-    : len_(buf_size),
+LinebufReader::LinebufReader(size_t buffer_size)
+    : len_(buffer_size),
       buffer_start_(new char[len_]),
       buffer_end_(buffer_start_ + len_),
       content_start_(buffer_start_),

@@ -46,6 +46,7 @@ class FixedArray {
   FixedArray(const FixedArray<T, N, IDX> &other) { CopyFrom(other); }
 
   FixedArray<T, N, IDX> &operator=(const FixedArray<T, N, IDX> &other) {
+    if (&other == this) return *this;
     CopyFrom(other);
     return *this;
   }

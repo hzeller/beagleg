@@ -31,10 +31,10 @@ static const char *skip_white(const char *line) {
 
 class SimpleLexerBase::Node {
  public:
-  Node() : value(0) { memset(&next_character, 0, 256 * sizeof(Node *)); }
+  Node() {}
 
-  Node *next_character[256];
-  int value;
+  Node *next_character[256] = {};
+  int value = 0;
 };
 
 SimpleLexerBase::SimpleLexerBase() : root_(new Node()) {}

@@ -244,7 +244,7 @@ class GCodeParser::EventReceiver {
   virtual void change_spindle_speed(float value) {}
 
   virtual void set_speed_factor(float factor) = 0;  // M220 feedrate factor 0..1
-  virtual void set_fanspeed(float value) = 0;       // M106, M107: speed 0...255
+  virtual void set_fanspeed(float speed) = 0;       // M106, M107: speed 0...255
   virtual void set_temperature(
     float degrees_c) = 0;                 // M104, M109: Set temp. in Celsius
   virtual void wait_temperature() = 0;    // M109, M116: Wait for temp. reached.

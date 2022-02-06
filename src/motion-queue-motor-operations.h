@@ -36,7 +36,7 @@ class MotionQueueMotorOperations : public SegmentQueue {
   void MotorEnable(bool on) final;
   void WaitQueueEmpty() final;
   bool GetPhysicalStatus(PhysicalStatus *status) final;
-  void SetExternalPosition(int axis, int pos) final;
+  void SetExternalPosition(int axis, int position_steps) final;
 
  private:
   bool EnqueueInternal(const LinearSegmentSteps &param,
