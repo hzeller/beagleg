@@ -164,11 +164,13 @@ class Device {
   void DrawGrid(const AxesRange &r, float d) {
     emit_comment("-- Grid");
     fprintf(file_, "GcodeGridColor setrgbcolor 0 setlinewidth\n");
-    for (float x = start_grid(r.min(AXIS_X), d); x < r.max(AXIS_X); x += d) {
+    for (float x = start_grid(r.min(AXIS_X), d); x < r.max(AXIS_X);  // NOLINT
+         x += d) {
       fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n", x,
               r.min(AXIS_Y), r.min(AXIS_Z), x, r.max(AXIS_Y), r.min(AXIS_Z));
     }
-    for (float y = start_grid(r.min(AXIS_Y), d); y < r.max(AXIS_Y); y += d) {
+    for (float y = start_grid(r.min(AXIS_Y), d); y < r.max(AXIS_Y);  // NOLINT
+         y += d) {
       fprintf(file_, "%.3f %.3f %.3f moveto3d %.3f %.3f %.3f lineto3d\n",
               r.min(AXIS_X), y, r.min(AXIS_Z), r.max(AXIS_X), y, r.min(AXIS_Z));
     }
