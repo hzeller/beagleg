@@ -463,8 +463,9 @@ class Device {
   // Set intensity of line, e.g. for laser engraving.
   void set_intensity(float value) { fprintf(file_, "%.2f setgray ", value); }
 
-  void MeasureLine(float min, float max, float size, bool show_metric,
-                   std::function<void(bool do_line, float c1, float c2)> draw) {
+  void MeasureLine(
+    float min, float max, float size, bool show_metric,
+    const std::function<void(bool do_line, float c1, float c2)> &draw) {
     float width = max - min;
     if (width < 3 * size) return;
     draw(false, 0, -size);

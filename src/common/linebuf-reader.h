@@ -62,7 +62,7 @@ class LinebufReader {
   // If you made sure that there is data available before calling Update(),
   // this will not block.
   // Returns the value returned by ReadFun.
-  ssize_t Update(ReadFun read_fun);
+  ssize_t Update(const ReadFun &read_fun);
 
   // The tpical way this will be called: with a file descriptor that has some
   // bytes ready.

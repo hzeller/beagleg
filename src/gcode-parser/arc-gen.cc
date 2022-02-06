@@ -51,7 +51,7 @@ static bool arc_gen(
   AxesRegister *position_out,        // start position. Will be updated.
   const AxesRegister &center,        // Offset to center.
   const AxesRegister &target,        // Target position.
-  std::function<bool(const AxesRegister &)> segment_output) {
+  const std::function<bool(const AxesRegister &)> &segment_output) {
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
   switch (normal_axis) {
@@ -168,7 +168,7 @@ static AxesRegister calc_bezier_point(float t, const AxesRegister &p0,
 static bool spline_gen(
   const AxesRegister &start, const AxesRegister &cp1, const AxesRegister &cp2,
   const AxesRegister &target,
-  std::function<bool(const AxesRegister &pos)> segment_output) {
+  const std::function<bool(const AxesRegister &pos)> &segment_output) {
 #if 0
   Log_debug("spline_gen: start:%.3f,%.3f cp1:%.3f,%.3f cp2:%.3f,%.3f end:%.3f,%.3f\n",
             position[AXIS_X], position[AXIS_Y],

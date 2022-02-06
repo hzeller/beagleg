@@ -29,7 +29,7 @@ LinebufReader::LinebufReader(size_t buf_size)
       cr_seen_(false) {}
 LinebufReader::~LinebufReader() { delete[] buffer_start_; }
 
-ssize_t LinebufReader::Update(ReadFun read_fun) {
+ssize_t LinebufReader::Update(const ReadFun &read_fun) {
   if (content_start_ - buffer_start_ > (int)(len_ / 2)) {
     const size_t copy_len = size();
     memmove(buffer_start_, content_start_, copy_len);
