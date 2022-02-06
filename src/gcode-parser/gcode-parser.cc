@@ -260,6 +260,7 @@ class GCodeParser::Impl {
 
   // Read parameter. Do range check.
   bool read_parameter(StringPiece param_name, float *result) const {
+    *result = 0;
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
     Config::ParamMap::const_iterator found =
@@ -736,7 +737,7 @@ const char *GCodeParser::Impl::gcodep_unary(const char *line, float *value) {
 
 bool GCodeParser::Impl::execute_binary(float *left, Operation op,
                                        const float *right) {
-  float val = *left;
+  float val;
   switch (op) {
   case POWER:
     if (*left < 0.0f && floor(*right) != *right) {
@@ -1016,7 +1017,7 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
   endptr = gcodep_expression(line + 1, &value);
   if (line == endptr || endptr == NULL) return;
 
-  const bool condition = (value == 1.0f) ? true : false;
+  const bool condition = (value == 1.0f);
 
   line = skip_white(endptr);
   if (!control_parse_.ExpectNext(&line, CK_THEN)) {
@@ -1026,7 +1027,7 @@ void GCodeParser::Impl::gcodep_conditional(const char *line) {
   }
 
   line = skip_white(line);
-  if (condition == true) {
+  if (condition) {
     // parse the true condition
     if (*line == '#') {
       gcodep_set_parameter(++line);

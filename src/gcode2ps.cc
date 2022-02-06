@@ -1077,7 +1077,7 @@ class SegmentQueuePrinter final : public SegmentQueue {
 
 static int usage(const char *progname, bool description = false) {
   std::string view_names;
-  for (auto it : kNamedViews) {
+  for (const auto &it : kNamedViews) {
     if (!view_names.empty()) view_names.append(", ");
     view_names.append(it.first);
   }
@@ -1202,7 +1202,7 @@ bool AppendViewOp(const std::string &view, std::vector<std::string> *result) {
     return true;
   } else {
     fprintf(stderr, "-V: Available views are valid prefix matches of ");
-    for (auto it : kNamedViews) {
+    for (const auto &it : kNamedViews) {
       fprintf(stderr, "'%s' ", it.first.c_str());
     }
     fprintf(stderr, "\n");
