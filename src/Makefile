@@ -49,7 +49,7 @@ BEAGLEG_OPT_CFLAGS?=-O3
 
 GIT_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/null || echo "[unknown version - compile from git]")
 
-CFLAGS+=-Wall -Wextra -W -Wno-unused-parameter -I. -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"' -DBEAGLEG_VERSION='"$(GIT_VERSION)"'
+CFLAGS+=-Wall -Wextra -W -Wno-unused-parameter -I$(shell pwd) -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"' -DBEAGLEG_VERSION='"$(GIT_VERSION)"'
 
 # We use c++11 and require at least gcc-4.7.
 # Note: older beaglebone wheezy images have even older compilers, but you can
