@@ -32,7 +32,7 @@ class PruHardwareInterface {
   virtual bool Init() = 0;
 
   // Retrieve the pointer of the pru mapping and initialize the memory.
-  virtual bool AllocateSharedMem(void **pru_mmap, const size_t size) = 0;
+  virtual bool AllocateSharedMem(void **pru_mmap, size_t size) = 0;
 
   // Enable the PRU and start predetermined program.
   virtual bool StartExecution() = 0;
@@ -47,7 +47,7 @@ class PruHardwareInterface {
 class UioPrussInterface : public PruHardwareInterface {
  public:
   bool Init() final;
-  bool AllocateSharedMem(void **pru_mmap, const size_t size) final;
+  bool AllocateSharedMem(void **pru_mmap, size_t size) final;
   bool StartExecution() final;
   unsigned WaitEvent() final;
   bool Shutdown() final;

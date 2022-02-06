@@ -25,7 +25,7 @@
 // Frequency we use for our timer. The CPU uses two CPU cycles per busy loop,
 // so we divide CPU freq by that.
 // A hardware timer might run natively at full speed.
-#define TIMER_FREQUENCY (200000000 / 2)
+#define TIMER_FREQUENCY (200000000.0 / 2)
 
 #define STATE_EMPTY  0  // Queue element empty, ready to be filled by host
 #define STATE_FILLED 1  // Queue element filled by host, to be picked up by PRU

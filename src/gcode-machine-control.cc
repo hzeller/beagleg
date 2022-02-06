@@ -117,7 +117,7 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
                               enum GCodeParserAxis defining_axis);
   int move_to_endstop(enum GCodeParserAxis axis, float feedrate,
                       HardwareMapping::AxisTrigger trigger);
-  int move_to_probe(enum GCodeParserAxis axis, float feedrate, const int dir,
+  int move_to_probe(enum GCodeParserAxis axis, float feedrate, int dir,
                     int max_steps);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::NamedOutput out, bool is_on);

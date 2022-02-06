@@ -270,7 +270,7 @@ class HardwareMapping {
 
   // Test current state of given switch number; if not configured, return
   // default result.
-  bool TestSwitch(const int switch_number, bool default_result);
+  bool TestSwitch(int switch_number, bool default_result);
 
   void ResetHardware();  // Initialize to a safe state.
 
