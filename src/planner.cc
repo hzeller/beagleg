@@ -89,15 +89,19 @@ struct AxisTarget {
   }
 };
 
-// Define values that might change depending on new segments added to
-// the planning buffer.
-// Currently planned profile for an AxisTarget.
-//    |  v1
-//    |   /¯¯¯¯¯¯¯¯¯¯\
-//    |  /            \ v2
-//    | /
-// v0 |/________________
-//      acc  travel   dec
+/*
+**
+** Define values that might change depending on new segments added to
+** the planning buffer.
+** Currently planned profile for an AxisTarget.
+**    |  v1
+**    |   /¯¯¯¯¯¯¯¯¯¯\
+**    |  /            \ v2
+**    | /
+** v0 |/________________
+**      acc  travel   dec
+**
+*/
 struct PlannedProfile {
   uint32_t accel, travel, decel;  // Steps of the defining axis for each ramp
   double v0, v1, v2;              // Speed(steps/s) of the defining axis,
@@ -246,8 +250,8 @@ static double get_speed_factor_for_axis(const struct AxisTarget *t,
   if (t->delta_steps[t->defining_axis] == 0) return 0.0;
   return (request_axis == t->defining_axis)
            ? 1.0
-           : 1.0 * fabs(t->delta_steps[request_axis] /
-                        t->delta_steps[t->defining_axis]);
+           : fabs(1.0 * t->delta_steps[request_axis] /
+                  t->delta_steps[t->defining_axis]);
 }
 
 // Get the speed for a particular axis. Depending on the direction, this can
@@ -473,7 +477,6 @@ bool Planner::Impl::issue_motor_move_if_possible(
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i)
       move_command.steps[i] -= accel_command.steps[i] + decel_command.steps[i];
 
-
     move_command.v0 = segment->planned.v1;
     move_command.v1 = segment->planned.v1;
 
@@ -643,10 +646,11 @@ void Planner::Impl::UpdateMotionProfile() {
     // next_speed is the speed of the next defining axis segment.
     // We want to have continuous speeds. We calculate what would be that speed
     // for the new defininx axis.
+    const auto speed_factor =
+      get_speed_factor_for_axis(&segment->target, defining_axis);
+
     const double segment_end_speed =
-      (speed != 0)
-        ? speed / get_speed_factor_for_axis(&segment->target, defining_axis)
-        : 0;
+      (speed_factor != 0) ? speed / speed_factor : 0;
 
     // Check if we intersect with a previously planned segment.
     // If we do, then we stop here. No need to compute the accel. It will happen
@@ -703,8 +707,10 @@ void Planner::Impl::UpdateMotionProfile() {
     segment = planning_buffer_[buffer_index];
     const auto speed_factor =
       get_speed_factor_for_axis(&segment->target, defining_axis);
-    const double segment_start_speed = (speed != 0) ? speed / speed_factor : 0;
+    const double segment_start_speed =
+      (speed_factor != 0) ? speed / speed_factor : 0;
     defining_axis = segment->target.defining_axis;
+    segment->planned.v0 = segment_start_speed;
 
     // Recompute the accel ramp if necessary.
     if (segment->planned.v1 == 0) {
@@ -736,9 +742,11 @@ void Planner::Impl::UpdateMotionProfile() {
 
     // We don't intersect with travel.
     segment->planned.travel = 0;
+    const double end_speed =
+      uar_speed(steps, segment_start_speed, segment->target.accel);
 
     // We do only accel and decel, no travel.
-    if (steps_to_vmax <= steps) {
+    if (end_speed > segment->planned.v2) {
       // NOTE(lromor): Here we are searching for the amount of steps at which
       // two accel-decel profiles would converge. If this value ends up being
       // very close to the end length of the segment, it means that we might
@@ -766,8 +774,7 @@ void Planner::Impl::UpdateMotionProfile() {
 
     // At the end of the segment we fall below v2, means
     // we remove any travel and decel.
-    const double end_speed = uar_speed(steps, speed, segment->target.accel);
-    segment->planned = {steps, 0, 0, speed, end_speed, end_speed};
+    segment->planned = {steps, 0, 0, segment_start_speed, end_speed, end_speed};
     speed = end_speed;
   }
 }

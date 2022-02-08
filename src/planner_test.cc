@@ -74,7 +74,7 @@ class FakeMotorOperations : public SegmentQueue {
       : config_(config) {}
 
   bool Enqueue(const LinearSegmentSteps &segment) final {
-#if 1
+#if 0
     // Prepare for printing.
 
     // Let's convert the velocities into Euclidian space again.
@@ -505,16 +505,18 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   }
 }
 
-// Check the scenario in which we have two segment steps
-// at the same requested feedrate, but the acceleration is high
-// enough that the previous segment needs a forward pass as well.
-// Currently planned profile for an AxisTarget.
-//    |___________
-//    |   /¯\
-//    |  /   \ v2
-//    | /\    \
-// v0 |/__\____\_________
-//                       t
+/*
+** Check the scenario in which we have two segment steps
+** at the same requested feedrate, but the acceleration is high
+** enough that the previous segment needs a forward pass as well.
+** Currently planned profile for an AxisTarget.
+**    |___________
+**    |   /¯\
+**    |  /   \ v2
+**    | /\    \
+** v0 |/__\____\_________
+**                       t
+*/
 TEST(PlannerTest, StraightLine_TwoSegmentsNeedsForwardPass) {}
 
 // Executing multiple short steps on a line should
