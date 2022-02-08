@@ -62,9 +62,9 @@ struct AxisTarget {
   double start_speed;  // Starting speed of the segment (steps/s).
   double speed;        // Maximum speed of the defining axis (steps/s).
   double accel;        // Maximum acceleration of the defining axis (steps/s^2).
-  unsigned short aux_bits;  // Auxillary bits in this segment; set with M42
-  double dx, dy, dz;        // 3D delta_steps in real units (mm)
-  double len;               // 3D length (mm)
+  uint16_t aux_bits;   // Auxillary bits in this segment; set with M42
+  double dx, dy, dz;   // 3D delta_steps in real units (mm)
+  double len;          // 3D length (mm)
 
   std::string ToString() const {
     std::ostringstream ss;
