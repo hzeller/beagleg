@@ -251,6 +251,15 @@ static size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
   return motor_index;
 }
 
+size_t get_defining_motor(const LinearSegmentSteps &segment) {
+  size_t motor_index = 0;
+  for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    if (abs(segment.steps[i]) > abs(segment.steps[motor_index]))
+      motor_index = i;
+  }
+  return motor_index;
+}
+
 // Conditions that we expect in all moves.
 static void VerifyCommonExpectations(
   const std::vector<LinearSegmentSteps> &segments,
