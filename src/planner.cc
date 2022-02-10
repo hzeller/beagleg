@@ -35,7 +35,9 @@
 #include "hardware-mapping.h"
 #include "segment-queue.h"
 
-#define PLANNING_BUFFER_SIZE 1024
+#define PLANNING_BUFFER_CAPACITY 1024
+
+using StepsAxesRegister = FixedArray<int, GCODE_NUM_AXES, GCodeParserAxis>;
 
 namespace {
 // The target position vector is essentially a position in the
@@ -53,11 +55,11 @@ namespace {
 // parameters that assuming the requested final trajectory stays the same, they
 // are constants, no matter the previous or next segments.
 struct AxisTarget {
-  int position_steps[GCODE_NUM_AXES];  // Absolute position at end of segment.
-                                       // In steps. (steps)
+  StepsAxesRegister position_steps;  // Absolute position at end of segment.
+                                     // In steps. (steps)
 
   // Derived values
-  int delta_steps[GCODE_NUM_AXES];  // Difference to previous position. (steps)
+  StepsAxesRegister delta_steps;  // Difference to previous position. (steps)
   enum GCodeParserAxis defining_axis;  // index into defining axis.
   double start_speed;  // Starting speed of the segment (steps/s).
   double speed;        // Maximum speed of the defining axis (steps/s).
@@ -66,7 +68,7 @@ struct AxisTarget {
   double dx, dy, dz;   // 3D delta_steps in real units (mm)
   double len;          // 3D length (mm)
 
-  std::string ToString() const {
+  std::string ToJsonString() const {
     std::ostringstream ss;
     ss << "{";
     ss << "\"start_speed\":" << start_speed << ",";
@@ -90,7 +92,6 @@ struct AxisTarget {
 };
 
 /*
-**
 ** Define values that might change depending on new segments added to
 ** the planning buffer.
 ** Currently planned profile for an AxisTarget.
@@ -100,7 +101,6 @@ struct AxisTarget {
 **    | /
 ** v0 |/________________
 **      acc  travel   dec
-**
 */
 struct PlannedProfile {
   uint32_t accel, travel, decel;  // Steps of the defining axis for each ramp
@@ -110,7 +110,7 @@ struct PlannedProfile {
   // Return the total number of steps in the profile.
   uint32_t TotalSteps() const { return accel + travel + decel; }
 
-  std::string ToString() const {
+  std::string ToJsonString() const {
     std::ostringstream ss;
     ss << "{";
     ss << "\"accel\":" << accel << ",";
@@ -138,7 +138,7 @@ struct PlannedProfile {
 //
 // We need to work in mm, since steps is not a uniform unit of space across
 // the different axes.
-static float clamp_defining_axis_limit(const int *axes_steps,
+static float clamp_defining_axis_limit(const StepsAxesRegister &axes_steps,
                                        const FloatAxisConfig &axes_limits_mm,
                                        enum GCodeParserAxis defining_axis,
                                        const FloatAxisConfig &steps_per_mm) {
@@ -215,11 +215,11 @@ class Planner::Impl {
     AxisTarget target;
     PlannedProfile planned;
 
-    std::string ToString() const {
+    std::string ToJsonString() const {
       std::ostringstream ss;
       ss << "{";
-      ss << "\"target\":" << target.ToString() << ",";
-      ss << "\"planned\":" << planned.ToString();
+      ss << "\"target\":" << target.ToJsonString() << ",";
+      ss << "\"planned\":" << planned.ToJsonString();
       ss << "}";
       return ss.str();
     }
@@ -231,7 +231,7 @@ class Planner::Impl {
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
-  RingDeque<PlanningSegment, PLANNING_BUFFER_SIZE> planning_buffer_;
+  RingDeque<PlanningSegment, PLANNING_BUFFER_CAPACITY> planning_buffer_;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
@@ -351,7 +351,8 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   // Initial machine position. We assume the homed position here, which is
   // wherever the endswitch is for each axis.
   struct PlanningSegment *init_axis = planning_buffer_.append();
-  memset(init_axis, 0x00, sizeof(*init_axis));
+  *init_axis = {};
+
   for (const GCodeParserAxis axis : AllAxes()) {
     HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
     const float home_pos =
@@ -402,25 +403,15 @@ bool Planner::Impl::issue_motor_move_if_possible(
   }
 
 #if 0
-  // if (!flush_planning_queue) {
-  //   for (num_segments = planning_buffer_.size(); num_segments > 0; --num_segments) {
-  //     const PlanningSegment *segment = planning_buffer_[num_segments - 1];
-  //     if (segment->planned.TotalSteps() > 0 && segment->planned.decel != segment->planned.TotalSteps()) {
-  //       --num_segments;
-  //       break;
-  //     }
-  //   }
-  // }
-
-  printf("\nTotal: %zu, to be pushed: %d, flush: %d\n", planning_buffer_.size(), num_segments, flush_planning_queue);
+  fprintf(stderr, "\nTo be enqueued: %d/%zu.\n", num_segments, planning_buffer_.size());
   for (unsigned i = 0; i < planning_buffer_.size(); ++i) {
-    printf("%s\n", planning_buffer_[i]->ToString().c_str());
+    fprintf(stderr, "%s\n", planning_buffer_[i]->ToJsonString().c_str());
   }
 #endif
 
   // We require a slot to be always present.
   if (num_segments == 0 &&
-      (planning_buffer_.size() == PLANNING_BUFFER_SIZE - 1))
+      (planning_buffer_.size() == PLANNING_BUFFER_CAPACITY - 1))
     ++num_segments;
 
   // No segments to enqueue, skip.
@@ -481,9 +472,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
     move_command.v1 = segment->planned.v1;
 
     if (segment->planned.accel) motor_ops_->Enqueue(accel_command);
-
     if (segment->planned.travel) motor_ops_->Enqueue(move_command);
-
     if (segment->planned.decel) motor_ops_->Enqueue(decel_command);
 
     // We always keep one segment to keep track of the last
@@ -491,16 +480,11 @@ bool Planner::Impl::issue_motor_move_if_possible(
     if (planning_buffer_.size() > 1)
       planning_buffer_.pop_front();
     else {
-      memset((void *)segment->target.delta_steps, 0,
-             sizeof(segment->target.delta_steps));
-      segment->target.start_speed = 0;
-      segment->target.speed = 0;
-      segment->target.accel = 0;
-      segment->target.dx = segment->target.dy = segment->target.dz =
-        segment->target.len = 0.0;
-      segment->planned.accel = segment->planned.decel =
-        segment->planned.travel = 0;
-      memset((void *)&segment->planned, 0, sizeof(segment->planned));
+      // Let's create a zero-steps segment to hold last position.
+      // We have only one segment, last speed is always 0.
+      const StepsAxesRegister last_pos = segment->target.position_steps;
+      *segment = {};
+      segment->target.position_steps = last_pos;
       path_halted_ = true;
       ret = false;
     }
@@ -509,23 +493,35 @@ bool Planner::Impl::issue_motor_move_if_possible(
   return ret;
 }
 
+// At this stage of the planning we receive a new position we want to reach and
+// a target feedrate. We always try to reach the highest possible speed whenever
+// we move. For this reason, the feedrate is just interpreted as a speed limit.
+// This function performs three fundamental steps:
+// 1: Create a new empty planning segment in the planning buffer to be filled
+// with a new AxisTarget. 2: Determine the defining axis of the newly pushed
+// AxisTarget and its limits considering
+//    the angle w.r.t the previous segment and maximum accelerations and speeds
+//    of the other axes.
+// 3: Update the planning buffer (UpdateMotionProfile) to enforce constrained
+// motion
+//    that will always end up at 0 speed.
+// 4: Enqueue the front of the planning buffer to the motors if certain
+//    conditions occur.
 bool Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   assert(position_known_);  // call SetExternalPosition() after DirectDrive()
 
   // We always assume there's enough space to store a new segment and that we
   // have at least one segment.
-  assert((planning_buffer_.size() < PLANNING_BUFFER_SIZE - 1) &&
+  assert((planning_buffer_.size() < PLANNING_BUFFER_CAPACITY - 1) &&
          planning_buffer_.size());
 
-  struct AxisTarget *prev_pos =
-    (planning_buffer_.size() > 0) ? &planning_buffer_.back()->target : NULL;
-
   // We always have a previous position.
-  const int *previous_position_steps = prev_pos->position_steps;
-  PlanningSegment *planning_segment = planning_buffer_.append();
-  memset(planning_segment, 0x00, sizeof(PlanningSegment));
+  struct AxisTarget *prev_pos = &planning_buffer_.back()->target;
+  const StepsAxesRegister &previous_position_steps = prev_pos->position_steps;
 
-  // Add a new slot.
+  // Create a new empty segment.
+  PlanningSegment *planning_segment = planning_buffer_.append();
+  *planning_segment = {};
   struct AxisTarget *new_pos = &planning_segment->target;
 
   int max_steps = -1;
@@ -615,7 +611,9 @@ void Planner::Impl::bring_path_to_halt() {
   issue_motor_move_if_possible(true);
 }
 
-// Backward and forward passes.
+// Perform a backward and forward pass across
+// the whole planning buffer to adapt the start
+// and final speed of all the segments.
 void Planner::Impl::UpdateMotionProfile() {
   assert(planning_buffer_.size());
 
@@ -645,14 +643,15 @@ void Planner::Impl::UpdateMotionProfile() {
 
     // next_speed is the speed of the next defining axis segment.
     // We want to have continuous speeds. We calculate what would be that speed
-    // for the new defininx axis.
+    // for the current defining axis.
     const auto speed_factor =
       get_speed_factor_for_axis(&segment->target, defining_axis);
 
     const double segment_end_speed =
       (speed_factor != 0) ? speed / speed_factor : 0;
 
-    // Check if we intersect with a previously planned segment.
+    // Check if the current segment v2 speed connects with the next
+    // (except if this is the very last segment).
     // If we do, then we stop here. No need to compute the accel. It will happen
     // in the forward pass. The new profile deceleration and travel will always
     // be above or equal to the current profile. This will only then happen if
@@ -664,9 +663,6 @@ void Planner::Impl::UpdateMotionProfile() {
       // already be the v0 of the next segment defining axis.
       break;
     }
-
-    // Update the final speed.
-    segment->planned.v2 = segment_end_speed;
 
     // We can decelarate.
     if (segment->target.speed > segment_end_speed) {
@@ -680,17 +676,18 @@ void Planner::Impl::UpdateMotionProfile() {
       segment->planned.v1 = uar_speed(segment->planned.decel, segment_end_speed,
                                       segment->target.accel);
       segment->planned.travel = delta_steps - segment->planned.decel;
+      segment->planned.v2 = segment_end_speed;
     } else {
       segment->planned.decel = 0;
       segment->planned.travel = delta_steps;
-      segment->planned.v1 = segment->target.speed;
+      segment->planned.v1 = segment->planned.v2 = segment->target.speed;
     }
 
     // Update variables for next loop cycle.
     defining_axis = segment->target.defining_axis;
     // In the next iteration segment, our speed should be the final speed
     // which is the smallest between the highest speed we could reach or
-    // the current segment start_speed.
+    // the current segment start_speed (the starting segment is special).
     speed = (buffer_index)
               ? std::min(segment->planned.v1, segment->target.start_speed)
               : segment->planned.v0;
