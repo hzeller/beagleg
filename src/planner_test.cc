@@ -38,6 +38,14 @@ testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
 #define EXPECT_NEAR_REL(val1, val2, rel_error) \
   EXPECT_PRED_FORMAT3(DoubleNearAbsRelPredFormat, val1, val2, rel_error)
 
+// Compute the absolute acceleration given space s and
+// starting speed v0 and end speed v1.
+template <typename T>
+static inline T fabs_accel(const T v0, const T v1, const int s) {
+  const T accel = (v1 * v1 - v0 * v0) / (2 * s);
+  return fabs(accel);
+}
+
 // Set up config that they are the same for all the tests.
 static void InitTestConfig(struct MachineControlConfig *c) {
   float steps_per_mm = 1000;
@@ -186,6 +194,8 @@ class PlannerHarness {
     return motor_ops_.segments();
   }
 
+  MachineControlConfig *GetConfig() const { return config_; }
+
  private:
   MachineControlConfig *config_;
   FakeMotorOperations motor_ops_;
@@ -194,9 +204,42 @@ class PlannerHarness {
   Planner *planner_;
 };
 
+// Verify that on average, the profile satisfies
+// the configured constraints both for speed and acceleration.
+static void VerifySegmentConstraints(const MachineControlConfig &config,
+                                     const LinearSegmentSteps &segment,
+                                     const float rel_error = 1e-3) {
+  // The axes X, Y, Z are mapped to motors 1, 2, 3.
+  for (int i = 1; i <= AXIS_Z; ++i) {
+    const GCodeParserAxis axis = (GCodeParserAxis)i;
+    if (segment.steps[axis]) {
+      const double accel =
+        fabs_accel(segment.v0, segment.v1, segment.steps[axis]);
+      const double max_accel =
+        config.acceleration[axis] * config.steps_per_mm[axis];
+      const double max_feedrate =
+        config.max_feedrate[axis] * config.steps_per_mm[axis];
+      EXPECT_LE(segment.v0, max_feedrate);
+      EXPECT_LE(segment.v1, max_feedrate);
+      if (segment.v0 != segment.v1)
+        EXPECT_NEAR_REL(accel, max_accel, rel_error);
+    }
+  }
+}
+
+size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
+  size_t motor_index = 0;
+  for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    if (abs(segment.steps[i]) > abs(segment.steps[motor_index]))
+      motor_index = i;
+  }
+  return motor_index;
+}
+
 // Conditions that we expect in all moves.
 static void VerifyCommonExpectations(
-  const std::vector<LinearSegmentSteps> &segments) {
+  const std::vector<LinearSegmentSteps> &segments,
+  const MachineControlConfig &config, const float rel_error = 1e-3) {
   ASSERT_GT((int)segments.size(), 1) << "Expected more than one segment";
 
   // Some basic assumption: something is moving.
@@ -209,9 +252,14 @@ static void VerifyCommonExpectations(
   // The joining speeds between segments match.
   for (size_t i = 0; i < segments.size() - 1; ++i) {
     // Let's determine the speed in euclidian space.
+    const size_t m1 = GetDefiningMotor(segments[i]);
+    const size_t m2 = GetDefiningMotor(segments[i + 1]);
+    if (m1 == m2) {
+      EXPECT_EQ(segments[i].v1, segments[i + 1].v0)
+        << "Joining speed between " << i << " and " << (i + 1);
+    }
 #if 1
-    EXPECT_EQ(segments[i].v1, segments[i + 1].v0)
-      << "Joining speed between " << i << " and " << (i + 1);
+    VerifySegmentConstraints(config, segments[i]);
 #endif
   }
 }
@@ -228,7 +276,7 @@ TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
   // reach, then decelerating.
   EXPECT_EQ(2, (int)plantest.segments().size());
 
-  VerifyCommonExpectations(plantest.segments());
+  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
 }
 
 TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
@@ -242,7 +290,7 @@ TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
   // We expect three segments: accelerating, plateau and decelerating.
   EXPECT_EQ(3, (int)plantest.segments().size());
 
-  VerifyCommonExpectations(plantest.segments());
+  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
 }
 
 // When we move axes, they should try to reach the speed the user requested
@@ -388,7 +436,7 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
   pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
   plantest.Enqueue(pos, kFeedrate);
   std::vector<LinearSegmentSteps> segments = plantest.segments();
-  VerifyCommonExpectations(segments);
+  VerifyCommonExpectations(segments, *plantest.GetConfig());
   return segments;
 }
 
