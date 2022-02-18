@@ -23,6 +23,9 @@
 
 #include "gcode-parser/gcode-parser.h"
 
+// Iterate through axis X, Y, Z. AXIS_A is the first _not_ in set
+typedef EnumIterable<GCodeParserAxis, AXIS_X, AXIS_A> XYZAxes;
+
 // Going around the circle for start-points with this step.
 #define TEST_ARC_STEP (2 * M_PI / 255)
 
@@ -49,7 +52,8 @@ class TestArcAccumulator : public GCodeParser::EventReceiver {
   void motors_enable(bool enable) final {}
   bool coordinated_move(float feed_mm_p_sec, const AxesRegister &pos) final {
     total_len_ +=
-      hypotf(pos[AXIS_X] - last_[AXIS_X], pos[AXIS_Y] - last_[AXIS_Y]);
+      hypot3(pos[AXIS_X] - last_[AXIS_X], pos[AXIS_Y] - last_[AXIS_Y],
+             pos[AXIS_Z] - last_[AXIS_Z]);
     last_ = pos;
     return true;
   }
@@ -65,6 +69,9 @@ class TestArcAccumulator : public GCodeParser::EventReceiver {
   }
 
  private:
+  static float hypot3(float x, float y, float z) {
+    return sqrtf(x * x + y * y + z * z);
+  }
   AxesRegister last_;
   float total_len_;
 };
@@ -105,24 +112,42 @@ TEST(ArcGenerator, HalfTurnAnyStartPosition_CCW) {
 
 // Starting from a position, generate arcs of varying length and determine
 // if they have the length as expected.
-static void testArcLength(bool clockwise, double start, double step,
-                          double end) {
+static void testArcLength(GCodeParserAxis normal, bool clockwise, double start,
+                          double step, double end) {
   // Varying arc-length.
   for (double turn_angle = start; turn_angle <= end - step;  // NOLINT
        turn_angle += step) {
     AxesRegister start, center, target;
 
-    start[AXIS_X] = 1.0;
-    start[AXIS_Y] = 0.0;
+    GCodeParserAxis a;
+    GCodeParserAxis b;
+    switch (normal) {
+    case GCodeParserAxis::AXIS_X:
+      a = AXIS_Y;
+      b = AXIS_Z;
+      break;
+    case GCodeParserAxis::AXIS_Y:
+      a = AXIS_X;
+      b = AXIS_Z;
+      break;
+    case GCodeParserAxis::AXIS_Z:
+      a = AXIS_X;
+      b = AXIS_Y;
+      break;
+    default: assert(false);
+    }
 
-    center[AXIS_X] = 0;
-    center[AXIS_Y] = 0;
+    start[a] = 1.0;
+    start[b] = 0.0;
 
-    target[AXIS_X] = cos(turn_angle);
-    target[AXIS_Y] = sin(turn_angle);
+    center[a] = 0;
+    center[b] = 0;
+
+    target[a] = cos(turn_angle);
+    target[b] = sin(turn_angle);
 
     TestArcAccumulator collect(start);
-    collect.arc_move(100, AXIS_Z, clockwise, start, center, target);
+    collect.arc_move(100, normal, clockwise, start, center, target);
 
     const float expected_len = clockwise ? 2 * M_PI - turn_angle : turn_angle;
     EXPECT_NEAR(collect.total_len(), expected_len, 0.003);
@@ -130,56 +155,110 @@ static void testArcLength(bool clockwise, double start, double step,
 }
 
 TEST(ArcGenerator, ArcLength_CW_360) {
-  testArcLength(true, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
+  testArcLength(AXIS_X, true, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
+  testArcLength(AXIS_Y, true, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
+  testArcLength(AXIS_Z, true, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
 }
 
 TEST(ArcGenerator, ArcLength_CW_HiRes_StartCircle) {
-  testArcLength(true, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT, HIRES_TEST_ARC_STEP,
-                2 * M_PI);
+  for (GCodeParserAxis normal : XYZAxes()) {
+    testArcLength(normal, true, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT,
+                  HIRES_TEST_ARC_STEP, 2 * M_PI);
+  }
 }
 
 TEST(ArcGenerator, ArcLength_CW_HiRes_FullCircle) {
-  testArcLength(true, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
-                HIRES_TEST_CIRCLE_SEGMENT);
+  for (GCodeParserAxis normal : XYZAxes()) {
+    testArcLength(normal, true, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
+                  HIRES_TEST_CIRCLE_SEGMENT);
+  }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_360) {
-  testArcLength(false, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
+  for (GCodeParserAxis normal : XYZAxes()) {
+    testArcLength(normal, false, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
+  }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_HiRes_StartCircle) {
-  testArcLength(false, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
-                HIRES_TEST_CIRCLE_SEGMENT);
+  for (GCodeParserAxis normal : XYZAxes()) {
+    testArcLength(normal, false, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
+                  HIRES_TEST_CIRCLE_SEGMENT);
+  }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_HiRes_FullCircle) {
-  testArcLength(false, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT,
-                HIRES_TEST_ARC_STEP, 2 * M_PI);
+  for (GCodeParserAxis normal : XYZAxes()) {
+    testArcLength(normal, false, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT,
+                  HIRES_TEST_ARC_STEP, 2 * M_PI);
+  }
 }
 
 // Test special case: if start/end position are the same, then we expect
 // a full turn.
-static void testFullTurn(bool clockwise) {
+static void testFullTurn(GCodeParserAxis normal, bool clockwise) {
   AxesRegister start, center, target;
 
-  start[AXIS_X] = 1.0;
-  start[AXIS_Y] = 0.0;
+  GCodeParserAxis a;
+  GCodeParserAxis b;
+  switch (normal) {
+  case GCodeParserAxis::AXIS_X:
+    a = AXIS_Y;
+    b = AXIS_Z;
+    break;
+  case GCodeParserAxis::AXIS_Y:
+    a = AXIS_X;
+    b = AXIS_Z;
+    break;
+  case GCodeParserAxis::AXIS_Z:
+    a = AXIS_X;
+    b = AXIS_Y;
+    break;
+  default: assert(false);
+  }
 
-  center[AXIS_X] = 0;
-  center[AXIS_Y] = 0;
+  start[a] = 1.0;
+  start[b] = 0.0;
 
-  target[AXIS_X] = 1.0;
-  target[AXIS_Y] = 0.0;
+  center[a] = 0;
+  center[b] = 0;
+
+  target[a] = 1.0;
+  target[b] = 0.0;
 
   TestArcAccumulator collect(start);
-  collect.arc_move(100, AXIS_Z, clockwise, start, center, target);
+  collect.arc_move(100, normal, clockwise, start, center, target);
 
   EXPECT_NEAR(collect.total_len(), 2 * M_PI, 0.003);
 }
 
-TEST(ArcGenerator, FullTurn_CW) { testFullTurn(true); }
+TEST(ArcGenerator, FullTurn_CW) {
+  testFullTurn(AXIS_X, true);
+  testFullTurn(AXIS_Y, true);
+  testFullTurn(AXIS_Z, true);
+}
+TEST(ArcGenerator, FullTurn_CCW) {
+  testFullTurn(AXIS_X, false);
+  testFullTurn(AXIS_Y, false);
+  testFullTurn(AXIS_Z, false);
+}
 
-TEST(ArcGenerator, FullTurn_CCW) { testFullTurn(false); }
+static float splineLen(const AxesRegister &start, const AxesRegister &cp1,
+                       const AxesRegister &cp2, const AxesRegister &end) {
+  TestArcAccumulator collect(start);
+  collect.spline_move(100, start, cp1, cp2, end);
+  return collect.total_len();
+}
+
+TEST(SplineGenerator, SimpleTests) {
+  // TODO: we need a function to test if a point is on a curve. For now
+  // we just test very simple assumptions, such as arc length on straight line.
+
+  // Everything on one line, expect arc length accordingly
+  EXPECT_NEAR(5.0, splineLen({0, 0}, {2, 0}, {3, 0}, {5, 0}), 0.003);
+  EXPECT_NEAR(5.0, splineLen({0, 0}, {0, 2}, {0, 3}, {0, 5}), 0.003);
+  // Are there other simple truths we can determine ?
+}
 
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
