@@ -897,8 +897,8 @@ TEST(GCodeParserTest, WhileLoop) {
   EXPECT_TRUE(counter.TestParseLine("#1=0"));
   EXPECT_TRUE(counter.TestParseLine("#2=1"));
   EXPECT_TRUE(counter.TestParseLine("WHILE [#1 < 10] DO"));
-  EXPECT_TRUE(counter.TestParseLine("#2 += #2"));
-  EXPECT_TRUE(counter.TestParseLine("#1++"));
+  EXPECT_TRUE(counter.TestParseLine("  #2 += #2"));
+  EXPECT_TRUE(counter.TestParseLine("  #1++"));
   EXPECT_TRUE(counter.TestParseLine("END"));
   EXPECT_EQ(10, counter.get_parameter(1));
   EXPECT_EQ(1024, counter.get_parameter(2));

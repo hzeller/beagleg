@@ -108,7 +108,8 @@ class GCodeParser::Impl {
   enum DebugLevel {
     DEBUG_NONE = 0,
     DEBUG_PARSER = (1 << 0),
-    DEBUG_EXPRESSION = (1 << 1)
+    DEBUG_EXPRESSION = (1 << 1),
+    DEBUG_INFO = (1 << 2),
   };
 
   // Reset parser, mostly reset relative coordinate systems to whatever they
@@ -551,7 +552,7 @@ const char *GCodeParser::Impl::read_param_name(const char *line,
   if (numeric_parameter && bracketed) {
     gprintf(GLOG_SYNTAX_ERR,
             "The #<> bracket syntax is only allowed for "
-            "the alphanumeric parameters (at %s)",
+            "the alphanumeric parameters (at %s)\n",
             line);
     return NULL;
   }
@@ -1245,8 +1246,10 @@ void GCodeParser::Impl::InitCoordSystems() {
 
   current_origin_ = &coord_system_[coord_system];
   inform_origin_offset_change(kCoordinateSystemNames[coord_system]);
-  Log_debug("Using Coordinate system #5220=%d: %s", coord_system + 1,
-            kCoordinateSystemNames[coord_system]);
+  if (debug_level_ & DEBUG_INFO) {
+    Log_debug("Using Coordinate system #5220=%d: %s", coord_system + 1,
+              kCoordinateSystemNames[coord_system]);
+  }
 }
 
 // Set coordinate system data
