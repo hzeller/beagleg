@@ -9,6 +9,7 @@
 #include <cfloat>
 #include <cstddef>
 
+#include "common/container.h"
 #include "common/logging.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"
@@ -440,29 +441,48 @@ TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_YY) {
 static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
                                                    float speed_tune_angle,
                                                    float start_angle,
-                                                   float delta_angle) {
+                                                   float delta_angle,
+                                                   float segment_len = 10) {
   const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
 #if 0
   fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f)\n",
           threshold_angle, start_angle, delta_angle);
 #endif
   PlannerHarness plantest(threshold_angle, speed_tune_angle);
-  const float kSegmentLen = 100;
+  const MachineControlConfig &config = *plantest.GetConfig();
 
   float radangle = 2 * M_PI * start_angle / 360;
   AxesRegister pos;
-  pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
-  pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
+  pos[AXIS_X] = segment_len * cos(radangle) + pos[AXIS_X];
+  pos[AXIS_Y] = segment_len * sin(radangle) + pos[AXIS_Y];
   plantest.Enqueue(pos, kFeedrate);
 
   radangle += 2 * M_PI * delta_angle / 360;
-  pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
-  pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
+  pos[AXIS_X] = segment_len * cos(radangle) + pos[AXIS_X];
+  pos[AXIS_Y] = segment_len * sin(radangle) + pos[AXIS_Y];
   plantest.Enqueue(pos, kFeedrate);
   std::vector<LinearSegmentSteps> segments = plantest.segments();
-  VerifyCommonExpectations(segments, *plantest.GetConfig());
+
+  // Check that we indeed reach the target position.
+  // We just check the cartesian axes since for tests
+  // have a simple gcode axis -> motor mapping.
+  FixedArray<int, GCODE_NUM_AXES> final_pos_steps;
+  for (const auto &s : segments) {
+    for (int i = 0; i <= AXIS_Z; ++i) {
+      const GCodeParserAxis axis = (GCodeParserAxis)i;
+      final_pos_steps[axis] += s.steps[i];
+    }
+  }
+  for (const GCodeParserAxis a : AllAxes()) {
+    EXPECT_EQ(final_pos_steps[a], std::lround(pos[a] * config.steps_per_mm[a]));
+  }
+  VerifyCommonExpectations(segments, config);
   return segments;
 }
+
+// Test with a small angle and a short segment that we
+// execute the right amount of steps.
+TEST(PlannerTest, ShortSegment_ShallowAngle) { DoAngleMove(5.0, 0, 5, 10); }
 
 TEST(PlannerTest, CornerMove_90Degrees) {
   const float kThresholdAngle = 5.0f;

@@ -435,8 +435,8 @@ bool Planner::Impl::issue_motor_move_if_possible(
     const unsigned defining_axis_steps = segment->planned.TotalSteps();
     const double accel_fraction =
       (double)segment->planned.accel / defining_axis_steps;
-    const double decel_fraction =
-      (double)segment->planned.decel / defining_axis_steps;
+    const double travel_fraction =
+      (double)segment->planned.travel / defining_axis_steps;
 
     // Accel
     if (segment->planned.accel) {
@@ -449,27 +449,27 @@ bool Planner::Impl::issue_motor_move_if_possible(
       accel_command.v1 = segment->planned.v1;
     }
 
-    // Decel
-    if (segment->planned.decel) {
+    // Travel
+    if (segment->planned.travel) {
       for (const GCodeParserAxis a : AllAxes()) {
-        const int decel_steps =
-          std::lround(decel_fraction * segment->target.delta_steps[a]);
-        assign_steps_to_motors(&decel_command, a, decel_steps);
+        const int travel_steps =
+          std::lround(travel_fraction * segment->target.delta_steps[a]);
+        assign_steps_to_motors(&move_command, a, travel_steps);
       }
+      move_command.v0 = segment->planned.v1;
+      move_command.v1 = segment->planned.v1;
+    }
+
+    // Decel
+    for (const GCodeParserAxis a : AllAxes()) {
+      assign_steps_to_motors(&decel_command, a, segment->target.delta_steps[a]);
       decel_command.v0 = segment->planned.v1;
       decel_command.v1 = segment->planned.v2;
     }
 
-    // Travel
-    for (const GCodeParserAxis a : AllAxes())
-      assign_steps_to_motors(&move_command, a, segment->target.delta_steps[a]);
-
-    // Now we substract from travel accel and decel.
+    // Now we substract from decel both accel and travel.
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i)
-      move_command.steps[i] -= accel_command.steps[i] + decel_command.steps[i];
-
-    move_command.v0 = segment->planned.v1;
-    move_command.v1 = segment->planned.v1;
+      decel_command.steps[i] -= accel_command.steps[i] + move_command.steps[i];
 
     if (segment->planned.accel) motor_ops_->Enqueue(accel_command);
     if (segment->planned.travel) motor_ops_->Enqueue(move_command);
