@@ -47,7 +47,8 @@ static inline T fabs_accel(const T v0, const T v1, const int s) {
 }
 
 // Set up config that they are the same for all the tests.
-static void InitTestConfig(struct MachineControlConfig *c, const float speed_step_factor = 4.0f) {
+static void InitTestConfig(struct MachineControlConfig *c,
+                           const float speed_step_factor = 4.0f) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
     const GCodeParserAxis axis = (GCodeParserAxis)i;
@@ -215,30 +216,6 @@ class PlannerHarness {
   Planner *planner_;
 };
 
-#if 0
-// Verify that on average, the profile satisfies
-// the configured constraints both for speed and acceleration.
-static void VerifySegmentConstraints(const MachineControlConfig &config,
-                                     const LinearSegmentSteps &segment,
-                                     const float rel_error = 1e-3) {
-  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    const GCodeParserAxis axis = (GCodeParserAxis)i;
-    const auto steps = segment.steps[axis];
-    if (steps == 0) continue;
-    const double accel = fabs_accel(segment.v0, segment.v1, steps);
-    const double max_accel =
-      config.acceleration[axis] * config.steps_per_mm[axis];
-    const double max_feedrate =
-      config.max_feedrate[axis] * config.steps_per_mm[axis];
-    EXPECT_LE(segment.v0, max_feedrate);
-    EXPECT_LE(segment.v1, max_feedrate);
-    if (segment.v0 != segment.v1) {
-      EXPECT_LE(accel, max_accel);
-    }
-  }
-}
-#endif
-
 static size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
   size_t motor_index = 0;
   for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
@@ -248,13 +225,43 @@ static size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
   return motor_index;
 }
 
-size_t get_defining_motor(const LinearSegmentSteps &segment) {
-  size_t motor_index = 0;
-  for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    if (abs(segment.steps[i]) > abs(segment.steps[motor_index]))
-      motor_index = i;
+// Every AxisTarget, the defining axis might change. Speeds though, should stay
+// continuous between each target for every axis. We need a function to compute
+// what was the speed in the previous target for the new defining axis.
+static double get_speed_factor_for_axis(const struct LinearSegmentSteps *t,
+                                        unsigned request_motor) {
+  const auto defining_motor = GetDefiningMotor(*t);
+  if (t->steps[defining_motor] == 0) return 0.0;
+  return (request_motor == defining_motor)
+           ? 1.0
+           : fabs(1.0 * t->steps[request_motor] / t->steps[defining_motor]);
+}
+
+// Verify that on average, the profile satisfies
+// the configured constraints both for speed and acceleration.
+static void VerifySegmentConstraints(const MachineControlConfig &config,
+                                     const LinearSegmentSteps &segment,
+                                     const float rel_error = 1e-3) {
+  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    const GCodeParserAxis axis = (GCodeParserAxis)i;
+    const auto steps = segment.steps[axis];
+    if (steps == 0) continue;
+    const double factor = get_speed_factor_for_axis(&segment, i);
+    const double v1 = factor * segment.v0;
+    const double v2 = factor * segment.v1;
+    const double accel = fabs_accel(v1, v2, steps);
+    const double max_accel =
+      config.acceleration[axis] * config.steps_per_mm[axis];
+    const double max_feedrate =
+      config.max_feedrate[axis] * config.steps_per_mm[axis];
+    EXPECT_LE(segment.v0, max_feedrate);
+    EXPECT_LE(segment.v1, max_feedrate);
+    if (segment.v0 != segment.v1) {
+      if (accel > max_accel) {
+        EXPECT_NEAR_REL(accel, max_accel, rel_error);
+      }
+    }
   }
-  return motor_index;
 }
 
 // Conditions that we expect in all moves.
@@ -279,15 +286,13 @@ static void VerifyCommonExpectations(
       EXPECT_EQ(segments[i].v1, segments[i + 1].v0)
         << "Joining speed between " << i << " and " << (i + 1);
     }
-#if 0  // This is now failing, we plan to fix it on the next PR(#44)
     VerifySegmentConstraints(config, segments[i]);
-#endif
   }
 }
 
 TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
   PlannerHarness plantest;
-
+  const MachineControlConfig *config = plantest.GetConfig();
   AxesRegister pos;
   pos[AXIS_X] = 100;
   pos[AXIS_Y] = 100;
@@ -297,7 +302,7 @@ TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
   // reach, then decelerating.
   EXPECT_EQ(2, (int)plantest.segments().size());
 
-  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
+  VerifyCommonExpectations(plantest.segments(), *config);
 }
 
 TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
@@ -503,8 +508,8 @@ TEST(PlannerTest, ShortSegment_EdgeCases) {
   pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
-  // Let's go down two chunks, we test the case for which we have all 30% accel travel decel
-  // but 4 steps on the other axis.
+  // Let's go down two chunks, we test the case for which we have all 30% accel
+  // travel decel but 4 steps on the other axis.
   pos[AXIS_Y] -= kDefiningAxisSwingSteps * 1.5 / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += 4 / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
@@ -613,10 +618,8 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
     pos[AXIS_X] += 1;
     plantest.Enqueue(pos, 1000);
   }
-#if 0
   for (const auto segment : plantest.segments())
     VerifySegmentConstraints(*config, segment);
-#endif
 }
 
 // If the queue is empty and we flush it,
@@ -711,7 +714,6 @@ TEST(PlannerTest, CornerMove_Shallow_NegativeAngle) {
   testShallowAngleAllStartingPoints(kThresholdAngle, kTestingAngle);
 }
 
-#if 0  // Needs fixing. PR #44 under way
 // This function compute acceleration based on the starting velocity, the ending
 // velocity and the path in steps
 static int acceleration_segment(float v0, float v1, int delta) {
@@ -806,9 +808,8 @@ TEST(PlannerTest, DetectOutRangeAcceleration) {
         abs(ay));  // added 0.3% of the acceleration limit
     }
   }
-  VerifyCommonExpectations(plantest.segments());
+  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
 }
-#endif
 
 int main(int argc, char *argv[]) {
   Log_init("/dev/stderr");
