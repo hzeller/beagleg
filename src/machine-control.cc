@@ -125,30 +125,31 @@ static bool drop_privileges(beagleg::string_view privs) {
     return false;
   }
 
-  std::string name;
   if (pair.size() == 2) {
-    name = pair[1].ToString();
-    struct group *g = getgrnam(name.c_str());
+    const std::string groupname(pair[1].begin(), pair[1].end());
+    struct group *g = getgrnam(groupname.c_str());
     if (g == NULL) {
-      Log_error("Drop privileges: Couldn't look up group '%s'.", name.c_str());
+      Log_error("Drop privileges: Couldn't look up group '%s'.",
+                groupname.c_str());
       return false;
     }
     if (setresgid(g->gr_gid, g->gr_gid, g->gr_gid) != 0) {
-      Log_error("Couldn't drop group privs to '%s' (gid %d): %s", name.c_str(),
-                g->gr_gid, strerror(errno));
+      Log_error("Couldn't drop group privs to '%s' (gid %d): %s",
+                groupname.c_str(), g->gr_gid, strerror(errno));
       return false;
     }
   }
 
-  name = pair[0].ToString();
-  struct passwd *p = getpwnam(name.c_str());
+  const std::string user_name(pair[0].begin(), pair[0].end());
+  struct passwd *p = getpwnam(user_name.c_str());
   if (p == NULL) {
-    Log_error("Drop privileges: Couldn't look up user '%s'.", name.c_str());
+    Log_error("Drop privileges: Couldn't look up user '%s'.",
+              user_name.c_str());
     return false;
   }
   if (setresuid(p->pw_uid, p->pw_uid, p->pw_uid) != 0) {
-    Log_error("Couldn't drop user privs to '%s' (uid %d): %s", name.c_str(),
-              p->pw_uid, strerror(errno));
+    Log_error("Couldn't drop user privs to '%s' (uid %d): %s",
+              user_name.c_str(), p->pw_uid, strerror(errno));
     return false;
   }
 

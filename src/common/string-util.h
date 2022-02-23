@@ -56,11 +56,6 @@ class string_view {
   }
   string_view substr(size_t pos) const { return substr(pos, length() - pos); }
 
-  void assign(const char *data, size_t len) {
-    data_ = data;
-    len_ = len;
-  }
-
   bool operator==(const string_view &other) const {
     if (len_ != other.len_) return false;
     if (data_ == other.data_) return true;
@@ -74,8 +69,6 @@ class string_view {
 
   iterator begin() const { return data_; }
   iterator end() const { return data_ + len_; }
-
-  std::string ToString() const { return std::string(data_, len_); }
 
  private:
   const char *data_;

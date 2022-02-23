@@ -280,9 +280,9 @@ class GCodeParser::Impl {
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
     // zero parameter can never be written.
-    if (param_name == "0" || atoi(param_name.ToString().c_str()) >= 5400) {
+    if (param_name == "0" || ParseDecimal(param_name, 0) >= 5400) {
       gprintf(GLOG_SEMANTIC_ERR, "writing unsupported parameter number (%s)\n",
-              param_name.ToString().c_str());
+              std::string(param_name.begin(), param_name.end()).c_str());
       return false;
     }
     (*config_.parameters)[ToLower(param_name)] = value;
@@ -1088,10 +1088,11 @@ void GCodeParser::Impl::gcodep_while_end() {
 
     line = skip_white(endptr);
     if (control_parse_.ExpectNext(&line, CK_DO)) {
-      std::vector<beagleg::string_view> piece = SplitString(while_loop_, "\n");
-      for (size_t i = 0; i < piece.size(); i++)
-        ParseBlock(while_owner_, piece[i].ToString().c_str(),
-                   while_err_stream_);
+      for (const beagleg::string_view wline : SplitString(while_loop_, "\n")) {
+        // TODO(hzeller):ParseBlock needs to accept string_view
+        std::string tmp(wline.begin(), wline.end());
+        ParseBlock(while_owner_, tmp.c_str(), while_err_stream_);
+      }
     } else {
       gprintf(GLOG_SYNTAX_ERR, "expected DO got '%s'\n", line);
       return;

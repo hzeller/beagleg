@@ -67,7 +67,8 @@ std::vector<beagleg::string_view> SplitString(beagleg::string_view s,
 }
 
 int64_t ParseDecimal(beagleg::string_view s, int64_t fallback) {
-  std::string as_str = s.ToString();  // we need safe c-str()
+  // In C++17: just use std::from_chars
+  std::string as_str(s.begin(), s.end());  // we need safe c-str()
   char *endptr = NULL;
   int64_t result = strtoll(as_str.c_str(), &endptr, 10);
   if (*endptr != '\0') return fallback;

@@ -121,7 +121,7 @@ bool ConfigParser::SetContentFromFile(const char *filename) {
 
 void ConfigParser::SetContent(beagleg::string_view content) {
   parse_success_ = true;
-  content_ = content.ToString();
+  content_.assign(content.begin(), content.end());
 }
 
 // Extract next line out of source; returns line, modifies "source"
@@ -136,16 +136,17 @@ static beagleg::string_view NextLine(beagleg::string_view *source) {
     // Whatever newline or comment comes first terminates our resulting line...
     if (!result.data() &&
         (*endline == '#' || *endline == '\r' || *endline == '\n')) {
-      result.assign(start, endline - start);
+      result = beagleg::string_view(start, endline - start);
     }
     if (*endline == '\n') {  // ... but we wait until \n to reposition source
-      source->assign(endline + 1, source->length() - (endline - start) - 1);
+      *source = beagleg::string_view(endline + 1,
+                                     source->length() - (endline - start) - 1);
       return result;
     }
   }
   // Encountered last line without final newline.
-  result.assign(start, endline - start);
-  source->assign(source->end(), 0);
+  result = beagleg::string_view(start, endline - start);
+  *source = beagleg::string_view(source->end(), 0);
   return result;
 }
 
@@ -194,7 +195,7 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
           beagleg::string_view(line.begin(), eq_pos - line.begin()));
         const beagleg::string_view value_piece = TrimWhitespace(
           beagleg::string_view(eq_pos + 1, line.end() - eq_pos - 1));
-        std::string value = value_piece.ToString();
+        std::string value(value_piece.begin(), value_piece.end());
         bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {
           reader->ReportError(
