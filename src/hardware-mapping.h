@@ -260,7 +260,7 @@ class HardwareMapping {
 
   // Converts the human readable name of an output to the enumeration if
   // possible.
-  static bool NameToOutput(StringPiece str, NamedOutput *result);
+  static bool NameToOutput(beagleg::string_view str, NamedOutput *result);
   static const char *OutputToName(NamedOutput output);
 
   // Return GPIO definition for various types of out/input. Count starts with 1.

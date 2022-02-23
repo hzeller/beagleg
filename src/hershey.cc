@@ -33,7 +33,7 @@ struct HersheyGlyph {
 extern const HersheyGlyph hershey_simplex[];
 }  // namespace
 
-float TextWidth(StringPiece str, float size) {
+float TextWidth(beagleg::string_view str, float size) {
   float longest_line = 0;
   size /= 25.0f;  // The actual coordinates are roughly in the range 0..25
 
@@ -50,7 +50,8 @@ float TextWidth(StringPiece str, float size) {
   return std::max(longest_line, w);
 }
 
-void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
+void DrawText(beagleg::string_view str, float tx, float ty, TextAlign align,
+              float size,
               const std::function<void(bool do_line, float x, float y)> &draw) {
   float dx = 0;
   if (align == TextAlign::kRight)

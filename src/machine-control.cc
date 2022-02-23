@@ -118,8 +118,8 @@ static int fyi_option_gone(const char *prog) {
 }
 
 // Call with <uid>:<gid> string.
-static bool drop_privileges(StringPiece privs) {
-  std::vector<StringPiece> pair = SplitString(privs, ":");
+static bool drop_privileges(beagleg::string_view privs) {
+  std::vector<beagleg::string_view> pair = SplitString(privs, ":");
   if (pair.empty() || pair.size() > 2) {
     Log_error("Drop privileges: Require colon separated <uid>[:<gid>]");
     return false;

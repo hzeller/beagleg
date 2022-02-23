@@ -31,35 +31,37 @@
 #define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
   __attribute__((format(printf, fmt_pos, args_pos)))
 
-// A StringPiece essentially points at a chunk of data of a particular
+// Our version of c++17 std::string_view
+// It essentially points at a chunk of data of a particular
 // length. Pointer + length.
-// It allows to have keep cheap substrings of strings without copy while still
+// Allows to have keep cheap substrings of strings without copy while still
 // have a type-safe, length-aware piece of string.
-class StringPiece {
+namespace beagleg {
+class string_view {
  public:
   typedef const char *iterator;
 
-  StringPiece() : data_(NULL), len_(0) {}
-  StringPiece(const char *data, size_t len) : data_(data), len_(len) {}
+  string_view() : data_(NULL), len_(0) {}
+  string_view(const char *data, size_t len) : data_(data), len_(len) {}
 
   // We want implicit conversions from these types
-  StringPiece(const std::string &s)  // NOLINT
+  string_view(const std::string &s)  // NOLINT
       : data_(s.data()), len_(s.length()) {}
-  StringPiece(const char *str)  // NOLINT
+  string_view(const char *str)  // NOLINT
       : data_(str), len_(strlen(str)) {}
 
-  StringPiece substr(size_t pos, size_t len) const {
+  string_view substr(size_t pos, size_t len) const {
     assert(pos + len <= len_);
-    return StringPiece(data_ + pos, len);
+    return string_view(data_ + pos, len);
   }
-  StringPiece substr(size_t pos) const { return substr(pos, length() - pos); }
+  string_view substr(size_t pos) const { return substr(pos, length() - pos); }
 
   void assign(const char *data, size_t len) {
     data_ = data;
     len_ = len;
   }
 
-  bool operator==(const StringPiece &other) const {
+  bool operator==(const string_view &other) const {
     if (len_ != other.len_) return false;
     if (data_ == other.data_) return true;
     return strncmp(data_, other.data_, len_) == 0;
@@ -80,30 +82,32 @@ class StringPiece {
   size_t len_;
 };
 
-inline std::ostream &operator<<(std::ostream &o, const StringPiece &s) {
-  o << s.ToString();
-  return o;
+inline std::ostream &operator<<(std::ostream &o, string_view s) {
+  return o.write(s.data(), s.length());
 }
 
-// Trim StringPiece of whitespace font and back and returned trimmed string.
-StringPiece TrimWhitespace(const StringPiece &s);
+}  // namespace beagleg
+
+// Trim beagleg::string_view of whitespace font and back and returned trimmed
+// string.
+beagleg::string_view TrimWhitespace(beagleg::string_view s);
 
 // Lowercase the string (simple ASCII) and return as newly allocated
 // std::string
-std::string ToLower(const StringPiece &in);
+std::string ToLower(beagleg::string_view in);
 
-// Test if given StringPiece is prefix of the other.
-bool HasPrefix(const StringPiece &s, const StringPiece &prefix);
+// Test if given beagleg::string_view is prefix of the other.
+bool HasPrefix(beagleg::string_view s, beagleg::string_view prefix);
 
 // Formatted printing into a string.
 std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 
 // Split a string at any of the given separator characters.
-std::vector<StringPiece> SplitString(const StringPiece &s,
-                                     const StringPiece &separators);
+std::vector<beagleg::string_view> SplitString(beagleg::string_view s,
+                                              beagleg::string_view separators);
 
-// Parse a decimal from a StringPiece.
-int64_t ParseDecimal(const StringPiece &s, int64_t fallback);
+// Parse a decimal from a beagleg::string_view.
+int64_t ParseDecimal(beagleg::string_view s, int64_t fallback);
 
 #undef PRINTF_FMT_CHECK
 #endif  // _BEAGLEG_STRING_UTIL_H

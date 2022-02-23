@@ -26,7 +26,7 @@
 // -- Functions to draw ASCII text in the Hershey simplex font.
 
 // Determine the width of the text if drawn with DrawText()
-float TextWidth(StringPiece str, float size);
+float TextWidth(beagleg::string_view str, float size);
 
 enum class TextAlign { kLeft, kCenter, kRight };
 
@@ -36,7 +36,8 @@ enum class TextAlign { kLeft, kCenter, kRight };
 //   "x", "y"   - the position to moveto/lineto
 // The function makes it independent of any output device and easy to
 // adapt in any environment.
-void DrawText(StringPiece str, float tx, float ty, TextAlign align, float size,
+void DrawText(beagleg::string_view str, float tx, float ty, TextAlign align,
+              float size,
               const std::function<void(bool do_line, float x, float y)>& draw);
 
 #endif  // _BEAGLEG_HERSHEY_H_

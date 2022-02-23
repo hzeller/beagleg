@@ -22,7 +22,7 @@
 #include <gtest/gtest.h>
 
 TEST(StringUtilTest, TrimWhitespace) {
-  EXPECT_EQ(StringPiece("hello"), TrimWhitespace(" \t  hello \n\r  "));
+  EXPECT_EQ(beagleg::string_view("hello"), TrimWhitespace(" \t  hello \n\r  "));
   EXPECT_TRUE(TrimWhitespace(" \t ").empty());
 }
 
@@ -37,23 +37,23 @@ TEST(StringUtilTest, HasPrefix) {
 }
 
 TEST(StringUtilTest, SplitString) {
-  std::vector<StringPiece> result = SplitString("foo", ",");
+  std::vector<beagleg::string_view> result = SplitString("foo", ",");
   EXPECT_EQ(1, (int)result.size());
-  EXPECT_EQ(StringPiece("foo"), result[0]);
+  EXPECT_EQ(beagleg::string_view("foo"), result[0]);
 
   result = SplitString(",hello, world", ",");
   EXPECT_EQ(3, (int)result.size());
-  EXPECT_EQ(StringPiece(""), result[0]);
-  EXPECT_EQ(StringPiece("hello"), result[1]);
-  EXPECT_EQ(StringPiece(" world"), result[2]);
+  EXPECT_EQ(beagleg::string_view(""), result[0]);
+  EXPECT_EQ(beagleg::string_view("hello"), result[1]);
+  EXPECT_EQ(beagleg::string_view(" world"), result[2]);
 
   // Also test with trailing, empty field
   result = SplitString(",hello, world,", ",");
   EXPECT_EQ(4, (int)result.size());
-  EXPECT_EQ(StringPiece(""), result[0]);
-  EXPECT_EQ(StringPiece("hello"), result[1]);
-  EXPECT_EQ(StringPiece(" world"), result[2]);
-  EXPECT_EQ(StringPiece(""), result[3]);
+  EXPECT_EQ(beagleg::string_view(""), result[0]);
+  EXPECT_EQ(beagleg::string_view("hello"), result[1]);
+  EXPECT_EQ(beagleg::string_view(" world"), result[2]);
+  EXPECT_EQ(beagleg::string_view(""), result[3]);
 }
 
 TEST(StringUtilTest, ParseDecimal) {
@@ -61,7 +61,7 @@ TEST(StringUtilTest, ParseDecimal) {
   EXPECT_EQ(12345678901234LL, ParseDecimal("12345678901234", -1));
 
   // Make sure we're not assumming a nul-byte at a particular point
-  StringPiece longer_string("4255");
+  beagleg::string_view longer_string("4255");
   EXPECT_EQ(42, ParseDecimal(longer_string.substr(0, 2), -1));
 }
 

@@ -71,7 +71,7 @@ class ConfigParser {
   // Set content of configuration file as one string. Typically useful in
   // unit tests.
   // Overwrites any previous content.
-  void SetContent(StringPiece content);
+  void SetContent(beagleg::string_view content);
 
   // Emit configuration values to the Reader for all sections it is interested
   // in.

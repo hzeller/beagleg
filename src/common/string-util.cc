@@ -25,48 +25,48 @@
 
 #include <algorithm>
 
-StringPiece TrimWhitespace(const StringPiece &s) {
-  StringPiece::iterator start = s.begin();
+beagleg::string_view TrimWhitespace(beagleg::string_view s) {
+  beagleg::string_view::iterator start = s.begin();
   while (start < s.end() && isspace(*start)) start++;
-  StringPiece::iterator end = s.end() - 1;
+  beagleg::string_view::iterator end = s.end() - 1;
   while (end > start && isspace(*end)) end--;
-  return StringPiece(start, end + 1 - start);
+  return beagleg::string_view(start, end + 1 - start);
 }
 
-std::string ToLower(const StringPiece &in) {
+std::string ToLower(beagleg::string_view in) {
   std::string result(in.length(), ' ');
   std::transform(in.begin(), in.end(), result.begin(), ::tolower);
   return result;
 }
 
-bool HasPrefix(const StringPiece &s, const StringPiece &prefix) {
+bool HasPrefix(beagleg::string_view s, beagleg::string_view prefix) {
   if (s.length() < prefix.length()) return false;
   return strncmp(s.data(), prefix.data(), prefix.length()) == 0;
 }
 
-static inline bool contains(const StringPiece &str, char c) {
+static inline bool contains(beagleg::string_view str, char c) {
   for (char i : str) {
     if (i == c) return true;
   }
   return false;
 }
 
-std::vector<StringPiece> SplitString(const StringPiece &s,
-                                     const StringPiece &separators) {
-  std::vector<StringPiece> result;
-  StringPiece::iterator i = s.begin();
-  StringPiece::iterator start = i;
+std::vector<beagleg::string_view> SplitString(beagleg::string_view s,
+                                              beagleg::string_view separators) {
+  std::vector<beagleg::string_view> result;
+  beagleg::string_view::iterator i = s.begin();
+  beagleg::string_view::iterator start = i;
   for (/**/; i != s.end(); ++i) {
     if (contains(separators, *i)) {
-      result.push_back(StringPiece(start, i - start));
+      result.push_back(beagleg::string_view(start, i - start));
       start = i + 1;
     }
   }
-  result.push_back(StringPiece(start, i - start));
+  result.push_back(beagleg::string_view(start, i - start));
   return result;
 }
 
-int64_t ParseDecimal(const StringPiece &s, int64_t fallback) {
+int64_t ParseDecimal(beagleg::string_view s, int64_t fallback) {
   std::string as_str = s.ToString();  // we need safe c-str()
   char *endptr = NULL;
   int64_t result = strtoll(as_str.c_str(), &endptr, 10);
