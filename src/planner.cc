@@ -192,6 +192,17 @@ static double find_uar_intersection(double v0, double v1, double acceleration,
   return reaching_distance * (v0 < v1) + (distance - reaching_distance) / 2;
 }
 
+// Returns true, if all results in zero movement
+static bool subtract_steps(struct LinearSegmentSteps *value,
+                           const struct LinearSegmentSteps &subtract) {
+  bool has_nonzero = false;
+  for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    value->steps[i] -= subtract.steps[i];
+    has_nonzero |= (value->steps[i] != 0);
+  }
+  return has_nonzero;
+}
+
 class Planner::Impl {
  public:
   Impl(const MachineControlConfig *config, HardwareMapping *hardware_mapping,
@@ -447,13 +458,13 @@ bool Planner::Impl::issue_motor_move_if_possible(
     const unsigned defining_axis_steps = segment->planned.TotalSteps();
     const double accel_fraction =
       (double)segment->planned.accel / defining_axis_steps;
-    const double travel_fraction =
-      (double)segment->planned.travel / defining_axis_steps;
+    const double decel_fraction =
+      (double)segment->planned.decel / defining_axis_steps;
 
     // Accel
     if (segment->planned.accel) {
       for (const GCodeParserAxis a : AllAxes()) {
-        const int accel_steps =
+        const unsigned accel_steps =
           std::lround(accel_fraction * segment->target.delta_steps[a]);
         assign_steps_to_motors(&accel_command, a, accel_steps);
       }
@@ -461,31 +472,33 @@ bool Planner::Impl::issue_motor_move_if_possible(
       accel_command.v1 = segment->planned.v1;
     }
 
-    // Travel
-    if (segment->planned.travel) {
-      for (const GCodeParserAxis a : AllAxes()) {
-        const int travel_steps =
-          std::lround(travel_fraction * segment->target.delta_steps[a]);
-        assign_steps_to_motors(&move_command, a, travel_steps);
-      }
-      move_command.v0 = segment->planned.v1;
-      move_command.v1 = segment->planned.v1;
-    }
-
     // Decel
-    for (const GCodeParserAxis a : AllAxes()) {
-      assign_steps_to_motors(&decel_command, a, segment->target.delta_steps[a]);
+    if (segment->planned.decel) {
+      for (const GCodeParserAxis a : AllAxes()) {
+        const unsigned decel_steps =
+          std::lround(decel_fraction * segment->target.delta_steps[a]);
+        assign_steps_to_motors(&decel_command, a, decel_steps);
+      }
       decel_command.v0 = segment->planned.v1;
       decel_command.v1 = segment->planned.v2;
     }
 
-    // Now we substract from decel both accel and travel.
-    for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i)
-      decel_command.steps[i] -= accel_command.steps[i] + move_command.steps[i];
+    // Travel
+    for (const GCodeParserAxis a : AllAxes()) {
+      assign_steps_to_motors(&move_command, a, segment->target.delta_steps[a]);
+      move_command.v0 = segment->planned.v1;
+      move_command.v1 = segment->planned.v1;
+    }
 
-    if (segment->planned.accel) motor_ops_->Enqueue(accel_command);
-    if (segment->planned.travel) motor_ops_->Enqueue(move_command);
-    if (segment->planned.decel) motor_ops_->Enqueue(decel_command);
+    // Now we substract from travel both accel and travel.
+    subtract_steps(&move_command, accel_command);
+    const bool has_move = subtract_steps(&move_command, decel_command);
+
+    if (cfg_->synchronous) motor_ops_->WaitQueueEmpty();
+
+    if (segment->planned.accel) ret = motor_ops_->Enqueue(accel_command);
+    if (has_move && ret) ret = motor_ops_->Enqueue(move_command);
+    if (segment->planned.decel && ret) ret = motor_ops_->Enqueue(decel_command);
 
     // We always keep one segment to keep track of the last
     // position and aux values.
