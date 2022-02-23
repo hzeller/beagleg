@@ -86,6 +86,18 @@ struct AxisTarget {
       }
       ss << delta_steps[a];
     }
+    ss << "],";
+    ss << "\"pos\":"
+       << "[";
+    first = true;
+    for (const GCodeParserAxis a : AllAxes()) {
+      if (first) {
+        first = false;
+      } else {
+        ss << ",";
+      }
+      ss << position_steps[a];
+    }
     ss << "]}";
     return ss.str();
   }

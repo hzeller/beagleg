@@ -16,10 +16,6 @@
 #include "hardware-mapping.h"
 #include "segment-queue.h"
 
-// Using different steps/mm speeds results in problems right now.
-// TODO: This should work being set to 1
-#define SPEED_STEP_FACTOR 4
-
 // Helper function for implementing ASSERT_NEAR.
 testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
                                                     const char *expr2,
@@ -51,14 +47,14 @@ static inline T fabs_accel(const T v0, const T v1, const int s) {
 }
 
 // Set up config that they are the same for all the tests.
-static void InitTestConfig(struct MachineControlConfig *c) {
+static void InitTestConfig(struct MachineControlConfig *c, const float speed_step_factor = 4.0f) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
     const GCodeParserAxis axis = (GCodeParserAxis)i;
     c->steps_per_mm[axis] = steps_per_mm;
     // We do different steps/mm to detect problems when going between
     // euclidian space and step-space.
-    steps_per_mm *= SPEED_STEP_FACTOR;
+    steps_per_mm *= speed_step_factor;
     c->acceleration[axis] = 100;  // mm/s^2
     c->max_feedrate[axis] = 10000;
   }
@@ -480,9 +476,65 @@ static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
   return segments;
 }
 
-// Test with a small angle and a short segment that we
-// execute the right amount of steps.
-TEST(PlannerTest, ShortSegment_ShallowAngle) { DoAngleMove(5.0, 0, 5, 10); }
+// In this test we try to check that all the axes other than
+// the defininx axis are being travelled without losing steps due to
+// rounding errors.
+TEST(PlannerTest, ShortSegment_EdgeCases) {
+  PlannerHarness plantest(5.0f, 0);
+  MachineControlConfig &config = *plantest.GetConfig();
+  config.steps_per_mm[AXIS_X] = 1;
+  config.steps_per_mm[AXIS_Y] = 1;
+  config.acceleration[AXIS_X] = 99;
+  config.acceleration[AXIS_Y] = 99;
+
+  const float kFeedrate = 100.0f;
+  const int kDefiningAxisSwingSteps = 100;
+  const int kOtherAxisSteps = 3;
+
+  // Let's go up two times and move right twice.
+  AxesRegister pos;
+  pos[AXIS_Y] += kDefiningAxisSwingSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's continue through this path. What we are trying to achieve is to have
+  // 0% accel 50% travel and 50% decel.
+  pos[AXIS_Y] += kDefiningAxisSwingSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's go down two chunks, we test the case for which we have all 30% accel travel decel
+  // but 4 steps on the other axis.
+  pos[AXIS_Y] -= kDefiningAxisSwingSteps * 1.5 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += 4 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's go up again, this time we want 50% accel, 50% travel, 0% decel.
+  pos[AXIS_Y] += kDefiningAxisSwingSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Final deceleration sprint so that  the previous segment can have 0 decel.
+  pos[AXIS_Y] += kDefiningAxisSwingSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  std::vector<LinearSegmentSteps> segments = plantest.segments();
+
+  // Check that we indeed reach the target position.
+  // We just check the cartesian axes since for tests
+  // have a simple gcode axis -> motor mapping.
+  FixedArray<int, GCODE_NUM_AXES> final_pos_steps;
+  for (const auto &s : segments) {
+    for (int i = 0; i <= AXIS_Z; ++i) {
+      const GCodeParserAxis axis = (GCodeParserAxis)i;
+      final_pos_steps[axis] += s.steps[i];
+    }
+  }
+  for (const GCodeParserAxis a : AllAxes()) {
+    EXPECT_EQ(final_pos_steps[a], std::lround(pos[a] * config.steps_per_mm[a]));
+  }
+}
 
 TEST(PlannerTest, CornerMove_90Degrees) {
   const float kThresholdAngle = 5.0f;
