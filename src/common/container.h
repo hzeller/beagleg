@@ -81,20 +81,27 @@ class FixedArray {
 };
 
 // A simple fixed size, compile-time allocated deque.
+// Any positiv CAPACITY parameter above 1 should work. Choosing a power of
+// two will typically generate faster code as modulo ops can become bit-AND ops.
+//
+// For a cheap empty() and size() implementation, the actual capacity() is one
+// less than the chosen CAPACITY template parameter.
 template <typename T, int CAPACITY>
 class RingDeque {
  public:
-  RingDeque() : write_pos_(0), read_pos_(0) {
+  RingDeque() {
+    static_assert(CAPACITY > 1, "Capacity needs to be > 1");
     // intentionally not initializing memory to better see if users do.
   }
 
   size_t size() const { return (write_pos_ + CAPACITY - read_pos_) % CAPACITY; }
   bool empty() const { return write_pos_ == read_pos_; }
+  constexpr size_t capacity() const { return CAPACITY - 1; }
 
   // Add a new element and return pointer to it.
   // Element is not initialized.
   T *append() {
-    assert(size() < CAPACITY - 1);
+    assert(size() < capacity());
     T *result = buffer_ + write_pos_;
     write_pos_ = (write_pos_ + 1) % CAPACITY;
     return result;
@@ -123,8 +130,8 @@ class RingDeque {
   }
 
  private:
-  unsigned write_pos_;
-  unsigned read_pos_;
+  unsigned write_pos_ = 0;
+  unsigned read_pos_ = 0;
   T buffer_[CAPACITY];
 };
 

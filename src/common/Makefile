@@ -30,7 +30,7 @@ PRU_BIN=motor-interface-pru_bin.h
 OBJECTS=logging.o string-util.o fd-mux.o linebuf-reader.o
 GENLIB=libbeaglegbase.a
 
-UNITTEST_BINARIES=string-util_test linebuf-reader_test
+UNITTEST_BINARIES=string-util_test linebuf-reader_test container_test
 TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
