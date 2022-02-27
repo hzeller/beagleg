@@ -89,6 +89,7 @@ class RingDeque {
   }
 
   size_t size() const { return (write_pos_ + CAPACITY - read_pos_) % CAPACITY; }
+  bool empty() const { return write_pos_ == read_pos_; }
 
   // Add a new element and return pointer to it.
   // Element is not initialized.
@@ -107,17 +108,17 @@ class RingDeque {
 
   // Return last inserted position
   T *back() {
-    assert(size() > 0);
+    assert(!empty());
     return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
   }
 
   void pop_front() {
-    assert(size() > 0);
+    assert(!empty());
     read_pos_ = (read_pos_ + 1) % CAPACITY;
   }
 
   void pop_back() {
-    assert(size() > 0);
+    assert(!empty());
     write_pos_ = (write_pos_ + CAPACITY - 1) % CAPACITY;
   }
 
