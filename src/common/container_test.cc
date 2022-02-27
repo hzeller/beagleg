@@ -38,7 +38,7 @@ TEST(FixedArray, BasicOp) {
     sum += val;
   }
   EXPECT_EQ(count, 3);
-  EXPECT_EQ(sum, 1+2+3);
+  EXPECT_EQ(sum, 1 + 2 + 3);
 }
 
 TEST(RingDeque, BasicOp) {
