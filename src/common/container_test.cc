@@ -21,6 +21,26 @@
 
 #include <gtest/gtest.h>
 
+TEST(FixedArray, BasicOp) {
+  FixedArray<int, 3> buffer;
+  EXPECT_EQ(buffer.size(), 3u);  // one less than CAPACITY
+#if __cplusplus > 201400L
+  static_assert(buffer.size() == 3);  // >= c++14: compile-time constexpr
+#endif
+  buffer[0] = 1;
+  buffer[1] = 2;
+  buffer[2] = 3;
+
+  int count = 0;
+  int sum = 0;
+  for (int val : buffer) {
+    count++;
+    sum += val;
+  }
+  EXPECT_EQ(count, 3);
+  EXPECT_EQ(sum, 1+2+3);
+}
+
 TEST(RingDeque, BasicOp) {
   RingDeque<int, 4> buffer;
   EXPECT_TRUE(buffer.empty());
@@ -43,6 +63,9 @@ TEST(RingDeque, BasicOp) {
 TEST(RingDeque, Wrapping) {
   RingDeque<int, 4> buffer;
   EXPECT_EQ(buffer.capacity(), 3u);  // one less than CAPACITY
+#if __cplusplus > 201400L
+  static_assert(buffer.capacity() == 3);  // >= c++14: compile-time constexpr
+#endif
 
   // Advance the internal positions so that we force wrapping.
   *buffer.append() = 42;

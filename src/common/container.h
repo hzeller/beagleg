@@ -62,7 +62,7 @@ class FixedArray {
     return memcmp(data_, other.data_, sizeof(data_)) == 0;
   }
 
-  size_t size() const { return N; }
+  constexpr size_t size() const { return N; }
 
   void zero() { bzero(data_, sizeof(data_)); }
 
