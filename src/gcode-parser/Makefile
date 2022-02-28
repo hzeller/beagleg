@@ -80,3 +80,5 @@ compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' > $@
 
 .PHONY: FORCE
+
+.SECONDARY: $(UNITTEST_BINARIES:=.o)
