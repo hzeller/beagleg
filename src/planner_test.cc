@@ -71,6 +71,12 @@ class FakeMotorOperations : public SegmentQueue {
   explicit FakeMotorOperations(const MachineControlConfig &config)
       : config_(config) {}
 
+  float stepsToMillimeter(int *motor_steps, GCodeParserAxis axis) {
+    return config_.steps_per_mm[axis] > 0
+             ? motor_steps[axis] / config_.steps_per_mm[axis]
+             : 0;
+  }
+
   bool Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
     // Prepare for printing.
@@ -94,15 +100,9 @@ class FakeMotorOperations : public SegmentQueue {
     fprintf(stderr,
             "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
             "len: %5.1f ; v: %8.1f -> %8.1f %s %s",
-            (config_.steps_per_mm[AXIS_X] != 0)
-              ? euclidian_speeds.steps[AXIS_X] / config_.steps_per_mm[AXIS_X]
-              : 0,
-            (config_.steps_per_mm[AXIS_Y] != 0)
-              ? euclidian_speeds.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y]
-              : 0,
-            (config_.steps_per_mm[AXIS_Z] != 0)
-              ? euclidian_speeds.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z]
-              : 0,
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_X),
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_Y),
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_Z),
             hypotenuse, segment.v0, segment.v1,
             (segment.v0 < segment.v1)   ? "accel"
             : (segment.v0 > segment.v1) ? "decel"
@@ -131,15 +131,10 @@ class FakeMotorOperations : public SegmentQueue {
   // Out of convenience, return back the length of the segment in euclid space
   float FixEuclidSpeed(LinearSegmentSteps *seg) {
     // Real world coordinates
-    const float dx = (config_.steps_per_mm[AXIS_X] != 0)
-                       ? seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X]
-                       : 0;
-    const float dy = (config_.steps_per_mm[AXIS_Y] != 0)
-                       ? seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y]
-                       : 0;
-    const float dz = (config_.steps_per_mm[AXIS_Z] != 0)
-                       ? seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z]
-                       : 0;
+    const float dx = stepsToMillimeter(seg->steps, AXIS_X);
+    const float dy = stepsToMillimeter(seg->steps, AXIS_Y);
+    const float dz = stepsToMillimeter(seg->steps, AXIS_Z);
+
     const float hypotenuse = sqrtf(dx * dx + dy * dy + dz * dz);
     GCodeParserAxis defining_axis = AXIS_X;
     for (int i = AXIS_Y; i < AXIS_Z; ++i) {
@@ -493,34 +488,36 @@ TEST(PlannerTest, ShortSegment_EdgeCases) {
   config.acceleration[AXIS_Y] = 99;
 
   const float kFeedrate = 100.0f;
-  const int kDefiningAxisSwingSteps = 100;
+
+  // We perform some swings up and down.
+  const int kDefiningAxisSteps = 100;
   const int kOtherAxisSteps = 3;
 
   // Let's go up two times and move right twice.
   AxesRegister pos;
-  pos[AXIS_Y] += kDefiningAxisSwingSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_Y] += kDefiningAxisSteps * 2 / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
   // Let's continue through this path. What we are trying to achieve is to have
   // 0% accel 50% travel and 50% decel.
-  pos[AXIS_Y] += kDefiningAxisSwingSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_Y] += kDefiningAxisSteps / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
   // Let's go down two chunks, we test the case for which we have all 30% accel
   // travel decel but 4 steps on the other axis.
-  pos[AXIS_Y] -= kDefiningAxisSwingSteps * 1.5 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_Y] -= kDefiningAxisSteps * 1.5 / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += 4 / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
   // Let's go up again, this time we want 50% accel, 50% travel, 0% decel.
-  pos[AXIS_Y] += kDefiningAxisSwingSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_Y] += kDefiningAxisSteps / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
   // Final deceleration sprint so that  the previous segment can have 0 decel.
-  pos[AXIS_Y] += kDefiningAxisSwingSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_Y] += kDefiningAxisSteps * 2 / config.steps_per_mm[AXIS_Y];
   pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
@@ -591,24 +588,10 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   }
 }
 
-/*
-** Check the scenario in which we have two segment steps
-** at the same requested feedrate, but the acceleration is high
-** enough that the previous segment needs a forward pass as well.
-** Currently planned profile for an AxisTarget.
-**    |___________
-**    |   /¯\
-**    |  /   \ v2
-**    | /\    \
-** v0 |/__\____\_________
-**                       t
-*/
-TEST(PlannerTest, StraightLine_TwoSegmentsNeedsForwardPass) {}
-
 // Executing multiple short steps on a line should
 // should abide to the provided constraints.
 TEST(PlannerTest, StraightLine_LotsOfSteps) {
-  MachineControlConfig *config = new MachineControlConfig;
+  MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
   PlannerHarness plantest(0, 0, config);
   unsigned kNumSteps = 10;
@@ -640,7 +623,7 @@ TEST(PlannerTest, StraightLine_SingleSegment) {
 
   // Enqueue a target position.
   {
-    config = new MachineControlConfig;
+    config = new MachineControlConfig();
     // Let's keep a 1to1 conversion rate
     config->steps_per_mm[axis] = 1;
     // We do different steps/mm to detect problems when going between
@@ -663,7 +646,7 @@ TEST(PlannerTest, StraightLine_SingleSegment) {
     last_profile = segments;
   }
 
-  config = new MachineControlConfig;
+  config = new MachineControlConfig();
   config->steps_per_mm[axis] = 1;
   config->max_feedrate[axis] = kMaxFeedrateSteps;
   config->acceleration[axis] = kMaxAccelerationSteps;  // mm/s^2

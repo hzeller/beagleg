@@ -169,26 +169,31 @@ static float clamp_defining_axis_limit(const StepsAxesRegister &axes_steps,
 // Uniformly accelerated ramp distance estimation.
 // The ramp is parametrized by v0 as the starting speed, v1 the final speed
 // and the constant acceleration.
-static double uar_distance(double v0, double v1, double acceleration) {
+static double uniformly_accelerated_ramp_distance(double v0, double v1,
+                                                  double acceleration) {
   return (v1 * v1 - v0 * v0) / (2 * acceleration);
 }
 
 // Uniformly accelerated ramp final speed estimation where
 // s is the travelled distance, v0 the starting speed and
 // acceleration is the constant acceleration.
-static double uar_speed(double s, double v0, double acceleration) {
+static double uniformly_accelerated_ramp_speed(double s, double v0,
+                                               double acceleration) {
   return std::sqrt(2 * acceleration * s + v0 * v0);
 }
 
 // Compute the distance for an acceleration ramp to cross a deceleration
 // ramp with the same module of the acceleration.
-static double find_uar_intersection(double v0, double v1, double acceleration,
-                                    double distance) {
+static double find_uniformly_accelerated_ramps_intersection(double v0,
+                                                            double v1,
+                                                            double acceleration,
+                                                            double distance) {
   const double min_v = v0 <= v1 ? v0 : v1;
   const double max_v = v0 <= v1 ? v1 : v0;
   // Distance we would need to reach the maximum between the two speeds using
   // the acceleration provided.
-  const double reaching_distance = uar_distance(min_v, max_v, acceleration);
+  const double reaching_distance =
+    uniformly_accelerated_ramp_distance(min_v, max_v, acceleration);
   return reaching_distance * (v0 < v1) + (distance - reaching_distance) / 2;
 }
 
@@ -409,9 +414,9 @@ double Planner::Impl::euclidian_speed(const struct AxisTarget *t) {
   return t->speed * speed_factor;
 }
 
-// Send the slots until we reach the final deceleration ramp.
-// The ramp can cover more than one segment.
-// Also prepare LinearSegmentSteps and pop num_segments from the queue.
+// Select a starting chunk of the planned trajectory and send to the backend.
+// if flush_planning_queue is true, we flush the planned trajectory and commit
+// to the planned motion until reaching zero speed.
 bool Planner::Impl::issue_motor_move_if_possible(
   const bool flush_planning_queue) {
   bool ret = true;
@@ -434,7 +439,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
 
   // We require a slot to be always present.
   if (num_segments == 0 &&
-      (planning_buffer_.size() == PLANNING_BUFFER_CAPACITY - 1))
+      (planning_buffer_.size() == planning_buffer_.capacity()))
     ++num_segments;
 
   // No segments to enqueue, skip.
@@ -490,7 +495,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
       move_command.v1 = segment->planned.v1;
     }
 
-    // Now we substract from travel both accel and travel.
+    // Now we substract from travel both accel and decel.
     subtract_steps(&move_command, accel_command);
     const bool has_move = subtract_steps(&move_command, decel_command);
 
@@ -537,8 +542,8 @@ bool Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
 
   // We always assume there's enough space to store a new segment and that we
   // have at least one segment.
-  assert((planning_buffer_.size() < PLANNING_BUFFER_CAPACITY - 1) &&
-         planning_buffer_.size());
+  assert(planning_buffer_.size() < planning_buffer_.capacity() &&
+         !planning_buffer_.empty());
 
   // We always have a previous position.
   struct AxisTarget *prev_pos = &planning_buffer_.back()->target;
@@ -640,7 +645,7 @@ void Planner::Impl::bring_path_to_halt() {
 // the whole planning buffer to adapt the start
 // and final speed of all the segments.
 void Planner::Impl::UpdateMotionProfile() {
-  assert(planning_buffer_.size());
+  assert(!planning_buffer_.empty());
 
   // Starting speed for each Planning segment.
   PlanningSegment *segment;
@@ -693,13 +698,13 @@ void Planner::Impl::UpdateMotionProfile() {
     if (segment->target.speed > segment_end_speed) {
       // Let's see if we can just fill the segment with a full decel ramp.
       // This is the total space required to reach max speed.
-      const int steps_to_max_speed = uar_distance(
+      const int steps_to_max_speed = uniformly_accelerated_ramp_distance(
         segment_end_speed, segment->target.speed, segment->target.accel);
 
       segment->planned.decel =
         (steps_to_max_speed > delta_steps) ? delta_steps : steps_to_max_speed;
-      segment->planned.v1 = uar_speed(segment->planned.decel, segment_end_speed,
-                                      segment->target.accel);
+      segment->planned.v1 = uniformly_accelerated_ramp_speed(
+        segment->planned.decel, segment_end_speed, segment->target.accel);
       segment->planned.travel = delta_steps - segment->planned.decel;
       segment->planned.v2 = segment_end_speed;
     } else {
@@ -750,7 +755,7 @@ void Planner::Impl::UpdateMotionProfile() {
 
     // We have acceleration.
     const uint32_t steps = segment->planned.TotalSteps();
-    const uint32_t steps_to_vmax = uar_distance(
+    const uint32_t steps_to_vmax = uniformly_accelerated_ramp_distance(
       segment_start_speed, segment->planned.v1, segment->target.accel);
 
     // We intersect with the travel part.
@@ -764,8 +769,8 @@ void Planner::Impl::UpdateMotionProfile() {
 
     // We don't intersect with travel.
     segment->planned.travel = 0;
-    const double end_speed =
-      uar_speed(steps, segment_start_speed, segment->target.accel);
+    const double end_speed = uniformly_accelerated_ramp_speed(
+      steps, segment_start_speed, segment->target.accel);
 
     // We do only accel and decel, no travel.
     if (end_speed > segment->planned.v2) {
@@ -779,9 +784,9 @@ void Planner::Impl::UpdateMotionProfile() {
       // by doing so, the worst case scenario is the new v1 to go below v2. At
       // that point we force v2 to be equal v1 and remove any other deceleration
       // step.
-      segment->planned.accel = find_uar_intersection(
+      segment->planned.accel = find_uniformly_accelerated_ramps_intersection(
         segment_start_speed, segment->planned.v2, segment->target.accel, steps);
-      segment->planned.v1 = uar_speed(
+      segment->planned.v1 = uniformly_accelerated_ramp_speed(
         segment->planned.accel, segment_start_speed, segment->target.accel);
       if (segment->planned.v1 <= segment->planned.v2) {
         segment->planned.v2 = segment->planned.v1;
