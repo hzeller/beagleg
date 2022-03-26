@@ -41,8 +41,32 @@ TEST(FixedArray, BasicOp) {
   EXPECT_EQ(sum, 1 + 2 + 3);
 }
 
-TEST(RingDeque, BasicOp) {
-  RingDeque<int, 4> buffer;
+// Wrapper to have a uniform template signature.
+template <typename T, int CAPACITY>
+struct DynamicRingDequeWrapper : public DynamicRingDeque<T> {
+  explicit DynamicRingDequeWrapper() : DynamicRingDeque<T>(CAPACITY) {}
+};
+template <typename T, int CAPACITY>
+struct RingDequesBuilder {
+  using Dynamic = DynamicRingDequeWrapper<T, CAPACITY>;
+  using Fixed = FixedRingDeque<T, CAPACITY>;
+};
+
+using RingDeques = RingDequesBuilder<int, 4>;
+
+using RingDequeTypes = testing::Types<RingDeques::Dynamic, RingDeques::Fixed>;
+
+template <typename T>
+struct RingDequeTest : public testing::Test {
+  using RingDequeType = T;
+};
+
+TYPED_TEST_SUITE(RingDequeTest, RingDequeTypes);
+
+TYPED_TEST(RingDequeTest, BasicOp) {
+  using RingDeque = typename TestFixture::RingDequeType;
+  auto buffer = RingDeque();
+
   EXPECT_TRUE(buffer.empty());
   EXPECT_EQ(buffer.size(), 0u);
 
@@ -60,11 +84,15 @@ TEST(RingDeque, BasicOp) {
   EXPECT_TRUE(buffer.empty());
 }
 
-TEST(RingDeque, Wrapping) {
-  RingDeque<int, 4> buffer;
+TYPED_TEST(RingDequeTest, Wrapping) {
+  using RingDeque = typename TestFixture::RingDequeType;
+  auto buffer = RingDeque();
+
   EXPECT_EQ(buffer.capacity(), 3u);  // one less than CAPACITY
 #if __cplusplus > 201400L
-  static_assert(buffer.capacity() == 3);  // >= c++14: compile-time constexpr
+  if constexpr (std::is_same<RingDeque, RingDeques::Fixed>::value) {
+    static_assert(buffer.capacity() == 3);  // >= c++14: compile-time constexpr
+  }
 #endif
 
   // Advance the internal positions so that we force wrapping.

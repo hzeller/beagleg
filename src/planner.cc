@@ -118,7 +118,7 @@ class Planner::Impl {
 
   // Next buffered positions. Written by incoming gcode, read by outgoing
   // motor movements.
-  RingDeque<AxisTarget, 4> planning_buffer_;
+  FixedRingDeque<AxisTarget, 4> planning_buffer_;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.

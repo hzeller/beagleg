@@ -25,6 +25,7 @@
 #include <strings.h>
 
 #include <initializer_list>
+#include <memory>
 
 // Fixed array of POD types (that can be zeroed with bzero()).
 // Allows to have the index be a specific type (typically an enum instad of
@@ -80,60 +81,98 @@ class FixedArray {
   T data_[N];
 };
 
-// A simple fixed size, compile-time allocated deque.
-// Any positiv CAPACITY parameter above 1 should work. Choosing a power of
-// two will typically generate faster code as modulo ops can become bit-AND ops.
-//
-// For a cheap empty() and size() implementation, the actual capacity() is one
-// less than the chosen CAPACITY template parameter.
-template <typename T, int CAPACITY>
-class RingDeque {
- public:
-  RingDeque() {
-    static_assert(CAPACITY > 1, "Capacity needs to be > 1");
-    // intentionally not initializing memory to better see if users do.
+template <typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args &&...args) {
+  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+
+template <typename T, size_t CAPACITY>
+struct FixedStoragePolicy {
+  static_assert(CAPACITY > 1, "Capacity needs to be > 1");
+  // intentionally not initializing memory to better see if users do.
+  T buffer[CAPACITY];
+  using type = T;
+  T *GetBuffer() { return &buffer[0]; }
+  static constexpr size_t storage_size = CAPACITY;
+};
+
+template <typename T>
+struct DynamicStoragePolicy {
+  explicit DynamicStoragePolicy(const size_t size)
+      : storage_size(size), buffer(std::unique_ptr<T[]>(new T[size])) {
+    assert(size > 1 && "Capacity needs to be > 1");
   }
 
-  size_t size() const { return (write_pos_ + CAPACITY - read_pos_) % CAPACITY; }
+  using type = T;
+  size_t storage_size;
+  std::unique_ptr<T[]> buffer;
+  T *GetBuffer() { return buffer.get(); }
+};
+
+template <typename StoragePolicy>
+class RingDeque : private StoragePolicy {
+ public:
+  size_t size() const {
+    return (write_pos_ + StoragePolicy::storage_size - read_pos_) %
+           StoragePolicy::storage_size;
+  }
   bool empty() const { return write_pos_ == read_pos_; }
-  constexpr size_t capacity() const { return CAPACITY - 1; }
+  constexpr size_t capacity() const { return StoragePolicy::storage_size - 1; }
+  using T = typename StoragePolicy::type;
+  using StoragePolicy::StoragePolicy;
 
   // Add a new element and return pointer to it.
   // Element is not initialized.
   T *append() {
     assert(size() < capacity());
-    T *result = buffer_ + write_pos_;
-    write_pos_ = (write_pos_ + 1) % CAPACITY;
+    T *result = StoragePolicy::GetBuffer() + write_pos_;
+    write_pos_ = (write_pos_ + 1) % StoragePolicy::storage_size;
     return result;
   }
 
   // Return the content relative to the read position.
   T *operator[](size_t pos) {
     assert(size() > pos);
-    return &buffer_[(read_pos_ + pos) % CAPACITY];
+    return &StoragePolicy::GetBuffer()[(read_pos_ + pos) %
+                                       StoragePolicy::storage_size];
   }
 
   // Return last inserted position
   T *back() {
     assert(!empty());
-    return &buffer_[(write_pos_ + CAPACITY - 1) % CAPACITY];
+    const auto storage_size = StoragePolicy::storage_size;
+    return &StoragePolicy::GetBuffer()[(write_pos_ + storage_size - 1) %
+                                       storage_size];
   }
 
   void pop_front() {
     assert(!empty());
-    read_pos_ = (read_pos_ + 1) % CAPACITY;
+    read_pos_ = (read_pos_ + 1) % StoragePolicy::storage_size;
   }
 
   void pop_back() {
     assert(!empty());
-    write_pos_ = (write_pos_ + CAPACITY - 1) % CAPACITY;
+    const auto storage_size = StoragePolicy::storage_size;
+    write_pos_ = (write_pos_ + storage_size - 1) % storage_size;
   }
 
  private:
   unsigned write_pos_ = 0;
   unsigned read_pos_ = 0;
-  T buffer_[CAPACITY];
 };
+
+// A simple fixed size, compile-time allocated deque.
+// Any positiv CAPACITY parameter above 1 should work. Choosing a power of
+// two will typically generate faster code as modulo ops can become bit-AND ops.
+//
+// For a cheap empty() and size() implementation, the actual capacity() is one
+// less than the chosen CAPACITY template parameter.
+template <typename T, size_t CAPACITY>
+using FixedRingDeque = RingDeque<FixedStoragePolicy<T, CAPACITY>>;
+
+// Identical to the FixedRingDeque but runtime-allocated.
+template <typename T>
+using DynamicRingDeque = RingDeque<DynamicStoragePolicy<T>>;
 
 // This class provides a way to iterate over enumeration values. Assumes enum
 // values to be contiguous.
