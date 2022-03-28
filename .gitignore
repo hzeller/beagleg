@@ -6,3 +6,5 @@ machine-control
 gcode-print-stats
 gcode2ps
 test-out/
+compile_commands.json
+.cache
