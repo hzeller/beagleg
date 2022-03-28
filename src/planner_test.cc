@@ -71,7 +71,7 @@ class FakeMotorOperations : public SegmentQueue {
   explicit FakeMotorOperations(const MachineControlConfig &config)
       : config_(config) {}
 
-  float stepsToMillimeter(int *motor_steps, GCodeParserAxis axis) {
+  float stepsToMillimeter(const int *motor_steps, GCodeParserAxis axis) {
     return config_.steps_per_mm[axis] > 0
              ? motor_steps[axis] / config_.steps_per_mm[axis]
              : 0;
