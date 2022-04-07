@@ -626,22 +626,22 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
 // We have very high acceleration but very slow feedrate.
 // The planner should discard any acceleration and do only
 // travel.
-// TEST(PlannerTest, StraightLine_SlowSegment) {
-//   MachineControlConfig *config = new MachineControlConfig();
-//   InitTestConfig(config);
-//   // For this simple test we want to use a single axis.
-//   const GCodeParserAxis kAxis = AXIS_X;
-//   const float kFeedrate = 1;
-//   config->acceleration[kAxis] = 4200;
+TEST(PlannerTest, StraightLine_SlowSegment) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  // For this simple test we want to use a single axis.
+  const GCodeParserAxis kAxis = AXIS_X;
+  const float kFeedrate = 1;
+  config->acceleration[kAxis] = 4200;
 
-//   PlannerHarness plantest(0, 0, config);
-//   AxesRegister pos = {};
-//   pos[AXIS_X] = 100;
-//   plantest.Enqueue(pos, kFeedrate);
+  PlannerHarness plantest(0, 0, config);
+  AxesRegister pos = {};
+  pos[AXIS_X] = 100;
+  plantest.Enqueue(pos, kFeedrate);
 
-//   const auto &segments = plantest.segments();
-//   VerifyCommonExpectations(segments, *config);
-// }
+  const auto &segments = plantest.segments();
+  VerifyCommonExpectations(segments, *config);
+}
 
 // If the queue is empty and we flush it,
 // the outputs segments shoud be a symmetric profile. Either a
