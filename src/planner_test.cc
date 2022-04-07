@@ -6,15 +6,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cfloat>
+#include <cstddef>
+
+#include "common/container.h"
 #include "common/logging.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"
 #include "segment-queue.h"
-
-// Using different steps/mm speeds results in problems right now.
-// TODO: This should work being set to 1
-#define SPEED_STEP_FACTOR 4
 
 // Helper function for implementing ASSERT_NEAR.
 testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
@@ -47,14 +47,15 @@ static inline T fabs_accel(const T v0, const T v1, const int s) {
 }
 
 // Set up config that they are the same for all the tests.
-static void InitTestConfig(struct MachineControlConfig *c) {
+static void InitTestConfig(struct MachineControlConfig *c,
+                           const float speed_step_factor = 4.0f) {
   float steps_per_mm = 1000;
   for (int i = 0; i <= AXIS_Z; ++i) {
     const GCodeParserAxis axis = (GCodeParserAxis)i;
     c->steps_per_mm[axis] = steps_per_mm;
     // We do different steps/mm to detect problems when going between
     // euclidian space and step-space.
-    steps_per_mm *= SPEED_STEP_FACTOR;
+    steps_per_mm *= speed_step_factor;
     c->acceleration[axis] = 100;  // mm/s^2
     c->max_feedrate[axis] = 10000;
   }
@@ -70,6 +71,12 @@ class FakeMotorOperations : public SegmentQueue {
   explicit FakeMotorOperations(const MachineControlConfig &config)
       : config_(config) {}
 
+  float stepsToMillimeter(const int *motor_steps, GCodeParserAxis axis) {
+    return config_.steps_per_mm[axis] > 0
+             ? motor_steps[axis] / config_.steps_per_mm[axis]
+             : 0;
+  }
+
   bool Enqueue(const LinearSegmentSteps &segment) final {
 #if 0
     // Prepare for printing.
@@ -82,29 +89,28 @@ class FakeMotorOperations : public SegmentQueue {
     // that are created due to rounding of the accel/decel steps. They
     // should have speeds equal to the last v0.
     bool rounding_glitch = false;
-    if (abs(segment.steps[AXIS_X]) < 2 &&
-        abs(segment.steps[AXIS_Y]) < 2 &&
-        abs(segment.steps[AXIS_Z]) < 2 &&
-        segment.v0 == segment.v1)
+    if (abs(segment.steps[AXIS_X]) < 2 && abs(segment.steps[AXIS_Y]) < 2 &&
+        abs(segment.steps[AXIS_Z]) < 2 && segment.v0 == segment.v1)
       rounding_glitch = true;
 
     // Somewhat verbose, but useful :).
     // The values are calculated back back into actual distances from steps.
     // Speeds are in steps/sec to avoid displaying incorrect speeds for the
     // 'rounding_glitch'.
-    fprintf(stderr, "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
+    fprintf(stderr,
+            "  Receiving: (%6.1f, %6.1f, %6.1f); Euclid space: "
             "len: %5.1f ; v: %8.1f -> %8.1f %s %s",
-            euclidian_speeds.steps[AXIS_X] / config_.steps_per_mm[AXIS_X],
-            euclidian_speeds.steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y],
-            euclidian_speeds.steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z],
-            hypotenuse,
-            segment.v0, segment.v1,
-            (segment.v0 < segment.v1) ? "accel" :
-            (segment.v0 > segment.v1) ? "decel" : "move",
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_X),
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_Y),
+            stepsToMillimeter(euclidian_speeds.steps, AXIS_Z),
+            hypotenuse, segment.v0, segment.v1,
+            (segment.v0 < segment.v1)   ? "accel"
+            : (segment.v0 > segment.v1) ? "decel"
+                                        : "move",
             rounding_glitch ? "rounding GLITCH!" : "");
     if (!rounding_glitch)
-      fprintf(stderr, " ; v: %7.1f -> %7.1f",
-              euclidian_speeds.v0, euclidian_speeds.v1);
+      fprintf(stderr, " ; v: %7.1f -> %7.1f", euclidian_speeds.v0,
+              euclidian_speeds.v1);
     fprintf(stderr, "\n");
 #endif
 
@@ -125,9 +131,10 @@ class FakeMotorOperations : public SegmentQueue {
   // Out of convenience, return back the length of the segment in euclid space
   float FixEuclidSpeed(LinearSegmentSteps *seg) {
     // Real world coordinates
-    const float dx = seg->steps[AXIS_X] / config_.steps_per_mm[AXIS_X];
-    const float dy = seg->steps[AXIS_Y] / config_.steps_per_mm[AXIS_Y];
-    const float dz = seg->steps[AXIS_Z] / config_.steps_per_mm[AXIS_Z];
+    const float dx = stepsToMillimeter(seg->steps, AXIS_X);
+    const float dy = stepsToMillimeter(seg->steps, AXIS_Y);
+    const float dz = stepsToMillimeter(seg->steps, AXIS_Z);
+
     const float hypotenuse = sqrtf(dx * dx + dy * dy + dz * dz);
     GCodeParserAxis defining_axis = AXIS_X;
     for (int i = AXIS_Y; i < AXIS_Z; ++i) {
@@ -204,7 +211,27 @@ class PlannerHarness {
   Planner *planner_;
 };
 
-#if 0
+static size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
+  size_t motor_index = 0;
+  for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
+    if (abs(segment.steps[i]) > abs(segment.steps[motor_index]))
+      motor_index = i;
+  }
+  return motor_index;
+}
+
+// Every AxisTarget, the defining axis might change. Speeds though, should stay
+// continuous between each target for every axis. We need a function to compute
+// what was the speed in the previous target for the new defining axis.
+static double get_speed_factor_for_axis(const struct LinearSegmentSteps *t,
+                                        unsigned request_motor) {
+  const auto defining_motor = GetDefiningMotor(*t);
+  if (t->steps[defining_motor] == 0) return 0.0;
+  return (request_motor == defining_motor)
+           ? 1.0
+           : fabs(1.0 * t->steps[request_motor] / t->steps[defining_motor]);
+}
+
 // Verify that on average, the profile satisfies
 // the configured constraints both for speed and acceleration.
 static void VerifySegmentConstraints(const MachineControlConfig &config,
@@ -214,7 +241,10 @@ static void VerifySegmentConstraints(const MachineControlConfig &config,
     const GCodeParserAxis axis = (GCodeParserAxis)i;
     const auto steps = segment.steps[axis];
     if (steps == 0) continue;
-    const double accel = fabs_accel(segment.v0, segment.v1, steps);
+    const double factor = get_speed_factor_for_axis(&segment, i);
+    const double v1 = factor * segment.v0;
+    const double v2 = factor * segment.v1;
+    const double accel = fabs_accel(v1, v2, steps);
     const double max_accel =
       config.acceleration[axis] * config.steps_per_mm[axis];
     const double max_feedrate =
@@ -222,19 +252,11 @@ static void VerifySegmentConstraints(const MachineControlConfig &config,
     EXPECT_LE(segment.v0, max_feedrate);
     EXPECT_LE(segment.v1, max_feedrate);
     if (segment.v0 != segment.v1) {
-      EXPECT_LE(accel, max_accel);
+      if (accel > max_accel) {
+        EXPECT_NEAR_REL(accel, max_accel, rel_error);
+      }
     }
   }
-}
-#endif
-
-static size_t GetDefiningMotor(const LinearSegmentSteps &segment) {
-  size_t motor_index = 0;
-  for (size_t i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-    if (abs(segment.steps[i]) > abs(segment.steps[motor_index]))
-      motor_index = i;
-  }
-  return motor_index;
 }
 
 // Conditions that we expect in all moves.
@@ -259,15 +281,13 @@ static void VerifyCommonExpectations(
       EXPECT_EQ(segments[i].v1, segments[i + 1].v0)
         << "Joining speed between " << i << " and " << (i + 1);
     }
-#if 0  // This is now failing, we plan to fix it on the next PR(#44)
     VerifySegmentConstraints(config, segments[i]);
-#endif
   }
 }
 
 TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
   PlannerHarness plantest;
-
+  const MachineControlConfig *config = plantest.GetConfig();
   AxesRegister pos;
   pos[AXIS_X] = 100;
   pos[AXIS_Y] = 100;
@@ -277,7 +297,7 @@ TEST(PlannerTest, SimpleMove_NeverReachingFullSpeed) {
   // reach, then decelerating.
   EXPECT_EQ(2, (int)plantest.segments().size());
 
-  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
+  VerifyCommonExpectations(plantest.segments(), *config);
 }
 
 TEST(PlannerTest, SimpleMove_ReachesFullSpeed) {
@@ -417,28 +437,105 @@ TEST(PlannerTest, SimpleMove_AxisSpeedLimitClampsOverallSpeed_YY) {
 static std::vector<LinearSegmentSteps> DoAngleMove(float threshold_angle,
                                                    float speed_tune_angle,
                                                    float start_angle,
-                                                   float delta_angle) {
+                                                   float delta_angle,
+                                                   float segment_len = 10) {
   const float kFeedrate = 3000.0f;  // Never reached. We go from accel to decel.
 #if 0
   fprintf(stderr, "DoAngleMove(%.1f, %.1f, %.1f)\n",
           threshold_angle, start_angle, delta_angle);
 #endif
   PlannerHarness plantest(threshold_angle, speed_tune_angle);
-  const float kSegmentLen = 100;
+  const MachineControlConfig &config = *plantest.GetConfig();
 
   float radangle = 2 * M_PI * start_angle / 360;
   AxesRegister pos;
-  pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
-  pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
+  pos[AXIS_X] = segment_len * cos(radangle) + pos[AXIS_X];
+  pos[AXIS_Y] = segment_len * sin(radangle) + pos[AXIS_Y];
   plantest.Enqueue(pos, kFeedrate);
 
   radangle += 2 * M_PI * delta_angle / 360;
-  pos[AXIS_X] = kSegmentLen * cos(radangle) + pos[AXIS_X];
-  pos[AXIS_Y] = kSegmentLen * sin(radangle) + pos[AXIS_Y];
+  pos[AXIS_X] = segment_len * cos(radangle) + pos[AXIS_X];
+  pos[AXIS_Y] = segment_len * sin(radangle) + pos[AXIS_Y];
   plantest.Enqueue(pos, kFeedrate);
   std::vector<LinearSegmentSteps> segments = plantest.segments();
-  VerifyCommonExpectations(segments, *plantest.GetConfig());
+
+  // Check that we indeed reach the target position.
+  // We just check the cartesian axes since for tests
+  // have a simple gcode axis -> motor mapping.
+  FixedArray<int, GCODE_NUM_AXES> final_pos_steps;
+  for (const auto &s : segments) {
+    for (int i = 0; i <= AXIS_Z; ++i) {
+      const GCodeParserAxis axis = (GCodeParserAxis)i;
+      final_pos_steps[axis] += s.steps[i];
+    }
+  }
+  for (const GCodeParserAxis a : AllAxes()) {
+    EXPECT_EQ(final_pos_steps[a], std::lround(pos[a] * config.steps_per_mm[a]));
+  }
+  VerifyCommonExpectations(segments, config);
   return segments;
+}
+
+// In this test we try to check that all the axes other than
+// the defininx axis are being travelled without losing steps due to
+// rounding errors.
+TEST(PlannerTest, ShortSegment_EdgeCases) {
+  PlannerHarness plantest(5.0f, 0);
+  MachineControlConfig &config = *plantest.GetConfig();
+  config.steps_per_mm[AXIS_X] = 1;
+  config.steps_per_mm[AXIS_Y] = 1;
+  config.acceleration[AXIS_X] = 99;
+  config.acceleration[AXIS_Y] = 99;
+
+  const float kFeedrate = 100.0f;
+
+  // We perform some swings up and down.
+  const int kDefiningAxisSteps = 100;
+  const int kOtherAxisSteps = 3;
+
+  // Let's go up two times and move right twice.
+  AxesRegister pos;
+  pos[AXIS_Y] += kDefiningAxisSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's continue through this path. What we are trying to achieve is to have
+  // 0% accel 50% travel and 50% decel.
+  pos[AXIS_Y] += kDefiningAxisSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's go down two chunks, we test the case for which we have all 30% accel
+  // travel decel but 4 steps on the other axis.
+  pos[AXIS_Y] -= kDefiningAxisSteps * 1.5 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += 4 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Let's go up again, this time we want 50% accel, 50% travel, 0% decel.
+  pos[AXIS_Y] += kDefiningAxisSteps / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  // Final deceleration sprint so that  the previous segment can have 0 decel.
+  pos[AXIS_Y] += kDefiningAxisSteps * 2 / config.steps_per_mm[AXIS_Y];
+  pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
+  plantest.Enqueue(pos, kFeedrate);
+
+  std::vector<LinearSegmentSteps> segments = plantest.segments();
+
+  // Check that we indeed reach the target position.
+  // We just check the cartesian axes since for tests
+  // have a simple gcode axis -> motor mapping.
+  FixedArray<int, GCODE_NUM_AXES> final_pos_steps;
+  for (const auto &s : segments) {
+    for (int i = 0; i <= AXIS_Z; ++i) {
+      const GCodeParserAxis axis = (GCodeParserAxis)i;
+      final_pos_steps[axis] += s.steps[i];
+    }
+  }
+  for (const GCodeParserAxis a : AllAxes()) {
+    EXPECT_EQ(final_pos_steps[a], std::lround(pos[a] * config.steps_per_mm[a]));
+  }
 }
 
 TEST(PlannerTest, CornerMove_90Degrees) {
@@ -491,6 +588,102 @@ void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
   }
 }
 
+// Executing multiple short steps on a line should
+// should abide to the provided constraints.
+TEST(PlannerTest, StraightLine_LotsOfSteps) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  PlannerHarness plantest(0, 0, config);
+  unsigned kNumSteps = 10;
+  AxesRegister pos = {};
+
+  for (unsigned i = 0; i < kNumSteps; ++i) {
+    pos[AXIS_X] += 1;
+    plantest.Enqueue(pos, 1000);
+  }
+  for (const auto segment : plantest.segments())
+    VerifySegmentConstraints(*config, segment);
+}
+
+// If the queue is empty and we flush it,
+// the outputs segments shoud be a symmetric profile. Either a
+// isosceles trapezoid or a triangle.
+TEST(PlannerTest, StraightLine_SingleSegment) {
+  MachineControlConfig *config = NULL;
+  // Let's set a really high speed. We don't care about the maximum feedrate.
+  // We are going to specify that anyways for each requested segment.
+  const int kMaxFeedrateSteps = 999999;
+  const int kMaxAccelerationSteps = 100;
+  const float kFeedrate = 500;
+
+  // For this simple test we want to use a single axis.
+  const GCodeParserAxis axis = AXIS_X;
+
+  std::vector<LinearSegmentSteps> last_profile;
+
+  // Enqueue a target position.
+  {
+    config = new MachineControlConfig();
+    // Let's keep a 1to1 conversion rate
+    config->steps_per_mm[axis] = 1;
+    // We do different steps/mm to detect problems when going between
+    // euclidian space and step-space.
+    config->max_feedrate[axis] = kMaxFeedrateSteps;
+    config->acceleration[axis] = kMaxAccelerationSteps;  // mm/s^2
+    config->threshold_angle = 0;
+    config->speed_tune_angle = 0;
+    config->require_homing = false;
+
+    PlannerHarness plantest(0, 0, config);
+    AxesRegister pos = {};
+    pos[AXIS_X] = 100;
+    plantest.Enqueue(pos, kFeedrate);
+
+    const auto &segments = plantest.segments();
+    const size_t num_segments = segments.size();
+    EXPECT_TRUE(num_segments > 0);
+    EXPECT_EQ(segments[num_segments - 1].v1, 0);
+    last_profile = segments;
+  }
+
+  config = new MachineControlConfig();
+  config->steps_per_mm[axis] = 1;
+  config->max_feedrate[axis] = kMaxFeedrateSteps;
+  config->acceleration[axis] = kMaxAccelerationSteps;  // mm/s^2
+  config->threshold_angle = 0;
+  config->speed_tune_angle = 0;
+  config->require_homing = false;
+
+  // Enqueue it two times.
+  PlannerHarness plantest(0, 0, config);
+  AxesRegister pos = {};
+  pos[AXIS_X] = 100;
+  plantest.Enqueue(pos, kFeedrate);
+  pos[AXIS_X] *= 2;
+  plantest.Enqueue(pos, kFeedrate);
+
+  const auto &segments = plantest.segments();
+
+  const size_t num_segments = segments.size();
+  EXPECT_TRUE(num_segments > 0);
+  EXPECT_EQ(segments[num_segments - 1].v1, 0);
+
+  // Check that the original profile (with a single target position)
+  // should now be bigger than zero!
+  for (size_t i = 0; i < segments.size(); ++i) {
+    const LinearSegmentSteps &segment = segments[i];
+    if (i == 0) {
+      EXPECT_NEAR_REL(segment.v0, 0, 1e-3);
+      EXPECT_GE(segment.v1, 0);
+    } else if (i == segments.size() - 1) {
+      EXPECT_NEAR_REL(segment.v1, 0, 1e-3);
+      EXPECT_GE(segment.v0, 0);
+    } else {
+      EXPECT_GT(segment.v0, segment.v1);
+    }
+  }
+}
+
 // these tests don't work currently.
 TEST(PlannerTest, CornerMove_Shallow_PositiveAngle) {
   const float kThresholdAngle = 5.0f;
@@ -504,7 +697,6 @@ TEST(PlannerTest, CornerMove_Shallow_NegativeAngle) {
   testShallowAngleAllStartingPoints(kThresholdAngle, kTestingAngle);
 }
 
-#if 0  // Needs fixing. PR #44 under way
 // This function compute acceleration based on the starting velocity, the ending
 // velocity and the path in steps
 static int acceleration_segment(float v0, float v1, int delta) {
@@ -599,9 +791,8 @@ TEST(PlannerTest, DetectOutRangeAcceleration) {
         abs(ay));  // added 0.3% of the acceleration limit
     }
   }
-  VerifyCommonExpectations(plantest.segments());
+  VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
 }
-#endif
 
 int main(int argc, char *argv[]) {
   Log_init("/dev/stderr");
