@@ -259,18 +259,36 @@ static void VerifySegmentConstraints(const MachineControlConfig &config,
   }
 }
 
+// At the begin and end of our travel, we expect
+// the initial speed and end speed to be almost zero.
+// Almost in the sense that they can be above zero as long as
+// the theoretical deceleration/acceleration would require less
+// than a step.
+static void VerifySpeedWithTolerance(const LinearSegmentSteps &segment,
+                                     const MachineControlConfig &config,
+                                     float segment_speed, float target_speed) {
+  const GCodeParserAxis defining_axis =
+    (GCodeParserAxis)GetDefiningMotor(segment);
+  const float accel =
+    fabs_accel(0.0f, segment_speed / config.steps_per_mm[defining_axis], 1.0f);
+  // Expect 0 <= accel <= config.acceleration;
+  EXPECT_LE(accel * accel - accel * config.acceleration[defining_axis], 0);
+}
+
 // Conditions that we expect in all moves.
 static void VerifyCommonExpectations(
   const std::vector<LinearSegmentSteps> &segments,
   const MachineControlConfig &config, const float rel_error = 1e-3) {
-  ASSERT_GT((int)segments.size(), 1) << "Expected more than one segment";
+  ASSERT_GE((int)segments.size(), 1) << "Expected at least one segment";
+
+  const LinearSegmentSteps starting_segment = segments[0];
+  const LinearSegmentSteps ending_segment = segments[segments.size() - 1];
 
   // Some basic assumption: something is moving.
-  EXPECT_GT(segments[0].v1, 0);
+  EXPECT_GT(starting_segment.v0 + starting_segment.v1, 0);
 
-  // At the begin and end of our travel, we have zero speed.
-  EXPECT_EQ(0, segments[0].v0);
-  EXPECT_EQ(0, segments[segments.size() - 1].v1);
+  VerifySpeedWithTolerance(starting_segment, config, starting_segment.v0, 0);
+  VerifySpeedWithTolerance(ending_segment, config, ending_segment.v1, 0);
 
   // The joining speeds between segments match.
   for (size_t i = 0; i < segments.size() - 1; ++i) {
@@ -603,6 +621,26 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
   }
   for (const auto segment : plantest.segments())
     VerifySegmentConstraints(*config, segment);
+}
+
+// We have very high acceleration but very slow feedrate.
+// The planner should discard any acceleration and do only
+// travel.
+TEST(PlannerTest, StraightLine_SlowSegment) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  // For this simple test we want to use a single axis.
+  const GCodeParserAxis kAxis = AXIS_X;
+  const float kFeedrate = 1;
+  config->acceleration[kAxis] = 4200;
+
+  PlannerHarness plantest(0, 0, config);
+  AxesRegister pos = {};
+  pos[AXIS_X] = 100;
+  plantest.Enqueue(pos, kFeedrate);
+
+  const auto &segments = plantest.segments();
+  VerifyCommonExpectations(segments, *config);
 }
 
 // If the queue is empty and we flush it,

@@ -703,8 +703,11 @@ void Planner::Impl::UpdateMotionProfile() {
 
       segment->planned.decel =
         (steps_to_max_speed > delta_steps) ? delta_steps : steps_to_max_speed;
-      segment->planned.v1 = uniformly_accelerated_ramp_speed(
-        segment->planned.decel, segment_end_speed, segment->target.accel);
+      segment->planned.v1 =
+        (steps_to_max_speed > 0)
+          ? uniformly_accelerated_ramp_speed(
+              segment->planned.decel, segment_end_speed, segment->target.accel)
+          : segment->target.speed;
       segment->planned.travel = delta_steps - segment->planned.decel;
       segment->planned.v2 = segment_end_speed;
     } else {
