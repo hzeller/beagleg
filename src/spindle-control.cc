@@ -605,9 +605,9 @@ class PololuSMCSpindle final : public BaseSpindle {
 };
 }  // anonymous namespace
 
-bool SpindleConfig::ConfigureFromFile(ConfigParser *parser) {
+bool SpindleConfig::ConfigureFromFile(const ConfigParser &parser) {
   SpindleConfigReader reader(this);
-  return parser->EmitConfigValues(&reader);
+  return parser.EmitConfigValues(&reader);
 }
 
 Spindle *Spindle::CreateFromConfig(const SpindleConfig &config,

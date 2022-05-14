@@ -509,20 +509,20 @@ int main(int argc, char *argv[]) {
     Log_error("Exiting. Cannot read config file '%s'", config_file);
     return 1;
   }
-  if (!config.ConfigureFromFile(&config_parser)) {
+  if (!config.ConfigureFromFile(config_parser)) {
     Log_error("Exiting. Parse error in configuration file '%s'", config_file);
     return 1;
   }
 
   HardwareMapping hardware_mapping;
-  if (!hardware_mapping.ConfigureFromFile(&config_parser)) {
+  if (!hardware_mapping.ConfigureFromFile(config_parser)) {
     Log_error("Exiting. Couldn't initialize hardware mapping (%s)",
               config_file);
     return 1;
   }
 
   SpindleConfig spindle_config;
-  if (!spindle_config.ConfigureFromFile(&config_parser)) {
+  if (!spindle_config.ConfigureFromFile(config_parser)) {
     Log_error("Exiting. Errors in spindle configuration in (%s)", config_file);
     return 1;
   }

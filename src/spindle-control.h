@@ -28,7 +28,7 @@ class ConfigParser;
 // Spindle configuration as read from config file.
 struct SpindleConfig {
   SpindleConfig();
-  bool ConfigureFromFile(ConfigParser *parser);
+  bool ConfigureFromFile(const ConfigParser &parser);
 
   std::string type;
   std::string port;

@@ -26,6 +26,17 @@
 
 // The config parser reads a configuration file and passes tokenized
 // values to a ConfigParser::Reader.
+// The configuration is organized in sections, starting with a [section]
+// header. Within each section, there are name = value pairs (and optional
+// #-comments.)
+//
+// A reader is informed whenever a new section comes up and asked if it is
+// interested in the values. If so, all name/value pairs in that section are
+// passed on to the reader.
+//
+// With this set-up, we can have one configuration file that is easily
+// extendable with new sections without any of the configuration readers being
+// confused about content not meant for them.
 class ConfigParser {
  public:
   // A reader has to be implemented by a subsystem that needs configuration
@@ -59,7 +70,7 @@ class ConfigParser {
   };
 
   // Create a config parser.
-  ConfigParser();
+  ConfigParser() = default;
 
   // Set content of configuration by reading from the file. Returns 'true'
   // if reading the file was successful.
@@ -90,10 +101,9 @@ class ConfigParser {
   // and all calls to SeenNameValue() returned true).
   //
   // Reader-ownership is not taken over.
-  bool EmitConfigValues(Reader *reader);
+  bool EmitConfigValues(Reader *reader) const;
 
  private:
   std::string content_;
-  bool parse_success_;
 };
 #endif  // _BEAGLEG_CONFIG_PARSER_H

@@ -36,7 +36,7 @@ TEST(MachineControlConfig, GeneralMapping) {
     "synchronous = false\n"  // 'NO'.
     "auto-motor-disable-seconds = 188 \n");
   MachineControlConfig config;
-  EXPECT_TRUE(config.ConfigureFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(p));
 
   EXPECT_EQ("ABC", config.home_order);
   EXPECT_FALSE(config.require_homing);
@@ -60,7 +60,7 @@ TEST(MachineControlConfig, AxisMapping) {
   );
 
   MachineControlConfig config;
-  EXPECT_TRUE(config.ConfigureFromFile(&p));
+  EXPECT_TRUE(config.ConfigureFromFile(p));
 
   EXPECT_FLOAT_EQ(200.0f / (2 * 60.0f), config.steps_per_mm[AXIS_X]);
   EXPECT_FLOAT_EQ(42.0f, config.max_feedrate[AXIS_X]);

@@ -119,7 +119,7 @@ class HardwareMapping {
    */
 
   // Pick the relevant mapping parameter from the configuration file.
-  bool ConfigureFromFile(ConfigParser *parser);
+  bool ConfigureFromFile(const ConfigParser &parser);
 
   // Connect logic output to aux pin in the range [1..NUM_BOOL_OUTPUTS]
   // A value of 0 for 'aux' is accepted, but does not connect it to anything.

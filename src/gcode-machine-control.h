@@ -38,7 +38,7 @@ struct MachineControlConfig {
   MachineControlConfig();
 
   // Read values from configuration file.
-  bool ConfigureFromFile(ConfigParser *parser);
+  bool ConfigureFromFile(const ConfigParser &parser);
 
   // Arrays with values for each axis
   FloatAxisConfig steps_per_mm;  // Steps per mm for each logical axis.

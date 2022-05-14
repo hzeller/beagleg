@@ -541,9 +541,9 @@ class HardwareMapping::ConfigReader : public ConfigParser::Reader {
   std::string current_section_;
 };
 
-bool HardwareMapping::ConfigureFromFile(ConfigParser *parser) {
+bool HardwareMapping::ConfigureFromFile(const ConfigParser &parser) {
   HardwareMapping::ConfigReader reader(this);
-  return parser->EmitConfigValues(&reader);
+  return parser.EmitConfigValues(&reader);
 }
 
 const char *HardwareMapping::OutputToName(NamedOutput output) {

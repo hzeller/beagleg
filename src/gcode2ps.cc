@@ -1166,7 +1166,7 @@ static bool ParseConfigIfAvailable(const char *config_file,
       fprintf(stderr, "Cannot read config file '%s'\n", config_file);
       return false;
     }
-    if (!machine_config->ConfigureFromFile(&config_parser)) {
+    if (!machine_config->ConfigureFromFile(config_parser)) {
       fprintf(stderr, "Exiting. Parse error in configuration file '%s'\n",
               config_file);
       return false;

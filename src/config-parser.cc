@@ -108,11 +108,8 @@ void ConfigParser::Reader::ReportError(int line_no, const std::string &msg) {
   Log_error("Line %d: %s", line_no, msg.c_str());
 }
 
-ConfigParser::ConfigParser() : parse_success_(true) {}
-
 bool ConfigParser::SetContentFromFile(const char *filename) {
   if (!filename) return false;
-  parse_success_ = true;
   std::ifstream file_stream(filename, std::ios::binary);
   content_.assign(std::istreambuf_iterator<char>(file_stream),
                   std::istreambuf_iterator<char>());
@@ -120,7 +117,6 @@ bool ConfigParser::SetContentFromFile(const char *filename) {
 }
 
 void ConfigParser::SetContent(beagleg::string_view content) {
-  parse_success_ = true;
   content_.assign(content.begin(), content.end());
 }
 
@@ -154,10 +150,7 @@ static std::string CanonicalizeName(const beagleg::string_view s) {
   return ToLower(TrimWhitespace(s));
 }
 
-bool ConfigParser::EmitConfigValues(Reader *reader) {
-  // The first pass collects all the parse errors and emits them. Later on,
-  // we refuse to run another time.
-  if (!parse_success_) return false;
+bool ConfigParser::EmitConfigValues(Reader *reader) const {
   bool success = true;
   bool current_section_interested = false;
   std::string current_section;
@@ -173,7 +166,7 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
     if (line[0] == '[') {
       if (line[line.length() - 1] != ']') {
         reader->ReportError(line_no, "Section line does not end in ']'");
-        parse_success_ = false;
+        success = false;
         current_section_interested = false;  // rest is probably bogus.
         continue;
       }
@@ -187,7 +180,7 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
         std::find(line.begin(), line.end(), '=');
       if (eq_pos == line.end()) {
         reader->ReportError(line_no, "name=value pair expected.");
-        parse_success_ = false;
+        success = false;
         continue;
       }
       if (current_section_interested) {
@@ -207,5 +200,5 @@ bool ConfigParser::EmitConfigValues(Reader *reader) {
       }
     }
   }
-  return parse_success_ && success;
+  return success;
 }

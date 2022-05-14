@@ -150,7 +150,7 @@ class MachineControlConfigReader : public ConfigParser::Reader {
 };
 }  // namespace
 
-bool MachineControlConfig::ConfigureFromFile(ConfigParser *parser) {
+bool MachineControlConfig::ConfigureFromFile(const ConfigParser &parser) {
   MachineControlConfigReader reader(this);
-  return parser->EmitConfigValues(&reader);
+  return parser.EmitConfigValues(&reader);
 }
