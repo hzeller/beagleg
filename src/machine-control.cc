@@ -108,12 +108,11 @@ static int usage(const char *prog, const char *msg) {
 }
 
 static int fyi_option_gone(const char *prog) {
-  fprintf(
-    stderr,
-    "Options for machine settings have been removed in favor of a "
-    "configuration file.\n"
-    "Provide it with -c <config-file>.\n"
-    "See https://github.com/hzeller/beagleg/blob/main/sample.config\n\n");
+  fprintf(stderr,
+          "Options for machine settings have been removed in favor of a "
+          "configuration file.\n"
+          "Provide it with -c <config-file>.\n"
+          "See https://github.com/hzeller/beagleg/blob/main/sample.config\n\n");
   return usage(prog, NULL);
 }
 
@@ -259,6 +258,7 @@ static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
 
 // THIS IS A SAMPLE ONLY at this point. We need to come up with a proper
 // definition first what we want from a status server.
+// https://github.com/hzeller/beagleg/issues/38
 // At this point: whenever it receives the character 'p' it prints the
 // position as json.
 static void run_status_server(const char *bind_addr, int port,
