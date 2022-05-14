@@ -113,7 +113,7 @@ static int fyi_option_gone(const char *prog) {
     "Options for machine settings have been removed in favor of a "
     "configuration file.\n"
     "Provide it with -c <config-file>.\n"
-    "See https://github.com/hzeller/beagleg/blob/master/sample.config\n\n");
+    "See https://github.com/hzeller/beagleg/blob/main/sample.config\n\n");
   return usage(prog, NULL);
 }
 
