@@ -21,16 +21,14 @@
 
 #include <deque>
 
-#include "segment-queue.h"
-
-#include "spi.h"
-
 #include "hsg-sim.h"
+#include "segment-queue.h"
+#include "spi.h"
 
 class BeagleGSPIProtocol;
 
 class SPISegmentQueue : public SegmentQueue {
-public:
+ public:
   SPISegmentQueue(SPIHost *spi, StepGeneratorModuleSim *module_sim);
   ~SPISegmentQueue();
 
@@ -40,9 +38,9 @@ public:
   bool GetPhysicalStatus(PhysicalStatus *status) final;
   void SetExternalPosition(int axis, int pos) final;
 
-private:
+ private:
   BeagleGSPIProtocol *const protocol_handler_;
   StepGeneratorModuleSim *const module_sim_;
 };
 
-#endif // MOTION_QUEUE_MOTOR_OPERATIONS_H
+#endif  // MOTION_QUEUE_MOTOR_OPERATIONS_H

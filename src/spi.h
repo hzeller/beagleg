@@ -4,12 +4,13 @@
 #define SPI_HOST_H
 
 #include <stdint.h>
+
 #include <string>
 
 class StepGeneratorModuleSim;
 
 class SPIHost {
-public:
+ public:
   struct Options {
     uint32_t mode = 0;  // TODO: choose rasonable default.
     uint8_t bits_per_word = 8;
@@ -18,8 +19,7 @@ public:
   };
 
   SPIHost(StepGeneratorModuleSim *optional_simulated = nullptr)
-    : fd_(-1), spi_sim_(optional_simulated) {
-  }
+      : fd_(-1), spi_sim_(optional_simulated) {}
   ~SPIHost();
 
   // Connect to given device, e.g. "/dev/spidev0.0".
@@ -31,7 +31,7 @@ public:
   bool TransferBuffer(const void *send, void *receive, size_t len,
                       bool is_last_in_transaction = true);
 
-private:
+ private:
   int fd_;
   struct Options options_;
   StepGeneratorModuleSim *const spi_sim_;

@@ -54,9 +54,9 @@
 #include "spindle-control.h"
 
 // New. Compile-time defined.
+#include "hsg-sim.h"
 #include "spi-segment-queue.h"
 #include "spi.h"
-#include "hsg-sim.h"
 #define USE_SPI_BACKEND 1
 
 static int usage(const char *prog, const char *msg) {
@@ -427,22 +427,12 @@ int main(int argc, char *argv[]) {
     case OPT_SET_SPEED_TUNE_ANGLE:
       config.speed_tune_angle = (float)atof(optarg);
       break;
-    case OPT_REQUIRE_HOMING:
-      require_homing = true;
-      break;
-    case OPT_DONT_REQUIRE_HOMING:
-      dont_require_homing = true;
-      break;
-    case OPT_DISABLE_RANGE_CHECK:
-      disable_range_check = true;
-      break;
-    case OPT_DISABLE_ACK_OK:
-      config.acknowledge_lines = false;
-      break;
+    case OPT_REQUIRE_HOMING: require_homing = true; break;
+    case OPT_DONT_REQUIRE_HOMING: dont_require_homing = true; break;
+    case OPT_DISABLE_RANGE_CHECK: disable_range_check = true; break;
+    case OPT_DISABLE_ACK_OK: config.acknowledge_lines = false; break;
 #if !USE_SPI_BACKEND
-    case 'n':
-      dry_run = true;
-      break;
+    case 'n': dry_run = true; break;
     case 'N':
       dry_run = true;
       simulation_output = true;
@@ -452,12 +442,8 @@ int main(int argc, char *argv[]) {
       wav_output = fopen(optarg, "w");
       break;
 #endif
-    case 'P':
-      config.debug_print = true;
-      break;
-    case 'S':
-      config.synchronous = true;
-      break;
+    case 'P': config.debug_print = true; break;
+    case 'S': config.synchronous = true; break;
     case OPT_LOOP:
       Log_error(
         "--loop has been removed. Did you use it ? "
@@ -583,7 +569,7 @@ int main(int argc, char *argv[]) {
 #if USE_SPI_BACKEND
   auto module_sim = StepGeneratorModuleSim::Init(argc, argv);
   SPIHost spi(module_sim);
-  spi.Connect(nullptr, { .verbose = false });   // true for hexdump
+  spi.Connect(nullptr, {.verbose = false});  // true for hexdump
   SPISegmentQueue motor_operations(&spi, module_sim);
 #else
   // The backend for our stepmotor control. We either talk to the PRU or
@@ -610,7 +596,8 @@ int main(int argc, char *argv[]) {
     pru_hw_interface = new UioPrussInterface();
     motion_backend = new PRUMotionQueue(&hardware_mapping, pru_hw_interface);
   }
-  MotionQueueMotorOperations motor_operations(&hardware_mapping, motion_backend);
+  MotionQueueMotorOperations motor_operations(&hardware_mapping,
+                                              motion_backend);
 #endif
 
   // Listen port bound, GPIO initialized. Ready to drop privileges.

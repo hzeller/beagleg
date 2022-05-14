@@ -19,7 +19,7 @@ static bool io_problem(const char *msg) {
 }
 
 static void hex_dump(const void *src, size_t length, const char *prefix) {
-  const uint8_t *address = (const unsigned char*) src;
+  const uint8_t *address = (const unsigned char *)src;
 
   printf("%s | ", prefix);
   if (!src) {
@@ -47,10 +47,8 @@ bool SPIHost::Connect(const char *device, const Options &set_options) {
   options_ = set_options;
   if (spi_sim_) return true;
 
-  if (fd_ >= 0)
-    close(fd_);  // Was already open.
-  if ((fd_ = open(device, O_RDWR)) < 0)
-    return io_problem(device);
+  if (fd_ >= 0) close(fd_);  // Was already open.
+  if ((fd_ = open(device, O_RDWR)) < 0) return io_problem(device);
 
   options_.mode = 0x55555555;  // See if we get properly set.
   // Right now, we only read the mode, but later should allow to set
@@ -75,11 +73,10 @@ bool SPIHost::Connect(const char *device, const Options &set_options) {
   if (ret < 0) return io_problem("Reading speed");
   if (options_.speed_hz != set_options.speed_hz) {
     fprintf(stderr, "Wanted speed: %.3fkHz, actual speed: %.3fkHz\n",
-            set_options.speed_hz/1000.0, options_.speed_hz/1000.0);
+            set_options.speed_hz / 1000.0, options_.speed_hz / 1000.0);
   }
   return true;
 }
-
 
 bool SPIHost::TransferBuffer(const void *send, void *receive, size_t len,
                              bool is_last_in_transaction) {
@@ -89,7 +86,7 @@ bool SPIHost::TransferBuffer(const void *send, void *receive, size_t len,
     struct spi_ioc_transfer tr = {};
     tr.tx_buf = (unsigned long)send;
     tr.rx_buf = (unsigned long)receive;
-    tr.len = (uint32_t) len;
+    tr.len = (uint32_t)len;
     tr.speed_hz = options_.speed_hz;
     tr.delay_usecs = 0;
     tr.bits_per_word = options_.bits_per_word;

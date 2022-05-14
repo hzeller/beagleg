@@ -29,9 +29,9 @@ struct SpiMotionSegment {
   uint32_t count_steps;
 };
 
-struct QueueStatus {   // This should be like PhysicalStatus
-  uint32_t counter : 24; // remaining number of cycles to be performed
-  uint32_t index : 8;    // represent the executing slot [0 to QUEUE_LEN - 1]
+struct QueueStatus {      // This should be like PhysicalStatus
+  uint32_t counter : 24;  // remaining number of cycles to be performed
+  uint32_t index   : 8;   // represent the executing slot [0 to QUEUE_LEN - 1]
 };
 }  // namespace beagleg
 
@@ -40,14 +40,14 @@ static constexpr int BYTES_PER_FIFO_RECORD = sizeof(beagleg::SpiMotionSegment);
 
 // This needs to be in-sync with FPGA impl.
 enum Command {
-  CMD_NO_OP      = 0x00,  // Just send one byte to receive fifo free
-  CMD_STATUS     = 0x01, // Send 5 bytes, receive fifo free + status word
+  CMD_NO_OP = 0x00,   // Just send one byte to receive fifo free
+  CMD_STATUS = 0x01,  // Send 5 bytes, receive fifo free + status word
   CMD_WRITE_FIFO = 0x02,
-  CMD_READ_FIFO  = 0x03,
+  CMD_READ_FIFO = 0x03,
 };
 
 class BeagleGSPIProtocol {
-public:
+ public:
   BeagleGSPIProtocol(SPIHost *channel) : spi_channel_(channel) {}
 
   // Get number of free slots.
@@ -95,8 +95,9 @@ public:
     }
 
     const int segment_tx_count = std::min((int)free_slots, count);
-    const int segment_byte_len = segment_tx_count * sizeof(beagleg::SpiMotionSegment);
-    char rx_buffer[segment_byte_len];   // Let's see what it sends back
+    const int segment_byte_len =
+      segment_tx_count * sizeof(beagleg::SpiMotionSegment);
+    char rx_buffer[segment_byte_len];  // Let's see what it sends back
 #if 0
     fprintf(stderr, "Sending actual data; %d elements = %d bytes\n",
             segment_tx_count, segment_byte_len);
@@ -106,19 +107,15 @@ public:
     return segment_tx_count;
   }
 
-private:
+ private:
   SPIHost *const spi_channel_;
 };
 
 SPISegmentQueue::SPISegmentQueue(SPIHost *spi,
                                  StepGeneratorModuleSim *module_sim)
-  : protocol_handler_(new BeagleGSPIProtocol(spi)),
-    module_sim_(module_sim) {
-}
+    : protocol_handler_(new BeagleGSPIProtocol(spi)), module_sim_(module_sim) {}
 
-SPISegmentQueue::~SPISegmentQueue() {
-  delete protocol_handler_;
-}
+SPISegmentQueue::~SPISegmentQueue() { delete protocol_handler_; }
 
 bool SPISegmentQueue::Enqueue(const LinearSegmentSteps &segment) {
   const int motor_steps = segment.steps[0];  // only looking at one motor
@@ -134,19 +131,23 @@ bool SPISegmentQueue::Enqueue(const LinearSegmentSteps &segment) {
   int count = 0;
   while ((protocol_handler_->SendMotionSegments(&seg, 1)) != 1) {
     count++;
-    if (count % 10 == 0) { fprintf(stderr, "."); fflush(stderr); }
+    if (count % 10 == 0) {
+      fprintf(stderr, ".");
+      fflush(stderr);
+    }
     module_sim_->Cycle(kCycles);  // Keep the clocks going.
   }
   if (count > 0) {
-    fprintf(stderr, "; had to emit %d * %d = %d cycles to send.\n",
-            count, kCycles, count * kCycles);
+    fprintf(stderr, "; had to emit %d * %d = %d cycles to send.\n", count,
+            kCycles, count * kCycles);
   } else {
     fprintf(stderr, "\n");
   }
   return true;
 }
 
-void SPISegmentQueue::MotorEnable(bool on) { /* TODO: implement */ }
+void SPISegmentQueue::MotorEnable(bool on) { /* TODO: implement */
+}
 
 void SPISegmentQueue::WaitQueueEmpty() {
   static constexpr int kCycles = 1000;
@@ -158,8 +159,8 @@ void SPISegmentQueue::WaitQueueEmpty() {
     module_sim_->Cycle(kCycles);
     ++count;
   }
-  fprintf(stderr, "In WaitQueueEmpty(): called %d * %d cycles\n",
-          count, kCycles);
+  fprintf(stderr, "In WaitQueueEmpty(): called %d * %d cycles\n", count,
+          kCycles);
 }
 
 bool SPISegmentQueue::GetPhysicalStatus(PhysicalStatus *status) {
