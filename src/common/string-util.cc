@@ -23,8 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <charconv>
 #include <algorithm>
+#include <charconv>
 
 std::string_view TrimWhitespace(std::string_view s) {
   std::string_view::iterator start = s.begin();

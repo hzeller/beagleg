@@ -572,8 +572,7 @@ const char *HardwareMapping::OutputToName(NamedOutput output) {
   return "<invalid>";
 }
 
-bool HardwareMapping::NameToOutput(std::string_view str,
-                                   NamedOutput *result) {
+bool HardwareMapping::NameToOutput(std::string_view str, NamedOutput *result) {
   const std::string n = ToLower(str);
   // clang-format off
 #define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)

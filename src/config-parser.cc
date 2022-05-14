@@ -135,8 +135,8 @@ static std::string_view NextLine(std::string_view *source) {
       result = std::string_view(start, endline - start);
     }
     if (*endline == '\n') {  // ... but we wait until \n to reposition source
-      *source = std::string_view(endline + 1,
-                                     source->length() - (endline - start) - 1);
+      *source =
+        std::string_view(endline + 1, source->length() - (endline - start) - 1);
       return result;
     }
   }
@@ -186,8 +186,8 @@ bool ConfigParser::EmitConfigValues(Reader *reader) const {
       if (current_section_interested) {
         const std::string name = CanonicalizeName(
           std::string_view(line.begin(), eq_pos - line.begin()));
-        const std::string_view value_piece = TrimWhitespace(
-          std::string_view(eq_pos + 1, line.end() - eq_pos - 1));
+        const std::string_view value_piece =
+          TrimWhitespace(std::string_view(eq_pos + 1, line.end() - eq_pos - 1));
         std::string value(value_piece.begin(), value_piece.end());
         bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {

@@ -25,9 +25,8 @@
 
 #include <ostream>
 #include <string>
-#include <vector>
-
 #include <string_view>
+#include <vector>
 
 // Define this with empty, if you're not using gcc.
 #define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
@@ -49,7 +48,7 @@ std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 
 // Split a string at any of the given separator characters.
 std::vector<std::string_view> SplitString(std::string_view s,
-                                              std::string_view separators);
+                                          std::string_view separators);
 
 // Parse a decimal from a std::string_view into "result". Returns 'true'
 // on success.
