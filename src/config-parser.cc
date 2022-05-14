@@ -65,9 +65,9 @@ static double ParseDoubleExpression(const char *input, double fallback,
   return value;
 }
 
-bool ConfigParser::Reader::ParseString(const std::string &value,
+bool ConfigParser::Reader::ParseString(beagleg::string_view value,
                                        std::string *result) {
-  *result = value;
+  result->assign(value.data(), value.length());
   return true;
 }
 
@@ -77,7 +77,7 @@ bool ConfigParser::Reader::ParseInt(const std::string &value, int *result) {
   return *end == '\0';
 }
 
-bool ConfigParser::Reader::ParseBool(const std::string &value, bool *result) {
+bool ConfigParser::Reader::ParseBool(beagleg::string_view value, bool *result) {
   if (value == "1" || value == "yes" || value == "true") {
     *result = true;
     return true;
