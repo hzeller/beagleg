@@ -18,8 +18,7 @@ BEAGLEG_OPT_CFLAGS?=-O3
 
 CFLAGS+=-Wall -Wextra -W -Wno-unused-parameter -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -I$(shell pwd)/..
 
-# See toplevel Makefile comment
-CXXFLAGS+=-std=c++11 $(CFLAGS)
+CXXFLAGS+=-std=c++17 $(CFLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm
