@@ -23,56 +23,58 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <charconv>
 #include <algorithm>
 
-beagleg::string_view TrimWhitespace(beagleg::string_view s) {
-  beagleg::string_view::iterator start = s.begin();
+std::string_view TrimWhitespace(std::string_view s) {
+  std::string_view::iterator start = s.begin();
   while (start < s.end() && isspace(*start)) start++;
-  beagleg::string_view::iterator end = s.end() - 1;
+  std::string_view::iterator end = s.end() - 1;
   while (end > start && isspace(*end)) end--;
-  return beagleg::string_view(start, end + 1 - start);
+  return std::string_view(start, end + 1 - start);
 }
 
-std::string ToLower(beagleg::string_view in) {
+std::string ToLower(std::string_view in) {
   std::string result(in.length(), ' ');
   std::transform(in.begin(), in.end(), result.begin(), ::tolower);
   return result;
 }
 
-bool HasPrefix(beagleg::string_view s, beagleg::string_view prefix) {
+bool HasPrefix(std::string_view s, std::string_view prefix) {
   if (s.length() < prefix.length()) return false;
   return strncmp(s.data(), prefix.data(), prefix.length()) == 0;
 }
 
-static inline bool contains(beagleg::string_view str, char c) {
-  for (char i : str) {
-    if (i == c) return true;
-  }
-  return false;
+static inline bool contains(std::string_view str, char c) {
+  return str.find_first_of(c) != std::string_view::npos;
 }
 
-std::vector<beagleg::string_view> SplitString(beagleg::string_view s,
-                                              beagleg::string_view separators) {
-  std::vector<beagleg::string_view> result;
-  beagleg::string_view::iterator i = s.begin();
-  beagleg::string_view::iterator start = i;
+std::vector<std::string_view> SplitString(std::string_view s,
+                                          std::string_view separators) {
+  std::vector<std::string_view> result;
+  std::string_view::iterator i = s.begin();
+  std::string_view::iterator start = i;
   for (/**/; i != s.end(); ++i) {
     if (contains(separators, *i)) {
-      result.push_back(beagleg::string_view(start, i - start));
+      result.emplace_back(start, i - start);
       start = i + 1;
     }
   }
-  result.push_back(beagleg::string_view(start, i - start));
+  result.emplace_back(start, i - start);
   return result;
 }
 
-int64_t ParseDecimal(beagleg::string_view s, int64_t fallback) {
-  // In C++17: just use std::from_chars
-  std::string as_str(s.begin(), s.end());  // we need safe c-str()
-  char *endptr = NULL;
-  int64_t result = strtoll(as_str.c_str(), &endptr, 10);
-  if (*endptr != '\0') return fallback;
-  return result;
+bool SafeParseDecimal(std::string_view s, int64_t *result) {
+  while (s.length() && isspace(s.front())) s.remove_prefix(1);
+  if (s.length() && s.front() == '+') s.remove_prefix(1);
+  auto success = std::from_chars(s.begin(), s.end(), *result, 10);
+  return success.ec == std::errc();
+}
+
+// Parse decimal and return on success or return fallback value otherwise.
+int64_t ParseDecimal(std::string_view s, int64_t fallback) {
+  int64_t result;
+  return SafeParseDecimal(s, &result) ? result : fallback;
 }
 
 static void vAppendf(std::string *str, const char *format, va_list ap) {

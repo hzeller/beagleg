@@ -63,9 +63,9 @@ class ConfigParser {
     // All the Accept() functions are done in the way that they always return
     // 'true' if the expected name is not matched, otherwise they return the
     // outcome of parsing the value. That way, they can be chained with &&
-    static bool ParseString(beagleg::string_view value, std::string *result);
+    static bool ParseString(std::string_view value, std::string *result);
     static bool ParseInt(const std::string &value, int *result);
-    static bool ParseBool(beagleg::string_view value, bool *result);
+    static bool ParseBool(std::string_view value, bool *result);
     static bool ParseFloatExpr(const std::string &value, float *result);
   };
 
@@ -82,7 +82,7 @@ class ConfigParser {
   // Set content of configuration file as one string. Typically useful in
   // unit tests.
   // Overwrites any previous content.
-  void SetContent(beagleg::string_view content);
+  void SetContent(std::string_view content);
 
   // Emit configuration values to the Reader for all sections it is interested
   // in.

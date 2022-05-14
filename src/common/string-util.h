@@ -27,87 +27,36 @@
 #include <string>
 #include <vector>
 
-#if __cplusplus >= 201703L
 #include <string_view>
-#endif
 
 // Define this with empty, if you're not using gcc.
 #define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
   __attribute__((format(printf, fmt_pos, args_pos)))
 
-namespace beagleg {
-#if __cplusplus >= 201703L
-using string_view = ::std::string_view;
-#else
-// Our version of c++17 std::string_view in case c++17 is not available yet.
-// It essentially points at a chunk of data of a particular
-// length. Pointer + length.
-// Allows to have keep cheap substrings of strings without copy while still
-// have a type-safe, length-aware piece of string.
-class string_view {
- public:
-  typedef const char *iterator;
-
-  string_view() : data_(NULL), len_(0) {}
-  string_view(const char *data, size_t len) : data_(data), len_(len) {}
-
-  // We want implicit conversions from these types
-  string_view(const std::string &s)  // NOLINT
-      : data_(s.data()), len_(s.length()) {}
-  string_view(const char *str)  // NOLINT
-      : data_(str), len_(strlen(str)) {}
-
-  string_view substr(size_t pos, size_t len) const {
-    assert(pos + len <= len_);
-    return string_view(data_ + pos, len);
-  }
-  string_view substr(size_t pos) const { return substr(pos, length() - pos); }
-
-  bool operator==(const string_view &other) const {
-    if (len_ != other.len_) return false;
-    if (data_ == other.data_) return true;
-    return strncmp(data_, other.data_, len_) == 0;
-  }
-
-  char operator[](size_t pos) const { return data_[pos]; }
-  const char *data() const { return data_; }
-  size_t length() const { return len_; }
-  bool empty() const { return len_ == 0; }
-
-  iterator begin() const { return data_; }
-  iterator end() const { return data_ + len_; }
-
- private:
-  const char *data_;
-  size_t len_;
-};
-
-inline std::ostream &operator<<(std::ostream &o, string_view s) {
-  return o.write(s.data(), s.length());
-}
-#endif
-}  // namespace beagleg
-
-// Trim beagleg::string_view of whitespace font and back and returned trimmed
+// Trim std::string_view of whitespace font and back and returned trimmed
 // string.
-beagleg::string_view TrimWhitespace(beagleg::string_view s);
+std::string_view TrimWhitespace(std::string_view s);
 
 // Lowercase the string (simple ASCII) and return as newly allocated
 // std::string
-std::string ToLower(beagleg::string_view in);
+std::string ToLower(std::string_view in);
 
-// Test if given beagleg::string_view is prefix of the other.
-bool HasPrefix(beagleg::string_view s, beagleg::string_view prefix);
+// Test if given std::string_view is prefix of the other.
+bool HasPrefix(std::string_view s, std::string_view prefix);
 
 // Formatted printing into a string.
 std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 
 // Split a string at any of the given separator characters.
-std::vector<beagleg::string_view> SplitString(beagleg::string_view s,
-                                              beagleg::string_view separators);
+std::vector<std::string_view> SplitString(std::string_view s,
+                                              std::string_view separators);
 
-// Parse a decimal from a beagleg::string_view.
-int64_t ParseDecimal(beagleg::string_view s, int64_t fallback);
+// Parse a decimal from a std::string_view into "result". Returns 'true'
+// on success.
+bool SafeParseDecimal(std::string_view s, int64_t *result);
+
+// Parse decimal and return on success or return fallback value otherwise.
+int64_t ParseDecimal(std::string_view s, int64_t fallback);
 
 #undef PRINTF_FMT_CHECK
 #endif  // _BEAGLEG_STRING_UTIL_H

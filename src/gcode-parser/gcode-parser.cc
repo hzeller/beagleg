@@ -260,7 +260,7 @@ class GCodeParser::Impl {
   const char *read_param_name(const char *line, std::string *result);
 
   // Read parameter. Do range check.
-  bool read_parameter(beagleg::string_view param_name, float *result) const {
+  bool read_parameter(std::string_view param_name, float *result) const {
     *result = 0;
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
@@ -276,7 +276,7 @@ class GCodeParser::Impl {
   }
 
   // Read parameter. Do range check.
-  bool store_parameter(beagleg::string_view param_name, float value) {
+  bool store_parameter(std::string_view param_name, float value) {
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
     // zero parameter can never be written.
@@ -1088,7 +1088,7 @@ void GCodeParser::Impl::gcodep_while_end() {
 
     line = skip_white(endptr);
     if (control_parse_.ExpectNext(&line, CK_DO)) {
-      for (const beagleg::string_view wline : SplitString(while_loop_, "\n")) {
+      for (const std::string_view wline : SplitString(while_loop_, "\n")) {
         // TODO(hzeller):ParseBlock needs to accept string_view
         std::string tmp(wline.begin(), wline.end());
         ParseBlock(while_owner_, tmp.c_str(), while_err_stream_);
