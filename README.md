@@ -168,6 +168,18 @@ these axes to motor drivers provided by the cape (`motor_1`, `motor_2`,...)
 and end switches (`switch_1`, `switch_2`,...) to logical functions
 (e.g. `min_x`). See the [annotated config file](./sample.config).
 
+## Visualization
+
+BeagleG provides a tool, `gcode2ps` to export the machine path and speed into
+a color-coded image for inspection. The color coding shows the machine speed
+according to the configured machine constraints.
+
+&nbsp;    | &nbsp;   | &nbsp;
+----------|----------|--------
+![](img/test/rounded-bracket-parametrized.png)|![](img/test/rounded-bracket-simple.png)|![](img/test/spiral-cut.png)
+![](img/test/square-moves-direct.png)|![](img/test/superellipse.png)|![](img/test/coordinate-systems.png)
+![](img/test/spline-character.png)|![](img/test/spline-loop.png)|![](img/test/splines.png)
+
 ## Development
 
 If you want to use the nicely seprated sub-APIs of BeagleG programmatically
