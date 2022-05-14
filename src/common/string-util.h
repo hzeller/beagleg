@@ -27,16 +27,23 @@
 #include <string>
 #include <vector>
 
+#if __cplusplus >= 201703L
+#include <string_view>
+#endif
+
 // Define this with empty, if you're not using gcc.
 #define PRINTF_FMT_CHECK(fmt_pos, args_pos) \
   __attribute__((format(printf, fmt_pos, args_pos)))
 
-// Our version of c++17 std::string_view
+namespace beagleg {
+#if __cplusplus >= 201703L
+using string_view = ::std::string_view;
+#else
+// Our version of c++17 std::string_view in case c++17 is not available yet.
 // It essentially points at a chunk of data of a particular
 // length. Pointer + length.
 // Allows to have keep cheap substrings of strings without copy while still
 // have a type-safe, length-aware piece of string.
-namespace beagleg {
 class string_view {
  public:
   typedef const char *iterator;
@@ -78,7 +85,7 @@ class string_view {
 inline std::ostream &operator<<(std::ostream &o, string_view s) {
   return o.write(s.data(), s.length());
 }
-
+#endif
 }  // namespace beagleg
 
 // Trim beagleg::string_view of whitespace font and back and returned trimmed
