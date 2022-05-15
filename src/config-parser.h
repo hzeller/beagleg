@@ -64,7 +64,7 @@ class ConfigParser {
     // 'true' if the expected name is not matched, otherwise they return the
     // outcome of parsing the value. That way, they can be chained with &&
     static bool ParseString(std::string_view value, std::string *result);
-    static bool ParseInt(const std::string &value, int *result);
+    static bool ParseInt(std::string_view value, int32_t *result);
     static bool ParseBool(std::string_view value, bool *result);
     static bool ParseFloatExpr(const std::string &value, float *result);
   };

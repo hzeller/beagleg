@@ -67,14 +67,13 @@ static double ParseDoubleExpression(const char *input, double fallback,
 
 bool ConfigParser::Reader::ParseString(std::string_view value,
                                        std::string *result) {
+  // Possibly in the future if needed: c-escapes.
   result->assign(value.data(), value.length());
   return true;
 }
 
-bool ConfigParser::Reader::ParseInt(const std::string &value, int *result) {
-  char *end;
-  *result = strtol(value.c_str(), &end, 10);
-  return *end == '\0';
+bool ConfigParser::Reader::ParseInt(std::string_view value, int32_t *result) {
+  return safe_strto32(value, result);
 }
 
 bool ConfigParser::Reader::ParseBool(std::string_view value, bool *result) {

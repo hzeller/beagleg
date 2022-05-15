@@ -61,7 +61,7 @@ TEST(RingDeque, BasicOp) {
 
 TEST(RingDeque, Wrapping) {
   RingDeque<int, 4> buffer;
-  EXPECT_EQ(buffer.capacity(), 3u);  // one less than CAPACITY
+  EXPECT_EQ(buffer.capacity(), 3u);       // one less than CAPACITY
   static_assert(buffer.capacity() == 3);  // compile-time constexpr
 
   // Advance the internal positions so that we force wrapping.
