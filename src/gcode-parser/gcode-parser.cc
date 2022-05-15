@@ -280,7 +280,7 @@ class GCodeParser::Impl {
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
     // zero parameter can never be written.
-    if (param_name == "0" || ParseDecimal(param_name, 0) >= 5400) {
+    if (param_name == "0" || ParseInt64(param_name, 0) >= 5400) {
       gprintf(GLOG_SEMANTIC_ERR, "writing unsupported parameter number (%s)\n",
               std::string(param_name.begin(), param_name.end()).c_str());
       return false;

@@ -50,12 +50,15 @@ std::string StringPrintf(const char *format, ...) PRINTF_FMT_CHECK(1, 2);
 std::vector<std::string_view> SplitString(std::string_view s,
                                           std::string_view separators);
 
-// Parse a decimal from a std::string_view into "result". Returns 'true'
+// Parse a number from a std::string_view into "result". Returns 'true'
 // on success.
-bool SafeParseDecimal(std::string_view s, int64_t *result);
+bool safe_strto32(std::string_view s, int32_t *result);
+bool safe_strto64(std::string_view s, int64_t *result);
+bool safe_strtof(std::string_view s, float *result);
+bool safe_strtod(std::string_view s, double *result);
 
-// Parse decimal and return on success or return fallback value otherwise.
-int64_t ParseDecimal(std::string_view s, int64_t fallback);
+// Parse integer. On success, return parsed number, fallback otherwise.
+int64_t ParseInt64(std::string_view s, int64_t fallback);
 
 #undef PRINTF_FMT_CHECK
 #endif  // _BEAGLEG_STRING_UTIL_H

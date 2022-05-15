@@ -56,24 +56,37 @@ TEST(StringUtilTest, SplitString) {
   EXPECT_EQ("", result[3]);
 }
 
-TEST(StringUtilTest, ParseDecimal) {
+TEST(StringUtilTest, ParseDecimalInt) {
   int64_t value;
-  EXPECT_FALSE(SafeParseDecimal("hello", &value));
-  EXPECT_TRUE(SafeParseDecimal("123", &value));
+  EXPECT_FALSE(safe_strto64("hello", &value));
+  EXPECT_TRUE(safe_strto64("123", &value));
   EXPECT_EQ(123, value);
-  EXPECT_TRUE(SafeParseDecimal("+456", &value));
+  EXPECT_TRUE(safe_strto64("+456", &value));
   EXPECT_EQ(456, value);
-  EXPECT_TRUE(SafeParseDecimal("-789", &value));
+  EXPECT_TRUE(safe_strto64("-789", &value));
   EXPECT_EQ(-789, value);
-  EXPECT_TRUE(SafeParseDecimal(" 123 ", &value));
+  EXPECT_TRUE(safe_strto64(" 123 ", &value));
   EXPECT_EQ(123, value);
 
   // Make sure we can parse beyond 32 bit.
-  EXPECT_EQ(12345678901234LL, ParseDecimal("12345678901234", -1));
+  EXPECT_EQ(12345678901234LL, ParseInt64("12345678901234", -1));
 
   // Make sure we're not assumming a nul-byte at a particular point
   std::string_view longer_string("4255");
-  EXPECT_EQ(42, ParseDecimal(longer_string.substr(0, 2), -1));
+  EXPECT_EQ(42, ParseInt64(longer_string.substr(0, 2), -1));
+}
+
+TEST(StringUtilTest, ParseFloat) {
+  float value;
+  EXPECT_FALSE(safe_strtof("hello", &value));
+  EXPECT_TRUE(safe_strtof("123", &value));
+  EXPECT_EQ(123, value);
+  EXPECT_TRUE(safe_strtof("+456.5", &value));
+  EXPECT_EQ(456.5, value);
+  EXPECT_TRUE(safe_strtof("-789", &value));
+  EXPECT_EQ(-789, value);
+  EXPECT_TRUE(safe_strtof(" 123 ", &value));
+  EXPECT_EQ(123, value);
 }
 
 int main(int argc, char *argv[]) {
