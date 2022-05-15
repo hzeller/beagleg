@@ -55,10 +55,10 @@ std::vector<std::string_view> SplitString(std::string_view s,
 // So this can be used in a simple boolean context for simple success
 // testing, but as well in parsing context where advancing to the next position
 // is needed.
-const char* convert_strto32(std::string_view s, int32_t *result);
-const char* convert_strto64(std::string_view s, int64_t *result);
-const char* convert_strtof(std::string_view s, float *result);
-const char* convert_strtod(std::string_view s, double *result);
+const char *convert_strto32(std::string_view s, int32_t *result);
+const char *convert_strto64(std::string_view s, int64_t *result);
+const char *convert_strtof(std::string_view s, float *result);
+const char *convert_strtod(std::string_view s, double *result);
 
 // Possible convenience functions
 // bool consume_strtof(std::string_view *s, float *result);
