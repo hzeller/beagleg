@@ -58,14 +58,14 @@ TEST(StringUtilTest, SplitString) {
 
 TEST(StringUtilTest, ParseDecimalInt) {
   int64_t value;
-  EXPECT_FALSE(safe_strto64("hello", &value));
-  EXPECT_TRUE(safe_strto64("123", &value));
+  EXPECT_FALSE(convert_strto64("hello", &value));
+  EXPECT_TRUE(convert_strto64("123", &value));
   EXPECT_EQ(123, value);
-  EXPECT_TRUE(safe_strto64("+456", &value));
+  EXPECT_TRUE(convert_strto64("+456", &value));
   EXPECT_EQ(456, value);
-  EXPECT_TRUE(safe_strto64("-789", &value));
+  EXPECT_TRUE(convert_strto64("-789", &value));
   EXPECT_EQ(-789, value);
-  EXPECT_TRUE(safe_strto64(" 123 ", &value));
+  EXPECT_TRUE(convert_strto64(" 123 ", &value));
   EXPECT_EQ(123, value);
 
   // Make sure we can parse beyond 32 bit.
@@ -74,6 +74,56 @@ TEST(StringUtilTest, ParseDecimalInt) {
   // Make sure we're not assumming a nul-byte at a particular point
   std::string_view longer_string("4255");
   EXPECT_EQ(42, ParseInt64(longer_string.substr(0, 2), -1));
+
+  // Make sure the returned value points to the characters after the number.
+  const std::string_view input = " +314cm";
+  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const char *remain_string = convert_strto64(input, &value);
+  ASSERT_TRUE(remain_string);
+  EXPECT_EQ(314, value);
+  EXPECT_EQ(remain_string, expected_remain.data());  // pointers must match.
+}
+
+TEST(StringUtilTest, ParseFloat) {
+  float value;
+  EXPECT_FALSE(convert_strtof("hello", &value));
+  EXPECT_TRUE(convert_strtof("123", &value));
+  EXPECT_EQ(123, value);
+  EXPECT_TRUE(convert_strtof("+456.5", &value));
+  EXPECT_EQ(456.5, value);
+  EXPECT_TRUE(convert_strtof("-789", &value));
+  EXPECT_EQ(-789, value);
+  EXPECT_TRUE(convert_strtof(" 123 ", &value));  // leading space
+  EXPECT_EQ(123, value);
+
+  // Make sure the returned value points to the characters after the number.
+  const std::string_view input = " +314.159cm";
+  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const char *remain_string = convert_strtof(input, &value);
+  ASSERT_TRUE(remain_string);
+  EXPECT_NEAR(314.159, value, 0.0001);
+  EXPECT_EQ(remain_string, expected_remain.data());  // pointers must match.
+}
+
+TEST(StringUtilTest, ParseDouble) {
+  double value;
+  EXPECT_FALSE(convert_strtod("hello", &value));
+  EXPECT_TRUE(convert_strtod("123", &value));
+  EXPECT_EQ(123, value);
+  EXPECT_TRUE(convert_strtod("+456.5", &value));
+  EXPECT_EQ(456.5, value);
+  EXPECT_TRUE(convert_strtod("-789", &value));
+  EXPECT_EQ(-789, value);
+  EXPECT_TRUE(convert_strtod(" 123 ", &value));
+  EXPECT_EQ(123, value);
+
+  // Make sure the returned value points to the characters after the number.
+  const std::string_view input = " +314.159cm";
+  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const char *remain_string = convert_strtod(input, &value);
+  ASSERT_TRUE(remain_string);
+  EXPECT_NEAR(314.159, value, 0.00001);
+  EXPECT_EQ(remain_string, expected_remain.data());  // pointers must match.
 }
 
 int main(int argc, char *argv[]) {

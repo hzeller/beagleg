@@ -73,7 +73,7 @@ bool ConfigParser::Reader::ParseString(std::string_view value,
 }
 
 bool ConfigParser::Reader::ParseInt(std::string_view value, int32_t *result) {
-  return safe_strto32(value, result);
+  return convert_strto32(value, result);
 }
 
 bool ConfigParser::Reader::ParseBool(std::string_view value, bool *result) {
