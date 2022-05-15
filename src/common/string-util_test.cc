@@ -76,19 +76,6 @@ TEST(StringUtilTest, ParseDecimalInt) {
   EXPECT_EQ(42, ParseInt64(longer_string.substr(0, 2), -1));
 }
 
-TEST(StringUtilTest, ParseFloat) {
-  float value;
-  EXPECT_FALSE(safe_strtof("hello", &value));
-  EXPECT_TRUE(safe_strtof("123", &value));
-  EXPECT_EQ(123, value);
-  EXPECT_TRUE(safe_strtof("+456.5", &value));
-  EXPECT_EQ(456.5, value);
-  EXPECT_TRUE(safe_strtof("-789", &value));
-  EXPECT_EQ(-789, value);
-  EXPECT_TRUE(safe_strtof(" 123 ", &value));
-  EXPECT_EQ(123, value);
-}
-
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

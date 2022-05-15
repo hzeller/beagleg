@@ -54,8 +54,7 @@ std::vector<std::string_view> SplitString(std::string_view s,
 // on success.
 bool safe_strto32(std::string_view s, int32_t *result);
 bool safe_strto64(std::string_view s, int64_t *result);
-bool safe_strtof(std::string_view s, float *result);
-bool safe_strtod(std::string_view s, double *result);
+// safe_strtof() and safe_strtod() won't work yet with early c++17 compilers
 
 // Parse integer. On success, return parsed number, fallback otherwise.
 int64_t ParseInt64(std::string_view s, int64_t fallback);
