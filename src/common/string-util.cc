@@ -77,12 +77,7 @@ bool safe_strto32(std::string_view s, int32_t *result) {
 bool safe_strto64(std::string_view s, int64_t *result) {
   return safe_strto_number<int64_t>(s, result);
 }
-bool safe_strtof(std::string_view s, float *result) {
-  return safe_strto_number<float>(s, result);
-}
-bool safe_strtod(std::string_view s, double *result) {
-  return safe_strto_number<double>(s, result);
-}
+// float and double not available yet in earlier c++17 compilers.
 
 // Parse decimal and return on success or return fallback value otherwise.
 int64_t ParseInt64(std::string_view s, int64_t fallback) {
