@@ -506,31 +506,8 @@ static const char *skip_white(const char *line) {
 // returns the beginning of the line.
 static const char *ParseGcodeNumber(const char *line, float *value) {
   line = skip_white(line);
-  // We need to copy the number into a temporary buffer as strtof() does
-  // not accept an end-limiter.
-  char buffer[40];
-  const char *src = line;
-  char *dst = buffer;
-  const char *end = buffer + sizeof(buffer) - 1;
-  const char *extra_allowed = "+-.";
-  bool have_point = false;
-  while (*src && (isdigit(*src) || index(extra_allowed, *src)) && dst < end) {
-    // the sign is only allowed in the first character of the buffer
-    if ((*src == '+' || *src == '-') && dst != buffer) break;
-    // only allow one decimal point
-    if (*src == '.') {
-      if (have_point)
-        break;
-      else
-        have_point = true;
-    }
-    *dst++ = *src++;
-  }
-  *dst = '\0';
-  char *parsed_end;
-  *value = strtof(buffer, &parsed_end);
-
-  return (parsed_end == dst) ? src : line;
+  const char *successful_parse_endpos = convert_strtof(line, value);
+  return successful_parse_endpos ? successful_parse_endpos : line;
 }
 
 // Parameter/variable names can be simple integers (traditional NIST), or

@@ -66,7 +66,7 @@ std::vector<std::string_view> SplitString(std::string_view s,
 }
 
 template <typename value_type>
-static const char* convert_strto_num(std::string_view s, value_type *result) {
+static const char *convert_strto_num(std::string_view s, value_type *result) {
   while (!s.empty() && isspace(s.front())) s.remove_prefix(1);
   if (!s.empty() && s.front() == '+') s.remove_prefix(1);
   auto success = std::from_chars(s.data(), s.data() + s.size(), *result);
@@ -102,15 +102,14 @@ inline constexpr bool from_chars_available_v = from_chars_available<T>::value;
 
 // Copy everything that looks like a number into output iterator.
 static void CopyNumberTo(const char *in_begin, const char *in_end,
-                         char* out_begin, const char *out_end) {
+                         char *out_begin, const char *out_end) {
   const char *src = in_begin;
   char *dst = out_begin;
   const char *extra_allowed = "+-.";
   bool have_point = false;
-  out_end -= 1; // Allow space for 0 termination.
-  while (src < in_end
-         && (isdigit(*src) || index(extra_allowed, *src))
-         && dst < out_end) {
+  out_end -= 1;  // Allow space for 0 termination.
+  while (src < in_end && (isdigit(*src) || index(extra_allowed, *src)) &&
+         dst < out_end) {
     // The sign is only allowed in the first character of the buffer
     if ((*src == '+' || *src == '-') && dst != out_begin) break;
     // only allow one decimal point
@@ -153,7 +152,7 @@ const char *convert_strtof(std::string_view s, float *result) {
   return convert_strto_ieee<float, strtof>(s, result);
 }
 
-const char*convert_strtod(std::string_view s, double *result) {
+const char *convert_strtod(std::string_view s, double *result) {
   return convert_strto_ieee<double, strtod>(s, result);
 }
 
