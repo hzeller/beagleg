@@ -34,13 +34,13 @@ struct SpindleConfig {
   std::string port;
   // TODO: other config options e.g. needed for modbus spindles.
 
-  int max_rpm;
-  int max_accel;
-  int max_decel;
-  int pwr_delay_ms;
-  int on_delay_ms;
-  int off_delay_ms;
-  bool allow_ccw;
+  int max_rpm = 0;
+  int max_accel = 0;
+  int max_decel = 0;
+  int pwr_delay_ms = 0;
+  int on_delay_ms = 0;
+  int off_delay_ms = 0;
+  bool allow_ccw = false;
 };
 
 class Spindle {
