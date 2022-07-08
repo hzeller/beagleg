@@ -68,14 +68,7 @@ static void sleep_ms(int ms) {
   }
 }
 
-SpindleConfig::SpindleConfig() {
-  type = kType;
-  port = kPort;
-  max_rpm = kMaxRPM;
-  pwr_delay_ms = 0;
-  on_delay_ms = 0;
-  off_delay_ms = 0;
-  allow_ccw = false;
+SpindleConfig::SpindleConfig() : type(kType), port(kPort), max_rpm(kMaxRPM) {
 }
 
 namespace {
