@@ -68,8 +68,7 @@ static void sleep_ms(int ms) {
   }
 }
 
-SpindleConfig::SpindleConfig() : type(kType), port(kPort), max_rpm(kMaxRPM) {
-}
+SpindleConfig::SpindleConfig() : type(kType), port(kPort), max_rpm(kMaxRPM) {}
 
 namespace {
 class SpindleConfigReader : public ConfigParser::Reader {
