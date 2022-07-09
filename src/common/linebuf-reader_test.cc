@@ -130,8 +130,12 @@ TEST_P(LinebufReaderTest, TightBufferReading) {
   EXPECT_EQ(kSampleLineCount, expected_next_sample);
 }
 
+#ifdef INSTANTIATE_TEST_SUITE_P
+// Very old googletest installations don't have this one available.
+// Let's skip the tests in this case.
 INSTANTIATE_TEST_SUITE_P(PortableEndLineTests, LinebufReaderTest,
                          ::testing::Values("\n", "\r", "\r\n"));
+#endif
 
 // TODO(hzeller): more testing
 //   - Implementation of a more graceful handling if our buffer is too small
