@@ -10,7 +10,7 @@ will have a couple of opto-coupled inputs and PWM outputs.
 Pins are defined with the universal overlay, so can be loaded with
 
 ```
-config-pin -f pockegotion.pins
+/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f pockegotion.pins
 ```
 
 The 'cape' is pretty much experimental right now:

@@ -1,4 +1,5 @@
-# Run with config-pin -f BUMPS.pins
+# Run with /opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f bumps.pins
+#
 # Step signals.
 P9.18 low     # motor 1 (top left Pololu;    BUMPS v0.1 label "Z")
 P9.17 low     # motor 2 (bottom left Pololu; BUMPS v0.1 label "E")
