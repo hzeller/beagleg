@@ -107,8 +107,9 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
   bool check_for_estop();
   bool check_for_pause();
   void issue_motor_move_if_possible();
-  bool test_homing_status_ok();
-  bool test_within_machine_limits(const AxesRegister &axes);
+  bool move_allowed_homing_status();
+  bool move_allowed_estop_status();
+  bool move_allowed_within_machine_limits(const AxesRegister &axes);
   void mprint_endstop_status();
   void mprint_current_position();
   const char *aux_bit_commands(char letter, float value, const char *);
@@ -729,7 +730,7 @@ void GCodeMachineControl::Impl::gcode_finished(bool end_of_stream) {
     motors_enable(false);
 }
 
-bool GCodeMachineControl::Impl::test_homing_status_ok() {
+bool GCodeMachineControl::Impl::move_allowed_homing_status() {
   if (!cfg_.require_homing) return true;
   if (homing_state_ > GCodeMachineControl::HomingState::NEVER_HOMED)
     return true;
@@ -737,7 +738,15 @@ bool GCodeMachineControl::Impl::test_homing_status_ok() {
   return false;
 }
 
-bool GCodeMachineControl::Impl::test_within_machine_limits(
+bool GCodeMachineControl::Impl::move_allowed_estop_status() {
+  if (in_estop()) {
+    mprintf("// ERROR: in soft-estop. Home and/or M999 first\n");
+    return false;
+  }
+  return true;
+}
+
+bool GCodeMachineControl::Impl::move_allowed_within_machine_limits(
   const AxesRegister &axes) {
   if (!cfg_.range_check) return true;
 
@@ -814,8 +823,10 @@ void GCodeMachineControl::Impl::clamp_to_range(AxisBitmap_t affected,
 
 bool GCodeMachineControl::Impl::coordinated_move(
   float feed, const AxesRegister &absolute_pos) {
-  if (!test_homing_status_ok()) return false;
-  if (!test_within_machine_limits(absolute_pos)) return false;
+  if (!move_allowed_homing_status()) return false;
+  if (!move_allowed_within_machine_limits(absolute_pos)) return false;
+  if (!move_allowed_estop_status()) return false;
+
   if (feed > 0) {
     current_feedrate_mm_per_sec_ = cfg_.speed_factor * feed;
   }
@@ -833,8 +844,10 @@ bool GCodeMachineControl::Impl::coordinated_move(
 
 bool GCodeMachineControl::Impl::rapid_move(float feed,
                                            const AxesRegister &absolute_pos) {
-  if (!test_homing_status_ok()) return false;
-  if (!test_within_machine_limits(absolute_pos)) return false;
+  if (!move_allowed_homing_status()) return false;
+  if (!move_allowed_within_machine_limits(absolute_pos)) return false;
+  if (!move_allowed_estop_status()) return false;
+
   float rapid_feed = g0_feedrate_mm_per_sec_;
   const float given = cfg_.speed_factor * prog_speed_factor_ * feed;
   if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
@@ -987,7 +1000,8 @@ void GCodeMachineControl::Impl::go_home(AxisBitmap_t axes_bitmap) {
 bool GCodeMachineControl::Impl::probe_axis(float feed_mm_p_sec,
                                            enum GCodeParserAxis axis,
                                            float *probed_position) {
-  if (!test_homing_status_ok()) return false;
+  if (!move_allowed_homing_status()) return false;
+  if (!move_allowed_estop_status()) return false;
 
   planner_->BringPathToHalt();
 
