@@ -181,6 +181,7 @@ bool HardwareMapping::InitializeHardware() {
       return false;
     }
   }
+  Log_info("Hardware initialized.");
   return true;
 }
 
@@ -196,7 +197,10 @@ void HardwareMapping::ResetHardware() {
 
 void HardwareMapping::EnableMotors(bool on) {
   if (!is_hardware_initialized_) return;
-  if (on && InSoftEStop()) return;
+  if (on && InSoftEStop()) {
+    Log_info("Not enabling motors while in soft-estop. Home or M999 to clear.");
+    on = false;
+  }
   // Right now, we just have this hardcoded, but if 'enable' should
   // ever be configurable via config file and not given by the hardware
   // mapping include, we can do that here.
