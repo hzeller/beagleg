@@ -41,24 +41,18 @@ IoT image).
 
 ### Enable PRU
 
-To be able to use the PRU, we need the `bone` kernel (not ti).
-```
-cd /opt/scripts/tools
-sudo ./update_kernel.sh --bone-rt-kernel --lts-4_19
-```
+To enable the PRU the way we use it, we need to `/boot/uEnv.txt` and
+enable the correct `uboot_overlay_pru` line.
 
-Then edit `/boot/uEnv.txt` and make sure that the line `uboot_overlay_pru`
-line is uncommented that contains the `PRU-UIO` firmware. The default otherwise
-is `PRU-RPROC`, we _do not_ want that, so comment that line out and enable
-the following `uboot_overlay_pru` line instead:
+We need to _disable_ the line containing `PRU-RPROC` (add a `#` in front) and
+_enable_ the line containing the `PRU-UIO` (remove `#` in front).
 
 ```
 ###pru_uio (4.14.x-ti, 4.19.x-ti & mainline/bone kernel)
 uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
 ```
 
-Then reboot. `uname -a` should return a kernel name with `bone` in its
-name `4.19.232-bone-rt-r75`.
+Reboot.
 
 ### Enable Output Pins for your board
 
