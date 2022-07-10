@@ -1,0 +1,46 @@
+# Run with
+# /opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f cramps.pins
+##
+
+# Step signals.
+P8.13 low    # X_STEP
+P8.15 low    # Y_STEP
+P8.19 low    # Z_STEP
+P9.16 low    # E0_STEP
+P9.17 low    # E1_STEP
+P9.24 low    # E2_STEP
+P9.42 low    # STEP_U
+P9.31 low    # STEP_V
+
+# Dir signals
+P8.12 low    # X_DIR
+P8.14 low    # Y_DIR
+P8.18 low    # Z_DIR
+P9.12 low    # E0_DIR
+P9.18 low    # E1_DIR
+P9.26 low    # E2_DIR
+P8.16 low    # DIR_U
+P9.28 low    # DIR_V
+
+# Output (TODO: maybe some of the FETs can be PWM'ed ?)
+P9.14 low   # AXIS_ENAn (motor enable)
+P9.41 low   # FET5
+P9.22 low   # FET6
+P9.29 low   # STEP_W (external. Not covered by PRU)
+P9.30 low   # DIR_W  (externa. Not covered by PRU)
+P8.26 low   # ESTOP_SW
+P9.23 low   # MACHINE_PWR
+P9.25 low   # LED
+P8.11 low   # FET1
+P9.15 low   # FET2
+P9.27 low   # FET3
+P9.21 low   # FET4
+
+# Input
+P8.08 in   # X-MIN
+P8.10 in   # Y-MIN
+P9.13 in   # Z-MIN
+P8.07 in   # X-MAX
+P8.09 in   # Y-MAX
+P9.11 in   # Z-MAX
+P8.17 in   # ESTOP
