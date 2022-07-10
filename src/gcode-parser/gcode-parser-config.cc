@@ -77,7 +77,7 @@ bool GCodeParser::Config::SaveParams() const {
       const std::string dir = paramfile.substr(0, paramfile.find_last_of('/'));
       Log_error(
         "Params-file permission problem: Need write access to %s/ "
-        "(FYI we run as uid=%d, gid=%d)",
+        "(FYI we run as uid=%d, gid=%d; Consider --priv option.)",
         dir.c_str(), getuid(), getgid());
     }
     return false;
