@@ -74,10 +74,7 @@ sudo ./update_kernel.sh
 ```
 
 In particular if you see **`prussdrv_open() failed`** in the logs, this might
-indicate that either the wrong kernel is enabled (if you type `uname -r`, the
-returned name needs to contain `bone` (like `4.19.232-bone-rt-r75`)) or if the
-`uboot_overlay_pru` setting in `/boot/uEnv.txt` is not properly enabled.
-(see 'Prepare the Environment' above).
+indicate that either the wrong PRU config is enabled; check `/boot/uEnv.txt`.
 
 ## System locks up
 
