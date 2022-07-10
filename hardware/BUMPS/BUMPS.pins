@@ -1,10 +1,10 @@
 # Run with config-pin -f BUMPS.pins
-# Step signals
-P9.18 low     # motor 1
-P9.17 low     # motor 2
-P9.21 low     # motor 3
-P9.42 low     # motor 4
-P9.22 low     # motor 5
+# Step signals.
+P9.18 low     # motor 1 (top left Pololu;    BUMPS v0.1 label "Z")
+P9.17 low     # motor 2 (bottom left Pololu; BUMPS v0.1 label "E")
+P9.21 low     # motor 3 (top center Pololu;  BUMPS v0.1 label "Y")
+P9.42 low     # motor 4 (bottom last Pololu; BUMPS v0.1 label "A")
+P9.22 low     # motor 5 (top right Pololu;   BUMPS v0.1 label "X")
 P9.26 low     # motor 6 (extern)
 P9.24 low     # motor 7 (extern)
 P9.41 low     # motor 8 (extern)
@@ -29,8 +29,8 @@ P8.07 timer   # PWM3 Open Collector PWM
 P8.08 timer   # PWM4 Open Collector PWM
 
 # Input
-P8.13 in      # END_X
-P8.14 in      # END_Y
-P8.17 in      # END_Z
+P8.13 in+      # END_X
+P8.14 in+      # END_Y
+P8.17 in+      # END_Z
 
 # (TODO: Analog)
