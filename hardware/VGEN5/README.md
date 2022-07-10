@@ -34,7 +34,7 @@ The I/O pins can then be configured using the config-pin utility. Refer to the
 [beaglebone-universal-io] for details.
 
 The pin configuration can also be setup from a file such as
-[vgen5.pins](./hardware/VGEN5/vgen5.pins).
+[vgen5.pins](./vgen5.pins).
 
 ```
 # Configure the I/O pins
@@ -44,7 +44,7 @@ config-pin -f vgen5.pins
 ## Machine control
 
 The VGEN5 cape can then control a machine with G-Code using the `machine-control`
-binary. The [vgen5.config](./hardware/VGEN5/vgen5.config) config file matches the
+binary. The [vgen5.config](./vgen5.config) config file matches the
 pin configuration setup above.
 
 ```
@@ -98,7 +98,7 @@ There are 9 inputs available, 6 are intended to be used for endstops.
 |GPIO input      |`GPIO_47`|`GPIO_46`|`GPIO_45`|`GPIO_44`|`GPIO_23`|`GPIO_26`|`GPIO_27`|`GPIO_65`|`GPIO_22`|
 |...on BBB Header|P8-15    |P8-16    |P8-11    |P8-12    |P8-13    |P8-14    |P8-17    |P8-18    |P8-19    |
 
-### Other 
+### Other
 
 These signals are all routed to test points. They are currently not used.
 
@@ -115,5 +115,5 @@ In addition, the VGEN5 cape has these features:
   * A 4 port USB 2.0 Hub with 2 external connectors, 2 internal connectors.
   * Support for a Pololu Simple Motor Controller (24V spindle).
   * A 5V switching power supply (only a 24V power supply is required).
-  
+
 [beaglebone-universal-io]: https://github.com/cdsteinkuehler/beaglebone-universal-io

@@ -1,4 +1,7 @@
 #!/bin/bash
+# (Deprecated: once all hardware mappings are switched to universal overlay,
+# this is not needed anymore)
+#
 # TODO: make more robust - this might change depending on the distribution.
 # Maybe there are already standard scripts available on the distribution that
 # do these things ?

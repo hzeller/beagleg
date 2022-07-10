@@ -5,6 +5,26 @@ The BUMPS cape was designed together with BeagleG.
 
 ![Bumps board][BUMPS-img]
 
+This cape uses the [beaglebone-universal-io] device tree overlay.
+
+## Overlay and I/O configuration
+
+The I/O pins can then be configured using the config-pin utility. Refer to the
+[beaglebone-universal-io] for details.
+
+The pin configuration can also be setup from a file such as
+[bumps.pins](./bumps.pins).
+
+```
+# Configure the I/O pins
+/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f bumps.pins
+```
+
+## Default configuration
+
+An example default configuration [bumps.config](./bumps.config) has been
+provided as a starting point.
+
 ## Pinout
 
 These are the GPIO bits associated with the motor outputs on the BUMPS board.
@@ -28,19 +48,15 @@ Motor enable for all motors is on `GPIO-1`, bit 28, P9-12
 can be used, but the mapping to P9-42A (P11-22) and P9-41A (P11-21) should
 probably move to an unambiguated pin)
 
-In the [Bumps cape][bumps] picture above, the X axis on the very left (with a plugged
-in motor), second slot empty, third is 'Z', fourth (second-last) is E, and
-finally the Y axis is on the very right (more space for two connectors which I
-need for my Type-A machine).
-The axis mapping is configured with:
-
-        ./machine-control --axis-mapping "X_ZEY"  ...
+The mapping of motor number to axis happens in the `[Motor-Mapping]` section
+of the configuration file, then the axes can be configured with steps etc.
 
 If you build your own cape: note all logic levels are 3.3V (and assume not more
 than ~4mA). The RAMPS driver board for instance only works if you power the
 5V input with 3.3V, so that the Pololu inputs detect the logic level properly.
 
-This is an early experimental manual cape interfacing to a RAMPS adapter:
+This is how the early experimental manual cape interfacing to a RAMPS adapter
+looked like.
 ![Manual Cape][manual-cape]
 
 At the middle/bottom of the test board you see a headpone connector: many of
@@ -60,3 +76,4 @@ Other pins:
 [BUMPS]: https://github.com/hzeller/bumps
 [BUMPS-img]: ../../img/bumps-connect.jpg
 [manual-cape]: ../../img/manual-ramps-cape.jpg
+[beaglebone-universal-io]: https://github.com/cdsteinkuehler/beaglebone-universal-io

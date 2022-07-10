@@ -32,20 +32,43 @@ socket (you can just telnet to it for an interactive session, how
 cool is that?).
 
 ## Install
-For system configuration and building the `machine-control` binary, see
+For detailed system configuration and building the `machine-control` binary, see
 [INSTALL.md](./INSTALL.md).
 
-## Getting started
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
-we have to tell the pin multiplexer to connect them to the output pins. For
-that, just run the `start-devicetree-overlay.sh` script with your hardware
-to install the device overlay. You find it in the `hardware/` subdirectory.
+two things are required on a fresh Beaglebone installation (we recommend the
+IoT image).
 
-    sudo hardware/start-devicetree-overlay.sh hardware/BUMPS/BeagleG.dts
+### Enable PRU
 
-See the [Hardware page](./hardware) how to enable the cape at boot time.
-(Note: this section will be simpler once we switched entirely to universal
-cape).
+To be able to use the PRU, we need the `bone` kernel (not ti).
+```
+cd /opt/scripts/tools
+sudo ./update_kernel.sh --bone-rt-kernel --lts-4_19
+```
+
+Then edit `/boot/uEnv.txt` and make sure that the line `uboot_overlay_pru`
+line is uncommented that contains the `PRU-UIO` firmware. The default otherwise
+is `PRU-RPROC`, we _do not_ want that, so comment that line out and enable
+the following `uboot_overlay_pru` line instead:
+
+```
+###pru_uio (4.14.x-ti, 4.19.x-ti & mainline/bone kernel)
+uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
+```
+
+Then reboot. `uname -a` should return a kernel name with `bone` in its
+name `4.19.232-bone-rt-r75`.
+
+### Enable Output Pins for your board
+
+The GPIO pins used for each hardware
+This is how you initialize the pins if you use the BUMPS board:
+```
+/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f hardware/BUMPS/bumps.pins
+```
+
+See the [Hardware page](./hardware) for more boards.
 
 ## Machine control binary
 To control a machine with G-Code, use the `machine-control` binary.
@@ -95,7 +118,7 @@ More details about the G-Code code parsed and handled can be found in the
 For testing your motor settings, you might initially just have a simple
 file:
 
-    sudo ./machine-control -c my.config -f 10 myfile.gcode
+    sudo ./machine-control -c hardware/BUMPS/bumps.config -f 10 myfile.gcode
 
 Output the file `myfile.gcode` in 10x the original speed (say you want to
 stress-test). Note, the factor will only scale feedrate, but the machine will
