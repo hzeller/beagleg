@@ -34,7 +34,7 @@ HardwareMapping::HardwareMapping()
       pause_input_(0),
       start_input_(0),
       probe_input_(0),
-      estop_state_(true),
+      estop_state_(false),
       motors_enabled_(false),
       aux_bits_(0),
       is_hardware_initialized_(false) {}
@@ -128,6 +128,8 @@ bool HardwareMapping::IsMotorFlipped(int motor) {
 }
 
 bool HardwareMapping::InitializeHardware() {
+  estop_state_ = true;  // TODO(hzeller): depend on --nohoming-required ?
+
   if (geteuid() != 0) {
     Log_error("Need to run as root to access GPIO pins.");
     return false;
