@@ -21,15 +21,12 @@ Then boot the Beaglebone and connect via ssh to it (
 
 ## Prepare the environment
 
-To be able to use the PRU as we use it, we need the `bone` kernel (not ti).
+To enable the PRU the way we use it, we need to `/boot/uEnv.txt` and
+enable the correct `uboot_overlay_pru` line.
 
-```bash
-cd /opt/scripts/tools
-sudo ./update_kernel.sh --bone-rt-kernel --lts-4_19
-```
-
-Then edit your `/boot/uEnv.txt` and comment `uboot_overlay_pru` lines but
-the `PRU-UIO` one:
+We need to _disable_ the line containing `PRU-RPROC` (add a `#` in front) and
+_enable_ the line containing the `PRU-UIO` (remove `#` in front); so it will
+look like this:
 
 ```
 ###PRUSS OPTIONS
@@ -37,11 +34,7 @@ the `PRU-UIO` one:
 #uboot_overlay_pru=/lib/firmware/AM335X-PRU-RPROC-4-4-TI-00A0.dtbo
 ###pru_uio (4.4.x-ti, 4.14.x-ti & mainline/bone kernel)
 uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
-###
-
 ```
-
-uncommenting (removing the `#` in front) the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
 
 ## Install BeagleG
 
