@@ -1,4 +1,7 @@
 #!/bin/bash
+# (Deprecated: once all hardware mappings are switched to universal overlay,
+# this is not needed anymore)
+#
 # Run as root.
 # What is happening here is well explained in Derek Molloy's excellent
 # video http://www.youtube.com/watch?v=wui_wU1AeQc

@@ -2,81 +2,46 @@
 
 ## Get one of the latest linux Debian images
 
-Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images). This installation guide refers to [*bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz*](http://debian.beagleboard.org/images/bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz).
-
-If necessary, check the integrity of the downloaded image by matching its sha256sum hash and the one provided on the website (on a linux terminal,
-just run `sha256sum bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz`).
+Download one of the latest debian images provided by the following [**list**](https://beagleboard.org/latest-images). This installation guide refers to
+[AM3358 Debian 10.3 2020-04-06 4GB SD IoT](https://debian.beagleboard.org/images/bone-debian-10.3-iot-armhf-2020-04-06-4gb.img.xz)
 
 Always use the most minimal image you can find, e.g. no graphical user
 interface etc.
 
-## Flash the SD card
-**WARNING**: **Be careful when selecting the device to be flashed, as you may end up losing data inside it.**
+## Flash the SD card; Boot; SSH into your Beaglebone
 
-Connect an empty SD card to your PC and extract and copy the image over your sd card.
+This documentation is provided elsewhere already, see
+https://beagleboard.org/getting-started
 
-Based on the platform this can be done via the following methods:
+In short: unpack the xz-packed image, and place as-is on the SD card (On
+Linux, use `dd`, on other platforms they have more complicated graphical tools).
 
-#### **Linux**
-On a terminal, save the SD card device path by inspecting `lsblk`. The SD card should be under a path similar to `/dev/mmcblkN`. Run on the terminal, `xzcat bone-debian-9.3-iot-armhf-2018-03-05-4gb.img.xz | sudo dd of=/dev/mmcblkN`.
-Before extracting the SD card remember to run `sync` in order to flush any remaining buffered I/O operation.
-
-#### **Linux / Mac OS / Windows**
-Using the graphical tool **https://etcher.io/**. Select the downloaded image , the target device and then click on **Flash**.
-
-
-## Boot
-
-1. Connect the beaglebone to your local LAN with DHCP enabled or via USB.
-2. Insert the SD card on the beaglebone slot.
-3. Turn on the beaglebone.
-
-### Connect via SSH
-
-If you connected the beaglebone via USB, a virtual Ethernet interface should appear on your PC.
-
-
-#### **Linux / Mac OS**
-
-Open a terminal and run: `ssh debian@beaglebone.local`
-the default password is usually `temppwd`.
-
-#### **Windows**
-
-Download the ssh client from https://www.putty.org/.
-use as hostname `debian@beaglebone.local` and connect using the usual `temppwd` password.
-
+Then boot the Beaglebone and connect via ssh to it (
+`ssh debian@beaglebone.local`, default password `temppwd`).
 
 ## Prepare the environment
 
-If the following one-liner:
+To be able to use the PRU as we use it, we need the `bone` kernel (not ti).
+
+```bash
+cd /opt/scripts/tools
+sudo ./update_kernel.sh --bone-rt-kernel --lts-4_19
 ```
-if lsmod | grep "uio_pruss" &> /dev/null ; then echo "The kernel is BeagleG ready"; else echo "uio_pruss module not present"; fi`
-```
 
-will return `The kernel is BeagleG-ready`, it means that you can skip this section, otherwise you will need some additional steps.
-
-Beagleg as it is now, requires a kernel module called `uio_pruss` (see [this](https://elinux.org/Ti_AM33XX_PRUSSv2#Communication)).
-
-To enable it, you will need to edit your `/boot/uEnv.txt`
-and change:
+Then edit your `/boot/uEnv.txt` and comment `uboot_overlay_pru` lines but
+the `PRU-UIO` one:
 
 ```
 ###PRUSS OPTIONS
 ###pru_rproc (4.4.x-ti kernel)
 #uboot_overlay_pru=/lib/firmware/AM335X-PRU-RPROC-4-4-TI-00A0.dtbo
 ###pru_uio (4.4.x-ti, 4.14.x-ti & mainline/bone kernel)
-#uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
+uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
 ###
 
 ```
 
 uncommenting (removing the `#` in front) the line `uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo`.
-
-Before rebooting, you will also need to have an updated version of your kernel as you may suffer a bug that will not correctly load the uio_pruss module and device tree overlay.
-
-To do so, run `sudo apt-get update; sudo apt-get upgrade` and on completion,
-execute a reboot.
 
 ## Install BeagleG
 
@@ -91,6 +56,9 @@ change directory into the repository and run `make`.
 
 The resulting `machine-control` binary will be in the toplevel directory. You
 can `sudo make install` it, or run it right there.
+
+Then [set up your hardware](./hardware/) and possibly create the necessary
+systemd configuration for a set-up that starts on boot.
 
 # TROUBLESHOOTING
 
@@ -112,13 +80,11 @@ git pull
 sudo ./update_kernel.sh
 ```
 
-## uio_pruss not loaded
-
-In some older kernels, you might need to manually
-
-```
-sudo modprobe uio_pruss
-```
+In particular if you see **`prussdrv_open() failed`** in the logs, this might
+indicate that either the wrong kernel is enabled (if you type `uname -r`, the
+returned name needs to contain `bone` (like `4.19.232-bone-rt-r75`)) or if the
+`uboot_overlay_pru` setting in `/boot/uEnv.txt` is not properly enabled.
+(see 'Prepare the Environment' above).
 
 ## System locks up
 
