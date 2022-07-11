@@ -23,8 +23,9 @@ Then boot the Beaglebone and connect via ssh to it (
 
 ### If you have an old Beaglebone
 
-If you have a beaglebone lying around in a drawer for a while, it is probably
-a good idea to update the uboot on he eMMC
+If you have your Beaglebone lying around in a drawer for a while, it is probably
+good to update the uboot on the eMMC to the latest version.
+
 ```
 sudo apt install bb-u-boot-am335x-evm
 sudo /opt/u-boot/bb-u-boot-am335x-evm/install-mmcblk0.sh
