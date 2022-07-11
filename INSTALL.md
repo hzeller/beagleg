@@ -21,6 +21,17 @@ Then boot the Beaglebone and connect via ssh to it (
 
 ## Prepare the environment
 
+### If you have an old Beaglebone
+
+If you have a beaglebone lying around in a drawer for a while, it is probably
+a good idea to update the uboot on he eMMC
+```
+sudo apt install bb-u-boot-am335x-evm
+sudo /opt/u-boot/bb-u-boot-am335x-evm/install-mmcblk0.sh
+sudo /opt/u-boot/bb-u-boot-am335x-evm/install-mmcblk1.sh
+```
+
+### Enable PRU
 To enable the PRU the way we use it, we need to `/boot/uEnv.txt` and
 enable the correct `uboot_overlay_pru` line.
 
