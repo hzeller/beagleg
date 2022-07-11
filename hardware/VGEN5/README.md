@@ -17,13 +17,21 @@ To support the VGEN5 cape, BeagleG must be built using the correct hardware targ
 make BEAGLEG_HARDWARE_TARGET=VGEN5
 ```
 
+## The config-pin utility
+
+There are two `config-pin` utilities in current installations.
+
+  * The shell script `/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin` is the tool we're using here.
+  * `/usr/bin/config-pin` seems to be the latest one which has slightly different options (and the script needs to be adapted).
+
 ## Overlay and I/O configuration
 
-The config-pin utility can be used to load the overlay.
+The config-pin utility can be used to load the overlay (might not be needed
+anymore in recent installations, as it should be loaded by default)
 
 ```
 # Load the cape-universal overlay
-config-pin overlay cape-universal
+/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin overlay cape-universal
 ```
 
 At this point, the various devices are loaded and all the gpio have been
@@ -38,7 +46,7 @@ The pin configuration can also be setup from a file such as
 
 ```
 # Configure the I/O pins
-config-pin -f vgen5.pins
+/opt/source/bb.org-overlays/tools/beaglebone-universal-io/config-pin -f vgen5.pins
 ```
 
 ## Machine control
