@@ -261,6 +261,17 @@ class Planner::Impl {
   // motor movements.
   RingDeque<PlanningSegment, PLANNING_BUFFER_CAPACITY> planning_buffer_;
 
+  // The planned motion is stored in the planning_buffer_ "planned" member.
+  // The planned motion always reaches speed zero at the end of the trajectory.
+  // This means there will always be a final deceleration ramp, maybe with some
+  // travels but no accels, that might change. Everything before this final
+  // deceleration ramp, is bound to stay the same, for this reason, we call it
+  // planned-invariant. In this variable we store the position of the segment
+  // from which this deceleration ramp starts. This allows us to avoid running
+  // the motion profile update as long as we have enough planned-invariants
+  // segments and update only the last deceleration ramp.
+  int last_planned_invariant_segment_;
+
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
   AxesRegister max_axis_speed_;  // max travel speed hz
@@ -374,6 +385,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
     : cfg_(config),
       hardware_mapping_(hardware_mapping),
       motor_ops_(motor_backend),
+      last_planned_invariant_segment_(0),
       path_halted_(true),
       position_known_(true) {
   // Initial machine position. We assume the homed position here, which is
@@ -394,6 +406,16 @@ Planner::Impl::Impl(const MachineControlConfig *config,
     const float accel = cfg_->acceleration[i] * cfg_->steps_per_mm[i];
     max_axis_accel_[i] = accel;
   }
+#if 0
+  fprintf(stderr, "\nmax_accelerations:\n[");
+  for (unsigned i = 0; i < max_axis_accel_.size(); ++i) {
+    fprintf(stderr, "%f", max_axis_accel_[(GCodeParserAxis)i]);
+    if (i < max_axis_accel_.size() - 1) {
+      fprintf(stderr, ",");
+    }
+  }
+  fprintf(stderr, "]\n");
+#endif
 }
 
 Planner::Impl::~Impl() { bring_path_to_halt(); }
@@ -431,10 +453,13 @@ bool Planner::Impl::issue_motor_move_if_possible(
   }
 
 #if 0
-  fprintf(stderr, "\nTo be enqueued: %d/%zu.\n", num_segments, planning_buffer_.size());
+  fprintf(stderr, "\nplanning buffer dump start: %d/%zu.\n[", num_segments, planning_buffer_.size());
   for (unsigned i = 0; i < planning_buffer_.size(); ++i) {
-    fprintf(stderr, "%s\n", planning_buffer_[i]->ToJsonString().c_str());
+    fprintf(stderr, "%s", planning_buffer_[i]->ToJsonString().c_str());
+    if (i < planning_buffer_.size() - 1)
+      fprintf(stderr, ",");
   }
+  fprintf(stderr, "]\n");
 #endif
 
   // We require a slot to be always present.
@@ -507,9 +532,11 @@ bool Planner::Impl::issue_motor_move_if_possible(
 
     // We always keep one segment to keep track of the last
     // position and aux values.
-    if (planning_buffer_.size() > 1)
+    if (planning_buffer_.size() > 1) {
       planning_buffer_.pop_front();
-    else {
+      if (last_planned_invariant_segment_ > 0)
+        --last_planned_invariant_segment_;
+    } else {
       // Let's create a zero-steps segment to hold last position.
       // We have only one segment, last speed is always 0.
       const StepsAxesRegister last_pos = segment->target.position_steps;
@@ -517,6 +544,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
       segment->target.position_steps = last_pos;
       path_halted_ = true;
       ret = false;
+      last_planned_invariant_segment_ = 0;
     }
   }
 
@@ -649,7 +677,7 @@ void Planner::Impl::UpdateMotionProfile() {
 
   // Starting speed for each Planning segment.
   PlanningSegment *segment;
-  unsigned buffer_index = planning_buffer_.size() - 1;
+  int buffer_index = planning_buffer_.size() - 1;
 
   // Next speed is the initial speed of the following(next) segment on the
   // original defining axis. We start from the backward pass so it's always 0
@@ -659,7 +687,7 @@ void Planner::Impl::UpdateMotionProfile() {
 
   // Perform the backward pass. Compute and join the travel and deceleration
   // parts of the profile.
-  for (; buffer_index < planning_buffer_.size(); --buffer_index) {
+  for (; buffer_index >= last_planned_invariant_segment_; --buffer_index) {
     segment = planning_buffer_[buffer_index];
     if (segment->target.speed == 0) {
       speed = 0;
@@ -687,7 +715,7 @@ void Planner::Impl::UpdateMotionProfile() {
     // be above or equal to the current profile. This will only then happen if
     // the new backward profile v2 equals the previous planned profile v2.
     if (segment->planned.v2 == segment_end_speed &&
-        buffer_index != planning_buffer_.size() - 1) {
+        buffer_index != (int)planning_buffer_.size() - 1) {
       // The current segment doesn't need to be touched in the forward pass.
       // We increment the buffer index and keep _speed_ the same as it should
       // already be the v0 of the next segment defining axis.
@@ -721,7 +749,7 @@ void Planner::Impl::UpdateMotionProfile() {
     // In the next iteration segment, our speed should be the final speed
     // which is the smallest between the highest speed we could reach or
     // the current segment start_speed (the starting segment is special).
-    speed = (buffer_index)
+    speed = buffer_index && (buffer_index != last_planned_invariant_segment_)
               ? std::min(segment->planned.v1, segment->target.start_speed)
               : segment->planned.v0;
 
@@ -733,7 +761,8 @@ void Planner::Impl::UpdateMotionProfile() {
   }
 
   // Compute the forward pass.
-  for (++buffer_index; buffer_index < planning_buffer_.size(); ++buffer_index) {
+  for (++buffer_index; buffer_index < (int)planning_buffer_.size();
+       ++buffer_index) {
     segment = planning_buffer_[buffer_index];
     const auto speed_factor =
       get_speed_factor_for_axis(&segment->target, defining_axis);
@@ -757,6 +786,9 @@ void Planner::Impl::UpdateMotionProfile() {
     }
 
     // We have acceleration.
+    // Let's update the last invariant segment.
+    last_planned_invariant_segment_ = buffer_index > 0 ? buffer_index : 0;
+
     const uint32_t steps = segment->planned.TotalSteps();
     const uint32_t steps_to_vmax = uniformly_accelerated_ramp_distance(
       segment_start_speed, segment->planned.v1, segment->target.accel);
