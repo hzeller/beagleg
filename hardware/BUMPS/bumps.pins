@@ -21,7 +21,7 @@ P9.14 low     # motor 7 (extern)
 P9.16 low     # motor 8 (extern)
 
 # Output
-P9.12 low     # Motor enable
+P9.12 high    # Motor enable
 P9.11 low     # AUX 1
 P9.13 low     # AUX 2
 P8.09 timer   # PWM1 Power PWM
