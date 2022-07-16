@@ -1088,9 +1088,15 @@ static int usage(const char *progname, bool description = false) {
 
   if (description) {
     fprintf(stderr,
-            "Utility to visualize the GCode path and the resulting machine\n"
-            "movement with speed colorization, dependent on configuration.\n"
-            "(Without config, only GCode path is shown)\n\n");
+            "Utility to visualize the\n"
+            "  * GCode path. Disable with -G to only show machine movement.\n"
+            "     - with spindle-RPM/Laser-power grayscale (enable with -l)\n"
+            "  * Resulting machine movement if machine config (-c) given.\n"
+            "     - with movement speed colorization (enable with -s)\n"
+            "Currently speed and power are not overlayed well, so use options\n"
+            "  -Gs to best show movement speed.\n"
+            "  -Ml to best show spindle-RPM/Laser-power.\n"
+            "\n");
   }
 
   fprintf(
@@ -1098,18 +1104,18 @@ static int usage(const char *progname, bool description = false) {
     "Usage: %s [options] <gcode-file>\n"
     "Options:\n"
     "\t-o <output-file>  : Name of output file; stdout default.\n"
-    "\t-c <config>       : BeagleG machine config.\n"
+    "\t-c <config>       : BeagleG machine config to visualize machine output\n"
     "\t-T <tool-diameter>: Tool diameter in mm.\n"
     "\t-t <threshold-angle>  : Threshold angle for accleration opt.\n"
     "\t-A <speed-tune-angle> : Speed tuning angle for accleration opt.\n"
-    "\t-q                : Quiet.\n"
-    "\t-s                : Visualize movement speeds.\n"
-    "\t-D                : Don't show dimensions.\n"
+    "\t-q                : Quiet (don't print GCode errors).\n"
+    "\t-s                : Visualize movement speeds (requires -c)\n"
     "\t-G                : Suppress GCode output, just show machine path.\n"
-    "\t-M                : Suppress machine path output.\n"
+    "\t-M                : Suppress machine path output (as if -c not given).\n"
+    "\t-l                : visualize laser intensity/spindle-RPM\n"
     "\t-i                : Toggle show IJK control lines.\n"
-    "\t-r                : Do range check\n"
-    "\t-l                : [EXPERIMENTAL]: visualize laser intensity\n"
+    "\t-r                : Do range check: report if machine limit exceeded.\n"
+    "\t-D                : Don't show dimensions.\n"
     "[---- Visualization ---- ]\n"
     "\t-w<width>         : Width in point (no unit) or mm (if appended)\n"
     "\t-e<distance>      : Eye distance in mm to show perspective.\n"
@@ -1240,8 +1246,8 @@ int main(int argc, char *argv[]) {
   float grid = -1;
 
   int opt;
-  while ((opt = getopt(argc, argv, "a:A:c:C:De:g:GilMo:P:qrR:sS:t:T:V:w:Y:")) !=
-         -1) {
+  while ((opt = getopt(argc, argv,
+                       "a:A:c:C:De:g:GilMo:P:qrR:sS:t:T:V:w:Y:h")) != -1) {
     switch (opt) {
     case 'o':
       out_filename = optarg;
@@ -1295,6 +1301,7 @@ int main(int argc, char *argv[]) {
         return usage(argv[0]);
       }
       break;
+    case 'h': return usage(argv[0], true);
     default: return usage(argv[0]);
     }
   }
