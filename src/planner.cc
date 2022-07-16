@@ -270,7 +270,7 @@ class Planner::Impl {
   // from which this deceleration ramp starts. This allows us to avoid running
   // the motion profile update as long as we have enough planned-invariants
   // segments and update only the last deceleration ramp.
-  int last_planned_invariant_segment_;
+  int last_planned_invariant_segment_ = 0;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
@@ -385,7 +385,6 @@ Planner::Impl::Impl(const MachineControlConfig *config,
     : cfg_(config),
       hardware_mapping_(hardware_mapping),
       motor_ops_(motor_backend),
-      last_planned_invariant_segment_(0),
       path_halted_(true),
       position_known_(true) {
   // Initial machine position. We assume the homed position here, which is
