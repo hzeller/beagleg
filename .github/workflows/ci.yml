@@ -48,6 +48,34 @@ jobs:
       run: |
         make valgrind-test
 
+  hardware-targets:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        hardware:  # TODO: can the matrix be derived from directory hardware/* ?
+          - BUMPS
+          - CRAMPS
+          - Pockegotion
+          - VGEN5
+
+    name: Hardware ${{matrix.hardware}}
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Configure shell
+      # Since we're not compiling on the Beaglebone, disable arm specifics
+      run: |
+        echo "ARM_COMPILE_FLAGS=" >> $GITHUB_ENV
+        echo BEAGLEG_HARDWARE_TARGET="${{matrix.hardware}}" >> $GITHUB_ENV
+
+    - name: Build
+      run: |
+        make
+
   Coverage:
     runs-on: ubuntu-latest
 
