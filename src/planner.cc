@@ -408,10 +408,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
 #if 0
   fprintf(stderr, "\nmax_accelerations:\n[");
   for (unsigned i = 0; i < max_axis_accel_.size(); ++i) {
-    fprintf(stderr, "%f", max_axis_accel_[(GCodeParserAxis)i]);
-    if (i < max_axis_accel_.size() - 1) {
-      fprintf(stderr, ",");
-    }
+    fprintf(stderr, "%s%f", !i ? "" : ",", max_axis_accel_[(GCodeParserAxis)i]);
   }
   fprintf(stderr, "]\n");
 #endif
@@ -454,9 +451,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
 #if 0
   fprintf(stderr, "\nplanning buffer dump start: %d/%zu.\n[", num_segments, planning_buffer_.size());
   for (unsigned i = 0; i < planning_buffer_.size(); ++i) {
-    fprintf(stderr, "%s", planning_buffer_[i]->ToJsonString().c_str());
-    if (i < planning_buffer_.size() - 1)
-      fprintf(stderr, ",");
+    fprintf(stderr, "%s%s", !i ? "" : ",", planning_buffer_[i]->ToJsonString().c_str());
   }
   fprintf(stderr, "]\n");
 #endif
