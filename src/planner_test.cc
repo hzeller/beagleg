@@ -619,8 +619,7 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
     pos[AXIS_X] += 1;
     plantest.Enqueue(pos, 1000);
   }
-  for (const auto segment : plantest.segments())
-    VerifySegmentConstraints(*config, segment);
+  VerifyCommonExpectations(plantest.segments(), *config);
 }
 
 // We have very high acceleration but very slow feedrate.
