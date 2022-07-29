@@ -831,6 +831,40 @@ TEST(PlannerTest, DetectOutRangeAcceleration) {
   VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
 }
 
+// If we start from zero speed and enqueue a line of segments
+// at constat max feedrate we expect the profile to always be symmetrical.
+TEST(PlannerTest, StraightLine_ProfileSymmetry) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  // The acceleration should stay high enough to avoid making
+  // to avoid numerical issues due to square root calculations
+  // for which the acceleration and deceleration, if they
+  // require too many steps, will end up being very inaccurate.
+  PlannerHarness plantest(0, 0, config);
+  unsigned kNumSteps = 200;
+  AxesRegister pos = {};
+
+  for (unsigned i = 0; i < kNumSteps; ++i) {
+    pos[AXIS_X] += 10;
+    plantest.Enqueue(pos, 10000);
+  }
+  // Check the profile is symmetric.
+  const auto segments = plantest.segments();
+  int32_t accel_steps = 0;
+  int32_t decel_steps = 0;
+  for (const auto &segment : segments) {
+    const int sign = segment.v1 - segment.v0;
+    if (sign > 0) {
+      accel_steps += segment.steps[AXIS_X];
+    } else if (sign < 0) {
+      decel_steps += segment.steps[AXIS_X];
+    }
+  }
+  EXPECT_GT(accel_steps, 0);
+  EXPECT_GT(decel_steps, 0);
+  EXPECT_EQ(accel_steps, decel_steps);
+}
+
 int main(int argc, char *argv[]) {
   Log_init("/dev/stderr");
   ::testing::InitGoogleTest(&argc, argv);
