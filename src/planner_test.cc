@@ -8,6 +8,7 @@
 
 #include <cfloat>
 #include <cstddef>
+#include <cstdint>
 
 #include "common/container.h"
 #include "common/logging.h"
@@ -619,8 +620,7 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
     pos[AXIS_X] += 1;
     plantest.Enqueue(pos, 1000);
   }
-  for (const auto segment : plantest.segments())
-    VerifySegmentConstraints(*config, segment);
+  VerifyCommonExpectations(plantest.segments(), *config);
 }
 
 // We have very high acceleration but very slow feedrate.
@@ -830,6 +830,47 @@ TEST(PlannerTest, DetectOutRangeAcceleration) {
     }
   }
   VerifyCommonExpectations(plantest.segments(), *plantest.GetConfig());
+}
+
+// If we start from zero speed and enqueue a line of segments
+// at constat max feedrate we expect the profile to always be symmetrical.
+TEST(PlannerTest, StraightLine_ProfileSymmetry) {
+  MachineControlConfig *config = new MachineControlConfig();
+  InitTestConfig(config);
+  // The acceleration should stay high enough to avoid making
+  // to avoid numerical issues due to square root calculations
+  // for which the acceleration and deceleration, if they
+  // require too many steps, will end up being very inaccurate.
+  PlannerHarness plantest(0, 0, config);
+  const int32_t kNumSegments = 200;
+  const int32_t kMMPerSegment = 10;
+  const int32_t kFeedrate = 10000;
+  AxesRegister pos = {};
+  for (int32_t i = 0; i < kNumSegments; ++i) {
+    pos[AXIS_X] += kMMPerSegment;
+    plantest.Enqueue(pos, kFeedrate);
+  }
+  // Check the profile is symmetric.
+  const auto segments = plantest.segments();
+  int32_t accel_steps = 0;
+  int32_t decel_steps = 0;
+  int32_t travel_steps = 0;
+  for (const auto &segment : segments) {
+    const int sign = segment.v1 - segment.v0;
+    const int32_t steps = segment.steps[AXIS_X];
+    if (sign > 0) {
+      accel_steps += steps;
+    } else if (sign < 0) {
+      decel_steps += steps;
+    } else {
+      travel_steps += steps;
+    }
+  }
+  EXPECT_GT(accel_steps, 0);
+  EXPECT_GT(decel_steps, 0);
+  EXPECT_EQ(accel_steps, decel_steps);
+  EXPECT_EQ(accel_steps + decel_steps + travel_steps,
+            kNumSegments * kMMPerSegment * config->steps_per_mm[AXIS_X]);
 }
 
 int main(int argc, char *argv[]) {
