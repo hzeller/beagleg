@@ -74,7 +74,8 @@ class FixedArray {
 
  private:
   void CopyFrom(const FixedArray<T, N, IDX> &other) {
-    if (data_ != other.data_) memcpy(data_, other.data_, sizeof(data_));
+    // Unary + to decay array to pointer and avoid array-comparison warning.
+    if (+data_ != +other.data_) memcpy(data_, other.data_, sizeof(data_));
   }
 
   T data_[N];
