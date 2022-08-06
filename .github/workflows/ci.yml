@@ -22,7 +22,7 @@ jobs:
     - name: Prepare
       run: |
         sudo apt-get update -qq
-        sudo apt install -y g++ clang googletest valgrind
+        sudo apt install -y g++ clang pkg-config libgtest-dev libgmock-dev valgrind
 
     - uses: actions/checkout@v2
       with:
@@ -84,7 +84,7 @@ jobs:
     - name: Prepare
       run: |
         sudo apt-get update -qq
-        sudo apt install -y g++ googletest lcov
+        sudo apt install -y g++ pkg-config libgtest-dev libgmock-dev lcov
 
     - uses: actions/checkout@v2
       with:
@@ -138,7 +138,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install googletest bear clang-tidy-11
+        sudo apt-get install pkg-config libgtest-dev libgmock-dev bear clang-tidy-11
 
     - name: Configure shell
       # Since we're not compiling on the Beaglebone, disable arm specifics
