@@ -15,6 +15,10 @@
 #define HOME_X         123
 #define HOME_Y         456
 #define HOME_Z         789
+#define HOME_A         201
+#define HOME_B         202
+#define HOME_C         203
+#define HOME_E         204
 #define PROBE_POSITION 42
 
 namespace {
@@ -39,6 +43,11 @@ class ParseTester : public GCodeParser::EventReceiver {
     config.machine_origin[AXIS_X] = HOME_X;
     config.machine_origin[AXIS_Y] = HOME_Y;
     config.machine_origin[AXIS_Z] = HOME_Z;
+
+    config.machine_origin[AXIS_A] = HOME_A;
+    config.machine_origin[AXIS_B] = HOME_B;
+    config.machine_origin[AXIS_C] = HOME_C;
+    config.machine_origin[AXIS_E] = HOME_E;
     config.parameters = &parameters_;
     parser_ = new GCodeParser(config, this);
     EXPECT_EQ(0, parser_->error_count());
@@ -98,6 +107,10 @@ class ParseTester : public GCodeParser::EventReceiver {
   void wait_temperature() final {}
   void dwell(float ms) final {}
 
+  bool has_errors() const {
+    return parser_->error_count() != 0;
+  }
+
  public:
   // public counters.
   int call_count[NUM_COUNTED_CALLS] = {};
@@ -142,12 +155,27 @@ TEST(GCodeParserTest, simple_move) {
   EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
+  EXPECT_EQ(HOME_A, counter.abs_pos[AXIS_A]);
 
   counter.TestParseLine("G1 X10 Y10 Z-20");
   EXPECT_EQ(2, counter.call_count[CALL_coordinated_move]);
   EXPECT_EQ(HOME_X + 10, counter.abs_pos[AXIS_X]);
   EXPECT_EQ(HOME_Y + 10, counter.abs_pos[AXIS_Y]);
   EXPECT_EQ(HOME_Z - 20, counter.abs_pos[AXIS_Z]);
+}
+
+TEST(GCodeParserTest, simple_move_non_euclidian) {
+  ParseTester counter;
+
+  counter.TestParseLine("G1 X100 A50");
+  EXPECT_EQ(1, counter.call_count[CALL_coordinated_move]);
+
+  // If we move one axis, the others are still at the origin.
+  EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+  EXPECT_EQ(HOME_A + 50, counter.abs_pos[AXIS_A]);
+
+  EXPECT_EQ(HOME_Y, counter.abs_pos[AXIS_Y]);
+  EXPECT_EQ(HOME_Z, counter.abs_pos[AXIS_Z]);
 }
 
 TEST(GCodeParserTest, setting_feedrate) {
@@ -552,11 +580,14 @@ TEST(GCodeParserTest, SetCoordinateSystemG10_G90_G91) {
   EXPECT_EQ(HOME_Z + 5, counter.parser_offset[AXIS_Z]);
 }
 
+// Test that all line segments sent to coordinated_move() are the expected
+// distance away from the center.
 class ArcTester : public ParseTester {
  public:
   bool coordinated_move(float feed_mm_p_sec, const AxesRegister &axes) final {
     ParseTester::coordinated_move(feed_mm_p_sec, axes);
-    if (!expect_radius_) return true;  // Not checking for circleness yet.
+    if (!expect_radius_) return true;  // ExpectCircle() not yet set-up
+
     // Radius seen in the plane.
     switch (normal_axis_) {
     case AXIS_Z: {
@@ -579,6 +610,7 @@ class ArcTester : public ParseTester {
     }
     default: break;
     }
+    ++segment_count_;
     return true;
   }
 
@@ -587,40 +619,144 @@ class ArcTester : public ParseTester {
     center_ = center;
     radius_ = r;
     normal_axis_ = normal_axis;
+    segment_count_ = 0;
     expect_radius_ = true;
   }
+
+  // return how many segments we received.
+  int segment_count() const { return segment_count_; }
 
  private:
   AxesRegister center_;
   float radius_;
   GCodeParserAxis normal_axis_;
   bool expect_radius_ = false;
+  int segment_count_ = 0;
 };
 
 TEST(GCodeParserTest, arc_generation) {
-  {
+  { // quarter turn, XY plane, specified with I, J
     ArcTester counter;
-    counter.TestParseLine("G17");
-    counter.TestParseLine("G1 X100 Y0");
+    counter.TestParseLine("G17");  // XY plane
+    counter.TestParseLine("G1 X0 Y100");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
-    counter.TestParseLine("G2 X100 Y0 I-100 J0");
-    counter.TestParseLine("G2 X100 Y0 R100");
+    counter.TestParseLine("G2 I0 J-100 X100 Y0");  // right quarter turn
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);  // Make sure we got called.
+    // Check that we got the expected target coordinate.
+    EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Y + 0, counter.abs_pos[AXIS_Y]);
   }
+
+  { // full turn, XY plane, specified with I, J
+    ArcTester counter;
+    counter.TestParseLine("G17");  // XY plane
+    counter.TestParseLine("G1 X0 Y100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
+    counter.TestParseLine("G2 I0 J-100 X0 Y100");
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);  // Make sure we got called.
+    // Check that we got the expected target coordinate.
+    EXPECT_EQ(HOME_X + 0, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Y + 100, counter.abs_pos[AXIS_Y]);
+  }
+
+  { // quarter turn, XY plane, specified with R
+    ArcTester counter;
+    counter.TestParseLine("G17");  // XY plane
+    counter.TestParseLine("G1 X0 Y100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
+    counter.TestParseLine("G2 R100 X100 Y0");  // right quarter turn
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);  // Make sure we got called.
+    // Check that we got the expected target coordinate.
+    EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Y + 0, counter.abs_pos[AXIS_Y]);
+  }
+
+  // Impossible radius to fulfill target, expecting error.
   {
     ArcTester counter;
-    counter.TestParseLine("G18");
-    counter.TestParseLine("G1 X100 Y0");
+    counter.TestParseLine("G17");  // XY plane
+    counter.TestParseLine("G1 X0 Y100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
+    counter.TestParseLine("G2 R50 X100 Y0");
+    EXPECT_TRUE(counter.has_errors());   // R50 can't reach the coordinate.
+    EXPECT_EQ(counter.segment_count(), 0);
+
+  }
+
+  // Regular arc interpolation, but also additional axes that need to
+  // be interpolated.
+  {
+    ArcTester counter;
+    counter.TestParseLine("G17");  // XY plane
+    counter.TestParseLine("G1 X0 Y100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Z, 100.0f);
+    counter.TestParseLine("G2 R100 X100 Y0 Z18 A77 B12 E42");
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);  // Make sure we got called.
+    // Check that we got the expected target coordinate.
+    EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Y + 0, counter.abs_pos[AXIS_Y]);
+    EXPECT_EQ(HOME_Z + 18, counter.abs_pos[AXIS_Z]);
+#if 0  // This should work after Pull Request #61 is in.
+    EXPECT_EQ(HOME_A + 77, counter.abs_pos[AXIS_A]);
+    EXPECT_EQ(HOME_B + 12, counter.abs_pos[AXIS_B]);
+    EXPECT_EQ(HOME_E + 42, counter.abs_pos[AXIS_E]);
+#endif
+  }
+
+  // -- Other planes
+
+  { // quarter turn, XZ plane, specified with I, K
+    ArcTester counter;
+    counter.TestParseLine("G18");  // XZ plane
+    counter.TestParseLine("G1 X0 Z100");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Y, 100.0f);
-    counter.TestParseLine("G2 X100 Y0 I-100 J0");
-    counter.TestParseLine("G2 X100 Y0 R100");
+    counter.TestParseLine("G2 I0 K-100 X100 Z0");
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);
+    EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Z + 0, counter.abs_pos[AXIS_Z]);
   }
-  {
+
+  { // quarter turn, XZ plane, specified with R
     ArcTester counter;
-    counter.TestParseLine("G19");
-    counter.TestParseLine("G1 X100 Y0");
+    counter.TestParseLine("G18");  // XZ plane
+    counter.TestParseLine("G1 X0 Z100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_Y, 100.0f);
+    counter.TestParseLine("G2 R100 X100 Z0");
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);
+    EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
+    EXPECT_EQ(HOME_Z + 0, counter.abs_pos[AXIS_Z]);
+  }
+
+  { // quarter turn, YZ plane, specified with J, K
+    ArcTester counter;
+    counter.TestParseLine("G19");  // YZ plane
+    counter.TestParseLine("G1 Y0 Z100");
     counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_X, 100.0f);
-    counter.TestParseLine("G2 X100 Y0 I-100 J0");
-    counter.TestParseLine("G2 X100 Y0 R100");
+    counter.TestParseLine("G2 J0 K-100 Y100 Z0");
+
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);
+    EXPECT_EQ(HOME_Y + 100, counter.abs_pos[AXIS_Y]);
+    EXPECT_EQ(HOME_Z + 0, counter.abs_pos[AXIS_Z]);
+  }
+
+  { // quarter turn, YZ plane, specified with R
+    ArcTester counter;
+    counter.TestParseLine("G19");  // YZ plane
+    counter.TestParseLine("G1 Y0 Z100");
+    counter.ExpectCircle({HOME_X, HOME_Y, HOME_Z}, AXIS_X, 100.0f);
+    counter.TestParseLine("G2 R100 Y100 Z0");
+
+    EXPECT_FALSE(counter.has_errors());
+    EXPECT_GT(counter.segment_count(), 500);
+    EXPECT_EQ(HOME_Y + 100, counter.abs_pos[AXIS_Y]);
+    EXPECT_EQ(HOME_Z + 0, counter.abs_pos[AXIS_Z]);
   }
 }
 
