@@ -116,11 +116,11 @@ class GCodeParser::Impl {
   // should be in the beginning.
   // Does _not_ reset the machine position.
   void InitProgramDefaults() {
-    xyz_unit_to_mm_factor_ = 1.0f;   // G21
+    xyz_unit_to_mm_factor_ = 1.0f;           // G21
     rotation_unit_to_degree_factor_ = 1.0f;  // Offer degree to radian switch ?
-    set_all_axis_to_absolute(true);  // G90
-    set_ijk_absolute(false);         // G91.1
-    reset_G92();                     // No global offset.
+    set_all_axis_to_absolute(true);          // G90
+    set_ijk_absolute(false);                 // G91.1
+    reset_G92();                             // No global offset.
     set_current_offset(global_offset_g92_, "H");
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
@@ -1249,7 +1249,7 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
       const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
       const float unit_val = value * xyz_unit_to_mm_factor_;  // rotational?
       if (axis == GCODE_NUM_AXES) break;  //  Possibly start of new command.
-      coords[axis] = unit_val;  // TODO: handle rotational
+      coords[axis] = unit_val;            // TODO: handle rotational
       have_val[axis] = true;
     }
     line = remaining_line;
@@ -1498,14 +1498,26 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
     const float dist_value = value * xyz_unit_to_mm_factor_;
     // center offset
-    if (letter == 'I') { offset[AXIS_X] = dist_value; have_ijk = true; }
-    else if (letter == 'J') { offset[AXIS_Y] = dist_value; have_ijk = true; }
-    else if (letter == 'K') { offset[AXIS_Z] = dist_value; have_ijk = true; }
+    if (letter == 'I') {
+      offset[AXIS_X] = dist_value;
+      have_ijk = true;
+    } else if (letter == 'J') {
+      offset[AXIS_Y] = dist_value;
+      have_ijk = true;
+    } else if (letter == 'K') {
+      offset[AXIS_Z] = dist_value;
+      have_ijk = true;
+    }
 
-    else if (letter == 'R') { radius = dist_value; have_r = true; }
+    else if (letter == 'R') {
+      radius = dist_value;
+      have_r = true;
+    }
 
-    else if (letter == 'P') turns = (int)value; // currently ignored
-    else if (letter == 'F') feedrate = f_param_to_feedrate(dist_value);
+    else if (letter == 'P')
+      turns = (int)value;  // currently ignored
+    else if (letter == 'F')
+      feedrate = f_param_to_feedrate(dist_value);
     else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(letter);
       if (update_axis == GCODE_NUM_AXES)
@@ -1820,11 +1832,11 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       switch ((int)value) {
       case 0:
         modal_g0_g1_ = 0;
-        line = handle_move(line, /* force-change=*/ false);
+        line = handle_move(line, /* force-change=*/false);
         break;
       case 1:
         modal_g0_g1_ = 1;
-        line = handle_move(line, /* force-change=*/ false);
+        line = handle_move(line, /* force-change=*/false);
         break;
       case 2: line = handle_arc(line, true); break;
       case 3: line = handle_arc(line, false); break;
@@ -1906,7 +1918,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
         // This line must be a continuation of a previous G0/G1 command.
         // Update the axis position then handle the move.
         axes_pos_[axis] = abs_axis_pos(axis, value);
-        line = handle_move(line, /* force-change=*/ true);
+        line = handle_move(line, /* force-change=*/true);
         // make gcode_command_done() think this was a 'G0/G1' command
         letter = 'G';
         value = modal_g0_g1_;
