@@ -2,7 +2,7 @@
 # This is free software. License: GNU 3.0
 
 # Location of testing framework
-GTEST_INCLUDE=$(shell pkg-config --cflags gtest gmock 2>/dev/null || echo "-I/usr/include")
+GTEST_INCLUDE=$(shell pkg-config --cflags-only-I gtest gmock 2>/dev/null || echo "-I/usr/include")
 GTEST_LIBS=$(shell pkg-config --libs gtest gmock 2>/dev/null || echo "-lgtest -lgmock")
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
@@ -41,7 +41,7 @@ valgrind-test: test-binaries
 	for test_bin in $(UNITTEST_BINARIES) ; do valgrind --track-origins=yes --leak-check=full --error-exitcode=1 -q ./$$test_bin || exit 1; done
 
 
-%_test: %_test.o $(GENLIB) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
+%_test: %_test.o $(GENLIB) compiler-flags
 	$(CROSS_COMPILE)$(CXX) -o $@ $< $(GENLIB) $(GTEST_LIBS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags

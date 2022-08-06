@@ -2,7 +2,7 @@
 # This is free software. License: GNU 3.0
 
 # Location of testing framework
-GTEST_INCLUDE=$(shell pkg-config --cflags gtest gmock 2>/dev/null || echo "-I/usr/include")
+GTEST_INCLUDE=$(shell pkg-config --cflags-only-I gtest gmock 2>/dev/null || echo "-I/usr/include")
 GTEST_LIBS=$(shell pkg-config --libs gtest gmock 2>/dev/null || echo "-lgtest -lgmock")
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
