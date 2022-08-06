@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -u
 
@@ -13,7 +13,13 @@ readonly TIDY_OUT=${TMPDIR}/clang-tidy.out
 # Using clang-tidy-11 as it is the last one still checking for
 # google-runtime-references, non-const references in parameters - which is
 # the preferred style in this project.
-readonly CLANG_TIDY=clang-tidy-11
+PREFERRED_BINARY=clang-tidy-11
+
+CLANG_TIDY=clang-tidy
+if command -v "${PREFERRED_BINARY}"; then
+  CLANG_TIDY="${PREFERRED_BINARY}"
+fi
+
 hash ${CLANG_TIDY} || exit 2  # make sure it is installed.
 
 echo ::group::Build compilation database

@@ -1,10 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
+PREFERRED_BINARY=clang-format-11
+
+CLANG_FORMAT=clang-format
+
+if command -v "${PREFERRED_BINARY}"; then
+  CLANG_FORMAT="${PREFERRED_BINARY}"
+fi
+
 FORMAT_OUT=${TMPDIR:-/tmp}/clang-format-diff.out
 
-find src -name "*.h" -o -name "*.cc" | xargs clang-format-11 --verbose -i
+find src -name "*.h" -o -name "*.cc" | xargs ${CLANG_FORMAT} --verbose -i
 
 # Check if we got any diff, then print it out in in the CI.
 # TODO: make these suggested diffs in the pull request.
