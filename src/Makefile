@@ -32,15 +32,9 @@ LIBDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/lib
 INCDIR_APP_LOADER?=$(AM335_BASE)/pru_sw/app_loader/include
 CAPE_INCLUDE=../hardware/$(BEAGLEG_HARDWARE_TARGET)
 
-# Where the google test source has been unpacked.
-# You also can check out from head in https://github.com/google/googletest and
-# point to the googletest/ and googlemock/ directories.
-GTEST_SOURCE?=/usr/src/googletest/googletest
-GMOCK_SOURCE?=/usr/src/googletest/googlemock
-
-# In particular, if this is a checked out version of google test/mock, this
-# makes sure that we see the right includes.
-GTEST_INCLUDE=-I$(GTEST_SOURCE)/include -I$(GMOCK_SOURCE)/include
+# Location of testing framework
+GTEST_INCLUDE=$(shell pkg-config --cflags gtest gmock 2>/dev/null || echo "-I/usr/include")
+GTEST_LIBS=$(shell pkg-config --libs gtest gmock 2>/dev/null || echo "-lgtest -lgmock")
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
@@ -70,7 +64,6 @@ GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
 	      spindle-control.o planner.o adc.o
 OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
-TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
 UNITTEST_BINARIES=gcode-machine-control_test config-parser_test machine-control-config_test planner_test motion-queue-motor-operations_test pru-motion-queue_test
@@ -119,7 +112,7 @@ beagleg.coverage: FORCE
 
 coverage-html: beagleg.coverage
 	genhtml --output-directory coverage beagleg.coverage
-	@echo "Output in $(realpath coverage)/index.html"
+	@echo "Output in $(shell realpath coverage)/index.html"
 
 valgrind-test: local-valgrind-tests
 	for d in $(SUBDIRS) ; do $(MAKE) -C $$d valgrind-test || exit 1; done
@@ -128,8 +121,8 @@ $(PRU_BIN) : motor-interface-constants.h \
              $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
-%_test: %_test.o $(OBJECTS) $(TEST_FRAMEWORK_OBJECTS) $(COMMON_LIBS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(TEST_FRAMEWORK_OBJECTS) $(LDFLAGS)
+%_test: %_test.o $(OBJECTS) $(COMMON_LIBS) compiler-flags
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(GTEST_LIBS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -154,13 +147,6 @@ uio-pruss-interface.o : $(PRU_BIN)
 
 # Auto generated dependencies
 -include $(DEPENDENCY_RULES)
-
-# Test and Mock framework.
-gtest-all.o : $(GTEST_SOURCE)/src/gtest-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GTEST_SOURCE) -I$(GTEST_SOURCE)/include -c  $< -o $@
-
-gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GMOCK_SOURCE) -I$(GMOCK_SOURCE)/include -c  $< -o $@
 
 clean:
 	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) hershey.o *.gcda *.gcov *.gcno *.cc.gcov.html *.h.gcov.html *.func.html
