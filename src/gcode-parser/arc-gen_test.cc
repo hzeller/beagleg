@@ -60,6 +60,8 @@ class TestArcAccumulator : public GCodeParser::EventReceiver {
 
   float total_len() const { return total_len_; }
 
+  const AxesRegister &last() const { return last_; }
+
   bool rapid_move(float feed_mm_p_sec, const AxesRegister &absolute_pos) final {
     return true;
   }
@@ -152,6 +154,27 @@ static void testArcLength(GCodeParserAxis normal, bool clockwise, double start,
     const float expected_len = clockwise ? 2 * M_PI - turn_angle : turn_angle;
     EXPECT_NEAR(collect.total_len(), expected_len, 0.003);
   }
+}
+
+TEST(ArcGenerator, ArcLength_InterpolateNonEuclideanAxes) {
+  AxesRegister start, center, target;
+  const double kTurnAngle = M_PI;
+  const float kAxisALength = 20.0;
+
+  start[AXIS_X] = 1.0;
+  start[AXIS_Y] = 0.0;
+  start[AXIS_A] = 0.0;
+
+  center[AXIS_X] = 0;
+  center[AXIS_Y] = 0;
+
+  target[AXIS_X] = cos(kTurnAngle);
+  target[AXIS_Y] = sin(kTurnAngle);
+  target[AXIS_A] = kAxisALength;
+
+  TestArcAccumulator collect(start);
+  collect.arc_move(100, AXIS_Z, true, start, center, target);
+  EXPECT_NEAR(collect.last()[AXIS_A], kAxisALength, 0.003);
 }
 
 TEST(ArcGenerator, ArcLength_CW_360) {

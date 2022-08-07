@@ -40,6 +40,8 @@
 // of arcs with the BeagleBone Black CPU. Sufficient :)
 #define MM_PER_ARC_SEGMENT 0.1
 
+typedef EnumIterable<GCodeParserAxis, AXIS_A, GCODE_NUM_AXES> AllAxesFromA;
+
 // Generate an arc. Input is the
 static bool arc_gen(
   enum GCodeParserAxis normal_axis,  // Normal axis
@@ -113,9 +115,13 @@ static bool arc_gen(
 
   // Figure out how many segments for this gcode
   const int segments = floorf(mm_of_travel / MM_PER_ARC_SEGMENT);
-
   const float theta_per_segment = angular_travel / segments;
   const float linear_per_segment = linear_travel / segments;
+
+  AxesRegister other_axes_per_segment;
+  for (const GCodeParserAxis a : AllAxesFromA()) {
+    other_axes_per_segment[a] = (target[a] - position[a]) / segments;
+  }
 
   for (int i = 1; i < segments; i++) {  // Increment (segments-1)
     const float cos_Ti = cosf(i * theta_per_segment);
@@ -128,14 +134,18 @@ static bool arc_gen(
     position[plane[1]] = center_1 + r_1;
     position[plane[2]] += linear_per_segment;
 
+    // Update other axis position
+    for (const GCodeParserAxis a : AllAxesFromA()) {
+      position[a] += other_axes_per_segment[a];
+    }
+
     // Emit
     if (!segment_output(position)) return false;
   }
 
   // Ensure last segment arrives at target location.
-  for (int axis = AXIS_X; axis <= AXIS_Z; axis++) {
-    position[(GCodeParserAxis)axis] = target[(GCodeParserAxis)axis];
-  }
+  position = target;
+
   return segment_output(position);
 }
 
