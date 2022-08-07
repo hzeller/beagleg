@@ -116,10 +116,11 @@ class GCodeParser::Impl {
   // should be in the beginning.
   // Does _not_ reset the machine position.
   void InitProgramDefaults() {
-    unit_to_mm_factor_ = 1.0f;       // G21
-    set_all_axis_to_absolute(true);  // G90
-    set_ijk_absolute(false);         // G91.1
-    reset_G92();                     // No global offset.
+    xyz_unit_to_mm_factor_ = 1.0f;           // G21
+    rotation_unit_to_degree_factor_ = 1.0f;  // Offer degree to radian switch ?
+    set_all_axis_to_absolute(true);          // G90
+    set_ijk_absolute(false);                 // G91.1
+    reset_G92();                             // No global offset.
     set_current_offset(global_offset_g92_, "H");
 
     arc_normal_ = AXIS_Z;  // Arcs in XY-plane
@@ -227,8 +228,14 @@ class GCodeParser::Impl {
                                              err_msg_);
   }
 
-  float abs_axis_pos(const enum GCodeParserAxis axis, const float unit_value) {
-    float relative_to =
+  // Given the axis and the given value passed in the block, convert
+  // this value into absolute metric coordinates. Takes into account if
+  // values are to be interpreted absolute/relative as well as metric/imperial.
+  float abs_axis_pos(const enum GCodeParserAxis axis, const float value) {
+    const float unit_value =
+      value * (is_rotational_axis(axis) ? rotation_unit_to_degree_factor_
+                                        : xyz_unit_to_mm_factor_);
+    const float relative_to =
       ((axis_is_absolute_[axis])
          ? current_origin()[axis] + current_global_offset()[axis]
          : axes_pos_[axis]);
@@ -321,12 +328,13 @@ class GCodeParser::Impl {
   };
   SimpleLexer<ControlKeyword> control_parse_;
 
-  bool program_in_progress_;
+  bool program_in_progress_ = false;
 
-  FILE *err_msg_;
-  int modal_g0_g1_;
-  int line_number_;
-  float unit_to_mm_factor_;  // metric: 1.0; imperial 25.4
+  FILE *err_msg_ = NULL;
+  int modal_g0_g1_ = 0;
+  int line_number_ = 0;
+  float xyz_unit_to_mm_factor_ = 1.0f;  // metric: 1.0; imperial 25.4
+  float rotation_unit_to_degree_factor_ = 1.0f;
 
   // We distinguish axes here, because in 3D printers, the E-axis can be
   // set relative independently of the other axes.
@@ -363,23 +371,22 @@ class GCodeParser::Impl {
   const AxesRegister *current_global_offset_;  // offset rel. to current origin.
   // more: tool offset.
 
-  enum GCodeParserAxis arc_normal_;  // normal vector of arcs.
+  enum GCodeParserAxis arc_normal_ = AXIS_Z;  // normal vector of arcs.
 
   AxesRegister last_spline_cp2_;
   bool have_first_spline_;
 
   GCodeParser *while_owner_;
-  FILE *while_err_stream_;
-  bool do_while_;
+  FILE *while_err_stream_ = NULL;
+  bool do_while_ = false;
   std::string while_condition_;
   std::string while_loop_;
 
-  unsigned int debug_level_;  // OR-ed bits from DebugLevel enum
-  bool allow_m111_;
+  unsigned int debug_level_ = DEBUG_NONE;  // OR-ed bits from DebugLevel enum
 
   // TODO(hzeller): right now, we hook the error count to the gprintf(), but
   // maybe this needs to be more explicit.
-  int error_count_;
+  int error_count_ = 0;
 };
 
 const AxesRegister GCodeParser::Impl::kZeroOffset;
@@ -388,11 +395,6 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
                         GCodeParser::EventReceiver *parse_events)
     : callbacks_(parse_events),
       config_(parse_config),
-      program_in_progress_(false),
-      err_msg_(NULL),
-      modal_g0_g1_(0),
-      line_number_(0),
-      unit_to_mm_factor_(1.0),  // G21
       // When we initialize the machine, we assume the axes to
       // be at the origin (but it better is G28-ed later)
       // TODO(hzeller): this might not be what we want. There are situations
@@ -406,12 +408,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
       // on the top right, that all valid coordinates to stay within the
       // machine cube are negative.
       current_origin_(&machine_origin_),
-      current_global_offset_(&kZeroOffset),
-      arc_normal_(AXIS_Z),
-      while_err_stream_(NULL),
-      do_while_(false),
-      debug_level_(DEBUG_NONE),
-      error_count_(0) {
+      current_global_offset_(&kZeroOffset) {
   assert(callbacks_);  // otherwise, this is not very useful.
   reset_G92();
   InitProgramDefaults();
@@ -1250,9 +1247,9 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
       p_val = (int)value;
     else {
       const enum GCodeParserAxis axis = gcodep_letter2axis(letter);
-      const float unit_val = value * unit_to_mm_factor_;
+      const float unit_val = value * xyz_unit_to_mm_factor_;  // rotational?
       if (axis == GCODE_NUM_AXES) break;  //  Possibly start of new command.
-      coords[axis] = unit_val;
+      coords[axis] = unit_val;            // TODO: handle rotational
       have_val[axis] = true;
     }
     line = remaining_line;
@@ -1356,7 +1353,8 @@ const char *GCodeParser::Impl::handle_G92(float sub_command, const char *line) {
     float value;
     const char *remaining_line;
     while ((remaining_line = gparse_pair(line, &axis_l, &value))) {
-      const float unit_val = value * unit_to_mm_factor_;
+      // TODO: handle rotational axis
+      const float unit_val = value * xyz_unit_to_mm_factor_;
       const enum GCodeParserAxis axis = gcodep_letter2axis(axis_l);
       if (axis == GCODE_NUM_AXES) break;  // Possibly start of new command.
       // This sets the given value to be the new zero.
@@ -1406,9 +1404,8 @@ const char *GCodeParser::Impl::handle_move(const char *line,
   AxisBitmap_t affected_axes = 0;
 
   while ((remaining_line = gparse_pair(line, &axis_l, &value))) {
-    const float unit_value = value * unit_to_mm_factor_;
     if (axis_l == 'F') {
-      feedrate = f_param_to_feedrate(unit_value);
+      feedrate = f_param_to_feedrate(value * xyz_unit_to_mm_factor_);
       any_change = true;
     } else if (axis_l == 'S') {
       callbacks()->change_spindle_speed(value);
@@ -1416,7 +1413,7 @@ const char *GCodeParser::Impl::handle_move(const char *line,
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(axis_l);
       if (update_axis == GCODE_NUM_AXES)
         break;  // Invalid axis: possibly start of new command.
-      new_pos[update_axis] = abs_axis_pos(update_axis, unit_value);
+      new_pos[update_axis] = abs_axis_pos(update_axis, value);
       any_change = true;
       affected_axes |= (1 << update_axis);
     }
@@ -1499,18 +1496,34 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   int turns = 1;
 
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
-    const float unit_value = value * unit_to_mm_factor_;
-    // clang-format off
-    if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
-    else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
-    else if (letter == 'Z') target[AXIS_Z] = abs_axis_pos(AXIS_Z, unit_value);
-    else if (letter == 'I') { offset[AXIS_X] = unit_value; have_ijk = true; }
-    else if (letter == 'J') { offset[AXIS_Y] = unit_value; have_ijk = true; }
-    else if (letter == 'K') { offset[AXIS_Z] = unit_value; have_ijk = true; }
-    else if (letter == 'F') feedrate = f_param_to_feedrate(unit_value);
-    else if (letter == 'P') turns = (int)value; // currently ignored
-    else if (letter == 'R') { radius = unit_value; have_r = true; }
-    else break;
+    const float dist_value = value * xyz_unit_to_mm_factor_;
+    // center offset
+    if (letter == 'I') {
+      offset[AXIS_X] = dist_value;
+      have_ijk = true;
+    } else if (letter == 'J') {
+      offset[AXIS_Y] = dist_value;
+      have_ijk = true;
+    } else if (letter == 'K') {
+      offset[AXIS_Z] = dist_value;
+      have_ijk = true;
+    }
+
+    else if (letter == 'R') {
+      radius = dist_value;
+      have_r = true;
+    }
+
+    else if (letter == 'P')
+      turns = (int)value;  // currently ignored
+    else if (letter == 'F')
+      feedrate = f_param_to_feedrate(dist_value);
+    else {
+      const enum GCodeParserAxis update_axis = gcodep_letter2axis(letter);
+      if (update_axis == GCODE_NUM_AXES)
+        break;  // Invalid axis: treat as new command now, but should be error
+      target[update_axis] = abs_axis_pos(update_axis, value);
+    }
     // clang-format on
     line = remaining_line;
   }
@@ -1583,8 +1596,9 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
   absolute_center[AXIS_Y] += offset[AXIS_Y];
   absolute_center[AXIS_Z] += offset[AXIS_Z];
   if (callbacks()->arc_move(feedrate, arc_normal_, is_cw, axes_pos_,
-                            absolute_center, target))
+                            absolute_center, target)) {
     axes_pos_ = target;
+  }
   return line;
 }
 
@@ -1668,21 +1682,25 @@ const char *GCodeParser::Impl::handle_spline(float sub_command,
   bool have_j = false;
   bool have_p = false;
   bool have_q = false;
+  float feedrate = -1;
   const char *remaining_line;
   float value;
   char letter;
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
-    const float unit_value = value * unit_to_mm_factor_;
+    const float dist_value = value * xyz_unit_to_mm_factor_;
     // clang-format off
-    if (letter == 'X') target[AXIS_X] = abs_axis_pos(AXIS_X, unit_value);
-    else if (letter == 'Y') target[AXIS_Y] = abs_axis_pos(AXIS_Y, unit_value);
-    else if (letter == 'I') { cp1[AXIS_X] = unit_value; have_i = true; }
-    else if (letter == 'J') { cp1[AXIS_Y] = unit_value; have_j = true; }
-    else if (letter == 'P') { cp2[AXIS_X] = unit_value; have_p = true; }
-    else if (letter == 'Q') { cp2[AXIS_Y] = unit_value; have_q = true; }
+    if (letter == 'I') { cp1[AXIS_X] = dist_value; have_i = true; }
+    else if (letter == 'J') { cp1[AXIS_Y] = dist_value; have_j = true; }
+    else if (letter == 'P') { cp2[AXIS_X] = dist_value; have_p = true; }
+    else if (letter == 'Q') { cp2[AXIS_Y] = dist_value; have_q = true; }
+    else if (letter == 'F') feedrate = f_param_to_feedrate(dist_value);
     else {
-      gprintf(GLOG_SEMANTIC_ERR, "handle_spline: invalid axis specified\n");
-      return NULL;
+      const enum GCodeParserAxis update_axis = gcodep_letter2axis(letter);
+      if (update_axis == GCODE_NUM_AXES) {
+        gprintf(GLOG_SEMANTIC_ERR, "handle_spline: invalid axis specified\n");
+        return NULL;
+      }
+      target[update_axis] = abs_axis_pos(update_axis, value);
     }
     // clang-format on
     line = remaining_line;
@@ -1737,8 +1755,9 @@ const char *GCodeParser::Impl::handle_spline(float sub_command,
     cp2 = _cp2;
   }
 
-  if (callbacks()->spline_move(-1, axes_pos_, cp1, cp2, target))
+  if (callbacks()->spline_move(feedrate, axes_pos_, cp1, cp2, target)) {
     axes_pos_ = target;
+  }
   return line;
 }
 
@@ -1749,11 +1768,11 @@ const char *GCodeParser::Impl::handle_z_probe(const char *line) {
   float probe_thickness = 0;
   const char *remaining_line;
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
-    const float unit_value = value * unit_to_mm_factor_;
+    const float unit_value = value * xyz_unit_to_mm_factor_;
     if (letter == 'F')
       feedrate = f_param_to_feedrate(unit_value);
     else if (letter == 'Z')
-      probe_thickness = value * unit_to_mm_factor_;
+      probe_thickness = value * xyz_unit_to_mm_factor_;
     else
       break;
     line = remaining_line;
@@ -1813,11 +1832,11 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       switch ((int)value) {
       case 0:
         modal_g0_g1_ = 0;
-        line = handle_move(line, false);
+        line = handle_move(line, /* force-change=*/false);
         break;
       case 1:
         modal_g0_g1_ = 1;
-        line = handle_move(line, false);
+        line = handle_move(line, /* force-change=*/false);
         break;
       case 2: line = handle_arc(line, true); break;
       case 3: line = handle_arc(line, false); break;
@@ -1832,8 +1851,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 17: arc_normal_ = AXIS_Z; break;
       case 18: arc_normal_ = AXIS_Y; break;
       case 19: arc_normal_ = AXIS_X; break;
-      case 20: unit_to_mm_factor_ = 25.4f; break;
-      case 21: unit_to_mm_factor_ = 1.0f; break;
+      case 20: xyz_unit_to_mm_factor_ = 25.4f; break;
+      case 21: xyz_unit_to_mm_factor_ = 1.0f; break;
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
       case 54:
@@ -1842,8 +1861,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 57:
       case 58:
       case 59: change_coord_system(value); break;
-      case 70: unit_to_mm_factor_ = 25.4f; break;
-      case 71: unit_to_mm_factor_ = 1.0f; break;
+      case 70: xyz_unit_to_mm_factor_ = 25.4f; break;
+      case 71: xyz_unit_to_mm_factor_ = 1.0f; break;
       case 90:
       case 91: handle_G90_G91(value); break;
       case 92: line = handle_G92(value, line); break;
@@ -1885,7 +1904,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       }
     } else if (letter == 'F') {
       // Feedrate is sometimes used in absence of a move command.
-      const float unit_value = value * unit_to_mm_factor_;
+      const float unit_value = value * xyz_unit_to_mm_factor_;
       const float feedrate = f_param_to_feedrate(unit_value);
       callbacks()->coordinated_move(feedrate, axes_pos_);  // No move, just feed
     } else if (letter == 'N') {
@@ -1898,9 +1917,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       } else {
         // This line must be a continuation of a previous G0/G1 command.
         // Update the axis position then handle the move.
-        const float unit_value = value * unit_to_mm_factor_;
-        axes_pos_[axis] = abs_axis_pos(axis, unit_value);
-        line = handle_move(line, true);
+        axes_pos_[axis] = abs_axis_pos(axis, value);
+        line = handle_move(line, /* force-change=*/true);
         // make gcode_command_done() think this was a 'G0/G1' command
         letter = 'G';
         value = modal_g0_g1_;

@@ -34,11 +34,20 @@ we use the [Google test framework](https://github.com/google/googletest),
 for which there are typically already packages available:
 
 ```bash
- sudo apt-get install libgtest-dev google-mock
+ sudo apt-get install pkg-config libgtest-dev libgmock-dev
  make test
  # Or, for more thorough memory-leak or initialization issue check:
  make valgrind-test
  ```
+
+### NixOS
+
+If you develop on nixos or have the nix package manager installed, use the
+shell.nix to set-up your development environment by calling nix-shell in
+the root of the environment.
+```
+nix-shell
+```
 
 ### Coverage
 To see if there is code that has not been covered in tests yet, there is

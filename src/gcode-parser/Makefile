@@ -1,15 +1,9 @@
 # (c) 2013 h.zeller@acm.org
 # This is free software. License: GNU 3.0
 
-# Where the google test source has been unpacked.
-# You also can check out from head in https://github.com/google/googletest and
-# point to the googletest/ and googlemock/ directories.
-GTEST_SOURCE?=/usr/src/googletest/googletest
-GMOCK_SOURCE?=/usr/src/googletest/googlemock
-
-# In particular, if this is a checked out version of google test/mock, this
-# makes sure that we see the right includes.
-GTEST_INCLUDE=-I$(GTEST_SOURCE)/include -I$(GMOCK_SOURCE)/include
+# Location of testing framework
+GTEST_INCLUDE=$(shell pkg-config --cflags-only-I gtest gmock 2>/dev/null || echo "-I/usr/include")
+GTEST_LIBS=$(shell pkg-config --libs gtest gmock 2>/dev/null || echo "-lgtest -lgmock")
 
 # Optmization flags. Typically, that should be -O3 for regluar use, but for
 # debugging and development "-g -O0" can be more helpful. Overridable by
@@ -30,7 +24,6 @@ OBJECTS=gcode-parser.o gcode-streamer.o arc-gen.o simple-lexer.o \
 GENLIB=libgcodeparser.a
 
 UNITTEST_BINARIES=gcode-parser_test gcode-streamer_test arc-gen_test simple-lexer_test
-TEST_FRAMEWORK_OBJECTS=gtest-all.o gmock-all.o
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d)
 
@@ -52,7 +45,7 @@ valgrind-test: test-binaries
 
 
 %_test: %_test.o $(GENLIB) $(COMMON_LIBS) $(TEST_FRAMEWORK_OBJECTS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(GENLIB) $(COMMON_LIBS) $(TEST_FRAMEWORK_OBJECTS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(GENLIB) $(COMMON_LIBS) $(GTEST_LIBS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -65,15 +58,8 @@ valgrind-test: test-binaries
 # Auto generated dependencies
 -include $(DEPENDENCY_RULES)
 
-# Test and Mock framework.
-gtest-all.o : $(GTEST_SOURCE)/src/gtest-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GTEST_SOURCE) -I$(GTEST_SOURCE)/include -c  $< -o $@
-
-gmock-all.o : $(GMOCK_SOURCE)/src/gmock-all.cc compiler-flags
-	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE) -I$(GMOCK_SOURCE) -I$(GMOCK_SOURCE)/include -c  $< -o $@
-
 clean:
-	rm -rf $(GENLIB) $(OBJECTS) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) *.gcda *.gcov *.gcno *.cc.html *.h.html
+	rm -rf $(GENLIB) $(OBJECTS) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) *.gcda *.gcov *.gcno *.cc.html *.h.html
 
 compiler-flags: FORCE
 	@echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' | cmp -s - $@ || echo '$(CXX) $(CXXFLAGS) $(GTEST_INCLUDE)' > $@

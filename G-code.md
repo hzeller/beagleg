@@ -53,7 +53,7 @@ G5 [see below]   | `coordinated_move()` | Cubic spline in XY plane
 G5.1 [see below] | `coordinated_move()` | Quadratic spline in XY plane
 G10 L2 Px [coord]| -                    | Set coordinate system data
 G17              | -                    | XY plane selection.
-G18              | -                    | ZX plane selection.
+G18              | -                    | XZ plane selection.
 G19              | -                    | YZ plane selection.
 G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
