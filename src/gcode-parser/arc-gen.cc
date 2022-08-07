@@ -50,7 +50,6 @@ static bool arc_gen(
   const AxesRegister &center,        // Offset to center.
   const AxesRegister &target,        // Target position.
   const std::function<bool(const AxesRegister &)> &segment_output) {
-
   // Depending on the normal vector, pre-calc plane
   enum GCodeParserAxis plane[3];
   switch (normal_axis) {
