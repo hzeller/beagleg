@@ -697,11 +697,9 @@ TEST(GCodeParserTest, arc_generation) {
     EXPECT_EQ(HOME_X + 100, counter.abs_pos[AXIS_X]);
     EXPECT_EQ(HOME_Y + 0, counter.abs_pos[AXIS_Y]);
     EXPECT_EQ(HOME_Z + 18, counter.abs_pos[AXIS_Z]);
-#if 0  // This should work after Pull Request #61 is in.
     EXPECT_EQ(HOME_A + 77, counter.abs_pos[AXIS_A]);
     EXPECT_EQ(HOME_B + 12, counter.abs_pos[AXIS_B]);
     EXPECT_EQ(HOME_E + 42, counter.abs_pos[AXIS_E]);
-#endif
   }
 
   // -- Other planes
