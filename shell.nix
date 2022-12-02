@@ -13,6 +13,7 @@ pkgs.mkShell {
       bear
       gtest
       valgrind
+      ghostscript
       clang-tools_11
     ];
   shellHook =
