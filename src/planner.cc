@@ -253,10 +253,10 @@ class Planner::Impl {
     }
   };
 
-  bool BackwardUpdateSegment(PlanningSegment *segment_to_plan,
-                             const PlanningSegment *next_segment);
-  bool ForwardUpdateSegment(const PlanningSegment *previous_segment,
-                            PlanningSegment *segment_to_plan);
+  bool DecelerationPlanSegment(PlanningSegment *segment_to_plan,
+                               const PlanningSegment *next_segment);
+  bool AccelerationPlanSegment(const PlanningSegment *previous_segment,
+                               PlanningSegment *segment_to_plan);
 
   // Run backward and forward passes to
   // compute the new profile.
@@ -275,7 +275,7 @@ class Planner::Impl {
   // from which this deceleration ramp starts. This allows us to avoid running
   // the motion profile update as long as we have enough planned-invariants
   // segments and update only the last deceleration ramp.
-  int last_planned_invariant_segment_ = 0;
+  int num_segments_ready_ = 0;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
@@ -533,8 +533,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
     // position and aux values.
     if (planning_buffer_.size() > 1) {
       planning_buffer_.pop_front();
-      if (last_planned_invariant_segment_ > 0)
-        --last_planned_invariant_segment_;
+      if (num_segments_ready_ > 0) --num_segments_ready_;
     } else {
       // Let's create a zero-steps segment to hold last position.
       // We have only one segment, last speed is always 0.
@@ -543,7 +542,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
       segment->target.position_steps = last_pos;
       path_halted_ = true;
       ret = false;
-      last_planned_invariant_segment_ = 0;
+      num_segments_ready_ = 0;
     }
   }
 
@@ -671,14 +670,15 @@ void Planner::Impl::bring_path_to_halt() {
 // Compute the backard pass of <segment_to_plan> given the
 // information (such as starting speed and defining axis) of the <next_segment>.
 // If <next_segment> is nullptr, the next segment is assumed to not exist (end
-// of the buffer). The function returns true if the final speed already connects
-// with the starting speed of the next segment and this is not the last segment.
-bool Planner::Impl::BackwardUpdateSegment(PlanningSegment *segment_to_plan,
-                                          const PlanningSegment *next_segment) {
+// of the buffer). The function returns false if the final speed already
+// connects with the starting speed of the next segment and this is not the last
+// segment.
+bool Planner::Impl::DecelerationPlanSegment(
+  PlanningSegment *segment_to_plan, const PlanningSegment *next_segment) {
   // Handle special case of zero feedrate. The segment is dummy as any no amount
   // of steps and be executed at zero speed.
   if (segment_to_plan->target.speed == 0) {
-    return false;
+    return true;
   }
 
   const bool is_last_segment = next_segment == nullptr;
@@ -715,11 +715,15 @@ bool Planner::Impl::BackwardUpdateSegment(PlanningSegment *segment_to_plan,
   // in the forward pass. The new profile deceleration and travel will always
   // be above or equal to the current profile. This will only then happen if
   // the new backward profile v2 equals the previous planned profile v2.
+  // Since the compared floats are results of the same algorithm, we can safely
+  // directly compare the floating values without checking some relative
+  // distance.
   if (planned.v2 == end_speed && !is_last_segment) {
     // The current segment doesn't need to be touched in the forward pass.
     // We increment the buffer index and keep _speed_ the same as it should
     // already be the v0 of the next segment defining axis.
-    return true;
+    // We return false as no deceleration occurs.
+    return false;
   }
 
   // We can decelarate.
@@ -748,10 +752,10 @@ bool Planner::Impl::BackwardUpdateSegment(PlanningSegment *segment_to_plan,
   // v2.
   // planned.v0 = planned.v1;
   planned.accel = 0;
-  return false;
+  return true;
 }
 
-bool Planner::Impl::ForwardUpdateSegment(
+bool Planner::Impl::AccelerationPlanSegment(
   const PlanningSegment *previous_segment, PlanningSegment *segment_to_plan) {
   const bool is_first_segment = previous_segment == nullptr;
   const enum GCodeParserAxis defining_axis =
@@ -844,11 +848,11 @@ void Planner::Impl::UpdateMotionProfile() {
   PlanningSegment *previous_segment = nullptr;
 
   // Perform a backward pass.
-  for (; buffer_index >= last_planned_invariant_segment_; --buffer_index) {
+  for (; buffer_index >= num_segments_ready_; --buffer_index) {
     // We connect to the previously existing profile, there's no need to updated
     // it further!
     previous_segment = planning_buffer_[buffer_index];
-    if (BackwardUpdateSegment(previous_segment, next_segment)) {
+    if (!DecelerationPlanSegment(previous_segment, next_segment)) {
       break;
     }
     next_segment = previous_segment;
@@ -860,10 +864,11 @@ void Planner::Impl::UpdateMotionProfile() {
   for (++buffer_index; buffer_index < (int)planning_buffer_.size();
        ++buffer_index) {
     next_segment = planning_buffer_[buffer_index];
-    if (ForwardUpdateSegment(previous_segment, next_segment) && !first_accel) {
+    if (AccelerationPlanSegment(previous_segment, next_segment) &&
+        !first_accel) {
       // We have acceleration.
       // Let's update the last invariant segment.
-      last_planned_invariant_segment_ = buffer_index;
+      num_segments_ready_ = buffer_index;
       first_accel = true;
     }
     previous_segment = next_segment;
