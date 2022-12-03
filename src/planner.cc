@@ -253,6 +253,11 @@ class Planner::Impl {
     }
   };
 
+  bool DecelerationPlanSegment(PlanningSegment *segment_to_plan,
+                               const PlanningSegment *next_segment);
+  bool AccelerationPlanSegment(const PlanningSegment *previous_segment,
+                               PlanningSegment *segment_to_plan);
+
   // Run backward and forward passes to
   // compute the new profile.
   void UpdateMotionProfile();
@@ -270,7 +275,7 @@ class Planner::Impl {
   // from which this deceleration ramp starts. This allows us to avoid running
   // the motion profile update as long as we have enough planned-invariants
   // segments and update only the last deceleration ramp.
-  int last_planned_invariant_segment_ = 0;
+  int num_segments_ready_ = 0;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
@@ -528,8 +533,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
     // position and aux values.
     if (planning_buffer_.size() > 1) {
       planning_buffer_.pop_front();
-      if (last_planned_invariant_segment_ > 0)
-        --last_planned_invariant_segment_;
+      if (num_segments_ready_ > 0) --num_segments_ready_;
     } else {
       // Let's create a zero-steps segment to hold last position.
       // We have only one segment, last speed is always 0.
@@ -538,7 +542,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
       segment->target.position_steps = last_pos;
       path_halted_ = true;
       ret = false;
-      last_planned_invariant_segment_ = 0;
+      num_segments_ready_ = 0;
     }
   }
 
@@ -663,6 +667,171 @@ void Planner::Impl::bring_path_to_halt() {
   issue_motor_move_if_possible(true);
 }
 
+// Compute the backard pass of <segment_to_plan> given the
+// information (such as starting speed and defining axis) of the <next_segment>.
+// If <next_segment> is nullptr, the next segment is assumed to not exist (end
+// of the buffer). The function returns false if the final speed already
+// connects with the starting speed of the next segment and this is not the last
+// segment.
+bool Planner::Impl::DecelerationPlanSegment(
+  PlanningSegment *segment_to_plan, const PlanningSegment *next_segment) {
+  // Handle special case of zero feedrate. The segment is dummy as any no amount
+  // of steps and be executed at zero speed.
+  if (segment_to_plan->target.speed == 0) {
+    return true;
+  }
+
+  const bool is_last_segment = next_segment == nullptr;
+  const enum GCodeParserAxis defining_axis =
+    segment_to_plan->target.defining_axis;
+  const AxisTarget &target = segment_to_plan->target;
+  PlannedProfile &planned = segment_to_plan->planned;
+
+  // Amount of absolute number of steps to be travelled in this segment
+  // by the defining axis.
+  const int delta_steps = abs(target.delta_steps[defining_axis]);
+  const GCodeParserAxis next_defining_axis =
+    is_last_segment ? defining_axis : next_segment->target.defining_axis;
+
+  // This speed is the starting speed of the defining axis of the next segment
+  // that we have to match our v2 with. The final speed we have to match is
+  // either zero if this is the last segment or v0 otherwise.
+  const double next_v0 =
+    is_last_segment
+      ? 0
+      : std::min(next_segment->planned.v1, next_segment->target.start_speed);
+
+  // We want to have continuous speeds. We calculate what would be that speed
+  // for the current defining axis.
+  const auto speed_factor =
+    get_speed_factor_for_axis(&target, next_defining_axis);
+
+  // Final speed constraint.
+  const double end_speed = (speed_factor != 0) ? next_v0 / speed_factor : 0;
+
+  // Check if the current segment v2 speed connects with the next
+  // (except if this is the very last segment).
+  // If we do, then we stop here. No need to compute the accel. It will happen
+  // in the forward pass. The new profile deceleration and travel will always
+  // be above or equal to the current profile. This will only then happen if
+  // the new backward profile v2 equals the previous planned profile v2.
+  // Since the compared floats are results of the same algorithm, we can safely
+  // directly compare the floating values without checking some relative
+  // distance.
+  if (planned.v2 == end_speed && !is_last_segment) {
+    // The current segment doesn't need to be touched in the forward pass.
+    // We increment the buffer index and keep _speed_ the same as it should
+    // already be the v0 of the next segment defining axis.
+    // We return false as no deceleration occurs.
+    return false;
+  }
+
+  // We can decelarate.
+  if (target.speed > end_speed) {
+    // Let's see if we can just fill the segment with a full decel ramp.
+    // This is the total space required to reach max speed.
+    const int steps_to_max_speed = uniformly_accelerated_ramp_distance(
+      end_speed, target.speed, target.accel);
+
+    planned.decel =
+      (steps_to_max_speed > delta_steps) ? delta_steps : steps_to_max_speed;
+    planned.v1 = (steps_to_max_speed > 0)
+                   ? uniformly_accelerated_ramp_speed(planned.decel, end_speed,
+                                                      target.accel)
+                   : target.speed;
+    planned.travel = delta_steps - planned.decel;
+    planned.v2 = end_speed;
+  } else {
+    planned.decel = 0;
+    planned.travel = delta_steps;
+    planned.v1 = planned.v2 = target.speed;
+  }
+
+  // Let's reset the final speed always as v1. We want to keep a consistent
+  // profile state which means if no accel -> v0 == v1 and no decel -> v1 ==
+  // v2.
+  // planned.v0 = planned.v1;
+  planned.accel = 0;
+  return true;
+}
+
+bool Planner::Impl::AccelerationPlanSegment(
+  const PlanningSegment *previous_segment, PlanningSegment *segment_to_plan) {
+  const bool is_first_segment = previous_segment == nullptr;
+  const enum GCodeParserAxis defining_axis =
+    segment_to_plan->target.defining_axis;
+  const AxisTarget &target = segment_to_plan->target;
+  PlannedProfile &planned = segment_to_plan->planned;
+
+  const double previous_v2 = is_first_segment ? segment_to_plan->planned.v0
+                                              : previous_segment->planned.v2;
+
+  const auto speed_factor = get_speed_factor_for_axis(&target, defining_axis);
+  const double start_speed =
+    (speed_factor != 0) ? previous_v2 / speed_factor : 0;
+  planned.v0 = start_speed;
+
+  // Recompute the accel ramp if necessary.
+  if (planned.v1 == 0) {
+    return false;
+  }
+
+  // Nothing to accelerate. Starting speed is above the travel speed.
+  if (start_speed >= planned.v1) {
+    planned.accel = 0;
+    planned.v0 = planned.v1;
+    return false;
+  }
+
+  const uint32_t steps = planned.TotalSteps();
+  const uint32_t steps_to_vmax =
+    uniformly_accelerated_ramp_distance(start_speed, planned.v1, target.accel);
+
+  // We intersect with the travel part.
+  if (steps_to_vmax <= planned.travel) {
+    planned.v0 = start_speed;
+    planned.accel = steps_to_vmax;
+    planned.travel = planned.travel - steps_to_vmax;
+    return true;
+  }
+
+  // We don't intersect with travel.
+  planned.travel = 0;
+  const double end_speed =
+    uniformly_accelerated_ramp_speed(steps, start_speed, target.accel);
+
+  // We do only accel and decel, no travel.
+  if (end_speed > planned.v2) {
+    // NOTE(lromor): Here we are searching for the amount of steps at which
+    // two accel-decel profiles would converge. If this value ends up being
+    // very close to the end length of the segment, it means that we might
+    // have a single step dedicated to deceleration. Due to step
+    // discretization we have a rounding error that mighe undershoot or
+    // overshoot the actual joining speed for instance going below the final
+    // speed v2 or above v1. We fix this by casting to int and assuming that
+    // by doing so, the worst case scenario is the new v1 to go below v2. At
+    // that point we force v2 to be equal v1 and remove any other deceleration
+    // step.
+    planned.accel = find_uniformly_accelerated_ramps_intersection(
+      start_speed, planned.v2, target.accel, steps);
+    planned.v1 = uniformly_accelerated_ramp_speed(planned.accel, start_speed,
+                                                  target.accel);
+    if (planned.v1 <= planned.v2) {
+      planned.v2 = planned.v1;
+      planned.accel = steps;
+    }
+
+    planned.decel = steps - planned.accel;
+    planned.v0 = start_speed;
+    return true;
+  }
+
+  // At the end of the segment we fall below v2, means
+  // we remove any travel and decel.
+  planned = {steps, 0, 0, start_speed, end_speed, end_speed};
+  return true;
+}
+
 // Perform a backward and forward pass across
 // the whole planning buffer to adapt the start
 // and final speed of all the segments.
@@ -670,168 +839,39 @@ void Planner::Impl::UpdateMotionProfile() {
   assert(!planning_buffer_.empty());
 
   // Starting speed for each Planning segment.
-  PlanningSegment *segment;
   int buffer_index = planning_buffer_.size() - 1;
 
   // Next speed is the initial speed of the following(next) segment on the
   // original defining axis. We start from the backward pass so it's always 0
   // since we plan to always decelerate to zero.
-  double speed = 0;
-  GCodeParserAxis defining_axis = planning_buffer_.back()->target.defining_axis;
+  PlanningSegment *next_segment = nullptr;
+  PlanningSegment *previous_segment = nullptr;
 
-  // Perform the backward pass. Compute and join the travel and deceleration
-  // parts of the profile.
-  for (; buffer_index >= last_planned_invariant_segment_; --buffer_index) {
-    segment = planning_buffer_[buffer_index];
-    if (segment->target.speed == 0) {
-      speed = 0;
-      continue;
-    }
-
-    // Amount of absolute number of steps to be travelled in this segment
-    // by the defining axis.
-    const int delta_steps =
-      abs(segment->target.delta_steps[segment->target.defining_axis]);
-
-    // next_speed is the speed of the next defining axis segment.
-    // We want to have continuous speeds. We calculate what would be that speed
-    // for the current defining axis.
-    const auto speed_factor =
-      get_speed_factor_for_axis(&segment->target, defining_axis);
-
-    const double segment_end_speed =
-      (speed_factor != 0) ? speed / speed_factor : 0;
-
-    // Check if the current segment v2 speed connects with the next
-    // (except if this is the very last segment).
-    // If we do, then we stop here. No need to compute the accel. It will happen
-    // in the forward pass. The new profile deceleration and travel will always
-    // be above or equal to the current profile. This will only then happen if
-    // the new backward profile v2 equals the previous planned profile v2.
-    if (segment->planned.v2 == segment_end_speed &&
-        buffer_index != (int)planning_buffer_.size() - 1) {
-      // The current segment doesn't need to be touched in the forward pass.
-      // We increment the buffer index and keep _speed_ the same as it should
-      // already be the v0 of the next segment defining axis.
+  // Perform a backward pass.
+  for (; buffer_index >= num_segments_ready_; --buffer_index) {
+    // We connect to the previously existing profile, there's no need to updated
+    // it further!
+    previous_segment = planning_buffer_[buffer_index];
+    if (!DecelerationPlanSegment(previous_segment, next_segment)) {
       break;
     }
-
-    // We can decelarate.
-    if (segment->target.speed > segment_end_speed) {
-      // Let's see if we can just fill the segment with a full decel ramp.
-      // This is the total space required to reach max speed.
-      const int steps_to_max_speed = uniformly_accelerated_ramp_distance(
-        segment_end_speed, segment->target.speed, segment->target.accel);
-
-      segment->planned.decel =
-        (steps_to_max_speed > delta_steps) ? delta_steps : steps_to_max_speed;
-      segment->planned.v1 =
-        (steps_to_max_speed > 0)
-          ? uniformly_accelerated_ramp_speed(
-              segment->planned.decel, segment_end_speed, segment->target.accel)
-          : segment->target.speed;
-      segment->planned.travel = delta_steps - segment->planned.decel;
-      segment->planned.v2 = segment_end_speed;
-    } else {
-      segment->planned.decel = 0;
-      segment->planned.travel = delta_steps;
-      segment->planned.v1 = segment->planned.v2 = segment->target.speed;
-    }
-
-    // Update variables for next loop cycle.
-    defining_axis = segment->target.defining_axis;
-    // In the next iteration segment, our speed should be the final speed
-    // which is the smallest between the highest speed we could reach or
-    // the current segment start_speed (the starting segment is special).
-    speed = buffer_index && (buffer_index != last_planned_invariant_segment_)
-              ? std::min(segment->planned.v1, segment->target.start_speed)
-              : segment->planned.v0;
-
-    // Let's reset the final speed always as v1. We want to keep a consistent
-    // profile state which means if no accel -> v0 == v1 and no decel -> v1 ==
-    // v2.
-    segment->planned.v0 = segment->planned.v1;
-    segment->planned.accel = 0;
+    next_segment = previous_segment;
   }
+  bool first_accel = false;
+  previous_segment = nullptr;
 
-  // Compute the forward pass.
+  // Perform a forward pass.
   for (++buffer_index; buffer_index < (int)planning_buffer_.size();
        ++buffer_index) {
-    segment = planning_buffer_[buffer_index];
-    const auto speed_factor =
-      get_speed_factor_for_axis(&segment->target, defining_axis);
-    const double segment_start_speed =
-      (speed_factor != 0) ? speed / speed_factor : 0;
-    defining_axis = segment->target.defining_axis;
-    segment->planned.v0 = segment_start_speed;
-
-    // Recompute the accel ramp if necessary.
-    if (segment->planned.v1 == 0) {
-      speed = 0;
-      continue;
+    next_segment = planning_buffer_[buffer_index];
+    if (AccelerationPlanSegment(previous_segment, next_segment) &&
+        !first_accel) {
+      // We have acceleration.
+      // Let's update the last invariant segment.
+      num_segments_ready_ = buffer_index;
+      first_accel = true;
     }
-
-    // Nothing to accelerate. Starting speed is above the travel speed.
-    if (segment_start_speed >= segment->planned.v1) {
-      segment->planned.accel = 0;
-      segment->planned.v0 = segment->planned.v1;
-      speed = segment->planned.v2;
-      continue;
-    }
-
-    // We have acceleration.
-    // Let's update the last invariant segment.
-    last_planned_invariant_segment_ = buffer_index > 0 ? buffer_index : 0;
-
-    const uint32_t steps = segment->planned.TotalSteps();
-    const uint32_t steps_to_vmax = uniformly_accelerated_ramp_distance(
-      segment_start_speed, segment->planned.v1, segment->target.accel);
-
-    // We intersect with the travel part.
-    if (steps_to_vmax <= segment->planned.travel) {
-      segment->planned.v0 = segment_start_speed;
-      segment->planned.accel = steps_to_vmax;
-      segment->planned.travel = segment->planned.travel - steps_to_vmax;
-      speed = segment->planned.v2;
-      continue;
-    }
-
-    // We don't intersect with travel.
-    segment->planned.travel = 0;
-    const double end_speed = uniformly_accelerated_ramp_speed(
-      steps, segment_start_speed, segment->target.accel);
-
-    // We do only accel and decel, no travel.
-    if (end_speed > segment->planned.v2) {
-      // NOTE(lromor): Here we are searching for the amount of steps at which
-      // two accel-decel profiles would converge. If this value ends up being
-      // very close to the end length of the segment, it means that we might
-      // have a single step dedicated to deceleration. Due to step
-      // discretization we have a rounding error that mighe undershoot or
-      // overshoot the actual joining speed for instance going below the final
-      // speed v2 or above v1. We fix this by casting to int and assuming that
-      // by doing so, the worst case scenario is the new v1 to go below v2. At
-      // that point we force v2 to be equal v1 and remove any other deceleration
-      // step.
-      segment->planned.accel = find_uniformly_accelerated_ramps_intersection(
-        segment_start_speed, segment->planned.v2, segment->target.accel, steps);
-      segment->planned.v1 = uniformly_accelerated_ramp_speed(
-        segment->planned.accel, segment_start_speed, segment->target.accel);
-      if (segment->planned.v1 <= segment->planned.v2) {
-        segment->planned.v2 = segment->planned.v1;
-        segment->planned.accel = steps;
-      }
-
-      segment->planned.decel = steps - segment->planned.accel;
-      segment->planned.v0 = segment_start_speed;
-      speed = segment->planned.v2;
-      continue;
-    }
-
-    // At the end of the segment we fall below v2, means
-    // we remove any travel and decel.
-    segment->planned = {steps, 0, 0, segment_start_speed, end_speed, end_speed};
-    speed = end_speed;
+    previous_segment = next_segment;
   }
 }
 
