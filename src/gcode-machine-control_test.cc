@@ -35,6 +35,9 @@ static void init_test_config(struct MachineControlConfig *c,
 }
 
 namespace {
+// Record Segment queue calls we care avout.
+enum { CALL_wait_queue_empty, NUM_COUNTED_CALLS };
+
 class MockMotorOps final : public SegmentQueue {
  public:
   explicit MockMotorOps(const LinearSegmentSteps *expected)
@@ -54,12 +57,17 @@ class MockMotorOps final : public SegmentQueue {
     return true;
   }
 
+  void WaitQueueEmpty() final { Count(CALL_wait_queue_empty); }
+
   void MotorEnable(bool on) final {}
-  void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int steps) final {}
 
+  int call_count[NUM_COUNTED_CALLS] = {};
+
  private:
+  void Count(int what) { call_count[what]++; }
+
   // Helpers to compare and print MotorMovements.
   static void PrintMovement(const char *msg,
                             const struct LinearSegmentSteps *m) {
@@ -94,11 +102,11 @@ class Harness {
   // Initialize harness with the expected sequence of motor movements
   // and return the callback struct to receive simulated gcode calls.
   explicit Harness(const LinearSegmentSteps *expected)
-      : expect_motor_ops_(expected) {
+      : expect_motor_ops(expected) {
     struct MachineControlConfig config;
-    init_test_config(&config, &hardware_);
+    init_test_config(&config, &hardware);
     machine_control =
-      GCodeMachineControl::Create(config, &expect_motor_ops_, &hardware_,
+      GCodeMachineControl::Create(config, &expect_motor_ops, &hardware,
                                   nullptr,   // spindle
                                   nullptr);  // msg-stream
     assert(machine_control != nullptr);
@@ -110,8 +118,8 @@ class Harness {
     return machine_control->ParseEventReceiver();
   }
 
-  MockMotorOps expect_motor_ops_;
-  HardwareMapping hardware_;
+  MockMotorOps expect_motor_ops;
+  HardwareMapping hardware;
   GCodeMachineControl *machine_control;
 };
 
@@ -217,6 +225,25 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
   harness.gcode_emit()->coordinated_move(50, coordinates);  // 50mm/s
 
   harness.gcode_emit()->motors_enable(false);  // finish movement.
+}
+
+TEST(GCodeMachineControlTest, m181_stops_and_set_planner_queue) {
+  static const struct LinearSegmentSteps expected[] = {
+    {0.0, 0.0, END_SENTINEL, {}},
+  };
+  Harness harness(expected);
+  GCodeParser::Config config;
+  GCodeParser::Config::ParamMap parameters;
+  config.parameters = &parameters;
+  GCodeParser parser = GCodeParser(config, harness.gcode_emit());
+  EXPECT_EQ(0, parser.error_count());
+
+  harness.gcode_emit()->gcode_start(&parser);
+  parser.ParseBlock("M181 S100", nullptr);
+  harness.gcode_emit()->gcode_finished(true);
+
+  // Changing lookahead should enforce a full stop.
+  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 1);
 }
 
 int main(int argc, char *argv[]) {

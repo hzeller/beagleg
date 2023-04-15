@@ -122,6 +122,7 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
                     int max_steps);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::NamedOutput out, bool is_on);
+  void set_lookahead(int size);
   void handle_M105();
   // Parse GCode spindle M3/M4 block.
   const char *set_spindle_on(bool is_ccw, const char *);
@@ -450,6 +451,22 @@ bool GCodeMachineControl::Impl::check_for_pause() {
   return hardware_mapping_->TestPauseSwitch();
 }
 
+void GCodeMachineControl::Impl::set_lookahead(int size) {
+  // It is necessary to have a fully stopped machine to change lookahead.
+  // This is to avoid introducing a delay between the requested change and
+  // actual machine behavior with previously enqueued segments.
+  motor_ops_->WaitQueueEmpty();
+  const bool set_max = size < 0;
+  size = (size <= 0) ? -1 : size;
+  const bool set = planner_->SetLookAhead(&size);
+  if (set_max) {
+    planner_->SetLookAhead(&size);
+  }
+  if (!set) {
+    mprintf("// ERROR: allowed range 1 <= S <= %d\n", size);
+  }
+}
+
 void GCodeMachineControl::Impl::handle_M105() {
   mprintf("// ");
   for (int chan = 0; chan < 8; chan++) {
@@ -534,6 +551,14 @@ const char *GCodeMachineControl::Impl::special_commands(char letter,
   case 119: mprint_endstop_status(); break;
   case 120: pause_enabled_ = true; break;
   case 121: pause_enabled_ = false; break;
+  case 181: {
+    const char *const after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
+    if (remaining == NULL) set_lookahead(-1);
+    else if (letter == 'S') set_lookahead((unsigned)value);
+    else break;
+    remaining = after_pair;
+    break;
+  }
   default:
     mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
             letter, code, remaining);

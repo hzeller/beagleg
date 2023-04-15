@@ -233,6 +233,7 @@ class Planner::Impl {
   void GetCurrentPosition(AxesRegister *pos);
   int DirectDrive(GCodeParserAxis axis, float distance, float v0, float v1);
   void SetExternalPosition(GCodeParserAxis axis, float pos);
+  bool SetLookAhead(int *size);
 
  private:
   const struct MachineControlConfig *const cfg_;
@@ -276,6 +277,9 @@ class Planner::Impl {
   // the motion profile update as long as we have enough planned-invariants
   // segments and update only the last deceleration ramp.
   int num_segments_ready_ = 0;
+
+  // Number of maximum planning steps allow to enqueue.
+  int lookahead_size_ = PLANNING_BUFFER_CAPACITY;
 
   // Pre-calculated per axis limits in steps, steps/s, steps/s^2
   // All arrays are indexed by axis.
@@ -463,7 +467,7 @@ bool Planner::Impl::issue_motor_move_if_possible(
 
   // We require a slot to be always present.
   if (num_segments == 0 &&
-      (planning_buffer_.size() == planning_buffer_.capacity()))
+      (planning_buffer_.size() == (unsigned)lookahead_size_))
     ++num_segments;
 
   // No segments to enqueue, skip.
@@ -934,6 +938,23 @@ void Planner::Impl::SetExternalPosition(GCodeParserAxis axis, float pos) {
   }
 }
 
+bool Planner::Impl::SetLookAhead(int *size) {
+  if (size == nullptr) {
+    return false;
+  }
+  const int value = *size;
+  if (value == 0) {
+    *size = lookahead_size_;
+    return false;
+  }
+  if (value < 0 || value > PLANNING_BUFFER_CAPACITY) {
+    *size = PLANNING_BUFFER_CAPACITY;
+    return false;
+  }
+  lookahead_size_ = value;
+  return true;
+}
+
 // -- public interface
 
 Planner::Planner(const MachineControlConfig *config,
@@ -960,3 +981,5 @@ int Planner::DirectDrive(GCodeParserAxis axis, float distance, float v0,
 void Planner::SetExternalPosition(GCodeParserAxis axis, float pos) {
   impl_->SetExternalPosition(axis, pos);
 }
+
+bool Planner::SetLookAhead(int *size) { return impl_->SetLookAhead(size); }
