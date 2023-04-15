@@ -64,6 +64,16 @@ class Planner {
   // Precondition: BringPathToHalt() had been called before.
   void SetExternalPosition(GCodeParserAxis axis, float pos);
 
+  // Set/get internal planning buffer size. Trade-off between
+  // command sent - executed motion latency and maximum achievable speed.
+  // Set the internal planning queue to the value pointed by size.
+  // If size is nullptr, this is a no-op and false is returned.
+  // Special size 0 returns false and sets size to the current value.
+  // Negative size values, or size values above the internal maximum
+  // will not change the internal state and set size to the maximum value
+  // instead.
+  bool SetLookAhead(int *size);
+
  private:
   class Impl;
   Impl *const impl_;

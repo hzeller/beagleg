@@ -1035,6 +1035,13 @@ TEST(GCodeParserTest, WhileLoop) {
   EXPECT_EQ(1024, counter.get_parameter(2));
 }
 
+TEST(GCodeParserTest, Unprocessed) {
+  ParseTester counter;
+
+  EXPECT_TRUE(counter.TestParseLine("M181 S300"));
+  EXPECT_EQ(1, counter.call_count[CALL_unprocessed]);
+}
+
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
