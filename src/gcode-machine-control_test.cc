@@ -227,7 +227,7 @@ TEST(GCodeMachineControlTest, straight_segments_speed_change) {
   harness.gcode_emit()->motors_enable(false);  // finish movement.
 }
 
-TEST(GCodeMachineControlTest, m181_stops_and_set_planner_queue) {
+TEST(GCodeMachineControlTest, m181_stops_and_sets_lookahead) {
   static const struct LinearSegmentSteps expected[] = {
     {0.0, 0.0, END_SENTINEL, {}},
   };
@@ -238,12 +238,54 @@ TEST(GCodeMachineControlTest, m181_stops_and_set_planner_queue) {
   GCodeParser parser = GCodeParser(config, harness.gcode_emit());
   EXPECT_EQ(0, parser.error_count());
 
+  // Machine should accept new value and stop.
   harness.gcode_emit()->gcode_start(&parser);
   parser.ParseBlock("M181 S100", nullptr);
-  harness.gcode_emit()->gcode_finished(true);
 
   // Changing lookahead should enforce a full stop.
   EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 1);
+  EXPECT_EQ(100, harness.machine_control->Lookahead());
+
+  // Machine should set maximum value.
+  parser.ParseBlock("M181", nullptr);
+  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 2);
+  EXPECT_EQ(harness.machine_control->GetMaxLookahead(),
+            harness.machine_control->Lookahead());
+
+  // Machine should not change value and not stop.
+  parser.ParseBlock("M181 S-1", nullptr);
+  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 2);
+  EXPECT_EQ(harness.machine_control->GetMaxLookahead(),
+            harness.machine_control->Lookahead());
+  harness.gcode_emit()->gcode_finished(true);
+}
+
+TEST(GCodeMachineControlTest, set_get_lookahead) {
+  static const struct LinearSegmentSteps expected[] = {
+    {0.0, 0.0, END_SENTINEL, {}},
+  };
+  Harness harness(expected);
+  GCodeParser::Config config;
+  GCodeParser::Config::ParamMap parameters;
+  config.parameters = &parameters;
+  GCodeParser parser = GCodeParser(config, harness.gcode_emit());
+
+  const int max_lookahead = harness.machine_control->GetMaxLookahead();
+
+  // Initial value shall be max.
+  EXPECT_EQ(max_lookahead, harness.machine_control->Lookahead());
+
+  // Negative value, shall fail.
+  EXPECT_FALSE(harness.machine_control->SetLookahead(-1));
+  EXPECT_EQ(max_lookahead, harness.machine_control->Lookahead());
+
+  // Greater than max, shall fail.
+  EXPECT_FALSE(harness.machine_control->SetLookahead(max_lookahead + 1));
+  EXPECT_EQ(max_lookahead, harness.machine_control->Lookahead());
+
+  // Ok value.
+  EXPECT_TRUE(harness.machine_control->SetLookahead(max_lookahead - 1));
+  EXPECT_EQ(max_lookahead - 1, harness.machine_control->Lookahead());
 }
 
 int main(int argc, char *argv[]) {
