@@ -75,6 +75,9 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
   HomingState GetHomeStatus();
   bool GetMotorsEnabled();
   void GetCurrentPosition(AxesRegister *pos);
+  bool SetLookahead(int size) { return planner_->SetLookahead(size); }
+  int Lookahead() const { return planner_->Lookahead(); }
+  int GetMaxLookahead() const { return planner_->GetMaxLookahead(); }
 
   // -- GCodeParser::Events interface implementation --
   void gcode_start(GCodeParser *parser) final;
@@ -122,7 +125,7 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
                     int max_steps);
   void home_axis(enum GCodeParserAxis axis);
   void set_output_flags(HardwareMapping::NamedOutput out, bool is_on);
-  void set_lookahead(int size);
+  const char *handle_set_lookahead(const char *);
   void handle_M105();
   // Parse GCode spindle M3/M4 block.
   const char *set_spindle_on(bool is_ccw, const char *);
@@ -451,20 +454,33 @@ bool GCodeMachineControl::Impl::check_for_pause() {
   return hardware_mapping_->TestPauseSwitch();
 }
 
-void GCodeMachineControl::Impl::set_lookahead(int size) {
-  // It is necessary to have a fully stopped machine to change lookahead.
-  // This is to avoid introducing a delay between the requested change and
-  // actual machine behavior with previously enqueued segments.
+const char *GCodeMachineControl::Impl::handle_set_lookahead(
+  const char *remaining) {
+  char letter;
+  float value;
+  const char *const after_pair =
+    parser_->ParsePair(remaining, &letter, &value, msg_stream_);
+  const int max_lookahead = GetMaxLookahead();
+
+  // No argument, set lookahead to max.
+  if (after_pair == NULL) {
+    motor_ops_->WaitQueueEmpty();
+    const bool is_set = SetLookahead(max_lookahead);
+    assert(is_set);
+    return remaining;
+  }
+
+  // Unrecognized pair.
+  if (letter != 'S') return after_pair;
+  const int lookahead = (int)value;
+  if (lookahead <= 0 || lookahead > max_lookahead) {
+    mprintf("// ERROR: allowed range 1 <= S <= %d\n", max_lookahead);
+    return after_pair;
+  }
   motor_ops_->WaitQueueEmpty();
-  const bool set_max = size < 0;
-  size = (size <= 0) ? -1 : size;
-  const bool set = planner_->SetLookAhead(&size);
-  if (set_max) {
-    planner_->SetLookAhead(&size);
-  }
-  if (!set) {
-    mprintf("// ERROR: allowed range 1 <= S <= %d\n", size);
-  }
+  const bool is_set = SetLookahead(lookahead);
+  assert(is_set);
+  return after_pair;
 }
 
 void GCodeMachineControl::Impl::handle_M105() {
@@ -551,14 +567,9 @@ const char *GCodeMachineControl::Impl::special_commands(char letter,
   case 119: mprint_endstop_status(); break;
   case 120: pause_enabled_ = true; break;
   case 121: pause_enabled_ = false; break;
-  case 181: {
-    const char *const after_pair = parser_->ParsePair(remaining, &letter, &value, msg_stream_);
-    if (remaining == NULL) set_lookahead(-1);
-    else if (letter == 'S') set_lookahead((unsigned)value);
-    else break;
-    remaining = after_pair;
+  case 181:
+    remaining = handle_set_lookahead(remaining);
     break;
-  }
   default:
     mprintf("// BeagleG: didn't understand ('%c', %d, '%s')\n",
             letter, code, remaining);
@@ -1103,4 +1114,14 @@ GCodeParser::EventReceiver *GCodeMachineControl::ParseEventReceiver() {
 
 void GCodeMachineControl::SetMsgOut(FILE *msg_stream) {
   impl_->set_msg_stream(msg_stream);
+}
+
+bool GCodeMachineControl::SetLookahead(int size) {
+  return impl_->SetLookahead(size);
+}
+
+int GCodeMachineControl::Lookahead() const { return impl_->Lookahead(); }
+
+int GCodeMachineControl::GetMaxLookahead() const {
+  return impl_->GetMaxLookahead();
 }

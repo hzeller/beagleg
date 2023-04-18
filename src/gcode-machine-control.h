@@ -123,6 +123,18 @@ class GCodeMachineControl {
   // Can only be called in the same thread that also handles gcode updates.
   void GetCurrentPosition(AxesRegister *pos);
 
+  // Set the internal planner queue size.
+  // Used to trade-off between command sent - executed motion latency
+  // and maximum achievable speed.
+  // Requires 0 < size <= GetMaxLookahead(), returns true on success.
+  bool SetLookahead(int size);
+
+  // Retrieve the internal planning queue size.
+  int Lookahead() const;
+
+  // Get the maximum allowed lookahead size.
+  int GetMaxLookahead() const;
+
  private:
   class Impl;
 
