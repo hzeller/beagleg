@@ -35,9 +35,6 @@ static void init_test_config(struct MachineControlConfig *c,
 }
 
 namespace {
-// Record Segment queue calls we care avout.
-enum { CALL_wait_queue_empty, NUM_COUNTED_CALLS };
-
 class MockMotorOps final : public SegmentQueue {
  public:
   explicit MockMotorOps(const LinearSegmentSteps *expected)
@@ -57,17 +54,15 @@ class MockMotorOps final : public SegmentQueue {
     return true;
   }
 
-  void WaitQueueEmpty() final { Count(CALL_wait_queue_empty); }
+  void WaitQueueEmpty() final { call_count_wait_queue_empty++; }
 
   void MotorEnable(bool on) final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int steps) final {}
 
-  int call_count[NUM_COUNTED_CALLS] = {};
+  int call_count_wait_queue_empty = 0;
 
  private:
-  void Count(int what) { call_count[what]++; }
-
   // Helpers to compare and print MotorMovements.
   static void PrintMovement(const char *msg,
                             const struct LinearSegmentSteps *m) {
@@ -104,9 +99,9 @@ class Harness {
   explicit Harness(const LinearSegmentSteps *expected)
       : expect_motor_ops(expected) {
     struct MachineControlConfig config;
-    init_test_config(&config, &hardware);
+    init_test_config(&config, &hardware_);
     machine_control =
-      GCodeMachineControl::Create(config, &expect_motor_ops, &hardware,
+      GCodeMachineControl::Create(config, &expect_motor_ops, &hardware_,
                                   nullptr,   // spindle
                                   nullptr);  // msg-stream
     assert(machine_control != nullptr);
@@ -119,8 +114,10 @@ class Harness {
   }
 
   MockMotorOps expect_motor_ops;
-  HardwareMapping hardware;
   GCodeMachineControl *machine_control;
+
+ private:
+  HardwareMapping hardware_;
 };
 
 TEST(GCodeMachineControlTest, initial_feedrate_not_set) {
@@ -243,18 +240,18 @@ TEST(GCodeMachineControlTest, m181_stops_and_sets_lookahead) {
   parser.ParseBlock("M181 S100", nullptr);
 
   // Changing lookahead should enforce a full stop.
-  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 1);
+  EXPECT_EQ(harness.expect_motor_ops.call_count_wait_queue_empty, 1);
   EXPECT_EQ(100, harness.machine_control->Lookahead());
 
   // Machine should set maximum value.
   parser.ParseBlock("M181", nullptr);
-  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 2);
+  EXPECT_EQ(harness.expect_motor_ops.call_count_wait_queue_empty, 2);
   EXPECT_EQ(harness.machine_control->GetMaxLookahead(),
             harness.machine_control->Lookahead());
 
   // Machine should not change value and not stop.
   parser.ParseBlock("M181 S-1", nullptr);
-  EXPECT_EQ(harness.expect_motor_ops.call_count[CALL_wait_queue_empty], 2);
+  EXPECT_EQ(harness.expect_motor_ops.call_count_wait_queue_empty, 2);
   EXPECT_EQ(harness.machine_control->GetMaxLookahead(),
             harness.machine_control->Lookahead());
   harness.gcode_emit()->gcode_finished(true);
