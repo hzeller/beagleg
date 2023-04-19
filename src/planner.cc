@@ -472,9 +472,11 @@ bool Planner::Impl::issue_motor_move_if_possible(
   fprintf(stderr, "]\n");
 #endif
 
-  // We require a slot to be always present.
-  if (num_segments == 0 && (planning_buffer_.size() == lookahead_size_))
-    ++num_segments;
+  // Count the amount of segments that are extra the lookahead size.
+  const int segments_extra = planning_buffer_.size() - lookahead_size_;
+  if (num_segments == 0 && (segments_extra >= 0))
+    num_segments =
+      segments_extra + 1;  // Always pop one free slot for the next.
 
   // No segments to enqueue, skip.
   if (!num_segments) return ret;
