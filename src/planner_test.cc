@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
 #include <cfloat>
 #include <cstddef>
 #include <cstdint>
@@ -124,6 +125,7 @@ class FakeMotorOperations : public SegmentQueue {
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int steps) final {}
 
+  int SegmentsCount() const { return collected_.size(); }
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }
 
  private:
@@ -203,6 +205,11 @@ class PlannerHarness {
   }
 
   MachineControlConfig *GetConfig() const { return config_; }
+
+  int GeneratedSegmentsCount() const { return motor_ops_.SegmentsCount(); }
+  bool SetLookahead(int size) { return planner_->SetLookahead(size); }
+  int Lookahead() const { return planner_->Lookahead(); }
+  int GetMaxLookahead() const { return planner_->GetMaxLookahead(); }
 
  private:
   MachineControlConfig *config_;
@@ -871,6 +878,97 @@ TEST(PlannerTest, StraightLine_ProfileSymmetry) {
   EXPECT_EQ(accel_steps, decel_steps);
   EXPECT_EQ(accel_steps + decel_steps + travel_steps,
             kNumSegments * kMMPerSegment * config->steps_per_mm[AXIS_X]);
+}
+
+struct LookaheadTestMetrics {
+  float avg_generation_freq;  // Generated steps per enqueued target.
+  unsigned stops_counts;      // Number of times the motor stops.
+  float max_speed;            // Maximum speed reached.
+
+  void Print(FILE *stream) {
+    fprintf(stream, "freq: %f, stops_counts: %d, max_speed: %f\n",
+            avg_generation_freq, stops_counts, max_speed);
+  }
+};
+
+// Given a lookahead size and a predefined path, measure the planner frequency
+// of generated steps, the times a motor stops.
+static void TestPlannerWithLookaheadFixture(int lookahead_size,
+                                            const int32_t num_segments,
+                                            LookaheadTestMetrics *out) {
+  LookaheadTestMetrics &metrics = *out;
+  metrics = {};
+  PlannerHarness plantest(0, 0, nullptr);
+  ASSERT_TRUE(plantest.SetLookahead(lookahead_size));
+
+  unsigned segments_previous_count = 0;
+  const int32_t kMMPerSegment = 10;
+  const int32_t kFeedrate = 10000;
+  AxesRegister pos = {};
+  for (int32_t i = 0; i < num_segments; ++i) {
+    pos[AXIS_X] += kMMPerSegment;
+    plantest.Enqueue(pos, kFeedrate);
+    const unsigned segments_count = plantest.GeneratedSegmentsCount();
+    if (segments_count > segments_previous_count) {
+      metrics.avg_generation_freq++;
+      segments_previous_count = segments_count;
+    }
+  }
+
+  const std::vector<LinearSegmentSteps> &segments = plantest.segments();
+  metrics.avg_generation_freq = metrics.avg_generation_freq / segments.size();
+  for (const LinearSegmentSteps &segment : segments) {
+    metrics.max_speed = std::max({segment.v0, segment.v1, metrics.max_speed});
+    if (segment.v0 == 0 || segment.v1 == 0) {
+      ++metrics.stops_counts;
+    }
+  }
+}
+
+// If we start with lookahead equal one and enqueue lots of small steps,
+// we expect the planner to send segments to the motors more frequently
+// but with a lower maximum speed.
+// If the lookahead increases, we expect a lower frequency but higher achievable
+// speeds.
+TEST(PlannerTest, StraightLine_DifferentLookahead) {
+  const int32_t kNumSegments = 200;
+  // Lookahead 1.
+  {
+    const float kExpectedFreq = 0.5;
+    // We expect every enqueued segment to start and stop.
+    const float kExpectedStopsCount = kNumSegments * 2;
+    LookaheadTestMetrics metrics;
+    TestPlannerWithLookaheadFixture(1, kNumSegments, &metrics);
+    // For size 1 we expect 0.5 freq and double stops.
+    EXPECT_NEAR_REL(kExpectedFreq, metrics.avg_generation_freq, 1e-6);
+    EXPECT_EQ(kExpectedStopsCount, metrics.stops_counts);
+    EXPECT_LT(metrics.max_speed, 35000);
+  }
+
+  // Lookahead tiny.
+  {
+    const float kExpectedFreq = 0.5;
+    // Only the first and last segment shall start and stop.
+    const float kExpectedStopsCount = 2;
+    LookaheadTestMetrics metrics;
+    TestPlannerWithLookaheadFixture(2, kNumSegments, &metrics);
+    // For size 1 we expect 0.5 freq and double stops.
+    EXPECT_NEAR_REL(kExpectedFreq, metrics.avg_generation_freq, 1e-6);
+    EXPECT_EQ(kExpectedStopsCount, metrics.stops_counts);
+    EXPECT_LT(metrics.max_speed, 60000);
+  }
+
+  // Lookahead large.
+  {
+    const float kExpectedFreq = 0.005;
+    const float kExpectedStopsCount = 2;
+    LookaheadTestMetrics metrics;
+    TestPlannerWithLookaheadFixture(200, kNumSegments, &metrics);
+    // For size 1 we expect 0.5 freq and double stops.
+    EXPECT_NEAR_REL(kExpectedFreq, metrics.avg_generation_freq, 1e-6);
+    EXPECT_EQ(kExpectedStopsCount, metrics.stops_counts);
+    EXPECT_LT(metrics.max_speed, 450000);
+  }
 }
 
 int main(int argc, char *argv[]) {
