@@ -159,6 +159,7 @@ M117             | Display message.
 M119             | Get endstop status.
 M120             | Enable pause switch detection.
 M121             | Disable pause switch detection.
+M181 Snn         | Set look-ahead buffer size to nn. Without the Snn parameter, reset the queue size to default. Will flush the current queue first.
 M245             | Start cooler
 M246             | Stop cooler
 M355             | Turn case lights on/off
