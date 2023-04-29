@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <array>
+
 #include "common/container.h"
 #include "common/logging.h"
 #include "hardware-mapping.h"
@@ -58,6 +60,18 @@ class MockMotionQueue final : public MotionQueue {
   unsigned int queue_size_;
 };
 
+// Create a dummy segment to be enqueued. Since the speeds
+// are ignored they are set to zero.
+LinearSegmentSteps CreateMockSegment(
+  const std::array<int, BEAGLEG_NUM_MOTORS> steps) {
+  LinearSegmentSteps segment = {0 /* v0, ignored */,
+                                0 /* v1, ignored */,
+                                0 /* aux, ignored */,
+                                {} /* steps */};
+  memcpy(segment.steps, steps.data(), sizeof(int) * steps.size());
+  return segment;
+}
+
 // Check that on init, the initial position is 0.
 TEST(RealtimePosition, init_pos) {
   HardwareMapping hw;
@@ -78,16 +92,11 @@ TEST(RealtimePosition, back_and_forth) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */, 0 /* v1 */, 0 /* aux */, {1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
-  };
+  const LinearSegmentSteps kSegment1 =
+    CreateMockSegment({1000, 0, 0, 0, 0, 0, 0, 0});
   // Enqueue a segment
-  const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {-1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
-  };
+  const LinearSegmentSteps kSegment2 =
+    CreateMockSegment({-1000, 0, 0, 0, 0, 0, 0, 0});
 
   PhysicalStatus status;
   motor_operations.Enqueue(kSegment1);
@@ -121,12 +130,10 @@ TEST(RealtimePosition, empty_element) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */, 0 /* v1 */, 0xff /* aux */, {0, 0, 0, 0, 0, 0, 0, 0} /* steps */
-  };
-  const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */, 0 /* v1 */, 0 /* aux */, {100, 0, 0, 0, 0, 0, 0, 0} /* steps */
-  };
+  const LinearSegmentSteps kSegment1 =
+    CreateMockSegment({0, 0, 0, 0, 0, 0, 0, 0});
+  const LinearSegmentSteps kSegment2 =
+    CreateMockSegment({100, 0, 0, 0, 0, 0, 0, 0});
 
   motor_operations.Enqueue(kSegment2);
   motor_operations.Enqueue(kSegment1);
@@ -147,18 +154,10 @@ TEST(RealtimePosition, sample_pos) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {10, -20, 30, -40, 0, -60, 70, -80} /* steps */
-  };
-  const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {17, +42, 12, -90, 30, +91, 113, -1000} /* steps */
-  };
+  const LinearSegmentSteps kSegment1 =
+    CreateMockSegment({10, -20, 30, -40, 0, -60, 70, -80});
+  const LinearSegmentSteps kSegment2 =
+    CreateMockSegment({17, +42, 12, -90, 30, +91, 113, -1000});
   motor_operations.Enqueue(kSegment1);
   motor_operations.Enqueue(kSegment2);
 
@@ -189,12 +188,8 @@ TEST(RealtimePosition, zero_loops_edge) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  LinearSegmentSteps segment = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {10, 20, 30, 40, 50, 60, 70, 80} /* steps */
-  };
+  LinearSegmentSteps segment =
+    CreateMockSegment({10, 20, 30, 40, 50, 60, 70, 80});
   const int expected[BEAGLEG_NUM_MOTORS] = {10, 20, 30, 40, 50, 60, 70, 80};
 
   motor_operations.Enqueue(segment);
@@ -219,12 +214,8 @@ TEST(RealtimePosition, clear_queue) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  LinearSegmentSteps segment = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {10, 20, 30, 40, 50, 60, 70, 80} /* steps */
-  };
+  LinearSegmentSteps segment =
+    CreateMockSegment({10, 20, 30, 40, 50, 60, 70, 80});
   int expected[BEAGLEG_NUM_MOTORS] = {10, 20, 30, 40, 50, 60, 70, 80};
 
   motor_operations.Enqueue(segment);
