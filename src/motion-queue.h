@@ -119,8 +119,9 @@ class MotionQueue {
   // of not yet executed loops in the item currenly being executed.
   virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
 
-  // Perform an immediate reset of the queue,
-  // even if motors are still moving.
+  // Immediately stop any motion and clear the internal queue.
+  // Returns true if the queue was successfully cleared,
+  // false if an internal error occurred.
   virtual bool Clear() = 0;
 };
 

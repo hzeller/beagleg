@@ -78,10 +78,10 @@ class SegmentQueue {
   // PhysicalStatus.
   virtual void SetExternalPosition(int axis, int position_steps) = 0;
 
-  // Clear the queue and reset it to its initial state.
-  // This action is immediate and will discard any running or
-  // enqueued and not yet executed segment.
+  // Immediately stop any motion and clear the internal queue.
   // Current physical status will be lost.
+  // Returns true if the queue was successfully cleared,
+  // false if an internal error occurred.
   virtual bool Clear() = 0;
 };
 
