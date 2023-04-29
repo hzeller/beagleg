@@ -30,12 +30,8 @@ class MockPRUInterface : public PruHardwareInterface {
  public:
   MockPRUInterface() : execution_index_(QUEUE_LEN - 1) {
     mmap = NULL;
-    ON_CALL(*this, Init).WillByDefault([]() {
-      return true;
-    });
-    ON_CALL(*this, Shutdown).WillByDefault([]() {
-      return true;
-    });
+    ON_CALL(*this, Init).WillByDefault([]() { return true; });
+    ON_CALL(*this, Shutdown).WillByDefault([]() { return true; });
   }
   ~MockPRUInterface() override { free(mmap); }
 
@@ -45,6 +41,7 @@ class MockPRUInterface : public PruHardwareInterface {
   MOCK_METHOD(bool, Shutdown, (), ());
 
   bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
+    if (mmap != NULL) return true;
     mmap = (struct MockPRUCommunication *)malloc(size);
     *pru_mmap = (void *)mmap;
     memset(*pru_mmap, 0x00, size);
@@ -141,9 +138,8 @@ TEST(PruMotionQueue, one_round_queue) {
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), QUEUE_LEN);
 }
 
-// Check emergency reset shutsdowns the motors and
-// the PRU and sets to zero the whole queue.
-TEST(PruMotionQueue, emergency_stop) {
+// Check the PRU is reset and no elements are pending.
+TEST(PruMotionQueue, clear_queue) {
   MotorsRegister absolute_pos_loops;
   NiceMock<MockPRUInterface> pru_interface;
   HardwareMapping hmap = HardwareMapping();
@@ -164,11 +160,9 @@ TEST(PruMotionQueue, emergency_stop) {
     EXPECT_CALL(pru_interface, Shutdown())
       .Times(1)
       .WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(pru_interface, Init())
-      .Times(1)
-      .WillOnce(testing::Return(true));
+    EXPECT_CALL(pru_interface, Init()).Times(1).WillOnce(testing::Return(true));
   }
-  EXPECT_TRUE(motion_backend.EmergencyReset());
+  EXPECT_TRUE(motion_backend.Clear());
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
 

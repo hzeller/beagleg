@@ -36,7 +36,15 @@ class MockMotionQueue final : public MotionQueue {
     if (head_item_progress) *head_item_progress = remaining_loops_;
     return queue_size_;
   }
-  bool EmergencyReset() final { return true; }
+
+  bool Clear() final {
+    clear_calls_count++;
+    remaining_loops_ = 0;
+    queue_size_ = 0;
+    return true;
+  }
+
+  int clear_calls_count = 0;
 
   void SimRun(const uint32_t executed_loops, const unsigned int buffer_size) {
     assert(buffer_size <= queue_size_);
@@ -200,6 +208,35 @@ TEST(RealtimePosition, zero_loops_edge) {
   motion_backend.SimRun(160, 1);
 
   motor_operations.GetPhysicalStatus(&status);
+  EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+}
+
+// Clear motion queue motor operations.
+// The physical status should be reset and motion_backend.Clear() called.
+TEST(RealtimePosition, clear_queue) {
+  HardwareMapping hw;
+  MockMotionQueue motion_backend = MockMotionQueue();
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
+
+  // Enqueue a segment
+  LinearSegmentSteps segment = {
+    0 /* v0 */,
+    0 /* v1 */,
+    0 /* aux */,
+    {10, 20, 30, 40, 50, 60, 70, 80} /* steps */
+  };
+  int expected[BEAGLEG_NUM_MOTORS] = {10, 20, 30, 40, 50, 60, 70, 80};
+
+  motor_operations.Enqueue(segment);
+  motion_backend.SimRun(0, 1);
+
+  PhysicalStatus status;
+  motor_operations.GetPhysicalStatus(&status);
+  EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+  EXPECT_TRUE(motor_operations.Clear());
+  EXPECT_EQ(motion_backend.clear_calls_count, 1);
+  motor_operations.GetPhysicalStatus(&status);
+  memset(expected, 0, sizeof(expected));
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 }
 

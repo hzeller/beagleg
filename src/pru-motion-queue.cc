@@ -177,8 +177,8 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
-bool PRUMotionQueue::EmergencyReset() {
-  Shutdown(false);
+bool PRUMotionQueue::Clear() {
+  pru_interface_->Shutdown();
   return Init();
 }
 

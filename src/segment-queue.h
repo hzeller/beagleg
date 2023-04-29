@@ -77,6 +77,12 @@ class SegmentQueue {
   // source (e.g. homing). This will allow accurate reporting of the
   // PhysicalStatus.
   virtual void SetExternalPosition(int axis, int position_steps) = 0;
+
+  // Clear the queue and reset it to its initial state.
+  // This action is immediate and will discard any running or
+  // enqueued and not yet executed segment.
+  // Current physical status will be lost.
+  virtual bool Clear() = 0;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

@@ -124,6 +124,7 @@ class FakeMotorOperations : public SegmentQueue {
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int steps) final {}
+  bool Clear() final { return false; }
 
   int SegmentsCount() const { return collected_.size(); }
   const std::vector<LinearSegmentSteps> &segments() { return collected_; }

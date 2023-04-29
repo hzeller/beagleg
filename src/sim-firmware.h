@@ -31,6 +31,7 @@ class SimFirmwareQueue : public MotionQueue {
   void WaitQueueEmpty() final {}
   void MotorEnable(bool on) final {}
   void Shutdown(bool flush_queue) final {}
+  bool Clear() final { return false; }
   int GetPendingElements(uint32_t *head_item_progress) final {
     if (head_item_progress) *head_item_progress = 0;
     return 1;

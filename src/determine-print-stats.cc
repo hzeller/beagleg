@@ -117,6 +117,7 @@ class StatsSegmentQueue : public SegmentQueue {
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int pos) final {}
+  bool Clear() final { return false; }
 
  private:
   BeagleGPrintStats *const print_stats_;

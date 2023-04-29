@@ -337,6 +337,13 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &segment) {
   return ret;
 }
 
+bool MotionQueueMotorOperations::Clear() {
+  const bool ret = backend_->Clear();
+  shadow_queue_->clear();
+  shadow_queue_->push_front({});
+  return ret;
+}
+
 void MotionQueueMotorOperations::MotorEnable(bool on) {
   backend_->WaitQueueEmpty();
   backend_->MotorEnable(on);
