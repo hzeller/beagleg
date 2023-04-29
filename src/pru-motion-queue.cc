@@ -177,6 +177,11 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
+bool PRUMotionQueue::EmergencyReset() {
+  Shutdown(false);
+  return Init();
+}
+
 PRUMotionQueue::~PRUMotionQueue() {}
 
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)

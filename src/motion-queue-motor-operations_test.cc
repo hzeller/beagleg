@@ -36,6 +36,7 @@ class MockMotionQueue final : public MotionQueue {
     if (head_item_progress) *head_item_progress = remaining_loops_;
     return queue_size_;
   }
+  bool EmergencyReset() final { return true; }
 
   void SimRun(const uint32_t executed_loops, const unsigned int buffer_size) {
     assert(buffer_size <= queue_size_);

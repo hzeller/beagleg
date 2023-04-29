@@ -118,6 +118,10 @@ class MotionQueue {
   // The return parameter head_item_progress is set to the number
   // of not yet executed loops in the item currenly being executed.
   virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
+
+  // Perform an immediate shutdown, even if motors are still moving, and
+  // reset the queue to its initial state.
+  virtual bool EmergencyReset() = 0;
 };
 
 // Standard implementation.
@@ -137,6 +141,7 @@ class PRUMotionQueue final : public MotionQueue {
   void MotorEnable(bool on) final;
   void Shutdown(bool flush_queue) final;
   int GetPendingElements(uint32_t *head_item_progress) final;
+  bool EmergencyReset() final;
 
  private:
   bool Init();
@@ -161,6 +166,7 @@ class DummyMotionQueue final : public MotionQueue {
     if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
+  bool EmergencyReset() final { return true; }
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_
