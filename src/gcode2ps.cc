@@ -1037,7 +1037,7 @@ class SegmentQueuePrinter final : public SegmentQueue {
   void MotorEnable(bool on) final {}
   void WaitQueueEmpty() final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
-  bool Clear() final { return false; }
+  void HaltAndDiscard() final {}
   void SetExternalPosition(int motor, int pos) final {
     current_pos_[motor] = pos;
     if (pass_ == ProcessingStep::GenerateOutput) {

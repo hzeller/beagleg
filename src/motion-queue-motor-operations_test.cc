@@ -39,11 +39,10 @@ class MockMotionQueue final : public MotionQueue {
     return queue_size_;
   }
 
-  bool Clear() final {
+  void HaltAndDiscard() final {
     clear_calls_count++;
     remaining_loops_ = 0;
     queue_size_ = 0;
-    return true;
   }
 
   int clear_calls_count = 0;
@@ -207,7 +206,8 @@ TEST(RealtimePosition, zero_loops_edge) {
 }
 
 // Clear motion queue motor operations.
-// The physical status should be reset and motion_backend.Clear() called.
+// The physical status should be reset and motion_backend.HaltAndDiscard()
+// called.
 TEST(RealtimePosition, clear_queue) {
   HardwareMapping hw;
   MockMotionQueue motion_backend = MockMotionQueue();
@@ -224,7 +224,7 @@ TEST(RealtimePosition, clear_queue) {
   PhysicalStatus status;
   motor_operations.GetPhysicalStatus(&status);
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
-  EXPECT_TRUE(motor_operations.Clear());
+  motor_operations.HaltAndDiscard();
   EXPECT_EQ(motion_backend.clear_calls_count, 1);
   motor_operations.GetPhysicalStatus(&status);
   memset(expected, 0, sizeof(expected));

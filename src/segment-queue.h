@@ -80,9 +80,7 @@ class SegmentQueue {
 
   // Immediately stop any motion and clear the internal queue.
   // Current physical status will be lost.
-  // Returns true if the queue was successfully cleared,
-  // false if an internal error occurred.
-  virtual bool Clear() = 0;
+  virtual void HaltAndDiscard() = 0;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

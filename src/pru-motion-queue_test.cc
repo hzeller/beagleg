@@ -18,8 +18,6 @@
 #include "pru-hardware-interface.h"
 #include "segment-queue.h"
 
-using ::testing::NiceMock;
-
 // PRU-side mock implementation of the ring buffer.
 struct MockPRUCommunication {
   internal::QueueStatus status;
@@ -28,17 +26,16 @@ struct MockPRUCommunication {
 
 class MockPRUInterface : public PruHardwareInterface {
  public:
-  MockPRUInterface() : execution_index_(QUEUE_LEN - 1) {
-    mmap = NULL;
-    ON_CALL(*this, Init).WillByDefault([]() { return true; });
-    ON_CALL(*this, Shutdown).WillByDefault([]() { return true; });
-  }
+  MockPRUInterface() : execution_index_(QUEUE_LEN - 1) { mmap = NULL; }
   ~MockPRUInterface() override { free(mmap); }
 
+  bool Init() final { return true; }
   bool StartExecution() final { return true; }
   unsigned WaitEvent() final { return 1; }
-  MOCK_METHOD(bool, Init, (), ());
-  MOCK_METHOD(bool, Shutdown, (), ());
+  bool Shutdown() final { return true; }
+
+  MOCK_METHOD(void, Halt, (), (final));
+  MOCK_METHOD(void, Restart, (), (final));
 
   bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
     if (mmap != NULL) return true;
@@ -70,7 +67,7 @@ class MockPRUInterface : public PruHardwareInterface {
 
 TEST(PruMotionQueue, status_init) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
@@ -78,7 +75,7 @@ TEST(PruMotionQueue, status_init) {
 
 TEST(PruMotionQueue, single_exec) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -91,7 +88,7 @@ TEST(PruMotionQueue, single_exec) {
 
 TEST(PruMotionQueue, full_exec) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -104,7 +101,7 @@ TEST(PruMotionQueue, full_exec) {
 
 TEST(PruMotionQueue, single_exec_some_loops) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -119,7 +116,7 @@ TEST(PruMotionQueue, single_exec_some_loops) {
 
 TEST(PruMotionQueue, one_round_queue) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -141,7 +138,7 @@ TEST(PruMotionQueue, one_round_queue) {
 // Check the PRU is reset and no elements are pending.
 TEST(PruMotionQueue, clear_queue) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -157,18 +154,16 @@ TEST(PruMotionQueue, clear_queue) {
   ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&pru_interface));
   {
     testing::InSequence seq;
-    EXPECT_CALL(pru_interface, Shutdown())
-      .Times(1)
-      .WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(pru_interface, Init()).Times(1).WillOnce(testing::Return(true));
+    EXPECT_CALL(pru_interface, Halt()).Times(1);
+    EXPECT_CALL(pru_interface, Restart()).Times(1);
   }
-  EXPECT_TRUE(motion_backend.Clear());
+  motion_backend.HaltAndDiscard();
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
 
 TEST(PruMotionQueue, exec_index_lt_queue_pos) {
   MotorsRegister absolute_pos_loops;
-  NiceMock<MockPRUInterface> pru_interface;
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 

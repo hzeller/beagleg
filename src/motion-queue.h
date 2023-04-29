@@ -120,9 +120,7 @@ class MotionQueue {
   virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
 
   // Immediately stop any motion and clear the internal queue.
-  // Returns true if the queue was successfully cleared,
-  // false if an internal error occurred.
-  virtual bool Clear() = 0;
+  virtual void HaltAndDiscard() = 0;
 };
 
 // Standard implementation.
@@ -142,12 +140,13 @@ class PRUMotionQueue final : public MotionQueue {
   void MotorEnable(bool on) final;
   void Shutdown(bool flush_queue) final;
   int GetPendingElements(uint32_t *head_item_progress) final;
-  bool Clear() final;
+  void HaltAndDiscard() final;
 
  private:
   bool Init();
 
   void ClearPRUAbort(unsigned int idx);
+  void ClearRingBuffer();
 
   HardwareMapping *const hardware_mapping_;
   PruHardwareInterface *const pru_interface_;
@@ -167,7 +166,7 @@ class DummyMotionQueue final : public MotionQueue {
     if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
-  bool Clear() final { return true; }
+  void HaltAndDiscard() final {}
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_
