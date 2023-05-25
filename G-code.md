@@ -106,65 +106,62 @@ both must be given.
 
 ### M Codes
 
-Command          | Callback              | Description
+M-Codes are partially dealt with directly in the
+[GCode parser](./src/gcode-parser/gcode-parser.h) as they change some internal
+mode (e.g. changing absolute to relative coordinates), others are handled in
+the [gcode-machine-control](./src/gcode-machine-control.h) either triggered by
+a parametrized callback from the GCode parser or by reacting to raw mcodes directly
+(coming through the `unprocessed()` callback).
+
+Command          | Callback/effect       | Description
 -----------------|-----------------------|-----------------------------
+M0               | machine control       | Unconditional stop, sets Software E-Stop.
 M2               | `gcode_finished()`    | Program end. Resets back to defaults.
-M24              | `wait_for_start()`    | Start/resume a program. Waits for the start input if available.
+M3 Sxx           | machine control       | Spindle On Clockwise at speed Sxx
+M4 Sxx           | machine control       | Spindle On Counterclockwise at speed Sxx
+M5               | machine control       | Spindle Off
+M7               | machine control       | Turn mist on
+M8               | machine control       | Turn flood on
+M9               | machine control       | Turn all coolant off
+M10              | machine control       | Turn on vacuum
+M11              | machine control       | Turn off vacuum
 M17              | `motors_enable()`     | Switch on motors.
 M18              | `motors_enable()`     | Switch off motors.
+M24              | `wait_for_start()`    | Start/resume a program. Waits for the start input if available.
 M30              | `gcode_finished()`    | Program end. Resets back to defaults.
+M42 Pnn          | machine control       | Get state of AUX Pin nn.
+M42 Pnn Sxx      | machine control       | Set AUX Pin nn to value xx
+M62 Pnn          | machine control       | Set AUX Pin nn to 1
+M63 Pnn          | machine control       | Set AUX Pin nn to 0
+M64 Pnn          | machine control       | Set AUX Pin nn to 1; updates immediately, independent of buffered moves.
+M65 Pnn          | machine control       | Set AUX Pin nn to 0; updates immediately, independent of buffered moves.
+M80              | machine control       | ATX Power On.
+M81              | machine control       | ATX Power Off.
+M82              | parser mode change    | Set E-axis to absolute.
+M83              | parser mode change    | Set E-axis to relative.
 M84              | `motors_enable()`     | Switch off motors.
-M82              | -                     | Set E-axis to absolute.
-M83              | -                     | Set E-axis to relative.
 M104 Snnn        | `set_temperature()`   | Set temperature in celsius.
-M116             | `wait_temperature()`  | Wait for temperature to be reached
-M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
+M105             | machine control       | Get current extruder temperature.
 M106 Snnn        | `set_fanspeed()`      | set speed of fan; 0..255
 M107             | `set_fanspeed(0)`     | switch off fan.
-M111 Snnn        | -                     | Set debug level.
+M109 Snnn        | `set_t.., wait_t..()` | Combination of M104, M116: Set temperature and wait for it to be reached.
+M111 Snnn        | influence parseer     | Set parser debug level.
+M114             | machine control       | Get current position; coordinate units in mm.
+M115             | machine control       | Get firmware version.
+M116             | `wait_temperature()`  | Wait for temperature to be reached
+M117             | machine control       | Display message.
+M119             | machine control       | Get endstop status.
+M120             | machine control       | Enable pause switch detection.
+M121             | machine control       | Disable pause switch detection.
+M181 Snn         | machine control       | Set look-ahead buffer size to nn. Without the Snn parameter, reset the queue size to default. Will flush the current queue first.
 M220 Snnn        | `set_speed_factor()`  | Set output speed factor.
+M245             | machine control       | Start cooler
+M246             | machine control       | Stop cooler
+M355             | machine control       | Turn case lights on/off
+M400             | machine control       | Wait for queue to be empty. Equivalent to G4 P0.
 M500             | `save_params()`       | Save parameters.
 M501             | `load_params()`       | Load parameters.
-
-### M Codes dealt with by gcode-machine-control
-
-The standard M-Code are directly handled by the G-code parser and result
-in parametrized callbacks. Other not quite standard G-codes are handled in
-[gcode-machine-control](./gcode-machine-control.c) when receiving
-the `unprocessed()` callback (see API below):
-
-Command          | Description
------------------|----------------------------------------
-M0               | Unconditional stop, sets Software E-Stop.
-M3 Sxx           | Spindle On Clockwise at speed Sxx
-M4 Sxx           | Spindle On Counterclockwise at speed Sxx
-M5               | Spindle Off
-M7               | Turn mist on
-M8               | Turn flood on
-M9               | Turn all coolant off
-M10              | Turn on vacuum
-M11              | Turn off vacuum
-M42 Pnn          | Get state of AUX Pin nn.
-M42 Pnn Sxx      | Set AUX Pin nn to value xx
-M62 Pnn          | Set AUX Pin nn to 1
-M63 Pnn          | Set AUX Pin nn to 0
-M64 Pnn          | Set AUX Pin nn to 1; updates immediately, independent of buffered moves.
-M65 Pnn          | Set AUX Pin nn to 0; updates immediately, independent of buffered moves.
-M80              | ATX Power On.
-M81              | ATX Power Off.
-M105             | Get current extruder temperature.
-M114             | Get current position; coordinate units in mm.
-M115             | Get firmware version.
-M117             | Display message.
-M119             | Get endstop status.
-M120             | Enable pause switch detection.
-M121             | Disable pause switch detection.
-M181 Snn         | Set look-ahead buffer size to nn. Without the Snn parameter, reset the queue size to default. Will flush the current queue first.
-M245             | Start cooler
-M246             | Stop cooler
-M355             | Turn case lights on/off
-M400             | Wait for queue to be empty. Equivalent to G4 P0.
-M999             | Clear Software E-Stop.
+M999             | machine control       | Clear Software E-Stop.
 
 ### Feedrate in Euclidian space
 The axes X, Y, and Z are dealt with specially by `gcode-machine-control`: they are
