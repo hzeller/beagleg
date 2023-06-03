@@ -224,10 +224,12 @@ TEST(RealtimePosition, clear_queue) {
   PhysicalStatus status;
   motor_operations.GetPhysicalStatus(&status);
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
+
   motor_operations.HaltAndDiscard();
   EXPECT_EQ(motion_backend.clear_calls_count, 1);
-  motor_operations.GetPhysicalStatus(&status);
+
   memset(expected, 0, sizeof(expected));
+  motor_operations.GetPhysicalStatus(&status);
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 }
 
