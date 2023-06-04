@@ -15,6 +15,7 @@ pkgs.mkShell {
       valgrind
       ghostscript
       clang-tools_11
+      graphviz
     ];
   shellHook =
   ''
