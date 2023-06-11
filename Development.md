@@ -209,7 +209,7 @@ waiting on GCode input.
 
 This is a overview of the pipeline components:
 
-![Processing](./img/machine-control.png)
+![Processing](./img/machine-control.svg)
 
 ### Data flow - layers of processing
 The above pictures gives a general idea of the flow of information.
@@ -362,7 +362,7 @@ second.
 It only takes a couple of seconds to simulate and pre-calculate the wall-time
 of many-hour long jobs. This might be useful to display to the user.
 
-![gcode-print-stats](./img/print-stats.png)
+![gcode-print-stats](./img/print-stats.svg)
 
 [ccache]: https://ccache.samba.org/
 
