@@ -379,7 +379,7 @@ hacking permits.
 - [ ] Needed for full 3D printer solution: add PWM/PID-loop for heaters.
 - [ ] Motion: consider limited constant jerk movements.
 
-### Random thought collction for roadmap points above
+### Random thought collection for roadmap points above
 
 #### Shoveller
 
@@ -393,12 +393,38 @@ hacking permits.
    an emergency stop (e.g. manually jogging away the tool, then restart
    will move it back to where we stopped.
 
-#### Planner
+#### Pause, Resume, Stop and Emergency Stop
 
- - right now, we just do proper 'ramp up' of acceleration, but not
-   deceleration. In order to do that, we need to delay emitting
-   LinearSegmentSteps until we know that we can stop within the deceleration
-   constraints. Otherwise we need to edit the speeds backwards.
+```mermaid
+stateDiagram-v2
+    [*] --> NotHomed: Start
+    NotHomed --> Homed: Homing
+    Homed --> Moving: GCode
+    Moving --> Homed: Finished
+    Moving --> Pause: Pause
+    Pause --> Moving: Resume
+    Pause --> Homed: Stop
+    Moving --> Homed: Stop
+    Moving --> NotHomed: EmergencyStop
+```
+
+##### Introduction
+This documentation introduces a set of operations that enhance the interaction with a running machine. These operations include pause, resume, stop, and emergency stop.
+
+###### Receiving Commands
+While the machine accepts GCode from a main channel (such as a TCP server or file), these commands are expected to be received through a secondary channel. This approach maintains asynchronous processing from the GCode parsing. The secondary channel can be either a hardware input or a secondary server.
+
+##### Pause Command
+The pause command initiates an immediate deceleration until the machine reaches speed 0. Additionally, auxiliary outputs are zeroed. This behavior allows users to interrupt the machine while it's executing GCode without affecting the final trajectory already enqueued.
+
+##### Resume Command
+The resume command is the opposite of the pause command. It instructs the machine to resume its motion and continue along its trajectory while adhering to the machine constraints.
+
+##### Stop Command
+The stop command has a similar effect to the resume command, but with one crucial difference: any motion that has been sent to the machine but not yet executed will be discarded. Consequently, it cannot be resumed once the stop command is issued.
+
+##### Emergency Stop
+The emergency stop command can be triggered by multiple sources. When issued, this command immediately disables the motors and halts any step generation output as quickly as possible, even if it violates the machine's motion constraints. Due to the possibility of lost steps, the machine will need to be homed again after an emergency stop.
 
 #### Status Server
  - Issue [#38](https://github.com/hzeller/beagleg/issues/38) has some good discussion.
