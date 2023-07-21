@@ -84,6 +84,10 @@ unsigned UioPrussInterface::WaitEvent() {
   return num_events;
 }
 
+void UioPrussInterface::Halt() { prussdrv_pru_disable(PRU_NUM); }
+
+void UioPrussInterface::Restart() { prussdrv_pru_enable_at(PRU_NUM, 0); }
+
 bool UioPrussInterface::Shutdown() {
   prussdrv_pru_disable(PRU_NUM);
   prussdrv_exit();

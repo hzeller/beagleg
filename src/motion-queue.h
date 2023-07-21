@@ -118,6 +118,9 @@ class MotionQueue {
   // The return parameter head_item_progress is set to the number
   // of not yet executed loops in the item currenly being executed.
   virtual int GetPendingElements(uint32_t *head_item_progress) = 0;
+
+  // Immediately stop any motion and clear the internal queue.
+  virtual void HaltAndDiscard() = 0;
 };
 
 // Standard implementation.
@@ -137,11 +140,13 @@ class PRUMotionQueue final : public MotionQueue {
   void MotorEnable(bool on) final;
   void Shutdown(bool flush_queue) final;
   int GetPendingElements(uint32_t *head_item_progress) final;
+  void HaltAndDiscard() final;
 
  private:
   bool Init();
 
   void ClearPRUAbort(unsigned int idx);
+  void ClearRingBuffer();
 
   HardwareMapping *const hardware_mapping_;
   PruHardwareInterface *const pru_interface_;
@@ -161,6 +166,7 @@ class DummyMotionQueue final : public MotionQueue {
     if (head_item_progress) *head_item_progress = 0;
     return 1;
   }
+  void HaltAndDiscard() final {}
 };
 
 #endif  // _BEAGLEG_MOTION_QUEUE_H_

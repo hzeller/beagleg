@@ -59,6 +59,7 @@ class MockMotorOps final : public SegmentQueue {
   void MotorEnable(bool on) final {}
   bool GetPhysicalStatus(PhysicalStatus *status) final { return false; }
   void SetExternalPosition(int axis, int steps) final {}
+  void HaltAndDiscard() final {}
 
   int call_count_wait_queue_empty = 0;
 

@@ -24,17 +24,21 @@ struct MockPRUCommunication {
   MotionSegment ring_buffer[QUEUE_LEN];
 } __attribute__((packed));
 
-class MockPRUInterface final : public PruHardwareInterface {
+class MockPRUInterface : public PruHardwareInterface {
  public:
   MockPRUInterface() : execution_index_(QUEUE_LEN - 1) { mmap = NULL; }
-  ~MockPRUInterface() final { free(mmap); }
+  ~MockPRUInterface() override { free(mmap); }
 
   bool Init() final { return true; }
   bool StartExecution() final { return true; }
   unsigned WaitEvent() final { return 1; }
   bool Shutdown() final { return true; }
 
+  MOCK_METHOD(void, Halt, (), (final));
+  MOCK_METHOD(void, Restart, (), (final));
+
   bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
+    if (mmap != NULL) return true;
     mmap = (struct MockPRUCommunication *)malloc(size);
     *pru_mmap = (void *)mmap;
     memset(*pru_mmap, 0x00, size);
@@ -63,16 +67,15 @@ class MockPRUInterface final : public PruHardwareInterface {
 
 TEST(PruMotionQueue, status_init) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
-
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
 }
 
 TEST(PruMotionQueue, single_exec) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -85,7 +88,7 @@ TEST(PruMotionQueue, single_exec) {
 
 TEST(PruMotionQueue, full_exec) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -98,7 +101,7 @@ TEST(PruMotionQueue, full_exec) {
 
 TEST(PruMotionQueue, single_exec_some_loops) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -113,7 +116,7 @@ TEST(PruMotionQueue, single_exec_some_loops) {
 
 TEST(PruMotionQueue, one_round_queue) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
@@ -132,9 +135,35 @@ TEST(PruMotionQueue, one_round_queue) {
   EXPECT_EQ(motion_backend.GetPendingElements(NULL), QUEUE_LEN);
 }
 
+// Check the PRU is reset and no elements are pending.
+TEST(PruMotionQueue, clear_queue) {
+  MotorsRegister absolute_pos_loops;
+  MockPRUInterface pru_interface;
+  HardwareMapping hmap = HardwareMapping();
+  PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
+
+  struct MotionSegment segment = {};
+  segment.state = STATE_FILLED;
+  motion_backend.Enqueue(&segment);
+  segment.state = STATE_FILLED;
+  motion_backend.Enqueue(&segment);
+  pru_interface.SimRun(2, 10);
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 1);
+
+  // Start recording mocks.
+  ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&pru_interface));
+  {
+    testing::InSequence seq;
+    EXPECT_CALL(pru_interface, Halt()).Times(1);
+    EXPECT_CALL(pru_interface, Restart()).Times(1);
+  }
+  motion_backend.HaltAndDiscard();
+  EXPECT_EQ(motion_backend.GetPendingElements(NULL), 0);
+}
+
 TEST(PruMotionQueue, exec_index_lt_queue_pos) {
   MotorsRegister absolute_pos_loops;
-  MockPRUInterface pru_interface = MockPRUInterface();
+  MockPRUInterface pru_interface;
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
 
