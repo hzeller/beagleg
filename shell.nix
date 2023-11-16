@@ -15,7 +15,7 @@ pkgs.mkShell {
 
       yosys
       surelog
-      yosys-symbiflow.systemverilog
+      yosys-synlig
 
       nextpnr
       verilator
