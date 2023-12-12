@@ -18,6 +18,8 @@ pkgs.mkShell {
       yosys-synlig
 
       nextpnr
+      icestorm
+      symbiyosys
       verilator
 
       clang-tools_11
