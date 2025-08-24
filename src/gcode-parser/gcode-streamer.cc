@@ -18,7 +18,6 @@
  */
 #include "gcode-parser/gcode-streamer.h"
 
-#include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 

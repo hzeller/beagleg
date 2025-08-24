@@ -22,8 +22,6 @@
 
 #include <stdint.h>
 
-#include "motor-interface-constants.h"
-
 // Start/stop the PWM timer
 void pwm_timer_start(uint32_t gpio_def, bool start);
 

@@ -30,7 +30,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -42,10 +41,8 @@
 #include "common/logging.h"
 #include "common/string-util.h"
 #include "gcode-parser/gcode-parser.h"
-#include "generic-gpio.h"
 #include "hardware-mapping.h"
 #include "planner.h"
-#include "pwm-timer.h"
 #include "segment-queue.h"
 #include "spindle-control.h"
 

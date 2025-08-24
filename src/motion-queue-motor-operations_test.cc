@@ -9,13 +9,10 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <stdio.h>
-#include <string.h>
 
 #include <cassert>
 #include <cstdint>
 
-#include "common/container.h"
 #include "common/logging.h"
 #include "hardware-mapping.h"
 #include "motion-queue.h"

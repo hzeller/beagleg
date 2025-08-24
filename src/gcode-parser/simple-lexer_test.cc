@@ -93,7 +93,7 @@ TEST(SimpleLexerTest, ReverseMapping) {
 
   EXPECT_EQ(std::string("elseif"), lexer.AsString(KEYWORD_ELSEIF));
   EXPECT_EQ(std::string("<"), lexer.AsString(KEYWORD_LT));
-  EXPECT_EQ(NULL, lexer.AsString(KEYWORD_IF));
+  EXPECT_EQ(nullptr, lexer.AsString(KEYWORD_IF));
 
   EXPECT_EQ(std::string("?"), lexer.AsString(NO_KEYWORD));
 }

@@ -22,7 +22,6 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <strings.h>
 
 #include <cstring>
 

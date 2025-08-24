@@ -24,8 +24,6 @@
 #include <string_view>
 #include <vector>
 
-#include "common/string-util.h"
-
 // The config parser reads a configuration file and passes tokenized
 // values to a ConfigParser::Reader.
 // The configuration is organized in sections, starting with a [section]

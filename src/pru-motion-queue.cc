@@ -21,19 +21,15 @@
 // We are using some shared memory between CPU and PRU to communicate.
 
 #include <assert.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
 
 #include <cstdint>
 
-#include "common/logging.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"
 #include "motion-queue.h"
 #include "pru-hardware-interface.h"
-#include "pwm-timer.h"
 
 using internal::QueueStatus;
 

@@ -23,8 +23,6 @@
 #include <cstddef>
 #include <cstring>
 
-#include "common/string-util.h"
-
 LinebufReader::LinebufReader(size_t buffer_size)
     : len_(buffer_size),
       buffer_start_(new char[len_]),

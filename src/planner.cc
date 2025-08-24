@@ -32,7 +32,6 @@
 #include <string>
 
 #include "common/container.h"
-#include "common/logging.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"

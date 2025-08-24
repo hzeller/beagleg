@@ -20,17 +20,13 @@
 #include "motion-queue-motor-operations.h"
 
 #include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
 
 #include <deque>
 
-#include "common/logging.h"
 #include "hardware-mapping.h"
 #include "motion-queue.h"
 #include "motor-interface-constants.h"

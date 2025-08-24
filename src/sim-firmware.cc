@@ -90,7 +90,6 @@ plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <strings.h>
 
 #include <cstring>
 

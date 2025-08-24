@@ -19,7 +19,6 @@
 
 #include "hardware-mapping.h"
 
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <cstddef>

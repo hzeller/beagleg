@@ -14,13 +14,11 @@
 #include <cstdint>
 #include <cstdlib>
 
-#include "common/container.h"
 #include "common/logging.h"
 #include "hardware-mapping.h"
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
 #include "pru-hardware-interface.h"
-#include "segment-queue.h"
 
 // PRU-side mock implementation of the ring buffer.
 struct MockPRUCommunication {

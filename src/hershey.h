@@ -22,8 +22,6 @@
 #include <functional>
 #include <string_view>
 
-#include "common/string-util.h"
-
 // -- Functions to draw ASCII text in the Hershey simplex font.
 
 // Determine the width of the text if drawn with DrawText()

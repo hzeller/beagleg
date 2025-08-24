@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include "common/logging.h"
+#include "motor-interface-constants.h"
 
 /* clang-format off */
 // Memory space mapped to the Clock Module registers

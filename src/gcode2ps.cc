@@ -50,13 +50,10 @@
 */
 
 #include <assert.h>
-#include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#include <unistd.h>  // IWYU pragma: keep (getopt_long)
 
 #include <algorithm>
 #include <complex>

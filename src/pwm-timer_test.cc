@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "motor-interface-constants.h"
+
 static int usage(const char *progname) {
   fprintf(stderr, "Usage: %s <timer> <freq> [<dc>] [<delay>]\n", progname);
   fprintf(stderr,

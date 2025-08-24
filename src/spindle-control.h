@@ -22,8 +22,6 @@
 
 #include <string>
 
-#include "common/string-util.h"
-
 class HardwareMapping;
 class ConfigParser;
 
