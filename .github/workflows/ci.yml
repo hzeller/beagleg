@@ -134,11 +134,6 @@ jobs:
       run: |
         sudo apt-get install pkg-config libgtest-dev libgmock-dev bear clang-tidy-19
 
-    - name: Prepare compilation DB
-      # Since we're not compiling on the Beaglebone, disable arm specifics
-      run: |
-        ARM_COMPILE_FLAGS= bear -- make
-
     - name: Run clang tidy
       run: |
         # for now, just report, but don't fail the CI

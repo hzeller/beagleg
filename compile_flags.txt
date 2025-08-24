@@ -1,0 +1,7 @@
+-xc++
+-std=c++17
+-DBEAGLEG_VERSION="foo"
+-DCAPE_NAME="BUMPS"
+-Isrc
+-Iam335x_pru_package/pru_sw/app_loader/include
+-Ihardware/BUMPS
