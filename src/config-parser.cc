@@ -97,7 +97,7 @@ bool ConfigParser::Reader::ParseBool(std::string_view value, bool *result) {
 bool ConfigParser::Reader::ParseFloatExpr(const std::string &value,
                                           float *result) {
   char *end;
-  double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
+  const double eval = ParseDoubleExpression(value.c_str(), 1.0, &end);
   if (end == NULL || *end == '\0') {
     *result = eval;
     if (*result < 0) {
@@ -193,8 +193,8 @@ bool ConfigParser::EmitConfigValues(Reader *reader) const {
           std::string_view(line.begin(), eq_pos - line.begin()));
         const std::string_view value_piece =
           TrimWhitespace(std::string_view(eq_pos + 1, line.end() - eq_pos - 1));
-        std::string value(value_piece.begin(), value_piece.end());
-        bool could_parse = reader->SeenNameValue(line_no, name, value);
+        const std::string value(value_piece.begin(), value_piece.end());
+        const bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {
           reader->ReportError(
             line_no,

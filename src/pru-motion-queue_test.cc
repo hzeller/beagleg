@@ -64,7 +64,7 @@ class MockPRUInterface final : public PruHardwareInterface {
 };
 
 TEST(PruMotionQueue, status_init) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
@@ -73,7 +73,7 @@ TEST(PruMotionQueue, status_init) {
 }
 
 TEST(PruMotionQueue, single_exec) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
@@ -86,7 +86,7 @@ TEST(PruMotionQueue, single_exec) {
 }
 
 TEST(PruMotionQueue, full_exec) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
@@ -99,7 +99,7 @@ TEST(PruMotionQueue, full_exec) {
 }
 
 TEST(PruMotionQueue, single_exec_some_loops) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
@@ -114,7 +114,7 @@ TEST(PruMotionQueue, single_exec_some_loops) {
 }
 
 TEST(PruMotionQueue, one_round_queue) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);
@@ -135,7 +135,7 @@ TEST(PruMotionQueue, one_round_queue) {
 }
 
 TEST(PruMotionQueue, exec_index_lt_queue_pos) {
-  MotorsRegister absolute_pos_loops;
+  const MotorsRegister absolute_pos_loops;
   MockPRUInterface pru_interface = MockPRUInterface();
   HardwareMapping hmap = HardwareMapping();
   PRUMotionQueue motion_backend(&hmap, (PruHardwareInterface *)&pru_interface);

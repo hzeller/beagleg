@@ -189,7 +189,7 @@ TEST(RealtimePosition, zero_loops_edge) {
   MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
 
   // Enqueue a segment
-  LinearSegmentSteps segment = {
+  const LinearSegmentSteps segment = {
     0,                                // v0
     0,                                // v1
     0,                                // aux

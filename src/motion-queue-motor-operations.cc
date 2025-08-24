@@ -130,7 +130,7 @@ bool MotionQueueMotorOperations::EnqueueInternal(
   // and 1 bit that overflows and toggles for the steps we want to generate.
   const uint64_t max_fraction = 0xFFFFFFFF / LOOPS_PER_STEP;
   for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-    bool flip = hardware_mapping_->IsMotorFlipped(i);
+    const bool flip = hardware_mapping_->IsMotorFlipped(i);
     if (param.steps[i] < 0) {
       if (!flip) new_element.direction_bits |= (1 << i);
       history_segment.pos_info[i].sign = -1;
@@ -166,7 +166,7 @@ bool MotionQueueMotorOperations::EnqueueInternal(
     // v1 = v0 + a*t -> t = (v1 - v0)/a
     // s = a/2 * t^2 + v0 * t; subsitution t from above.
     // a = (v1^2-v0^2)/(2*s)
-    float acceleration =
+    const float acceleration =
       (sq(param.v1) - sq(param.v0)) / (2.0f * defining_axis_steps);
     // fprintf(stderr, "M-OP HZ: defining=%d ; accel=%.2f\n",
     // defining_axis_steps, acceleration);
@@ -186,7 +186,7 @@ bool MotionQueueMotorOperations::EnqueueInternal(
       new_element.travel_delay_cycles = 0;
     new_element.loops_decel = total_loops;
 
-    float acceleration =
+    const float acceleration =
       (sq(param.v0) - sq(param.v1)) / (2.0f * defining_axis_steps);
     // fprintf(stderr, "M-OP HZ: defining=%d ; decel=%.2f\n",
     // defining_axis_steps, acceleration);

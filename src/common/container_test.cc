@@ -32,7 +32,7 @@ TEST(FixedArray, BasicOp) {
 
   int count = 0;
   int sum = 0;
-  for (int val : buffer) {
+  for (const int val : buffer) {
     count++;
     sum += val;
   }

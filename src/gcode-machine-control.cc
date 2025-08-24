@@ -251,7 +251,7 @@ bool GCodeMachineControl::Impl::Init() {
   }
 
   axis_clamped_ = 0;
-  for (char c : cfg_.clamp_to_range) {
+  for (const char c : cfg_.clamp_to_range) {
     const GCodeParserAxis clamped_axis = gcodep_letter2axis(c);
     if (clamped_axis == GCODE_NUM_AXES) {
       Log_error("clamp-to-range: Invalid clamping axis %c", c);
@@ -371,7 +371,7 @@ void GCodeMachineControl::Impl::inform_origin_offset(const AxesRegister &o,
 
 void GCodeMachineControl::Impl::set_fanspeed(float speed) {
   if (speed < 0.0 || speed > 255.0) return;
-  float duty_cycle = speed / 255.0;
+  const float duty_cycle = speed / 255.0;
   // The fan can be mapped to an aux and/or pwm signal
   set_output_flags(HardwareMapping::NamedOutput::FAN, duty_cycle > 0.0);
   hardware_mapping_->SetPWMOutput(HardwareMapping::NamedOutput::FAN,
@@ -485,7 +485,7 @@ const char *GCodeMachineControl::Impl::handle_set_lookahead(
 void GCodeMachineControl::Impl::handle_M105() {
   mprintf("// ");
   for (int chan = 0; chan < 8; chan++) {
-    int raw = arc_read_raw(chan);
+    const int raw = arc_read_raw(chan);
     mprintf("RAW%d:%d ", chan, raw);
   }
   mprintf("\n");
@@ -723,7 +723,7 @@ void GCodeMachineControl::Impl::mprint_current_position() {
 void GCodeMachineControl::Impl::mprint_endstop_status() {
   bool any_endstops_found = false;
   for (const GCodeParserAxis axis : AllAxes()) {
-    HardwareMapping::AxisTrigger triggers =
+    const HardwareMapping::AxisTrigger triggers =
       hardware_mapping_->AvailableAxisSwitch(axis);
     if ((triggers & HardwareMapping::TRIGGER_MIN) != 0) {
       mprintf(
@@ -870,7 +870,7 @@ bool GCodeMachineControl::Impl::coordinated_move(
     return false;
   }
 
-  float feedrate = prog_speed_factor_ * current_feedrate_mm_per_sec_;
+  const float feedrate = prog_speed_factor_ * current_feedrate_mm_per_sec_;
   if (!planner_->Enqueue(absolute_pos, feedrate)) {
     if (check_for_estop()) return false;
   }
@@ -883,7 +883,7 @@ bool GCodeMachineControl::Impl::rapid_move(float feed,
   if (!move_allowed_within_machine_limits(absolute_pos)) return false;
   if (!move_allowed_estop_status()) return false;
 
-  float rapid_feed = g0_feedrate_mm_per_sec_;
+  const float rapid_feed = g0_feedrate_mm_per_sec_;
   const float given = cfg_.speed_factor * prog_speed_factor_ * feed;
   if (given > 0 && current_feedrate_mm_per_sec_ <= 0) {
     current_feedrate_mm_per_sec_ = given;  // At least something for G1.
@@ -965,7 +965,7 @@ int GCodeMachineControl::Impl::move_to_endstop(
   int total_movement = 0;
   const int dir = trigger == HardwareMapping::TRIGGER_MIN ? -1 : 1;
   float v0 = 0;
-  float v1 = feedrate;
+  const float v1 = feedrate;
   while (!hardware_mapping_->TestAxisSwitch(axis, trigger)) {
     if (hardware_mapping_->TestEStopSwitch()) return 0;
     total_movement += planner_->DirectDrive(axis, dir * kHomingMM, v0, v1);
@@ -1052,13 +1052,13 @@ bool GCodeMachineControl::Impl::probe_axis(float feed_mm_p_sec,
   planner_->GetCurrentPosition(&machine_pos);
 
   // The probe endstop should be in the direction that is _not_ used for homing.
-  HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
+  const HardwareMapping::AxisTrigger home_trigger = cfg_.homing_trigger[axis];
   const int dir = home_trigger == HardwareMapping::TRIGGER_MIN ? 1 : -1;
 
   if (feed_mm_p_sec <= 0) feed_mm_p_sec = 20;
-  int max_steps = abs(cfg_.move_range_mm[axis] * cfg_.steps_per_mm[axis]);
-  int total_steps = move_to_probe(axis, feed_mm_p_sec, dir, max_steps);
-  float distance_moved = total_steps / cfg_.steps_per_mm[axis];
+  const int max_steps = abs(cfg_.move_range_mm[axis] * cfg_.steps_per_mm[axis]);
+  const int total_steps = move_to_probe(axis, feed_mm_p_sec, dir, max_steps);
+  const float distance_moved = total_steps / cfg_.steps_per_mm[axis];
 
   const float new_pos = machine_pos[axis] + distance_moved;
   planner_->SetExternalPosition(axis, new_pos);
@@ -1084,7 +1084,8 @@ GCodeMachineControl *GCodeMachineControl::Create(
 void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
   home_pos->zero();
   for (const GCodeParserAxis axis : AllAxes()) {
-    HardwareMapping::AxisTrigger trigger = impl_->config().homing_trigger[axis];
+    const HardwareMapping::AxisTrigger trigger =
+      impl_->config().homing_trigger[axis];
     (*home_pos)[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
                           ? impl_->config().move_range_mm[axis]
                           : 0;

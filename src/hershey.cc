@@ -40,7 +40,7 @@ float TextWidth(std::string_view str, float size) {
   size /= 25.0f;  // The actual coordinates are roughly in the range 0..25
 
   float w = 0;
-  for (char c : str) {
+  for (const char c : str) {
     if (c == '\n') {
       longest_line = std::max(longest_line, w);
       w = 0;
@@ -62,7 +62,7 @@ void DrawText(std::string_view str, float tx, float ty, TextAlign align,
     dx = -TextWidth(str, size) / 2;
   size /= 25.0f;  // The actual coordinates are roughly in the range 0..25
   float x = 0, y = 0;
-  for (char c : str) {
+  for (const char c : str) {
     if (c == '\n') {
       y -= 30 * size;
       x = 0;

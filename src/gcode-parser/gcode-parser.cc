@@ -136,7 +136,7 @@ class GCodeParser::Impl {
   void InitCoordSystems();
 
   void set_all_axis_to_absolute(bool value) {
-    for (GCodeParserAxis a : AllAxes()) {
+    for (const GCodeParserAxis a : AllAxes()) {
       axis_is_absolute_[a] = value;
     }
     modal_absolute_g90_ = value;
@@ -161,7 +161,7 @@ class GCodeParser::Impl {
 
   void inform_origin_offset_change(const char *name) {
     AxesRegister visible_origin(*current_origin_);
-    for (GCodeParserAxis a : AllAxes()) {
+    for (const GCodeParserAxis a : AllAxes()) {
       visible_origin[a] += current_global_offset()[a];
     }
     callbacks()->inform_origin_offset(visible_origin, name);
@@ -268,7 +268,7 @@ class GCodeParser::Impl {
     *result = 0;
     if (config_.parameters == NULL) return false;
     param_name = TrimWhitespace(param_name);
-    Config::ParamMap::const_iterator found =
+    const Config::ParamMap::const_iterator found =
       config_.parameters->find(ToLower(param_name));
     if (found != config_.parameters->end()) {
       *result = found->second;
@@ -649,7 +649,7 @@ const char *GCodeParser::Impl::gcodep_atan(const char *line, float *value) {
   }
   line = endptr;
 
-  float val = (atan2f(*value, value2) * 180.0f) / M_PI;
+  const float val = (atan2f(*value, value2) * 180.0f) / M_PI;
   gprintf(GLOG_EXPRESSION, "%s[%f]/[%f] -> %f\n", op_parse_.AsString(ATAN),
           *value, value2, val);
   *value = val;
@@ -933,7 +933,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
   } else {
     // see if this is a ternary operation '? :'
     if (*line == '?') {
-      bool condition = (value != 0.0f);
+      const bool condition = (value != 0.0f);
       line = skip_white(line + 1);
 
       endptr = gcodep_value(line, &value);
@@ -945,7 +945,7 @@ const char *GCodeParser::Impl::gcodep_set_parameter(const char *line) {
         return NULL;
       }
       line = skip_white(endptr);
-      float true_value = value;
+      const float true_value = value;
 
       if (*line == ':') {
         line = skip_white(line + 1);
@@ -1061,7 +1061,7 @@ void GCodeParser::Impl::gcodep_while_end() {
     if (control_parse_.ExpectNext(&line, CK_DO)) {
       for (const std::string_view wline : SplitString(while_loop_, "\n")) {
         // TODO(hzeller):ParseBlock needs to accept string_view
-        std::string tmp(wline.begin(), wline.end());
+        const std::string tmp(wline.begin(), wline.end());
         ParseBlock(while_owner_, tmp.c_str(), while_err_stream_);
       }
     } else {
@@ -1178,7 +1178,7 @@ const char *GCodeParser::Impl::handle_home(const char *line) {
   callbacks()->go_home(homing_flags);
 
   // Now update the world position
-  for (GCodeParserAxis a : AllAxes()) {
+  for (const GCodeParserAxis a : AllAxes()) {
     if (homing_flags & (1 << a)) {
       axes_pos_[a] = machine_origin_[a];
     }
@@ -1192,10 +1192,10 @@ void GCodeParser::Impl::InitCoordSystems() {
   float value;
   for (int i = 0; i < 9; ++i) {
     bool set = false;
-    int offset = i * 20;
+    const int offset = i * 20;
     value = 0.0;
     std::string coords;
-    for (GCodeParserAxis axis : AllAxes()) {
+    for (const GCodeParserAxis axis : AllAxes()) {
       read_parameter(StringPrintf("%d", 5221 + offset + axis), &value);
       coord_system_[i][axis] = machine_origin_[axis] + value;
       if (axis <= AXIS_Y || value)
@@ -1230,7 +1230,7 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   int l_val = -1;
   int p_val = -1;
   bool have_val[GCODE_NUM_AXES];
-  for (GCodeParserAxis a : AllAxes()) {
+  for (const GCodeParserAxis a : AllAxes()) {
     have_val[a] = false;
   }
 
@@ -1271,7 +1271,7 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
   const int cs = p_val - 1;  // Target coordinate system.
 
   // Update coordinate system with values that changed.
-  for (GCodeParserAxis a : AllAxes()) {
+  for (const GCodeParserAxis a : AllAxes()) {
     if (!have_val[a]) continue;
     coord_system_[cs][a] = modal_absolute_g90_
                              ? machine_origin_[a] + coords[a]
@@ -1280,7 +1280,7 @@ const char *GCodeParser::Impl::handle_G10(const char *line) {
 
   // Now update the parameters
   const int variable_offset = cs * 20;
-  for (GCodeParserAxis a : AllAxes()) {
+  for (const GCodeParserAxis a : AllAxes()) {
     if (!have_val[a]) continue;
     // We always store the absolute offset from home.
     store_parameter(StringPrintf("%d", 5221 + variable_offset + a),
@@ -1822,7 +1822,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       callbacks()->gcode_start(owner);
       program_in_progress_ = true;
     }
-    bool last_spline = have_first_spline_;
+    const bool last_spline = have_first_spline_;
     have_first_spline_ = false;
     bool processed_command = true;
     if (letter == 'G') {

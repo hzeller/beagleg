@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
   case 7: gpio_def = PIN_P8_8; break;
   default: return usage(argv[0]);
   }
-  int freq = atoi(argv[2]);
+  const int freq = atoi(argv[2]);
   float dc = 0.5;
   if (argc > 3) dc = atof(argv[3]);
   int delay = 5;

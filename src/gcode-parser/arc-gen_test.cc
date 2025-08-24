@@ -186,34 +186,34 @@ TEST(ArcGenerator, ArcLength_CW_360) {
 }
 
 TEST(ArcGenerator, ArcLength_CW_HiRes_StartCircle) {
-  for (GCodeParserAxis normal : XYZAxes()) {
+  for (const GCodeParserAxis normal : XYZAxes()) {
     testArcLength(normal, true, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT,
                   HIRES_TEST_ARC_STEP, 2 * M_PI);
   }
 }
 
 TEST(ArcGenerator, ArcLength_CW_HiRes_FullCircle) {
-  for (GCodeParserAxis normal : XYZAxes()) {
+  for (const GCodeParserAxis normal : XYZAxes()) {
     testArcLength(normal, true, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
                   HIRES_TEST_CIRCLE_SEGMENT);
   }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_360) {
-  for (GCodeParserAxis normal : XYZAxes()) {
+  for (const GCodeParserAxis normal : XYZAxes()) {
     testArcLength(normal, false, TEST_ARC_STEP, TEST_ARC_STEP, 2 * M_PI);
   }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_HiRes_StartCircle) {
-  for (GCodeParserAxis normal : XYZAxes()) {
+  for (const GCodeParserAxis normal : XYZAxes()) {
     testArcLength(normal, false, HIRES_TEST_ARC_STEP, HIRES_TEST_ARC_STEP,
                   HIRES_TEST_CIRCLE_SEGMENT);
   }
 }
 
 TEST(ArcGenerator, ArcLength_CCW_HiRes_FullCircle) {
-  for (GCodeParserAxis normal : XYZAxes()) {
+  for (const GCodeParserAxis normal : XYZAxes()) {
     testArcLength(normal, false, 2 * M_PI - HIRES_TEST_CIRCLE_SEGMENT,
                   HIRES_TEST_ARC_STEP, 2 * M_PI);
   }

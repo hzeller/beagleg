@@ -419,7 +419,8 @@ static void parametrizedAxisClamping(GCodeParserAxis defining_axis,
                                 constant_speed_section.steps[defining_axis];
 
   // Get the step speed of the axis we're interested in.
-  float step_speed_of_interest = constant_speed_section.v0 * slow_axis_ratio;
+  const float step_speed_of_interest =
+    constant_speed_section.v0 * slow_axis_ratio;
 
   // Get the acceleration segment accel.
   const LinearSegmentSteps &constant_accel_section = plantest.segments()[0];
@@ -550,7 +551,7 @@ TEST(PlannerTest, ShortSegment_EdgeCases) {
   pos[AXIS_X] += kOtherAxisSteps * 2 / config.steps_per_mm[AXIS_X];
   plantest.Enqueue(pos, kFeedrate);
 
-  std::vector<LinearSegmentSteps> segments = plantest.segments();
+  const std::vector<LinearSegmentSteps> segments = plantest.segments();
 
   // Check that we indeed reach the target position.
   // We just check the cartesian axes since for tests
@@ -623,7 +624,7 @@ TEST(PlannerTest, StraightLine_LotsOfSteps) {
   MachineControlConfig *config = new MachineControlConfig();
   InitTestConfig(config);
   PlannerHarness plantest(0, 0, config);
-  unsigned kNumSteps = 10;
+  const unsigned kNumSteps = 10;
   AxesRegister pos = {};
 
   for (unsigned i = 0; i < kNumSteps; ++i) {
@@ -767,7 +768,7 @@ TEST(PlannerTest, DetectOutRangeAcceleration) {
   config->acceleration[AXIS_X] = 100;  // mm/s^2
   config->acceleration[AXIS_Y] = 100;  // mm/s^2
   PlannerHarness plantest(2.5, 0, config);
-  float speed = 10000;
+  const float speed = 10000;
   AxesRegister pos;
   pos[AXIS_X] = 60;
   pos[AXIS_Y] = 250;

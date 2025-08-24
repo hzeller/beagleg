@@ -147,7 +147,7 @@ TEST(Streaming, two_consecutive_connections) {
 TEST(Streaming, basic_stream) {
   StreamTester tester;
   {
-    InSequence s;
+    const InSequence s;
     EXPECT_CALL(tester, gcode_start(_)).Times(1);
     EXPECT_CALL(tester, coordinated_move(FloatEq(1000.0 / 60), _)).Times(2);
     EXPECT_CALL(tester, input_idle(_)).Times(0);

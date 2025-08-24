@@ -112,7 +112,7 @@ bool GCodeParser::Config::SaveParams() const {
   }
 
   // Now, all the non-numeric parmeters
-  int start_alpha = pcount;
+  const int start_alpha = pcount;
   for (const auto &name_value : *parameters) {
     if (name_value.first.empty()) continue;      // Should not happen.
     if (isdigit(name_value.first[0])) continue;  // Numeric: already written

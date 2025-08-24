@@ -56,7 +56,7 @@ void SimpleLexerBase::AddKeywordIntValue(const char *keyword, int value) {
 
 const char *SimpleLexerBase::ReverseMapToString(int value) {
   if (value == 0) return "?";
-  KeywordMap::const_iterator found = keyword_mappings_.find(value);
+  const KeywordMap::const_iterator found = keyword_mappings_.find(value);
   if (found == keyword_mappings_.end()) return NULL;
   return found->second;
 }

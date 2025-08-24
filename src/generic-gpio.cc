@@ -61,7 +61,7 @@ static volatile uint32_t *get_gpio_base(uint32_t gpio_def) {
 
 int get_gpio(uint32_t gpio_def) {
   volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
-  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  const uint32_t bitmask = 1 << (gpio_def & 0x1f);
   uint32_t status;
 
   if (gpio_port) {
@@ -73,13 +73,13 @@ int get_gpio(uint32_t gpio_def) {
 
 void set_gpio(uint32_t gpio_def) {
   volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
-  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  const uint32_t bitmask = 1 << (gpio_def & 0x1f);
   if (gpio_port) gpio_port[GPIO_SETDATAOUT / 4] = bitmask;
 }
 
 void clr_gpio(uint32_t gpio_def) {
   volatile uint32_t *gpio_port = get_gpio_base(gpio_def);
-  uint32_t bitmask = 1 << (gpio_def & 0x1f);
+  const uint32_t bitmask = 1 << (gpio_def & 0x1f);
   if (gpio_port) gpio_port[GPIO_CLEARDATAOUT / 4] = bitmask;
 }
 

@@ -379,10 +379,10 @@ static double determine_joining_speed(const struct AxisTarget *from,
     if ((from_delta < 0 && to_delta > 0) || (from_delta > 0 && to_delta < 0))
       return 0.0;  // turing around
 
-    double to_speed = get_speed_for_axis(to, axis);
+    const double to_speed = get_speed_for_axis(to, axis);
     // What would this speed translated to our defining axis be ?
-    double speed_conversion = 1.0 * from_defining_steps / from_delta;
-    double goal = to_speed * speed_conversion;
+    const double speed_conversion = 1.0 * from_defining_steps / from_delta;
+    const double goal = to_speed * speed_conversion;
     if (goal < 0.0) return 0.0;
     if (is_first || within_acceptable_range(goal, from_defining_speed, 1e-5)) {
       if (goal < from_defining_speed) from_defining_speed = goal;
@@ -409,7 +409,7 @@ Planner::Impl::Impl(const MachineControlConfig *config,
   *init_axis = {};
 
   for (const GCodeParserAxis axis : AllAxes()) {
-    HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
+    const HardwareMapping::AxisTrigger trigger = cfg_->homing_trigger[axis];
     const float home_pos =
       trigger == HardwareMapping::TRIGGER_MAX ? cfg_->move_range_mm[axis] : 0;
     SetExternalPosition(axis, home_pos);
@@ -667,7 +667,7 @@ bool Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
   // redefine starting and final speeds.
   UpdateMotionProfile();
 
-  bool ret = issue_motor_move_if_possible();
+  const bool ret = issue_motor_move_if_possible();
   if (ret) path_halted_ = false;
   return ret;
 }

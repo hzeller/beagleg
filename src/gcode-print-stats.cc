@@ -46,7 +46,8 @@ static void print_file_stats(const char *filename, int indentation,
                              FILE *msg_out,
                              const MachineControlConfig &config) {
   struct BeagleGPrintStats result;
-  int fd = strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
+  const int fd =
+    strcmp(filename, "-") == 0 ? STDIN_FILENO : open(filename, O_RDONLY);
   if (determine_print_stats(fd, config, msg_out, &result)) {
     // Filament length looks a bit high, is this input or extruded ?
     printf("%-*s %10.0f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f %7.1f",
@@ -113,7 +114,7 @@ int main(int argc, char *argv[]) {
 
   int longest_filename = strlen("#[filename]");  // table header
   for (int i = optind; i < argc; ++i) {
-    int len = strlen(argv[i]);
+    const int len = strlen(argv[i]);
     if (len > longest_filename) longest_filename = len;
   }
   if (print_header) {

@@ -158,7 +158,7 @@ static void send_file_to_machine(GCodeMachineControl *machine,
                                  GCodeStreamer *streamer,
                                  const char *gcode_filename) {
   machine->SetMsgOut(stderr);
-  int fd = open(gcode_filename, O_RDONLY);
+  const int fd = open(gcode_filename, O_RDONLY);
   streamer->ConnectStream(fd, stderr);
 }
 
@@ -169,7 +169,7 @@ static int open_server(const char *bind_addr, int port) {
     Log_error("Invalid port %d\n", port);
     return -1;
   }
-  int s = socket(AF_INET, SOCK_STREAM, 0);
+  const int s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0) {
     Log_error("creating socket: %s", strerror(errno));
     return -1;
@@ -213,7 +213,7 @@ static void run_gcode_server(int listen_socket, FDMultiplexer *event_server,
     listen_socket, [listen_socket, machine, streamer]() {
       struct sockaddr_in client;
       socklen_t socklen = sizeof(client);
-      int connection =
+      const int connection =
         accept(listen_socket, (struct sockaddr *)&client, &socklen);
       if (connection < 0) {
         Log_error("accept(): %s", strerror(errno));
@@ -275,7 +275,8 @@ static void run_status_server(const char *bind_addr, int port,
                                               event_server]() {
     struct sockaddr_in client;
     socklen_t socklen = sizeof(client);
-    int conn = accept(listen_socket, (struct sockaddr *)&client, &socklen);
+    const int conn =
+      accept(listen_socket, (struct sockaddr *)&client, &socklen);
     if (conn < 0) {
       Log_error("accept(): %s", strerror(errno));
       return true;
@@ -298,9 +299,10 @@ static void run_status_server(const char *bind_addr, int port,
                 pos[AXIS_X], pos[AXIS_Y], pos[AXIS_Z]);
       }
       if (query == 's') {
-        GCodeMachineControl::EStopState estop_status =
+        const GCodeMachineControl::EStopState estop_status =
           machine->GetEStopStatus();
-        GCodeMachineControl::HomingState home_status = machine->GetHomeStatus();
+        const GCodeMachineControl::HomingState home_status =
+          machine->GetHomeStatus();
         // JSON {"estop":"status", "homed":"status", "motors":bool}
         dprintf(
           conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
@@ -525,7 +527,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  std::unique_ptr<Spindle> spindle(
+  const std::unique_ptr<Spindle> spindle(
     Spindle::CreateFromConfig(spindle_config, &hardware_mapping));
 
   // ... other configurations that read from that file.
@@ -607,7 +609,7 @@ int main(int argc, char *argv[]) {
   machine_control->GetHomePos(&parser_cfg.machine_origin);
   GCodeParser *parser =
     new GCodeParser(parser_cfg, machine_control->ParseEventReceiver());
-  GCodeStreamer *streamer = new GCodeStreamer(
+  GCodeStreamer *const streamer = new GCodeStreamer(
     &event_server, parser, machine_control->ParseEventReceiver());
   int ret = 0;
   if (has_filename) {
@@ -630,7 +632,7 @@ int main(int argc, char *argv[]) {
   delete parser;
   delete machine_control;
 
-  const bool caught_signal = (ret == 1);
+  const bool caught_signal = (ret == 1);  // ?
   if (caught_signal) {
     Log_info(
       "Caught signal: immediate exit. "

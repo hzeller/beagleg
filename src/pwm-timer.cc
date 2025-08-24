@@ -172,7 +172,7 @@ void pwm_timer_set_duty(uint32_t gpio_def, float duty_cycle) {
 
 static void pwm_timer_calc_resolution(struct pwm_timer_data *timer,
                                       int pwm_freq) {
-  float pwm_period = 1.0 / pwm_freq;
+  const float pwm_period = 1.0 / pwm_freq;
   uint64_t resolution = 0;
   int ratio;
   char pre;
@@ -180,7 +180,7 @@ static void pwm_timer_calc_resolution(struct pwm_timer_data *timer,
 
   // select the largest possible prescale ratio
   for (ratio = 1; ratio <= 256; ratio *= 2) {
-    float clk_period = (1.0 / TIMER_BASE_CLOCK) * ratio;
+    const float clk_period = (1.0 / TIMER_BASE_CLOCK) * ratio;
     resolution = pwm_period / clk_period;
     if (resolution < TIMER_OVERFLOW) break;
   }

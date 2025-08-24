@@ -180,7 +180,7 @@ bool HardwareMapping::InitializeHardware() {
   // startup, which is of course an impossible mechanical state.
   // Since we don't know in which direction to move out of the way, we have to
   // bail for safety.
-  for (GCodeParserAxis axis : AllAxes()) {
+  for (const GCodeParserAxis axis : AllAxes()) {
     if (TestAxisSwitch(axis, TRIGGER_MIN) &&
         TestAxisSwitch(axis, TRIGGER_MAX)) {
       Log_error(
@@ -327,13 +327,13 @@ HardwareMapping::AxisTrigger HardwareMapping::AvailableAxisSwitch(
 
 bool HardwareMapping::TestSwitch(const int switch_number, bool default_result) {
   if (!is_hardware_initialized_) return default_result;
-  GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
+  const GPIODefinition gpio_def = get_endstop_gpio_descriptor(switch_number);
   if (gpio_def == GPIO_NOT_MAPPED) return default_result;
   bool state = get_gpio(gpio_def);
   int debounce = 0;
   for (;;) {
     usleep(10);
-    bool new_state = get_gpio(gpio_def);
+    const bool new_state = get_gpio(gpio_def);
     if (new_state == state) {
       debounce++;
       if (debounce == 2) break;
@@ -474,7 +474,7 @@ class HardwareMapping::ConfigReader : public ConfigParser::Reader {
         if (axis.empty()) return false;
 
         const char axis_letter = axis[0];
-        LogicAxis logic_axis = gcodep_letter2axis(axis_letter);
+        const LogicAxis logic_axis = gcodep_letter2axis(axis_letter);
         if (logic_axis == GCODE_NUM_AXES) {
           Log_error("Invalid axis letter '%c'", axis_letter);
           return false;  // invalid axis.

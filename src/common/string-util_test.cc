@@ -75,7 +75,7 @@ TEST(StringUtilTest, ParseDecimalInt) {
   EXPECT_EQ(12345678901234LL, ParseInt64("12345678901234", -1));
 
   // Make sure we're not assumming a nul-byte at a particular point
-  std::string_view longer_string("4255");
+  const std::string_view longer_string("4255");
   EXPECT_EQ(42, ParseInt64(longer_string.substr(0, 2), -1));
 
   // Make sure the returned value points to the characters after the number.

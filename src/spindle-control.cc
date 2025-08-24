@@ -402,7 +402,8 @@ class PololuSMCSpindle final : public BaseSpindle {
     }
 
     // scale the desired RPM to the MAX_SPEED of the SMC
-    int speed = std::min(rpm * MAX_SPEED / config_.max_rpm, (int)MAX_SPEED);
+    const int speed =
+      std::min(rpm * MAX_SPEED / config_.max_rpm, (int)MAX_SPEED);
     set_target_speed(ccw, speed);
 
     if (is_off_) {
@@ -416,7 +417,7 @@ class PololuSMCSpindle final : public BaseSpindle {
       is_off_ = false;
     }
 
-    float duty_cycle = std::min((float)rpm / config_.max_rpm, 1.0f);
+    const float duty_cycle = std::min((float)rpm / config_.max_rpm, 1.0f);
     Log_debug("PololuSMCSpindle: on %s at %d RPM (speed: %d)",
               ccw ? "ccw" : "cw", (int)(config_.max_rpm * duty_cycle), speed);
   }
@@ -537,7 +538,7 @@ class PololuSMCSpindle final : public BaseSpindle {
   // Read the status flag register Error Status or Errors Occurred.
   // Note, reading the Errors Occurred register clears all the bits.
   void check_errors(unsigned char id) {
-    int errors = get_variable(id);
+    const int errors = get_variable(id);
     if (errors) {
       Log_debug("  Error%s: 0x%04x\n",
                 id == ERROR_STATUS ? " status" : "s occurred", errors);
@@ -579,7 +580,7 @@ class PololuSMCSpindle final : public BaseSpindle {
   }
 
   void send(const void *buf, int count) {
-    int sent = write(fd_, buf, count);
+    const int sent = write(fd_, buf, count);
     if (sent == -1)
       perror("PololuSMCSpindle: send() error");
     else if (sent != count)
@@ -588,7 +589,7 @@ class PololuSMCSpindle final : public BaseSpindle {
   }
 
   void receive(void *buf, int count) {
-    int got = read(fd_, buf, count);
+    const int got = read(fd_, buf, count);
     if (got == -1)
       perror("PololuSMCSpindle: receive() error");
     else if (got != count)

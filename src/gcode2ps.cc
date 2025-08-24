@@ -470,7 +470,7 @@ class Device {
   void MeasureLine(
     float min, float max, float size, bool show_metric,
     const std::function<void(bool do_line, float c1, float c2)> &draw) {
-    float width = max - min;
+    const float width = max - min;
     if (width < 3 * size) return;
     draw(false, 0, -size);
     draw(true, 0, size);  // first tick.
@@ -515,8 +515,9 @@ class Device {
 
     const int kLegendPartitions = 6;
     for (int i = 1; i < kLegendPartitions; ++i) {
-      float val = i * (max_color_range - min_color_range) / kLegendPartitions;
-      float pos = i * width / kLegendPartitions;
+      const float val =
+        i * (max_color_range - min_color_range) / kLegendPartitions;
+      const float pos = i * width / kLegendPartitions;
       fprintf(file_,
               "%.1f %.1f moveto 0 %.1f rlineto 0 0.5 rmoveto "
               "(%.1f) dup stringwidth pop 2 div neg 0 rmoveto show stroke\n",
@@ -1002,7 +1003,7 @@ class SegmentQueuePrinter final : public SegmentQueue {
           device_->switch_color(new_color);
         }
 
-        int pos = snprintf(
+        const int pos = snprintf(
           comment, sizeof(comment), "%.1f mm/s [%s]", v,
           param.v0 == param.v1 ? "=" : (param.v0 < param.v1 ? "^" : "v"));
         if (i == 0) {
@@ -1185,7 +1186,8 @@ static bool ParseConfigIfAvailable(const char *config_file,
   // at least extract the home position from the config.
   machine_config->require_homing = false;
   for (const GCodeParserAxis axis : AllAxes()) {
-    HardwareMapping::AxisTrigger trigger = machine_config->homing_trigger[axis];
+    const HardwareMapping::AxisTrigger trigger =
+      machine_config->homing_trigger[axis];
     parser_cfg->machine_origin[axis] = (trigger & HardwareMapping::TRIGGER_MAX)
                                          ? machine_config->move_range_mm[axis]
                                          : 0;

@@ -103,7 +103,7 @@ class StatsSegmentQueue : public SegmentQueue {
   bool Enqueue(const LinearSegmentSteps &param) final {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
-      int steps = abs(param.steps[i]);
+      const int steps = abs(param.steps[i]);
       if (steps > max_steps) max_steps = steps;
     }
 

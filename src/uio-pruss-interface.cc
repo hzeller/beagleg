@@ -48,11 +48,11 @@
 #endif
 
 bool UioPrussInterface::Init() {
-  tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
+  const tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
   prussdrv_init();
 
   /* Get the interrupt initialized */
-  int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
+  const int ret = prussdrv_open(PRU_EVTOUT_0);  // allow access.
   if (ret) {
     Log_error("prussdrv_open() failed (%d) %s\n", ret, strerror(errno));
     return false;

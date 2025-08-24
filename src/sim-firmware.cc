@@ -118,13 +118,13 @@ class SimFirmwareQueue::Averager {
     if (back >= pos_) {
       back = pos_ - 1;
     }
-    double dt0 = ringbuffer_[(pos_ + AVERAGE_RINBGUFFER_SIZE - back) %
-                             AVERAGE_RINBGUFFER_SIZE];
-    double dt1 = ringbuffer_[pos_ % AVERAGE_RINBGUFFER_SIZE];
+    const double dt0 = ringbuffer_[(pos_ + AVERAGE_RINBGUFFER_SIZE - back) %
+                                   AVERAGE_RINBGUFFER_SIZE];
+    const double dt1 = ringbuffer_[pos_ % AVERAGE_RINBGUFFER_SIZE];
     if (dt0 <= 0 || dt1 <= 0) return 0;
 
-    double v0 = (1 / dt0) / LOOPS_PER_STEP;
-    double v1 = (1 / dt1) / LOOPS_PER_STEP;
+    const double v0 = (1 / dt0) / LOOPS_PER_STEP;
+    const double v1 = (1 / dt1) / LOOPS_PER_STEP;
     return (v1 - v0) / (dt_sum_ - dt1);
   }
 
@@ -187,10 +187,10 @@ bool SimFirmwareQueue::Enqueue(MotionSegment *segment) {
   for (;;) {
     // Increment by motor fraction.
     for (int i = 0; i < MOTION_MOTOR_COUNT; ++i) {
-      int before = (state.m[i] & 0x80000000) != 0;
+      const int before = (state.m[i] & 0x80000000) != 0;
       state.m[i] += segment->fractions[i];
       // Top bit is our step bit. Collect all of these and output to hardware.
-      int after = (state.m[i] & 0x80000000) != 0;
+      const int after = (state.m[i] & 0x80000000) != 0;
       if (!before && after) {  // transition 0->1
         sim_steps[i] += ((1 << i) & segment->direction_bits) ? -1 : 1;
       }
@@ -304,11 +304,11 @@ bool SimFirmwareQueue::Enqueue(MotionSegment *segment) {
     } else {
       break;  // done.
     }
-    double wait_time = 1.0 * delay_loops / TIMER_FREQUENCY;
+    const double wait_time = 1.0 * delay_loops / TIMER_FREQUENCY;
     averager_->PushDeltaTime(1.0 * hires_delay / TIMER_FREQUENCY);
-    double acceleration = averager_->GetAcceleration();
+    const double acceleration = averager_->GetAcceleration();
     sim_time += wait_time;
-    double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
+    const double velocity = (1 / wait_time) / LOOPS_PER_STEP;  // in Hz.
 
     // Total time; speed; acceleration; delay_loops. [steps walked for all
     // motors].

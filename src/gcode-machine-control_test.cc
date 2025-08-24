@@ -266,7 +266,7 @@ TEST(GCodeMachineControlTest, set_get_lookahead) {
   GCodeParser::Config config;
   GCodeParser::Config::ParamMap parameters;
   config.parameters = &parameters;
-  GCodeParser parser = GCodeParser(config, harness.gcode_emit());
+  const GCodeParser parser = GCodeParser(config, harness.gcode_emit());
 
   const int max_lookahead = harness.machine_control->GetMaxLookahead();
 

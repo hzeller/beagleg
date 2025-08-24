@@ -52,7 +52,7 @@ void Log_init(const char *filename) {
       openlog(NULL, LOG_PID | LOG_CONS, LOG_DAEMON);  // fallback.
       return;
     }
-    bool enable_color = isatty(log_fd);
+    const bool enable_color = isatty(log_fd);
     if (enable_color) {
       info_markup_start_ = kInfoHighlight;
       debug_markup_start_ = kDebugHighlight;
@@ -76,7 +76,7 @@ static void Log_internal(int fd, const char *markup_start, const char *format,
   parts[1].iov_len = vasprintf((char **)&parts[1].iov_base, format, ap);
   parts[2].iov_base = (void *)"\n";
   parts[2].iov_len = 1;
-  int already_newline =
+  const int already_newline =
     (parts[1].iov_len > 0 &&
      ((const char *)parts[1].iov_base)[parts[1].iov_len - 1] == '\n');
   if (writev(fd, parts, already_newline ? 2 : 3) < 0) {
