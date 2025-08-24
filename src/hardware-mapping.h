@@ -22,6 +22,10 @@
 
 #include <stdint.h>
 
+#include <string>
+#include <string_view>
+
+#include "common/container.h"
 #include "common/string-util.h"
 #include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "segment-queue.h"

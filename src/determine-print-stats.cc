@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <strings.h>
 
+#include <cstring>
+
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"

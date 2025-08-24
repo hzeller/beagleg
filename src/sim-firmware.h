@@ -19,6 +19,8 @@
 
 #include <stdio.h>
 
+#include <cstdint>
+
 #include "motion-queue.h"
 
 class SimFirmwareQueue : public MotionQueue {

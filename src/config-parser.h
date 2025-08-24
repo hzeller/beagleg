@@ -19,7 +19,9 @@
 #ifndef _BEAGLEG_CONFIG_PARSER_H
 #define _BEAGLEG_CONFIG_PARSER_H
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/string-util.h"

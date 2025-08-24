@@ -23,9 +23,12 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstdio>
+#include <iterator>
 
 #include "common/logging.h"
 

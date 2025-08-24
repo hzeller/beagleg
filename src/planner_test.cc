@@ -7,9 +7,12 @@
 #include <string.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cfloat>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "common/container.h"
 #include "common/logging.h"

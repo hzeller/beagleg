@@ -23,6 +23,8 @@
 
 #include "config-parser.h"
 #include "gcode-machine-control.h"  // contains struct MachineControlConfig
+#include "gcode-parser/gcode-parser.h"
+#include "hardware-mapping.h"
 
 // TODO(hzeller): add tests for error conditions.
 

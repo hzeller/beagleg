@@ -19,6 +19,8 @@
 #ifndef FD_GCODE_STREAMER_H_
 #define FD_GCODE_STREAMER_H_
 
+#include <cstdio>
+
 #include "common/fd-mux.h"
 #include "common/linebuf-reader.h"
 #include "gcode-parser/gcode-parser.h"

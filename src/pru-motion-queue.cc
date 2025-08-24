@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <strings.h>
 
+#include <cstdint>
+
 #include "common/logging.h"
 #include "generic-gpio.h"
 #include "hardware-mapping.h"

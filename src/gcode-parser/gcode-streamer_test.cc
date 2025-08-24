@@ -22,7 +22,10 @@
 #include <gtest/gtest.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
+#include <cassert>
+#include <cstdlib>
 #include <memory>
 
 #include "common/fd-mux.h"

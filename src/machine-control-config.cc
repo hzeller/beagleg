@@ -25,6 +25,8 @@
 #include "common/string-util.h"
 #include "config-parser.h"
 #include "gcode-machine-control.h"
+#include "gcode-parser/gcode-parser.h"
+#include "hardware-mapping.h"
 #include "segment-queue.h"
 
 // Default order in which axes should be homed.

@@ -20,6 +20,8 @@
 #ifndef BEAGLEG_SPINDLE_CONTROL_
 #define BEAGLEG_SPINDLE_CONTROL_
 
+#include <string>
+
 #include "common/string-util.h"
 
 class HardwareMapping;

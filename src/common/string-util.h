@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <cstdint>
 #include <ostream>
 #include <string>
 #include <string_view>

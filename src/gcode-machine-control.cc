@@ -35,6 +35,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string>
+
 #include "adc.h"
 #include "common/container.h"
 #include "common/logging.h"

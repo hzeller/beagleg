@@ -21,6 +21,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cctype>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <map>
+
 #include "common/logging.h"
 #include "gcode-parser/gcode-parser.h"
 

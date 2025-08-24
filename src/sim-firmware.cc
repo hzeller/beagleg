@@ -92,6 +92,8 @@ plot "/tmp/foo.data" using 1:3 title "velocity Euclid" with lines ls 1, '' using
 #include <stdio.h>
 #include <strings.h>
 
+#include <cstring>
+
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
 

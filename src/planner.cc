@@ -20,6 +20,8 @@
 
 #include <math.h>
 
+#include <algorithm>
+#include <cassert>
 #include <cmath>  // We use these functions as they work type-agnostic
 #include <cstddef>
 #include <cstdint>
@@ -27,6 +29,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <sstream>
+#include <string>
 
 #include "common/container.h"
 #include "common/logging.h"

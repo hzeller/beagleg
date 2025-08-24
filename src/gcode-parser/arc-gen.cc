@@ -23,6 +23,7 @@
 
 #include <functional>
 
+#include "common/container.h"
 #include "gcode-parser/gcode-parser.h"
 
 // Arc generation based on smoothieware implementation

@@ -30,6 +30,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <memory>
 
 #include "common/logging.h"

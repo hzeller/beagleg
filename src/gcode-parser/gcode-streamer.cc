@@ -20,8 +20,14 @@
 
 #include <fcntl.h>
 #include <string.h>
+#include <unistd.h>
 
+#include <cerrno>
+#include <cstdio>
+
+#include "common/fd-mux.h"
 #include "common/logging.h"
+#include "gcode-parser/gcode-parser.h"
 
 GCodeStreamer::GCodeStreamer(FDMultiplexer *event_server, GCodeParser *parser,
                              GCodeParser::EventReceiver *parse_events)

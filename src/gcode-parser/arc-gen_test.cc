@@ -19,8 +19,10 @@
 #include <gtest/gtest.h>
 #include <math.h>
 
+#include <cassert>
 #include <iostream>
 
+#include "common/container.h"
 #include "gcode-parser/gcode-parser.h"
 
 // Iterate through axis X, Y, Z. AXIS_A is the first _not_ in set

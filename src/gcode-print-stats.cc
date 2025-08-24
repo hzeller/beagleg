@@ -30,6 +30,8 @@
 #include "config-parser.h"
 #include "determine-print-stats.h"
 #include "gcode-machine-control.h"
+#include "gcode-parser/gcode-parser.h"
+#include "hardware-mapping.h"
 
 int usage(const char *prog) {
   fprintf(stderr,

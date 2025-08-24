@@ -19,6 +19,8 @@
 #include "hershey.h"
 
 #include <algorithm>
+#include <functional>
+#include <string_view>
 
 namespace {
 // Definition of the font at end of file.

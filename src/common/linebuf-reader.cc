@@ -18,6 +18,11 @@
  */
 #include "common/linebuf-reader.h"
 
+#include <unistd.h>
+
+#include <cstddef>
+#include <cstring>
+
 #include "common/string-util.h"
 
 LinebufReader::LinebufReader(size_t buffer_size)

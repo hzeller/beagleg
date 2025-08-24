@@ -19,6 +19,8 @@
 
 #include <stdio.h>
 
+#include <cstdint>
+
 #include "motion-queue.h"
 
 // Output to wav file. Only motor 0/1 (X/Y) on left/right channel. Helps to

@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <strings.h>
 
+#include <cstring>
+
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
 

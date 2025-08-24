@@ -60,9 +60,14 @@
 
 #include <algorithm>
 #include <complex>
+#include <cstring>
 #include <functional>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "common/logging.h"
+#include "common/string-util.h"
 #include "config-parser.h"
 #include "gcode-machine-control.h"
 #include "gcode-parser/gcode-parser.h"

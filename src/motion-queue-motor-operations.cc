@@ -34,6 +34,7 @@
 #include "hardware-mapping.h"
 #include "motion-queue.h"
 #include "motor-interface-constants.h"
+#include "segment-queue.h"
 
 // We need two loops per motor step (edge up, edge down),
 // So we need to multiply step-counts by 2

@@ -10,6 +10,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cassert>
+#include <cstdint>
+#include <cstdlib>
+
 #include "common/container.h"
 #include "common/logging.h"
 #include "hardware-mapping.h"

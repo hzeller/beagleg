@@ -21,6 +21,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
 TEST(StringUtilTest, TrimWhitespace) {
   EXPECT_EQ("hello", TrimWhitespace(" \t  hello \n\r  "));
   EXPECT_TRUE(TrimWhitespace(" \t ").empty());

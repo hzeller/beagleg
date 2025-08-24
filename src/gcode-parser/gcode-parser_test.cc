@@ -9,6 +9,8 @@
 #include <string.h>
 #include <strings.h>
 
+#include <string>
+
 #include "common/string-util.h"
 
 // 'home' position of our simulated machine. Arbitrary values.

@@ -23,8 +23,13 @@
 #include <ctype.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <string_view>
 
 #include "common/logging.h"
 #include "common/string-util.h"

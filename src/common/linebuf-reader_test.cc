@@ -20,7 +20,12 @@
 #include "common/linebuf-reader.h"
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 

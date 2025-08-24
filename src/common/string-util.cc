@@ -24,8 +24,16 @@
 #include <string.h>
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
+#include <cstdint>
+#include <cstdlib>
+#include <string>
+#include <string_view>
+#include <system_error>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 std::string_view TrimWhitespace(std::string_view s) {
   std::string_view::iterator start = s.begin();

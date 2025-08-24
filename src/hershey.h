@@ -20,6 +20,7 @@
 #define _BEAGLEG_HERSHEY_H_
 
 #include <functional>
+#include <string_view>
 
 #include "common/string-util.h"
 

@@ -21,6 +21,8 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+
 enum MyKeywords {
   NO_KEYWORD,  // the equivalent of 'not found' needs to be first
   KEYWORD_IF,

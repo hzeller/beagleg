@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <cassert>
+
 #include "common/logging.h"
 #include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"

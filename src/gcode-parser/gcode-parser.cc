@@ -39,6 +39,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <string>
+#include <string_view>
+
 #include "common/logging.h"
 #include "common/string-util.h"
 #include "gcode-parser/simple-lexer.h"

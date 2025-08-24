@@ -19,6 +19,7 @@
 #ifndef _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 #define _BEAGLEG_GCODE_MACHINE_CONTROL_H_
 
+#include <cstdio>
 #include <string>
 
 #include "common/container.h"

@@ -22,9 +22,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "common/logging.h"
 #include "common/string-util.h"
 #include "config-parser.h"
+#include "gcode-parser/gcode-parser.h"
 #include "generic-gpio.h"
 #include "pwm-timer.h"
 #include "segment-queue.h"  // LinearSegmentSteps
