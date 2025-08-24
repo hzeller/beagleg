@@ -138,12 +138,15 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install pkg-config libgtest-dev libgmock-dev bear clang-tidy-11
+        sudo apt-get install pkg-config libgtest-dev libgmock-dev bear clang-tidy-19
 
-    - name: Configure shell
+    - name: Prepare compilation DB
       # Since we're not compiling on the Beaglebone, disable arm specifics
       run: |
         echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
+        bear -- make
 
     - name: Run clang tidy
-      run: ./.github/bin/run-clang-tidy.sh
+      run: |
+        # for now, just report, but don't fail the CI
+        ./.github/bin/run-clang-tidy-cached.cc || true

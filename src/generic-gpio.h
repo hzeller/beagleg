@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 
-#include "motor-interface-constants.h"
+#include "motor-interface-constants.h"  // IWYU pragma: export
 
 int get_gpio(uint32_t gpio_def);
 
