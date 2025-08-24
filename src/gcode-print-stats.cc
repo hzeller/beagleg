@@ -23,6 +23,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <algorithm>
+
 #include "common/logging.h"
 #include "config-parser.h"
 #include "determine-print-stats.h"
@@ -115,7 +117,7 @@ int main(int argc, char *argv[]) {
   int longest_filename = strlen("#[filename]");  // table header
   for (int i = optind; i < argc; ++i) {
     const int len = strlen(argv[i]);
-    if (len > longest_filename) longest_filename = len;
+    longest_filename = std::max(len, longest_filename);
   }
   if (print_header) {
     printf("%-*s %10s %7s %7s %7s %7s %7s %7s %7s %7s\n", longest_filename,

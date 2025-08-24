@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <cstring>
 
 #include "gcode-machine-control.h"
@@ -79,8 +80,8 @@ class StatsCollectingEventDelegator : public GCodeParser::EventReceiver {
 
  private:
   static void set_min_max(float value, float *min, float *max) {
-    if (value < *min) *min = value;
-    if (value > *max) *max = value;
+    *min = std::min(value, *min);
+    *max = std::max(value, *max);
   }
   void update_coordinate_stats(const AxesRegister &axis) {
     set_min_max(axis[AXIS_X], &stats_->x_min, &stats_->x_max);
@@ -104,7 +105,7 @@ class StatsSegmentQueue : public SegmentQueue {
     int max_steps = 0;
     for (int i = 0; i < BEAGLEG_NUM_MOTORS; ++i) {
       const int steps = abs(param.steps[i]);
-      if (steps > max_steps) max_steps = steps;
+      max_steps = std::max(steps, max_steps);
     }
 
     // max_steps = a/2*t^2 + v0*t; a = (v1-v0)/t

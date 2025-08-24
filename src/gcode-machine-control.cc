@@ -34,6 +34,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <string>
 
 #include "adc.h"
@@ -218,9 +219,8 @@ bool GCodeMachineControl::Impl::Init() {
   }
 
   for (const GCodeParserAxis axis : AllAxes()) {
-    if (cfg_.max_feedrate[axis] > g0_feedrate_mm_per_sec_) {
-      g0_feedrate_mm_per_sec_ = cfg_.max_feedrate[axis];
-    }
+    g0_feedrate_mm_per_sec_ =
+      std::max(cfg_.max_feedrate[axis], g0_feedrate_mm_per_sec_);
   }
   prog_speed_factor_ = 1.0f;
 
@@ -992,7 +992,7 @@ int GCodeMachineControl::Impl::move_to_probe(enum GCodeParserAxis axis,
   int total_movement = 0;
   float v0 = 0;
   float v1 = feedrate;
-  if (v1 > cfg_.max_probe_feedrate[axis]) v1 = cfg_.max_probe_feedrate[axis];
+  v1 = std::min(v1, cfg_.max_probe_feedrate[axis]);
   while (!hardware_mapping_->TestProbeSwitch()) {
     total_movement += planner_->DirectDrive(axis, dir * kProbeMM, v0, v1);
     v0 = v1;  // TODO: possibly acceleration over multiple segments.

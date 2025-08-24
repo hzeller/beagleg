@@ -119,12 +119,12 @@ class AxesRange {
 
   // Update with a range we should cover at least.
   void Update(const AxesRegister &axes) {
-    if (axes[AXIS_X] < min_[AXIS_X]) min_[AXIS_X] = axes[AXIS_X];
-    if (axes[AXIS_Y] < min_[AXIS_Y]) min_[AXIS_Y] = axes[AXIS_Y];
-    if (axes[AXIS_Z] < min_[AXIS_Z]) min_[AXIS_Z] = axes[AXIS_Z];
-    if (axes[AXIS_X] > max_[AXIS_X]) max_[AXIS_X] = axes[AXIS_X];
-    if (axes[AXIS_Y] > max_[AXIS_Y]) max_[AXIS_Y] = axes[AXIS_Y];
-    if (axes[AXIS_Z] > max_[AXIS_Z]) max_[AXIS_Z] = axes[AXIS_Z];
+    min_[AXIS_X] = std::min(axes[AXIS_X], min_[AXIS_X]);
+    min_[AXIS_Y] = std::min(axes[AXIS_Y], min_[AXIS_Y]);
+    min_[AXIS_Z] = std::min(axes[AXIS_Z], min_[AXIS_Z]);
+    max_[AXIS_X] = std::max(axes[AXIS_X], max_[AXIS_X]);
+    max_[AXIS_Y] = std::max(axes[AXIS_Y], max_[AXIS_Y]);
+    max_[AXIS_Z] = std::max(axes[AXIS_Z], max_[AXIS_Z]);
   }
 
   void ZeroUnusedAxes() {
@@ -772,8 +772,8 @@ class GCodePrintVisualizer : public GCodeParser::EventReceiver {
   void change_spindle_speed(float value) final {
     // Hack to visualize brightness in lasing applications.
     laser_intensity_ = value;
-    if (laser_intensity_ < laser_min_) laser_min_ = laser_intensity_;
-    if (laser_intensity_ > laser_max_) laser_max_ = laser_intensity_;
+    laser_min_ = std::min(laser_intensity_, laser_min_);
+    laser_max_ = std::max(laser_intensity_, laser_max_);
   }
 
   const char *unprocessed(char letter, float value, const char *remain) final {
@@ -871,8 +871,8 @@ class SegmentQueuePrinter final : public SegmentQueue {
   }
 
   void RememberMinMax(float v) {
-    if (v > max_v_) max_v_ = v;
-    if (v < min_v_) min_v_ = v;
+    max_v_ = std::max(v, max_v_);
+    min_v_ = std::min(v, min_v_);
   }
 
   bool Enqueue(const LinearSegmentSteps &param) final {

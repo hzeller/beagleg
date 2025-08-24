@@ -385,7 +385,7 @@ static double determine_joining_speed(const struct AxisTarget *from,
     const double goal = to_speed * speed_conversion;
     if (goal < 0.0) return 0.0;
     if (is_first || within_acceptable_range(goal, from_defining_speed, 1e-5)) {
-      if (goal < from_defining_speed) from_defining_speed = goal;
+      from_defining_speed = std::min(goal, from_defining_speed);
       is_first = false;
     } else {
       return 0.0;  // Too far off.
@@ -646,15 +646,14 @@ bool Planner::Impl::machine_move(const AxesRegister &axis, float feedrate) {
 
   // Clamp the next speed to insure that this segment does not go over.
   // The new target speed must be equal or lower than the previously planned.
-  if (new_previous_speed < new_pos->start_speed)
-    new_pos->start_speed = new_previous_speed;
+  new_pos->start_speed = std::min(new_previous_speed, new_pos->start_speed);
 
   // Make sure the target feedrate for the move is clamped to what all the
   // moving axes can reach.
   const double max_speed =
     clamp_defining_axis_limit(new_pos->delta_steps, cfg_->max_feedrate,
                               defining_axis, cfg_->steps_per_mm);
-  if (max_speed < new_pos->speed) new_pos->speed = max_speed;
+  new_pos->speed = std::min(max_speed, new_pos->speed);
 
   // Define the maximum acceleration given the following motion angles and
   // defining axis.
@@ -914,11 +913,9 @@ int Planner::Impl::DirectDrive(GCodeParserAxis axis, float distance, float v0,
   struct LinearSegmentSteps move_command = {};
 
   move_command.v0 = v0 * steps_per_mm;
-  if (move_command.v0 > max_axis_speed_[axis])
-    move_command.v0 = max_axis_speed_[axis];
+  move_command.v0 = std::min(move_command.v0, max_axis_speed_[axis]);
   move_command.v1 = v1 * steps_per_mm;
-  if (move_command.v1 > max_axis_speed_[axis])
-    move_command.v1 = max_axis_speed_[axis];
+  move_command.v1 = std::min(move_command.v1, max_axis_speed_[axis]);
 
   move_command.aux_bits = hardware_mapping_->GetAuxBits();
 

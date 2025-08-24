@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <algorithm>
 #include <deque>
 
 #include "hardware-mapping.h"
@@ -255,9 +256,7 @@ void MotionQueueMotorOperations::SetExternalPosition(int axis, int steps) {
 static int get_defining_axis_steps(const LinearSegmentSteps &param) {
   int defining_axis_steps = abs(param.steps[0]);
   for (int i = 1; i < BEAGLEG_NUM_MOTORS; ++i) {
-    if (abs(param.steps[i]) > defining_axis_steps) {
-      defining_axis_steps = abs(param.steps[i]);
-    }
+    defining_axis_steps = std::max(abs(param.steps[i]), defining_axis_steps);
   }
   return defining_axis_steps;
 }

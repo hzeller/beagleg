@@ -44,7 +44,7 @@ class InputStreamSimulator {
     for (const char *line : kSampleLines) {
       if (line == nullptr) break;
       buffer_.append(line).append(endline);
-      if (strlen(line) > longest_line_len_) longest_line_len_ = strlen(line);
+      longest_line_len_ = std::max(strlen(line), longest_line_len_);
     }
   }
 
