@@ -51,7 +51,7 @@ std::string ToLower(std::string_view in) {
 
 bool HasPrefix(std::string_view s, std::string_view prefix) {
   if (s.length() < prefix.length()) return false;
-  return strncmp(s.data(), prefix.data(), prefix.length()) == 0;
+  return strncmp(s.data(), prefix.data(), prefix.length()) == 0;  // NOLINT
 }
 
 static inline bool contains(std::string_view str, char c) {

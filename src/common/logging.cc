@@ -29,8 +29,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "syslog.h"
-
 static int log_fd = 2;  // Allow logging before Log_init().
 
 static const char *const kInfoHighlight = "\033[1mINFO  ";

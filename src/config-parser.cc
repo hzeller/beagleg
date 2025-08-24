@@ -130,7 +130,7 @@ void ConfigParser::SetContent(std::string_view content) {
 // Modifies source.
 static std::string_view NextLine(std::string_view *source) {
   std::string_view result;
-  if (source->length() == 0) return result;
+  if (source->empty()) return result;
   const std::string_view::iterator start = source->begin();
   std::string_view::iterator endline = start;
   for (/**/; endline != source->end(); ++endline) {

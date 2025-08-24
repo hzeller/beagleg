@@ -78,7 +78,7 @@ class StatsCollectingEventDelegator : public GCodeParser::EventReceiver {
   }
 
  private:
-  static inline void set_min_max(float value, float *min, float *max) {
+  static void set_min_max(float value, float *min, float *max) {
     if (value < *min) *min = value;
     if (value > *max) *max = value;
   }
