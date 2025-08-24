@@ -99,13 +99,7 @@ jobs:
     - name: Coverage run
       run: |
         make -C src beagleg.coverage
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v2
-      with:
-        files: src/beagleg.coverage
-        fail_ci_if_error: true
-        verbose: true
+        # todo: do something with coverage
 
   CodeFormatting:
     runs-on: ubuntu-latest
@@ -119,7 +113,7 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        sudo apt-get install clang-format-11
+        sudo apt-get install clang-format-19
         clang-format --version
 
     - name: Run formatting style check
@@ -143,8 +137,7 @@ jobs:
     - name: Prepare compilation DB
       # Since we're not compiling on the Beaglebone, disable arm specifics
       run: |
-        echo 'ARM_COMPILE_FLAGS=' >> $GITHUB_ENV
-        bear -- make
+        ARM_COMPILE_FLAGS= bear -- make
 
     - name: Run clang tidy
       run: |
