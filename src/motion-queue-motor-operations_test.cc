@@ -29,9 +29,9 @@ class MockMotionQueue final : public MotionQueue {
     return true;
   }
 
-  void WaitQueueEmpty() final{};
-  void MotorEnable(bool on) final{};
-  void Shutdown(bool flush_queue) final{};
+  void WaitQueueEmpty() final {};
+  void MotorEnable(bool on) final {};
+  void Shutdown(bool flush_queue) final {};
   int GetPendingElements(uint32_t *head_item_progress) final {
     if (head_item_progress) *head_item_progress = remaining_loops_;
     return queue_size_;
@@ -70,14 +70,17 @@ TEST(RealtimePosition, back_and_forth) {
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */, 0 /* v1 */, 0 /* aux */, {1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
+    0,                           // v0
+    0,                           // v1
+    0,                           // aux
+    {1000, 0, 0, 0, 0, 0, 0, 0}  // steps
   };
   // Enqueue a segment
   const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {-1000, 0, 0, 0, 0, 0, 0, 0} /* steps */
+    0,                            // v0
+    0,                            // v1
+    0,                            // aux
+    {-1000, 0, 0, 0, 0, 0, 0, 0}  // steps
   };
 
   PhysicalStatus status;
@@ -113,10 +116,16 @@ TEST(RealtimePosition, empty_element) {
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */, 0 /* v1 */, 0xff /* aux */, {0, 0, 0, 0, 0, 0, 0, 0} /* steps */
+    0,                        // v0
+    0,                        // v1
+    0xff,                     // aux
+    {0, 0, 0, 0, 0, 0, 0, 0}  // steps
   };
   const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */, 0 /* v1 */, 0 /* aux */, {100, 0, 0, 0, 0, 0, 0, 0} /* steps */
+    0,                          // v0
+    0,                          // v1
+    0,                          // aux
+    {100, 0, 0, 0, 0, 0, 0, 0}  // steps
   };
 
   motor_operations.Enqueue(kSegment2);
@@ -139,16 +148,16 @@ TEST(RealtimePosition, sample_pos) {
 
   // Enqueue a segment
   const LinearSegmentSteps kSegment1 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {10, -20, 30, -40, 0, -60, 70, -80} /* steps */
+    0,                                   // v0
+    0,                                   // v1
+    0,                                   // aux
+    {10, -20, 30, -40, 0, -60, 70, -80}  // steps
   };
   const LinearSegmentSteps kSegment2 = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {17, +42, 12, -90, 30, +91, 113, -1000} /* steps */
+    0,                                       // v0
+    0,                                       // v1
+    0,                                       // aux
+    {17, +42, 12, -90, 30, +91, 113, -1000}  // steps
   };
   motor_operations.Enqueue(kSegment1);
   motor_operations.Enqueue(kSegment2);
@@ -181,10 +190,10 @@ TEST(RealtimePosition, zero_loops_edge) {
 
   // Enqueue a segment
   LinearSegmentSteps segment = {
-    0 /* v0 */,
-    0 /* v1 */,
-    0 /* aux */,
-    {10, 20, 30, 40, 50, 60, 70, 80} /* steps */
+    0,                                // v0
+    0,                                // v1
+    0,                                // aux
+    {10, 20, 30, 40, 50, 60, 70, 80}  // steps
   };
   const int expected[BEAGLEG_NUM_MOTORS] = {10, 20, 30, 40, 50, 60, 70, 80};
 

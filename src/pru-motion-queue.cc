@@ -35,7 +35,7 @@
 
 using internal::QueueStatus;
 
-//#define DEBUG_QUEUE
+// #define DEBUG_QUEUE
 
 // The communication with the PRU. We memory map the static RAM in the PRU
 // and write stuff into it from here. Mostly this is a ring-buffer with
