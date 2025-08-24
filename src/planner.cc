@@ -75,8 +75,7 @@ struct AxisTarget {
     ss << "\"speed\":" << speed << ",";
     ss << "\"accel\":" << accel << ",";
     ss << "\"defining_axis\":" << defining_axis << ",";
-    ss << "\"delta\":"
-       << "[";
+    ss << "\"delta\":" << "[";
     bool first = true;
     for (const GCodeParserAxis a : AllAxes()) {
       if (first) {
@@ -87,8 +86,7 @@ struct AxisTarget {
       ss << delta_steps[a];
     }
     ss << "],";
-    ss << "\"pos\":"
-       << "[";
+    ss << "\"pos\":" << "[";
     first = true;
     for (const GCodeParserAxis a : AllAxes()) {
       if (first) {
