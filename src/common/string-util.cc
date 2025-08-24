@@ -116,7 +116,7 @@ static void CopyNumberTo(const char *in_begin, const char *in_end,
   const char *extra_allowed = "+-.";
   bool have_point = false;
   out_end -= 1;  // Allow space for 0 termination.
-  while (src < in_end && (isdigit(*src) || index(extra_allowed, *src)) &&
+  while (src < in_end && (isdigit(*src) || strchr(extra_allowed, *src)) &&
          dst < out_end) {
     // The sign is only allowed in the first character of the buffer
     if ((*src == '+' || *src == '-') && dst != out_begin) break;
