@@ -60,7 +60,7 @@ static void sleep_ms(int ms) {
   struct timespec req;
   struct timespec rem;
   req.tv_sec = ms / 1000;
-  req.tv_nsec = (ms % 1000) * (1000 * 1000);
+  req.tv_nsec = (ms % 1000L) * 1000'000L;
   if (nanosleep(&req, &rem) == -1) {
     if (errno == EINTR) {
       Log_error("sleep_ms: nanosleep() was interrupted (%ld.%ld sec remaining)",

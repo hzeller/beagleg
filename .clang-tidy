@@ -27,6 +27,7 @@ Checks: >
   performance-*,
   -performance-enum-size,
   readability-*,
+  -readability-avoid-nested-conditional-operator,
   -readability-avoid-unconditional-preprocessor-if,
   -readability-braces-around-statements,
   -readability-convert-member-functions-to-static,

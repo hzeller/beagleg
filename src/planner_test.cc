@@ -21,6 +21,7 @@
 #include "hardware-mapping.h"
 #include "segment-queue.h"
 
+namespace {
 // Helper function for implementing ASSERT_NEAR.
 testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
                                                     const char *expr2,
@@ -39,6 +40,7 @@ testing::AssertionResult DoubleNearAbsRelPredFormat(const char *expr1,
          << expr2 << " evaluates to " << val2 << ",\n"
          << rel_error_expr << " evaluates to " << rel_error << ".";
 }
+}  // namespace
 
 #define EXPECT_NEAR_REL(val1, val2, rel_error) \
   EXPECT_PRED_FORMAT3(DoubleNearAbsRelPredFormat, val1, val2, rel_error)
@@ -581,7 +583,8 @@ TEST(PlannerTest, CornerMove_90Degrees) {
   EXPECT_EQ(segments[1].v1, segments[2].v0);
 }
 
-void testShallowAngleAllStartingPoints(float threshold, float testing_angle) {
+static void testShallowAngleAllStartingPoints(float threshold,
+                                              float testing_angle) {
   const float kSpeedTuneAngle = 0.0f;
   // Essentially, we go around the circle as starting segments.
   for (float angle = 0; angle < 360; angle += threshold / 2) {  // NOLINT

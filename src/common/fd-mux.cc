@@ -107,8 +107,8 @@ bool FDMultiplexer::SingleCycle(unsigned int timeout_ms) {
   fd_set write_fds;
 
   struct timeval timeout;
-  timeout.tv_sec = timeout_ms / 1000;
-  timeout.tv_usec = (timeout_ms % 1000) * 1000;
+  timeout.tv_sec = timeout_ms / 1000L;
+  timeout.tv_usec = (timeout_ms % 1000L) * 1000L;
 
   int maxfd = -1;
   FD_ZERO(&read_fds);

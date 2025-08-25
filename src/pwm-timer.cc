@@ -102,7 +102,7 @@ struct pwm_timer_data {
   char running;
 };
 
-struct pwm_timer_data timers[4] = {{}, {}, {}, {}};
+static struct pwm_timer_data timers[4] = {{}, {}, {}, {}};
 
 static struct pwm_timer_data *pwm_timer_get_data(uint32_t gpio_def) {
   struct pwm_timer_data *timer = NULL;

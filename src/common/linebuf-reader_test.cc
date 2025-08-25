@@ -31,7 +31,7 @@
 
 // Raw lines that we use as samples
 constexpr int kSampleLineCount = 4;
-const char *kSampleLines[kSampleLineCount + 1] = {
+static const char *kSampleLines[kSampleLineCount + 1] = {
   "This is a short line",          //
   "This is another, longer line",  //
   "",                              // Emtpy line

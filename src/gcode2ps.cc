@@ -1196,8 +1196,8 @@ static bool ParseConfigIfAvailable(const char *config_file,
 }
 
 // Append operation, making sure that the "arg" can properly parsed as float.
-bool AppendFloatOp(const char *arg, const char *op,
-                   std::vector<std::string> *result) {
+static bool AppendFloatOp(const char *arg, const char *op,
+                          std::vector<std::string> *result) {
   char *endptr = nullptr;
   strtof(arg, &endptr);
   if (*endptr != '\0') {
@@ -1208,7 +1208,8 @@ bool AppendFloatOp(const char *arg, const char *op,
   return true;
 }
 
-bool AppendViewOp(const std::string &view, std::vector<std::string> *result) {
+static bool AppendViewOp(const std::string &view,
+                         std::vector<std::string> *result) {
   const std::string key = ToLower(view);
   auto found = kNamedViews.lower_bound(key);
   if (found != kNamedViews.end() && HasPrefix(found->first, key)) {
@@ -1224,7 +1225,8 @@ bool AppendViewOp(const std::string &view, std::vector<std::string> *result) {
   }
 }
 
-void ClearAndWarnIfNotEmpty(const char *msg, std::vector<std::string> *v) {
+static void ClearAndWarnIfNotEmpty(const char *msg,
+                                   std::vector<std::string> *v) {
   if (!v->empty()) fprintf(stderr, "%s\n", msg);
   v->clear();
 }

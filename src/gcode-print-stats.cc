@@ -32,7 +32,7 @@
 #include "gcode-parser/gcode-parser.h"
 #include "hardware-mapping.h"
 
-int usage(const char *prog) {
+static int usage(const char *prog) {
   fprintf(stderr,
           "Usage: %s [options] <gcode-file> [<gcode-file> ..]\n"
           "Options:\n"

@@ -330,7 +330,9 @@ static std::string MakeAbsoluteFile(const char *in) {
   if (!in || in[0] == '\0') return "";
   if (in[0] == '/') return in;
   char buf[1024];
-  return std::string(getcwd(buf, sizeof(buf))) + "/" + in;
+  const char *cwd = getcwd(buf, sizeof(buf));
+  assert(cwd != NULL);  // Uh, couldn't getcwd() ?
+  return std::string(cwd) + "/" + in;
 }
 
 int main(int argc, char *argv[]) {

@@ -182,7 +182,7 @@ bool SimFirmwareQueue::Enqueue(MotionSegment *segment) {
 #endif
   bool is_first = true;
   uint32_t remainder = 0;
-  const char *msg = "";
+  const char *msg = nullptr;
 
   for (;;) {
     // Increment by motor fraction.
