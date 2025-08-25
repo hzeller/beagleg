@@ -127,8 +127,9 @@ bool GCodeParser::Config::SaveParams() const {
   Log_debug("Saving %d parameters to %s", pcount, paramfile.c_str());
 
   // Want to make sure it actually made it to disk.
-  // Using '&' to always execute all of these, no shortcut eval.
-  if ((fflush(fp) == 0) & (fdatasync(fileno(fp)) == 0) & (fclose(fp) == 0)) {
+  fflush(fp);
+  fdatasync(fileno(fp));
+  if (fclose(fp) == 0) {
     rename(paramfile.c_str(), (paramfile + ".bak").c_str());
     if (rename(tmp_name.c_str(), paramfile.c_str()) == 0) return true;
   }
