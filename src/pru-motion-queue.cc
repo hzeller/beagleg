@@ -178,9 +178,12 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
 }
 
 void PRUMotionQueue::HaltAndDiscard() {
+  // De-energize first so any pulse the PRU emits before Halt() is ignored
+  // by the now-disabled drivers.
   MotorEnable(false);
   pru_interface_->Halt();
   ClearRingBuffer();
+  memset((void *)&pru_data_->status, 0, sizeof(pru_data_->status));
   queue_pos_ = 0;
   pru_interface_->Restart();
 }

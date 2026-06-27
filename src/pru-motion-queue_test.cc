@@ -38,10 +38,11 @@ class MockPRUInterface : public PruHardwareInterface {
   MOCK_METHOD(void, Restart, (), (final));
 
   bool AllocateSharedMem(void **pru_mmap, const size_t size) final {
-    if (mmap != NULL) return true;
-    mmap = (struct MockPRUCommunication *)malloc(size);
+    if (mmap == NULL) {
+      mmap = (struct MockPRUCommunication *)malloc(size);
+      memset(mmap, 0x00, size);
+    }
     *pru_mmap = (void *)mmap;
-    memset(*pru_mmap, 0x00, size);
     return true;
   }
 
