@@ -35,6 +35,12 @@ cool is that?).
 For detailed system configuration and building the `machine-control` binary, see
 [INSTALL.md](./INSTALL.md).
 
+If you use the [nix](https://nixos.org/) package manager, BeagleG ships with
+a `flake.nix` that builds the project hermetically and can cross-compile to
+the BeagleBone target straight from an x86 dev box — no toolchain to install
+by hand, identical builds across machines. See [Development.md](./Development.md#nixos)
+for the one-liner.
+
 Before you can use beagleg and get meaningful outputs on the GPIO pins,
 two things are required on a fresh Beaglebone installation (we recommend the
 IoT image).
