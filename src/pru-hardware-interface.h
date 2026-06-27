@@ -61,4 +61,28 @@ class UioPrussInterface : public PruHardwareInterface {
   void Restart() final;
 };
 
+// PRU hardware control via the kernel's remoteproc / uio_pruss split:
+// firmware lifecycle through /sys/class/remoteproc/, shared-memory mapping
+// and event waiting through /dev/uio0. Works on stock BeagleBone Debian
+// images (kernel >= 4.19) without device-tree overrides.
+class RemoteprocPruInterface : public PruHardwareInterface {
+ public:
+  RemoteprocPruInterface();
+  ~RemoteprocPruInterface() final;
+
+  bool Init() final;
+  bool AllocateSharedMem(void **pru_mmap, size_t size) final;
+  bool StartExecution() final;
+  unsigned WaitEvent() final;
+  bool Shutdown() final;
+  void Halt() final;
+  void Restart() final;
+
+ private:
+  int uio_fd_;
+  void *mmap_;
+  size_t mmap_size_;
+  char *rproc_dir_;  // e.g. "/sys/class/remoteproc/remoteproc1"
+};
+
 #endif  // BEAGLEG_PRU_HARDWARE_INTERFACE_

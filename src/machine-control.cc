@@ -578,7 +578,11 @@ int main(int argc, char *argv[]) {
         "Use the dryrun option -n to not write to GPIO).");
       return 1;
     }
+#ifdef BEAGLEG_PRU_BACKEND_REMOTEPROC
+    pru_hw_interface = new RemoteprocPruInterface();
+#else
     pru_hw_interface = new UioPrussInterface();
+#endif
     motion_backend = new PRUMotionQueue(&hardware_mapping, pru_hw_interface);
   }
 
