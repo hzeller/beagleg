@@ -49,6 +49,36 @@ the root of the environment.
 nix-shell
 ```
 
+The shell pulls in the host build deps: gtest, valgrind, clang-tools,
+lcov, ghostscript, graphviz.
+
+#### Building with the flake
+
+There is also a `flake.nix` that exposes BeagleG as a nix package and
+supports cross-compilation to the BeagleBone target out of the box. The
+`am335x_pru_package` git submodule is followed transparently via
+`inputs.self.submodules = true;` in the flake.
+
+Each program is its own flake output (and so is its cross-compiled
+counterpart suffixed `-armv7`):
+
+```
+# run any program directly
+nix run .#machine-control -- --help
+nix run .#gcode2ps testdata/some.gcode
+
+# build a single binary (result/bin/<name>)
+nix build .#gcode-print-stats
+
+# cross-compile a single binary for the BeagleBone (armv7l-hf)
+nix build .#machine-control-armv7
+
+# list every flake output (packages, dev shells, ...)
+nix flake show
+```
+
+The cross-built binaries are ARM EABI5 ELFs ready to scp onto a BBB.
+
 ### Coverage
 To see if there is code that has not been covered in tests yet, there is
 a target `make coverage`, that creates a `src/coverage.html` report with
