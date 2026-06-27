@@ -68,11 +68,13 @@ else
   PRU_BACKEND_LIBS=$(PRUSS_LIBS)
 endif
 
-# PRU cross-toolchain (Debian: binutils-pru, gcc-pru). Only needed for
-# PRU_BACKEND=remoteproc.
-PRU_GCC?=pru-gcc
-PRU_LD?=pru-ld
-PRU_OBJCOPY?=pru-objcopy
+# PRU cross-toolchain (Debian: binutils-pru). Only needed for
+# PRU_BACKEND=remoteproc. Just binutils is enough; no C compiler is
+# required (PASM produces the firmware bytes and the resource_table
+# is a pure-asm fragment).
+PRU_AS?=pru-elf-as
+PRU_LD?=pru-elf-ld
+PRU_OBJCOPY?=pru-elf-objcopy
 
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
@@ -166,8 +168,8 @@ motor-interface-pru-text.o : motor-interface-pru.bin
 	    --rename-section .data=.text,alloc,load,readonly,code \
 	    $< $@
 
-pru-resource-table.o : pru-resource-table.c
-	$(PRU_GCC) -c -o $@ $<
+pru-resource-table.o : pru-resource-table.S
+	$(PRU_AS) -o $@ $<
 
 beagleg-pru0-fw : motor-interface-pru-text.o pru-resource-table.o pru-firmware.ld
 	$(PRU_LD) -T pru-firmware.ld -o $@ \
