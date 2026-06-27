@@ -48,6 +48,21 @@ look like this:
 uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
 ```
 
+### Alternative: remoteproc backend (stock Debian 12+ kernels)
+
+The default `make` builds against the legacy `uio_pruss` driver. On
+modern BeagleBone Debian images the kernel binds the PRU to `remoteproc`
+out of the box; rather than overriding the device tree, build BeagleG
+with the remoteproc backend:
+
+```
+sudo apt install binutils-pru gcc-pru
+make PRU_BACKEND=remoteproc
+sudo make PRU_BACKEND=remoteproc install   # installs firmware to /lib/firmware
+```
+
+The default `PRU-RPROC` overlay can stay enabled in `/boot/uEnv.txt`.
+
 ## Install BeagleG
 
 

@@ -27,6 +27,7 @@
 
 PREFIX?=/usr/local
 BINDIR=$(PREFIX)/bin
+FIRMWAREDIR?=/lib/firmware
 
 export CPP_STANDARD?=-std=c++17   # we're compatible down to 11
 
@@ -36,6 +37,10 @@ all machine-control:
 install: machine-control
 	mkdir -p $(BINDIR)
 	install -m 755 machine-control $(BINDIR)
+ifeq ($(PRU_BACKEND),remoteproc)
+	mkdir -p $(FIRMWAREDIR)
+	install -m 644 src/beagleg-pru0-fw $(FIRMWAREDIR)
+endif
 
 clean test valgrind-test:
 	$(MAKE) -C src/common $@
