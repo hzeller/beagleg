@@ -62,10 +62,17 @@ ifeq ($(PRU_BACKEND),remoteproc)
   PRU_BACKEND_OBJ=remoteproc-pruss-interface.o
   PRU_BACKEND_LIBS=
   CFLAGS+=-DBEAGLEG_PRU_BACKEND_REMOTEPROC
+  PRU_FIRMWARE=beagleg-pru0-fw
 else
   PRU_BACKEND_OBJ=uio-pruss-interface.o
   PRU_BACKEND_LIBS=$(PRUSS_LIBS)
 endif
+
+# PRU cross-toolchain (Debian: binutils-pru, gcc-pru). Only needed for
+# PRU_BACKEND=remoteproc.
+PRU_GCC?=pru-gcc
+PRU_LD?=pru-ld
+PRU_OBJCOPY?=pru-objcopy
 
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
@@ -78,7 +85,7 @@ GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
 OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o $(PRU_BACKEND_OBJ) $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 
-TARGETS=../machine-control ../gcode-print-stats gcode2ps
+TARGETS=../machine-control ../gcode-print-stats gcode2ps $(PRU_FIRMWARE)
 UNITTEST_BINARIES=gcode-machine-control_test config-parser_test machine-control-config_test planner_test motion-queue-motor-operations_test pru-motion-queue_test
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d) hershey.o.d
@@ -148,6 +155,24 @@ $(PRU_BIN) : motor-interface-constants.h \
 %_bin.h : %.p $(PASM) compiler-flags
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
 
+# --- remoteproc firmware build ---
+# PASM emits a raw binary; wrap it in an ELF object so the PRU linker
+# can place it in IMEM together with the resource_table.
+motor-interface-pru.bin : motor-interface-pru.p $(PASM) compiler-flags
+	$(PASM) -I$(CAPE_INCLUDE) -V3 -b $< $(basename $@)
+
+motor-interface-pru-text.o : motor-interface-pru.bin
+	$(PRU_OBJCOPY) -I binary -O elf32-pru \
+	    --rename-section .data=.text,alloc,load,readonly,code \
+	    $< $@
+
+pru-resource-table.o : pru-resource-table.c
+	$(PRU_GCC) -c -o $@ $<
+
+beagleg-pru0-fw : motor-interface-pru-text.o pru-resource-table.o pru-firmware.ld
+	$(PRU_LD) -T pru-firmware.ld -o $@ \
+	    motor-interface-pru-text.o pru-resource-table.o
+
 $(PASM):
 	make -C $(AM335_BASE)
 
@@ -162,7 +187,7 @@ uio-pruss-interface.o : $(PRU_BIN)
 -include $(DEPENDENCY_RULES)
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) hershey.o *.gcda *.gcov *.gcno *.cc.gcov.html *.h.gcov.html *.func.html
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) hershey.o beagleg-pru0-fw motor-interface-pru.bin motor-interface-pru-text.o pru-resource-table.o *.gcda *.gcov *.gcno *.cc.gcov.html *.h.gcov.html *.func.html
 	$(MAKE) -C common clean
 	$(MAKE) -C gcode-parser clean
 
