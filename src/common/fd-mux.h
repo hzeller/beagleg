@@ -46,8 +46,9 @@ class FDMultiplexer {
   void RunOnIdle(const Handler &handler);
 
   // Run the main loop. Blocks while there is still a filedescriptor
-  // registered (return 0) or until a signal is triggered (return 1).
-  int Loop();
+  // registered.
+  // Return `true` on sucess, `false` if we exited due to some signal.
+  bool Loop();
 
  protected:
   // Run a single cycle resulting in exactly one call of a handler function.

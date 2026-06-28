@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include <cmath>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -613,7 +614,6 @@ int main(int argc, char *argv[]) {
     new GCodeParser(parser_cfg, machine_control->ParseEventReceiver());
   GCodeStreamer *const streamer = new GCodeStreamer(
     &event_server, parser, machine_control->ParseEventReceiver());
-  int ret = 0;
   if (has_filename) {
     const char *filename = argv[optind];
     send_file_to_machine(machine_control, streamer, filename);
@@ -627,20 +627,20 @@ int main(int argc, char *argv[]) {
                       machine_control);
   }
 
-  event_server.Loop();  // Run service until Ctrl-C or all sockets closed.
+  // Run service until Ctrl-C or all sockets closed.
+  const bool clean_exit = event_server.Loop();
   Log_info("Exiting.");
 
   delete streamer;
   delete parser;
   delete machine_control;
 
-  const bool caught_signal = (ret == 1);  // ?
-  if (caught_signal) {
+  if (!clean_exit) {
     Log_info(
       "Caught signal: immediate exit. "
       "Skipping potential remaining queue.");
   }
-  motion_backend->Shutdown(!caught_signal);
+  motion_backend->Shutdown(clean_exit);
 
   delete motion_backend;
   delete pru_hw_interface;
@@ -650,5 +650,5 @@ int main(int argc, char *argv[]) {
   parser_cfg.SaveParams();
 
   Log_info("Shutdown.");
-  return ret;
+  return clean_exit ? EXIT_SUCCESS : EXIT_FAILURE;
 }
