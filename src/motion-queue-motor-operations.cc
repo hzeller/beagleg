@@ -238,11 +238,10 @@ void MotionQueueMotorOperations::SetExternalPosition(int axis, int steps) {
   struct HistorySegment history_segment = shadow_queue_->front();
   if (steps < 0) {
     history_segment.pos_info[axis].sign = -1;
-    history_segment.pos_info[axis].position_steps = -steps;
   } else {
     history_segment.pos_info[axis].sign = 1;
-    history_segment.pos_info[axis].position_steps = steps;
   }
+  history_segment.pos_info[axis].position_steps = steps;
   shadow_queue_->push_front(history_segment);
   // Shrink the queue and remove the elements that we are not interested
   // in anymore.
