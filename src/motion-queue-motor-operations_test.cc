@@ -61,6 +61,24 @@ TEST(RealtimePosition, init_pos) {
   EXPECT_THAT(expected, ::testing::ContainerEq(status.pos_steps));
 }
 
+TEST(RealtimePosition, set_external_position_negative) {
+  HardwareMapping hw;
+  MockMotionQueue motion_backend = MockMotionQueue();
+  MotionQueueMotorOperations motor_operations(&hw, &motion_backend);
+
+  motor_operations.SetExternalPosition(0, -12345);
+
+  PhysicalStatus status;
+  motor_operations.GetPhysicalStatus(&status);
+  EXPECT_EQ(-12345, status.pos_steps[0]);
+
+  const LinearSegmentSteps segment = {0, 0, 0, {100, 0, 0, 0, 0, 0, 0, 0}};
+  motor_operations.Enqueue(segment);
+  motion_backend.SimRun(0, 1);
+  motor_operations.GetPhysicalStatus(&status);
+  EXPECT_EQ(-12245, status.pos_steps[0]);
+}
+
 // Check that the steps are correctly evaluated from the shadow queue
 // with the correct sign.
 TEST(RealtimePosition, back_and_forth) {
