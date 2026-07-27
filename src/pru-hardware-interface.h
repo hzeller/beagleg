@@ -42,6 +42,12 @@ class PruHardwareInterface {
 
   // Halt the PRU
   virtual bool Shutdown() = 0;
+
+  // Halt any program execution. An halted program can be restarted.
+  virtual void Halt() = 0;
+
+  // Restart the execution of the previously halted program.
+  virtual void Restart() = 0;
 };
 
 class UioPrussInterface : public PruHardwareInterface {
@@ -51,6 +57,8 @@ class UioPrussInterface : public PruHardwareInterface {
   bool StartExecution() final;
   unsigned WaitEvent() final;
   bool Shutdown() final;
+  void Halt() final;
+  void Restart() final;
 };
 
 #endif  // BEAGLEG_PRU_HARDWARE_INTERFACE_
