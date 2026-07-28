@@ -57,6 +57,8 @@ namespace {
 // parameters that assuming the requested final trajectory stays the same, they
 // are constants, no matter the previous or next segments.
 struct AxisTarget {
+  AxisTarget() = default;
+
   StepsAxesRegister position_steps;  // Absolute position at end of segment.
                                      // In steps. (steps)
 
@@ -248,6 +250,8 @@ class Planner::Impl {
   SegmentQueue *const motor_ops_;
 
   struct PlanningSegment {
+    PlanningSegment() = default;
+
     AxisTarget target;
     PlannedProfile planned;
 

@@ -175,7 +175,7 @@ static int open_server(const char *bind_addr, int port) {
     return -1;
   }
 
-  struct sockaddr_in serv_addr = {};
+  struct sockaddr_in serv_addr{};
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
   if (bind_addr && !inet_pton(AF_INET, bind_addr, &serv_addr.sin_addr.s_addr)) {

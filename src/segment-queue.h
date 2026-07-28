@@ -26,6 +26,8 @@ enum { BEAGLEG_NUM_MOTORS = 8 };
 // The movement command send to the segment queue either changes speed, or
 // provides a steady speed. Already low-level broken down for motors.
 struct LinearSegmentSteps {
+  LinearSegmentSteps() = default;
+
   // Speed is steps/s. If initial speed and final speed differ, the motor will
   // accelerate or decelerate to reach the final speed within the given number
   // of alotted steps of the axis with the most number of steps; all other axes

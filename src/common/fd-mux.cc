@@ -50,7 +50,7 @@ static void arm_signal_handler() {
   s_caught_exit_trigger_signal = 0;
   s_caught_ignored_signal = 0;
 
-  struct sigaction sa = {};
+  struct sigaction sa{};
   sa.sa_handler = receive_signal;
 
   // We might get multiple signals on shutdown, so not using SA_RESETHAND

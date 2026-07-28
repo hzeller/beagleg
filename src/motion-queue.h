@@ -49,6 +49,8 @@
 // Also useful for testing.
 
 struct MotionSegment {
+  MotionSegment() = default;
+
   // Queue header
   uint8_t state;  // see motor-interface-constants.h STATE_* constants.
 

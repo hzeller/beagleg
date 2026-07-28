@@ -93,6 +93,8 @@
 /* clang-format on */
 
 struct pwm_timer_data {
+  pwm_timer_data() = default;
+
   volatile uint32_t *regs;
   int pwm_freq;
   uint32_t resolution;
