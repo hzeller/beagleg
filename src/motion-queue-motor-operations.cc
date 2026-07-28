@@ -290,7 +290,7 @@ bool MotionQueueMotorOperations::Enqueue(const LinearSegmentSteps &segment) {
         ((int64_t)segment.steps[i] << 32) / divisions + 1;
     }
 
-    struct LinearSegmentSteps previous = {}, accumulator = {}, output;
+    struct LinearSegmentSteps previous{}, accumulator{}, output;
     int64_t hires_step_accumulator[BEAGLEG_NUM_MOTORS] = {0};
     double previous_speed = segment.v0;  // speed calculation in double
 

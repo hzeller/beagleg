@@ -487,15 +487,15 @@ bool Planner::Impl::issue_motor_move_if_possible(
 
   // 2) submit the segments
   // Flush the full queue.
-  struct LinearSegmentSteps accel_command = {};
-  struct LinearSegmentSteps move_command = {};
-  struct LinearSegmentSteps decel_command = {};
+  struct LinearSegmentSteps accel_command{};
+  struct LinearSegmentSteps move_command{};
+  struct LinearSegmentSteps decel_command{};
   PlanningSegment *segment = NULL;
 
   for (uint32_t i = 0; i < num_segments; ++i) {
     segment = planning_buffer_[0];
 
-    memset(&move_command, 0, sizeof(move_command));
+    move_command = LinearSegmentSteps{};
     move_command.aux_bits = segment->target.aux_bits;
     memcpy(&accel_command, &move_command, sizeof(accel_command));
     memcpy(&decel_command, &move_command, sizeof(decel_command));
