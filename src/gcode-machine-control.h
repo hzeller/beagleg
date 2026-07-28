@@ -49,6 +49,7 @@ struct MachineControlConfig {
   FloatAxisConfig max_feedrate;  // Max feedrate for axis (mm/s)
   FloatAxisConfig acceleration;  // Max acceleration for axis (mm/s^2)
 
+  FloatAxisConfig home_feedrate; // Home feedrate for axis (mm/s)
   FloatAxisConfig max_probe_feedrate;  // Max probe feedrate for axis (mm/s)
 
   float speed_factor;      // Multiply feed with. Should be 1.0 by default.

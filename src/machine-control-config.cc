@@ -103,6 +103,7 @@ class MachineControlConfigReader : public ConfigParser::Reader {
       ACCEPT_EXPR("max-feedrate", &config_->max_feedrate[current_axis_]);
       ACCEPT_EXPR("max-anglerate", &config_->max_feedrate[current_axis_]);
 
+      ACCEPT_EXPR("home-feedrate", &config_->home_feedrate[current_axis_]);
       ACCEPT_EXPR("max-probe-feedrate",
                   &config_->max_probe_feedrate[current_axis_]);
 

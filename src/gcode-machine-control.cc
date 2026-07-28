@@ -1035,10 +1035,11 @@ void GCodeMachineControl::Impl::home_axis(enum GCodeParserAxis axis) {
   const float home_pos =
     ((trigger == HardwareMapping::TRIGGER_MAX) ? cfg_.move_range_mm[axis]
                                                : 0.0f);
-  const float kHomingSpeed = 15;  // mm/sec  (make configurable ?)
+  const float homing_speed =
+    (cfg_.home_feedrate[axis] > 0) ? cfg_.home_feedrate[axis] : 15;
 
   planner_->BringPathToHalt();
-  move_to_endstop(axis, kHomingSpeed, trigger);
+  move_to_endstop(axis, homing_speed, trigger);
   planner_->SetExternalPosition(axis, home_pos);
 }
 
