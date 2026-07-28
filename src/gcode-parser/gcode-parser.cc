@@ -156,6 +156,24 @@ class GCodeParser::Impl {
     Log_debug("Axes scale reset\n");
   }
 
+  const char *set_xyz_scale(const char *line) {
+    char axis_l;
+    float value;
+    const char *remaining_line;
+    while ((remaining_line = gparse_pair(line, &axis_l, &value))) {
+      const enum GCodeParserAxis a = gcodep_letter2axis(axis_l);
+      if (a == GCODE_NUM_AXES) break;  // Possibly start of a new command.
+      if (is_linear_axis(a)) {
+        scale_[a] = value;
+        Log_debug("Axis %c scale = %f\n", gcodep_axis2letter(a), value);
+      } else {
+        Log_debug("M51 only works for XYZ axes\n");
+      }
+      line = remaining_line;
+    }
+    return line;
+  }
+
   void reset_G92() { global_offset_g92_ = kZeroOffset; }
 
   // The following methods set the origin and offset and also
@@ -1880,6 +1898,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
       case 50: reset_scale(); break;
+      case 51: line = set_xyz_scale(line); break;
       case 54:
       case 55:
       case 56:
