@@ -224,6 +224,13 @@ class GCodeParser::Impl {
                                              err_msg_);
   }
 
+  // Set the units factor for metric/imperial scaling.
+  // G20/G70 - imperial (inches, scale = 25.4)
+  // G21/G71 - metric (millimeters, scale = 1.0)
+  void set_units_factor(float value) {
+    xyz_unit_to_mm_factor_ = value;
+  }
+
   // Given the axis and the given value passed in the block, convert
   // this value into absolute metric coordinates. Takes into account if
   // values are to be interpreted absolute/relative as well as metric/imperial.
@@ -1847,8 +1854,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 17: arc_normal_ = AXIS_Z; break;
       case 18: arc_normal_ = AXIS_Y; break;
       case 19: arc_normal_ = AXIS_X; break;
-      case 20: xyz_unit_to_mm_factor_ = 25.4f; break;
-      case 21: xyz_unit_to_mm_factor_ = 1.0f; break;
+      case 20: set_units_factor(25.4f); break;
+      case 21: set_units_factor(1.0f); break;
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
       case 54:
@@ -1857,8 +1864,8 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 57:
       case 58:
       case 59: change_coord_system(value); break;
-      case 70: xyz_unit_to_mm_factor_ = 25.4f; break;
-      case 71: xyz_unit_to_mm_factor_ = 1.0f; break;
+      case 70: set_units_factor(25.4f); break;
+      case 71: set_units_factor(1.0f); break;
       case 90:
       case 91: handle_G90_G91(value); break;
       case 92: line = handle_G92(value, line); break;
