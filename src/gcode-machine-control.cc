@@ -806,6 +806,8 @@ bool GCodeMachineControl::Impl::move_allowed_within_machine_limits(
   if (!cfg_.range_check) return true;
 
   for (const GCodeParserAxis i : AllAxes()) {
+    if (is_rotational_axis(i)) continue;  // no range check for rotary
+
     // Min range ...
     if (axes[i] < 0) {
       // Machine cube must be in positive range.
