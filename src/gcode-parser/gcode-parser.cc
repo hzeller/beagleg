@@ -116,6 +116,7 @@ class GCodeParser::Impl {
     rotation_unit_to_degree_factor_ = 1.0f;  // Offer degree to radian switch ?
     set_all_axis_to_absolute(true);          // G90
     set_ijk_absolute(false);                 // G91.1
+    reset_scale();                           // G50
     reset_G92();                             // No global offset.
     set_current_offset(global_offset_g92_, "H");
 
@@ -146,6 +147,13 @@ class GCodeParser::Impl {
       gprintf(GLOG_SEMANTIC_ERR, "TODO: We don't support absolute IJK yet\n");
     }
     ijk_is_absolute_ = absolute;
+  }
+
+  void reset_scale() {
+    for (const GCodeParserAxis axis : AllAxes()) {
+      scale_[axis] = 1.0f;
+    }
+    Log_debug("Axes scale reset\n");
   }
 
   void reset_G92() { global_offset_g92_ = kZeroOffset; }
@@ -242,7 +250,7 @@ class GCodeParser::Impl {
       ((axis_is_absolute_[axis])
          ? current_origin()[axis] + current_global_offset()[axis]
          : axes_pos_[axis]);
-    return relative_to + unit_value;
+    return relative_to + unit_value * scale_[axis];
   }
 
   const char *handle_home(const char *line);
@@ -351,6 +359,9 @@ class GCodeParser::Impl {
   // This represents the current position of the machine.
   AxesRegister axes_pos_;
 
+  // Scaling values for each axis.
+  AxesRegister scale_;
+
   // -- Origins
   // All the following coordinates are absolute positions. They
   // can be choosen as active origin.
@@ -413,6 +424,7 @@ GCodeParser::Impl::Impl(const GCodeParser::Config &parse_config,
       current_origin_(&machine_origin_),
       current_global_offset_(&kZeroOffset) {
   assert(callbacks_);  // otherwise, this is not very useful.
+  reset_scale();
   reset_G92();
   InitProgramDefaults();
   InitCoordSystems();
@@ -1502,18 +1514,18 @@ const char *GCodeParser::Impl::handle_arc(const char *line, bool is_cw) {
     const float dist_value = value * xyz_unit_to_mm_factor_;
     // center offset
     if (letter == 'I') {
-      offset[AXIS_X] = dist_value;
+      offset[AXIS_X] = dist_value * scale_[AXIS_X];
       have_ijk = true;
     } else if (letter == 'J') {
-      offset[AXIS_Y] = dist_value;
+      offset[AXIS_Y] = dist_value * scale_[AXIS_Y];
       have_ijk = true;
     } else if (letter == 'K') {
-      offset[AXIS_Z] = dist_value;
+      offset[AXIS_Z] = dist_value * scale_[AXIS_Z];
       have_ijk = true;
     }
 
     else if (letter == 'R') {
-      radius = dist_value;
+      radius = dist_value;  // Arc radius is not scaled
       have_r = true;
     }
 
@@ -1692,12 +1704,21 @@ const char *GCodeParser::Impl::handle_spline(float sub_command,
   while ((remaining_line = gparse_pair(line, &letter, &value))) {
     const float dist_value = value * xyz_unit_to_mm_factor_;
     // clang-format off
-    if (letter == 'I') { cp1[AXIS_X] = dist_value; have_i = true; }
-    else if (letter == 'J') { cp1[AXIS_Y] = dist_value; have_j = true; }
-    else if (letter == 'P') { cp2[AXIS_X] = dist_value; have_p = true; }
-    else if (letter == 'Q') { cp2[AXIS_Y] = dist_value; have_q = true; }
-    else if (letter == 'F') feedrate = f_param_to_feedrate(dist_value);
-    else {
+    if (letter == 'I') {
+      cp1[AXIS_X] = dist_value * scale_[AXIS_X];
+      have_i = true;
+    } else if (letter == 'J') {
+      cp1[AXIS_Y] = dist_value * scale_[AXIS_Y];
+      have_j = true;
+    } else if (letter == 'P') {
+      cp2[AXIS_X] = dist_value * scale_[AXIS_X];
+      have_p = true;
+    } else if (letter == 'Q') {
+      cp2[AXIS_Y] = dist_value * scale_[AXIS_Y];
+      have_q = true;
+    } else if (letter == 'F') {
+      feedrate = f_param_to_feedrate(dist_value);
+    } else {
       const enum GCodeParserAxis update_axis = gcodep_letter2axis(letter);
       if (update_axis == GCODE_NUM_AXES) {
         gprintf(GLOG_SEMANTIC_ERR, "handle_spline: invalid axis specified\n");
@@ -1858,6 +1879,7 @@ void GCodeParser::Impl::ParseBlock(GCodeParser *owner, const char *line,
       case 21: set_units_factor(1.0f); break;
       case 28: line = handle_home(line); break;
       case 30: line = handle_z_probe(line); break;
+      case 50: reset_scale(); break;
       case 54:
       case 55:
       case 56:

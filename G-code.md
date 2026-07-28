@@ -59,6 +59,7 @@ G20              | -                    | Set coordinates to inches.
 G21              | -                    | Set coordinates to millimeter.
 G28 [coordinates]| `handle_home()`      | Home the machine on given axes.
 G30 [Z<thick>]   | `handle_z_probe()`   | Z Probe, with optional target thickness.
+G50              | `reset_scale()`      | Reset scaling to 1.0.
 G54              | -                    | Select coordinate system 1 (G10 L2 P1 ...)
 G55              | -                    | Select coordinate system 2 (G10 L2 P2 ...)
 G56              | -                    | Select coordinate system 3 (G10 L2 P3 ...)
