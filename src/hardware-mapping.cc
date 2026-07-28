@@ -25,7 +25,6 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "common/logging.h"

@@ -34,7 +34,6 @@
 #include <string.h>
 
 #include <string>
-#include <string_view>
 
 #include "common/logging.h"
 #include "common/string-util.h"

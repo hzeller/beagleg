@@ -20,7 +20,8 @@
 
 #include <algorithm>
 #include <functional>
-#include <string_view>
+
+#include "common/string-util.h"
 
 namespace {
 // Definition of the font at end of file.
