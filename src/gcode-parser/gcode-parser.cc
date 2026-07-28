@@ -306,6 +306,13 @@ class GCodeParser::Impl {
       *result = found->second;
       return true;
     } else {
+      if (param_name.size() == 1) {
+        const enum GCodeParserAxis axis = gcodep_letter2axis(param_name[0]);
+        if (axis != GCODE_NUM_AXES) {
+          *result = axes_pos_[axis];
+          return true;
+        }
+      }
       *result = 0;
       return false;
     }
