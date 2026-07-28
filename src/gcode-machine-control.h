@@ -80,8 +80,8 @@ struct MachineControlConfig {
 class GCodeMachineControl {
  public:
   enum class EStopState { NONE, SOFT, HARD };
-
   enum class PauseState { NONE, ACTIVE, INACTIVE };
+  enum class StartState { NONE, ACTIVE, INACTIVE };
 
   // The three levels of homing confidence. If we ever switch off
   // power to the motors after homing, we can't be sure.
@@ -117,6 +117,10 @@ class GCodeMachineControl {
   // Return the Pause status.
   // Can only be called in the same thread that also handles gcode updates.
   PauseState GetPauseStatus();
+
+  // Return the Start status.
+  // Can only be called in the same thread that also handles gcode updates.
+  StartState GetStartStatus();
 
   // Return the Homing status.
   // Can only be called in the same thread that also handles gcode updates.

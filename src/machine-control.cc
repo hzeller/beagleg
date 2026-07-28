@@ -303,11 +303,13 @@ static void run_status_server(const char *bind_addr, int port,
           machine->GetEStopStatus();
         const GCodeMachineControl::PauseState pause_status =
           machine->GetPauseStatus();
+        const GCodeMachineControl::StartState start_status =
+          machine->GetStartStatus();
         const GCodeMachineControl::HomingState home_status =
           machine->GetHomeStatus();
-        // JSON {"estop":"status", "pause":"status", "homed":"status", "motors":bool}
+        // JSON {"estop":"status", "pause":"status", "start":"status", "homed":"status", "motors":bool}
         dprintf(
-          conn, "{\"estop\":\"%s\", \"pause\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
+          conn, "{\"estop\":\"%s\", \"pause\":\"%s\", \"start\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
           estop_status == GCodeMachineControl::EStopState::NONE   ? "none"
           : estop_status == GCodeMachineControl::EStopState::SOFT ? "soft"
           : estop_status == GCodeMachineControl::EStopState::HARD ? "hard"
@@ -315,6 +317,10 @@ static void run_status_server(const char *bind_addr, int port,
           pause_status == GCodeMachineControl::PauseState::NONE       ? "none"
           : pause_status == GCodeMachineControl::PauseState::ACTIVE   ? "active"
           : pause_status == GCodeMachineControl::PauseState::INACTIVE ? "inactive"
+                                                                      : "unknown",
+          start_status == GCodeMachineControl::StartState::NONE       ? "none"
+          : start_status == GCodeMachineControl::StartState::ACTIVE   ? "active"
+          : start_status == GCodeMachineControl::StartState::INACTIVE ? "inactive"
                                                                       : "unknown",
           home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no"
           : home_status ==
