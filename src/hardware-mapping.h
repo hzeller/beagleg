@@ -233,6 +233,8 @@ class HardwareMapping {
   // Returns true if the E-Stop input is active.
   bool TestEStopSwitch();
 
+  bool HasPauseSwitch() const { return pause_input_ != 0; }
+
   // Returns true if the pause input is active.
   bool TestPauseSwitch();
 

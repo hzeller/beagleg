@@ -301,15 +301,21 @@ static void run_status_server(const char *bind_addr, int port,
       if (query == 's') {
         const GCodeMachineControl::EStopState estop_status =
           machine->GetEStopStatus();
+        const GCodeMachineControl::PauseState pause_status =
+          machine->GetPauseStatus();
         const GCodeMachineControl::HomingState home_status =
           machine->GetHomeStatus();
-        // JSON {"estop":"status", "homed":"status", "motors":bool}
+        // JSON {"estop":"status", "pause":"status", "homed":"status", "motors":bool}
         dprintf(
-          conn, "{\"estop\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
+          conn, "{\"estop\":\"%s\", \"pause\":\"%s\", \"homed\":\"%s\", \"motors\":%s}\n",
           estop_status == GCodeMachineControl::EStopState::NONE   ? "none"
           : estop_status == GCodeMachineControl::EStopState::SOFT ? "soft"
           : estop_status == GCodeMachineControl::EStopState::HARD ? "hard"
                                                                   : "unknown",
+          pause_status == GCodeMachineControl::PauseState::NONE       ? "none"
+          : pause_status == GCodeMachineControl::PauseState::ACTIVE   ? "active"
+          : pause_status == GCodeMachineControl::PauseState::INACTIVE ? "inactive"
+                                                                      : "unknown",
           home_status == GCodeMachineControl::HomingState::NEVER_HOMED ? "no"
           : home_status ==
               GCodeMachineControl::HomingState::HOMED_BUT_MOTORS_UNPOWERED

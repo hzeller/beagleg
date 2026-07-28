@@ -72,6 +72,7 @@ class GCodeMachineControl::Impl final : public GCodeParser::EventReceiver {
   const MachineControlConfig &config() const { return cfg_; }
   void set_msg_stream(FILE *msg) { msg_stream_ = msg; }
   EStopState GetEStopStatus();
+  PauseState GetPauseStatus();
   HomingState GetHomeStatus();
   bool GetMotorsEnabled();
   void GetCurrentPosition(AxesRegister *pos);
@@ -667,6 +668,15 @@ GCodeMachineControl::EStopState GCodeMachineControl::Impl::GetEStopStatus() {
   return GCodeMachineControl::EStopState::NONE;
 }
 
+GCodeMachineControl::PauseState GCodeMachineControl::Impl::GetPauseStatus() {
+  if (hardware_mapping_->HasPauseSwitch()) {
+    if (hardware_mapping_->TestPauseSwitch())
+      return GCodeMachineControl::PauseState::ACTIVE;
+    return GCodeMachineControl::PauseState::INACTIVE;
+  }
+  return GCodeMachineControl::PauseState::NONE;
+}
+
 GCodeMachineControl::HomingState GCodeMachineControl::Impl::GetHomeStatus() {
   return homing_state_;
 }
@@ -1094,6 +1104,10 @@ void GCodeMachineControl::GetHomePos(AxesRegister *home_pos) {
 
 GCodeMachineControl::EStopState GCodeMachineControl::GetEStopStatus() {
   return impl_->GetEStopStatus();
+}
+
+GCodeMachineControl::PauseState GCodeMachineControl::GetPauseStatus() {
+  return impl_->GetPauseStatus();
 }
 
 GCodeMachineControl::HomingState GCodeMachineControl::GetHomeStatus() {

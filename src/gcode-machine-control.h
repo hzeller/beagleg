@@ -81,6 +81,8 @@ class GCodeMachineControl {
  public:
   enum class EStopState { NONE, SOFT, HARD };
 
+  enum class PauseState { NONE, ACTIVE, INACTIVE };
+
   // The three levels of homing confidence. If we ever switch off
   // power to the motors after homing, we can't be sure.
   enum class HomingState { NEVER_HOMED, HOMED_BUT_MOTORS_UNPOWERED, HOMED };
@@ -111,6 +113,10 @@ class GCodeMachineControl {
   // Return the E-Stop status.
   // Can only be called in the same thread that also handles gcode updates.
   EStopState GetEStopStatus();
+
+  // Return the Pause status.
+  // Can only be called in the same thread that also handles gcode updates.
+  PauseState GetPauseStatus();
 
   // Return the Homing status.
   // Can only be called in the same thread that also handles gcode updates.
