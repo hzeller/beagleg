@@ -34,8 +34,8 @@
 #include <vector>
 
 #if __cplusplus >= 201703L
-#include <string_view>
 #include <charconv>
+#include <string_view>
 #endif
 
 beagleg::string_view TrimWhitespace(beagleg::string_view s) {
