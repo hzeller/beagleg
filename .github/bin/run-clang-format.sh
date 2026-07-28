@@ -2,13 +2,7 @@
 
 set -e
 
-PREFERRED_BINARY=clang-format-11
-
-CLANG_FORMAT=clang-format
-
-if command -v "${PREFERRED_BINARY}"; then
-  CLANG_FORMAT="${PREFERRED_BINARY}"
-fi
+CLANG_FORMAT=${CLANG_FORMAT:-clang-format}
 
 FORMAT_OUT=${TMPDIR:-/tmp}/clang-format-diff.out
 

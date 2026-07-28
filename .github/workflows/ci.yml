@@ -158,10 +158,12 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get install clang-format-19
-        clang-format --version
+        clang-format-19 --version
 
     - name: Run formatting style check
-      run: ./.github/bin/run-clang-format.sh
+      run: |
+        export CLANG_FORMAT=clang-format-19
+        ./.github/bin/run-clang-format.sh
 
   ClangTidy:
     runs-on: ubuntu-latest
