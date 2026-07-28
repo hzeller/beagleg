@@ -46,7 +46,7 @@ GIT_VERSION=$(shell git log -n1 --date=short --format="%cd (commit=%h)" 2>/dev/n
 CFLAGS+=-Wall -Wextra -W -Wno-unused-parameter -I$(shell pwd) -I$(INCDIR_APP_LOADER) -I$(CAPE_INCLUDE) -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -DCAPE_NAME='"$(BEAGLEG_HARDWARE_TARGET)"' -DBEAGLEG_VERSION='"$(GIT_VERSION)"'
 
 # Expected to have at least c++17 on all systems these days.
-CXXFLAGS+=-std=c++17 $(CFLAGS) $(CONFIG_FLAGS)
+CXXFLAGS+=$(CPP_STANDARD) $(CFLAGS) $(CONFIG_FLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm

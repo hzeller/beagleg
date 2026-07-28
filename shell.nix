@@ -1,4 +1,18 @@
 { pkgs ? import <nixpkgs> {} }:
+let
+  # Want a gtest version that is compatible with c++11
+  gtest_1_12_1 = pkgs.gtest.overrideAttrs (oldAttrs: rec {
+    version = "1.12.1";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "google";
+      repo = "googletest";
+      rev = "release-${version}";
+      hash = "sha256-W+OxRTVtemt2esw4P7IyGWXOonUN5ZuscjvzqkYvZbM=";
+    };
+    patches = [];
+  });
+in
 pkgs.mkShell {
   buildInputs = with pkgs;
     [
@@ -7,7 +21,7 @@ pkgs.mkShell {
       git
       lcov
       bear
-      gtest
+      gtest_1_12_1
       valgrind
       ghostscript
       llvmPackages_19.clang-tools

@@ -460,7 +460,7 @@ class HardwareMapping::ConfigReader : public ConfigParser::Reader {
   }
 
   bool SetMotorAxis(int line_no, int motor_number, const std::string &in_val) {
-    std::vector<std::string_view> options = SplitString(in_val, " \t,");
+    std::vector<beagleg::string_view> options = SplitString(in_val, " \t,");
     for (size_t i = 0; i < options.size(); ++i) {
       const std::string option = ToLower(options[i]);
       if (HasPrefix(option, "axis:")) {
@@ -493,7 +493,7 @@ class HardwareMapping::ConfigReader : public ConfigParser::Reader {
 
   bool SetSwitchOptions(int line_no, int switch_number,
                         const std::string &value) {
-    std::vector<std::string_view> options = SplitString(value, " \t,");
+    std::vector<beagleg::string_view> options = SplitString(value, " \t,");
     for (size_t i = 0; i < options.size(); ++i) {
       const std::string option = ToLower(options[i]);
       if (option.empty()) continue;
@@ -585,7 +585,8 @@ const char *HardwareMapping::OutputToName(NamedOutput output) {
   return "<invalid>";
 }
 
-bool HardwareMapping::NameToOutput(std::string_view str, NamedOutput *result) {
+bool HardwareMapping::NameToOutput(beagleg::string_view str,
+                                   NamedOutput *result) {
   const std::string n = ToLower(str);
   // clang-format off
 #define MAP_VAL(condition, val) if (condition)  do { *result = val; return true; } while(0)

@@ -71,18 +71,19 @@ static double ParseDoubleExpression(const char *input, double fallback,
   return value;
 }
 
-bool ConfigParser::Reader::ParseString(std::string_view value,
+bool ConfigParser::Reader::ParseString(beagleg::string_view value,
                                        std::string *result) {
   // Possibly in the future if needed: c-escapes.
   result->assign(value.data(), value.length());
   return true;
 }
 
-bool ConfigParser::Reader::ParseInt(std::string_view value, int32_t *result) {
+bool ConfigParser::Reader::ParseInt(beagleg::string_view value,
+                                    int32_t *result) {
   return convert_strto32(value, result);
 }
 
-bool ConfigParser::Reader::ParseBool(std::string_view value, bool *result) {
+bool ConfigParser::Reader::ParseBool(beagleg::string_view value, bool *result) {
   if (value == "1" || value == "yes" || value == "true") {
     *result = true;
     return true;
@@ -121,37 +122,37 @@ bool ConfigParser::SetContentFromFile(const char *filename) {
   return file_stream.good();
 }
 
-void ConfigParser::SetContent(std::string_view content) {
+void ConfigParser::SetContent(beagleg::string_view content) {
   content_.assign(content.begin(), content.end());
 }
 
 // Extract next line out of source; returns line, modifies "source"
 // to point to next
 // Modifies source.
-static std::string_view NextLine(std::string_view *source) {
-  std::string_view result;
+static beagleg::string_view NextLine(beagleg::string_view *source) {
+  beagleg::string_view result;
   if (source->empty()) return result;
-  const std::string_view::iterator start = source->begin();
-  std::string_view::iterator endline = start;
+  const beagleg::string_view::iterator start = source->begin();
+  beagleg::string_view::iterator endline = start;
   for (/**/; endline != source->end(); ++endline) {
     // Whatever newline or comment comes first terminates our resulting line...
     if (!result.data() &&
         (*endline == '#' || *endline == '\r' || *endline == '\n')) {
-      result = std::string_view(start, endline - start);
+      result = beagleg::string_view(start, endline - start);
     }
     if (*endline == '\n') {  // ... but we wait until \n to reposition source
-      *source =
-        std::string_view(endline + 1, source->length() - (endline - start) - 1);
+      *source = beagleg::string_view(endline + 1,
+                                     source->length() - (endline - start) - 1);
       return result;
     }
   }
   // Encountered last line without final newline.
-  result = std::string_view(start, endline - start);
-  *source = std::string_view(source->end(), 0);
+  result = beagleg::string_view(start, endline - start);
+  *source = beagleg::string_view(source->end(), 0);
   return result;
 }
 
-static std::string CanonicalizeName(const std::string_view s) {
+static std::string CanonicalizeName(const beagleg::string_view s) {
   return ToLower(TrimWhitespace(s));
 }
 
@@ -160,8 +161,8 @@ bool ConfigParser::EmitConfigValues(Reader *reader) const {
   bool current_section_interested = false;
   std::string current_section;
   int line_no = 0;
-  std::string_view content_data(content_.data(), content_.length());
-  std::string_view line = NextLine(&content_data);
+  beagleg::string_view content_data(content_.data(), content_.length());
+  beagleg::string_view line = NextLine(&content_data);
   for (/**/; line.data() != NULL; line = NextLine(&content_data)) {
     ++line_no;
     line = TrimWhitespace(line);
@@ -176,12 +177,12 @@ bool ConfigParser::EmitConfigValues(Reader *reader) const {
         continue;
       }
 
-      const std::string_view section = line.substr(1, line.length() - 2);
+      const beagleg::string_view section = line.substr(1, line.length() - 2);
       current_section = CanonicalizeName(section);
       current_section_interested =
         reader->SeenSection(line_no, current_section);
     } else {
-      std::string_view::iterator eq_pos =
+      beagleg::string_view::iterator eq_pos =
         std::find(line.begin(), line.end(), '=');
       if (eq_pos == line.end()) {
         reader->ReportError(line_no, "name=value pair expected.");
@@ -190,9 +191,9 @@ bool ConfigParser::EmitConfigValues(Reader *reader) const {
       }
       if (current_section_interested) {
         const std::string name = CanonicalizeName(
-          std::string_view(line.begin(), eq_pos - line.begin()));
-        const std::string_view value_piece =
-          TrimWhitespace(std::string_view(eq_pos + 1, line.end() - eq_pos - 1));
+          beagleg::string_view(line.begin(), eq_pos - line.begin()));
+        const beagleg::string_view value_piece = TrimWhitespace(
+          beagleg::string_view(eq_pos + 1, line.end() - eq_pos - 1));
         const std::string value(value_piece.begin(), value_piece.end());
         const bool could_parse = reader->SeenNameValue(line_no, name, value);
         if (!could_parse) {

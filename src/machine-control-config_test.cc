@@ -19,8 +19,6 @@
 
 #include <gtest/gtest.h>
 
-#include <iostream>
-
 #include "config-parser.h"
 #include "gcode-machine-control.h"  // contains struct MachineControlConfig
 #include "gcode-parser/gcode-parser.h"

@@ -23,9 +23,9 @@
 #include <stdint.h>
 
 #include <string>
-#include <string_view>
 
 #include "common/container.h"
+#include "common/string-util.h"
 #include "gcode-parser/gcode-parser.h"  // For GCodeParserAxis
 #include "segment-queue.h"
 
@@ -263,7 +263,7 @@ class HardwareMapping {
 
   // Converts the human readable name of an output to the enumeration if
   // possible.
-  static bool NameToOutput(std::string_view str, NamedOutput *result);
+  static bool NameToOutput(beagleg::string_view str, NamedOutput *result);
   static const char *OutputToName(NamedOutput output);
 
   // Return GPIO definition for various types of out/input. Count starts with 1.
