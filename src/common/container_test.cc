@@ -24,7 +24,9 @@
 TEST(FixedArray, BasicOp) {
   FixedArray<int, 3> buffer;
   EXPECT_EQ(buffer.size(), 3u);
+#if __cplusplus >= 201703L
   static_assert(buffer.size() == 3);  // compile-time constexpr
+#endif
 
   buffer[0] = 1;
   buffer[1] = 2;
@@ -61,9 +63,10 @@ TEST(RingDeque, BasicOp) {
 
 TEST(RingDeque, Wrapping) {
   RingDeque<int, 4> buffer;
-  EXPECT_EQ(buffer.capacity(), 3u);       // one less than CAPACITY
+  EXPECT_EQ(buffer.capacity(), 3u);  // one less than CAPACITY
+#if __cplusplus >= 201703L
   static_assert(buffer.capacity() == 3);  // compile-time constexpr
-
+#endif
   // Advance the internal positions so that we force wrapping.
   *buffer.append() = 42;
   *buffer.append() = 42;

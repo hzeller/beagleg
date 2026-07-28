@@ -162,10 +162,13 @@ static AxesRegister calc_bezier_point(float t, const AxesRegister &p0,
   AxesRegister p = p0;
   p[AXIS_X] = uuu * p0[AXIS_X];  // first term
   p[AXIS_Y] = uuu * p0[AXIS_Y];
+
   p[AXIS_X] += (3.0f * uu * t * p1[AXIS_X]);  // second term
   p[AXIS_Y] += (3.0f * uu * t * p1[AXIS_Y]);
+
   p[AXIS_X] += (3.0f * u * tt * p2[AXIS_X]);  // third term
   p[AXIS_Y] += (3.0f * u * tt * p2[AXIS_Y]);
+
   p[AXIS_X] += (ttt * p3[AXIS_X]);  // forth term
   p[AXIS_Y] += (ttt * p3[AXIS_Y]);
   return p;

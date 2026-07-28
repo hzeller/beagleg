@@ -24,8 +24,9 @@
 #include <cstdint>
 #include <vector>
 
+namespace beagleg {
 TEST(StringUtilTest, TrimWhitespace) {
-  EXPECT_EQ("hello", TrimWhitespace(" \t  hello \n\r  "));
+  EXPECT_EQ(string_view{"hello"}, TrimWhitespace(" \t  hello \n\r  "));
   EXPECT_TRUE(TrimWhitespace(" \t ").empty());
 }
 
@@ -40,23 +41,23 @@ TEST(StringUtilTest, HasPrefix) {
 }
 
 TEST(StringUtilTest, SplitString) {
-  std::vector<std::string_view> result = SplitString("foo", ",");
+  std::vector<beagleg::string_view> result = SplitString("foo", ",");
   EXPECT_EQ(1, (int)result.size());
-  EXPECT_EQ("foo", result[0]);
+  EXPECT_EQ(string_view{"foo"}, result[0]);
 
   result = SplitString(",hello, world", ",");
   EXPECT_EQ(3, (int)result.size());
-  EXPECT_EQ("", result[0]);
-  EXPECT_EQ("hello", result[1]);
-  EXPECT_EQ(" world", result[2]);
+  EXPECT_EQ(string_view{""}, result[0]);
+  EXPECT_EQ(string_view{"hello"}, result[1]);
+  EXPECT_EQ(string_view{" world"}, result[2]);
 
   // Also test with trailing, empty field
   result = SplitString(",hello, world,", ",");
   EXPECT_EQ(4, (int)result.size());
-  EXPECT_EQ("", result[0]);
-  EXPECT_EQ("hello", result[1]);
-  EXPECT_EQ(" world", result[2]);
-  EXPECT_EQ("", result[3]);
+  EXPECT_EQ(string_view{""}, result[0]);
+  EXPECT_EQ(string_view{"hello"}, result[1]);
+  EXPECT_EQ(string_view{" world"}, result[2]);
+  EXPECT_EQ(string_view{""}, result[3]);
 }
 
 TEST(StringUtilTest, ParseDecimalInt) {
@@ -75,12 +76,12 @@ TEST(StringUtilTest, ParseDecimalInt) {
   EXPECT_EQ(12345678901234LL, ParseInt64("12345678901234", -1));
 
   // Make sure we're not assumming a nul-byte at a particular point
-  const std::string_view longer_string("4255");
+  const beagleg::string_view longer_string("4255");
   EXPECT_EQ(42, ParseInt64(longer_string.substr(0, 2), -1));
 
   // Make sure the returned value points to the characters after the number.
-  const std::string_view input = " +314cm";
-  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const beagleg::string_view input = " +314cm";
+  const beagleg::string_view expected_remain = input.substr(input.find("cm"));
   const char *remain_string = convert_strto64(input, &value);
   ASSERT_TRUE(remain_string);
   EXPECT_EQ(314, value);
@@ -100,8 +101,8 @@ TEST(StringUtilTest, ParseFloat) {
   EXPECT_EQ(123, value);
 
   // Make sure the returned value points to the characters after the number.
-  const std::string_view input = " +314.159cm";
-  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const beagleg::string_view input = " +314.159cm";
+  const beagleg::string_view expected_remain = input.substr(input.find("cm"));
   const char *remain_string = convert_strtof(input, &value);
   ASSERT_TRUE(remain_string);
   EXPECT_NEAR(314.159, value, 0.0001);
@@ -121,13 +122,14 @@ TEST(StringUtilTest, ParseDouble) {
   EXPECT_EQ(123, value);
 
   // Make sure the returned value points to the characters after the number.
-  const std::string_view input = " +314.159cm";
-  const std::string_view expected_remain = input.substr(input.find("cm"));
+  const beagleg::string_view input = " +314.159cm";
+  const beagleg::string_view expected_remain = input.substr(input.find("cm"));
   const char *remain_string = convert_strtod(input, &value);
   ASSERT_TRUE(remain_string);
   EXPECT_NEAR(314.159, value, 0.00001);
   EXPECT_EQ(remain_string, expected_remain.data());  // pointers must match.
 }
+}  // namespace beagleg
 
 int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);

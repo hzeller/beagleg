@@ -12,7 +12,7 @@ BEAGLEG_OPT_CFLAGS?=-O3
 
 CFLAGS+=-Wall -Wextra -W -Wno-unused-result -Wno-unused-parameter -D_XOPEN_SOURCE=500 $(ARM_COMPILE_FLAGS) $(BEAGLEG_OPT_CFLAGS) -I$(shell pwd)/..
 
-CXXFLAGS+=-std=c++17 $(CFLAGS)
+CXXFLAGS+=$(CPP_STANDARD) $(CFLAGS)
 CXX?=g++
 
 LDFLAGS+=-lpthread -lm

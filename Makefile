@@ -28,6 +28,8 @@
 PREFIX?=/usr/local
 BINDIR=$(PREFIX)/bin
 
+export CPP_STANDARD?=-std=c++17   # we're compatible down to 11
+
 all machine-control:
 	$(MAKE) -e -C src all
 
