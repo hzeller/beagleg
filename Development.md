@@ -49,6 +49,11 @@ the root of the environment.
 nix-shell
 ```
 
+Besides the host build dependencies, the shell provides the GNU PRU
+binutils from `nix/pru-toolchain.nix` -- handy to inspect assembled
+PRU code (`pru-elf-objdump -D -b binary -m pru ...`) and needed to
+package PRU firmware as remoteproc-loadable ELFs.
+
 The shell pulls in the host build deps: gtest, valgrind, clang-tools,
 lcov, ghostscript, graphviz.
 

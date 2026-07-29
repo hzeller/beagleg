@@ -12,6 +12,7 @@ let
     };
     patches = [];
   });
+  pru = pkgs.callPackage ./nix/pru-toolchain.nix {};
 in
 pkgs.mkShell {
   buildInputs = with pkgs;
@@ -26,6 +27,7 @@ pkgs.mkShell {
       ghostscript
       llvmPackages_19.clang-tools
       graphviz
+      pru.binutils-pru
     ];
   shellHook =
   ''
