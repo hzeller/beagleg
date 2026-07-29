@@ -180,10 +180,16 @@ DONE_CALCULATE_DELAY:
 .endm
 
 INIT:
-	;; Clear STANDBY_INIT in SYSCFG register.
+	;; Clear STANDBY_INIT in SYSCFG register. (This also enables the
+	;; OCP master port that the rpmsg variant needs to reach DDR.)
 	LBCO r0, C4, 4, 4
 	CLR r0, r0, 4
 	SBCO r0, C4, 4, 4
+
+#ifdef NOTIFY_RPMSG
+	;; Bring up the rpmsg link; blocks until the host handshake.
+	CALL rpmsg_init
+#endif
 
 	MOV r2, QUEUE_OFFSET ; Queue address in PRU memory
 	MOV r28, 0           ; Status register in PRU memory,
@@ -285,7 +291,12 @@ DONE_STEP_GEN:
 	MOV queue_header.state, STATE_EMPTY
 STEP_GEN_ABORTED:
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
-	MOV R31.b0, PRU0_ARM_INTERRUPT+16 ; signal host program free slot.
+	;; Signal host a free queue slot.
+#ifdef NOTIFY_RPMSG
+	CALL rpmsg_notify
+#else
+	MOV R31.b0, PRU0_ARM_INTERRUPT+16
+#endif
 
 	;; Next position in ring buffer
 	ADD r2, r2, QUEUE_ELEMENT_SIZE
@@ -299,7 +310,11 @@ STEP_GEN_ABORTED:
 FINISH:
 	MOV queue_header.state, STATE_EMPTY
 	SBCO queue_header.state, CONST_PRUDRAM, r2, 1
+#ifdef NOTIFY_RPMSG
+	CALL rpmsg_notify
+#else
 	MOV R31.b0, PRU0_ARM_INTERRUPT+16
+#endif
 
 	HALT
 
@@ -311,3 +326,8 @@ FINISH:
 ;;; include pru-generic-io-routines.hp that just uses the generic bits
 ;;; or provide their own optimized version.
 #include <pru-io-routines.hp>
+
+#ifdef NOTIFY_RPMSG
+;;; rpmsg_init / rpmsg_notify for the remoteproc firmware variant.
+#include "pru-rpmsg.hp"
+#endif

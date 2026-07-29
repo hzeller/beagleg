@@ -1,0 +1,237 @@
+;;; -*- asm -*-
+;;;
+;;; (c) 2026 Leonardo Romor <leonardo.romor@gmail.com>
+;;;
+;;; This file is part of BeagleG. http://github.com/hzeller/beagleg
+;;;
+;;; BeagleG is free software: you can redistribute it and/or modify
+;;; it under the terms of the GNU General Public License as published by
+;;; the Free Software Foundation, either version 3 of the License, or
+;;; (at your option) any later version.
+;;;
+;;; BeagleG is distributed in the hope that it will be useful,
+;;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;; GNU General Public License for more details.
+;;;
+;;; You should have received a copy of the GNU General Public License
+;;; along with BeagleG.  If not, see <http://www.gnu.org/licenses/>.
+
+;;; Minimal rpmsg (virtio-ring) implementation for the remoteproc
+;;; firmware variant. Just enough protocol for what BeagleG needs:
+;;; announce one channel ("rpmsg-pru", port 30) and send one small
+;;; message per completed queue segment; received messages are only
+;;; parsed for the sender address (the host's one-byte handshake) and
+;;; their buffers returned.
+;;;
+;;; The kernel side: pru_rproc loads the resource table (declared in
+;;; pru-rpmsg-data.s), allocates the two vrings + message buffers in
+;;; DDR, writes the vring device addresses back into the table and
+;;; flips the vdev status to DRIVER_OK. vring0 carries PRU->ARM
+;;; messages, vring1 ARM->PRU. Kicks in both directions are PRU system
+;;; events (16 to the ARM, 17 from it -- we don't even need to consume
+;;; 17, we poll the avail index instead).
+;;;
+;;; Memory ordering: all buffer/ring stores are SBBO through the PRU's
+;;; OCP master port, which issues them in program order; the used->idx
+;;; store therefore lands after the used-ring entry it publishes.
+;;;
+;;; Register use (all dead at the call sites -- INIT and the
+;;; end-of-segment boundary; never inside the step-timing loop):
+;;;   r0, r1, r3..r6 : scratch
+;;;   r7.w0  : _rpmsg_tx argument: destination address
+;;;   r8     : _rpmsg_tx argument: payload source (DRAM address)
+;;;   r9.w0  : _rpmsg_tx argument: payload length in bytes
+;;;   r10,r11: message buffer address (desc->addr lo/hi)
+;;;   r12..r15: rpmsg header assembly / used-ring entry
+;;;   r29.w0 : link register for the internal helpers
+;;; Entry points rpmsg_init / rpmsg_notify are CALLed (r30.w0) by the
+;;; motion core; r2 (queue position) and r28 (status counter) are never
+;;; touched.
+
+#include "pru-rpmsg-layout.h"
+
+;;; rpmsg_init: block until the rpmsg link is usable.
+;;; 1. Wait for the kernel to set DRIVER_OK in the vdev status.
+;;; 2. Compute and store the desc/avail/used pointers of both vrings
+;;;    from the kernel-written device addresses.
+;;; 3. Send the name-service announcement (creates /dev/rpmsg_pru30).
+;;; 4. Wait for the host's handshake message to learn its address.
+rpmsg_init:
+	MOV r3, RPMSG_RT_ADDR
+init_wait_driver_ok:
+	LBBO r0, r3, RT_VDEV_STATUS_OFFSET, 1
+	QBBC init_wait_driver_ok, r0, 2	; VIRTIO_CONFIG_S_DRIVER_OK = 1<<2
+
+	MOV r4, RPMSG_STATE_ADDR
+	;; vring0 (PRU -> ARM); ring offsets exceed the 8-bit ADD
+	;; immediate, so keep them in registers.
+	MOV r5, VRING_AVAIL_OFF
+	MOV r6, VRING_USED_OFF
+	LBBO r0, r3, RT_VRING0_OFFSET, 4
+	SBBO r0, r4, ST_VQ0_DESC, 4
+	ADD r1, r0, r5
+	SBBO r1, r4, ST_VQ0_AVAIL, 4
+	ADD r1, r0, r6
+	SBBO r1, r4, ST_VQ0_USED, 4
+	;; vring1 (ARM -> PRU)
+	LBBO r0, r3, RT_VRING1_OFFSET, 4
+	SBBO r0, r4, ST_VQ1_DESC, 4
+	ADD r1, r0, r5
+	SBBO r1, r4, ST_VQ1_AVAIL, 4
+	ADD r1, r0, r6
+	SBBO r1, r4, ST_VQ1_USED, 4
+	;; fresh ring indices and no host address yet (the kernel resets
+	;; the vrings on every PRU stop/start cycle, so do we).
+	ZERO &r0, 4
+	SBBO r0, r4, ST_VQ0_LAST, 4	; clears VQ0_LAST and VQ1_LAST
+	SBBO r0, r4, ST_HOST_ADDR, 2
+
+	;; Announce the channel to the name-service endpoint.
+	MOV r7, RPMSG_NS_ADDR
+	MOV r8, RPMSG_NS_TMPL_ADDR
+	MOV r9, RPMSG_NS_LEN
+	JAL r29.w0, _rpmsg_tx
+
+	;; The reply destination is dynamically assigned by the kernel, so
+	;; we can not send anything else until the host wrote its one-byte
+	;; handshake into /dev/rpmsg_pru30.
+init_wait_handshake:
+	JAL r29.w0, _rpmsg_rx_drain
+	MOV r4, RPMSG_STATE_ADDR
+	LBBO r0, r4, ST_HOST_ADDR, 2
+	QBEQ init_wait_handshake, r0.w0, 0
+	RET
+
+;;; rpmsg_notify: one message per completed queue segment. The payload
+;;; content is irrelevant -- its arrival unblocks the host's blocking
+;;; read -- so we just send the first byte of the NS template.
+rpmsg_notify:
+	MOV r4, RPMSG_STATE_ADDR
+	LBBO r7, r4, ST_HOST_ADDR, 2
+	MOV r8, RPMSG_NS_TMPL_ADDR
+	MOV r9, 1
+	JAL r29.w0, _rpmsg_tx
+	;; Return any host-written buffers so the ARM->PRU ring never
+	;; fills (and pick up address changes after a channel reopen).
+	JAL r29.w0, _rpmsg_rx_drain
+	RET
+
+;;; _rpmsg_tx: send r9.w0 bytes from DRAM address r8 to endpoint r7.w0.
+;;; Claims the next kernel-provided buffer from vring0's avail ring
+;;; (spinning until one exists -- the kernel preloads all 16, so this
+;;; only ever waits if 16 notifications are in flight), writes the
+;;; rpmsg header + payload, publishes the used-ring entry and kicks.
+;;; Link register: r29.w0.
+_rpmsg_tx:
+	MOV r3, RPMSG_STATE_ADDR
+	LBBO r4, r3, ST_VQ0_AVAIL, 4
+	LBBO r5, r3, ST_VQ0_LAST, 2
+tx_wait_buffer:
+	LBBO r0, r4, 2, 2		; avail->idx
+	QBNE tx_have_buffer, r0.w0, r5.w0
+	JMP tx_wait_buffer
+tx_have_buffer:
+	;; head = avail->ring[last % VRING_NUM]
+	AND r6, r5.b0, VRING_NUM - 1
+	LSL r6, r6, 1
+	ADD r6, r6, 4			; u16 ring[] starts at offset 4
+	ADD r6, r6, r4
+	LBBO r6, r6, 0, 2		; r6.w0 = descriptor index
+	;; buffer address = desc[head].addr (64 bit; AM335x DDR fits in
+	;; the low word -- the high word is zero by construction)
+	LBBO r0, r3, ST_VQ0_DESC, 4
+	LSL r1, r6.w0, 4		; head * sizeof(vring_desc)
+	ADD r0, r0, r1
+	LBBO r10, r0, 0, 8		; r10 = addr.lo, r11 = addr.hi
+	;; rpmsg header {src, dst, reserved, len|flags}
+	MOV r12, RPMSG_OUR_ADDR
+	MOV r13, r7.w0
+	MOV r14, 0
+	MOV r15.w0, r9.w0
+	MOV r15.w2, 0
+	SBBO r12, r10, 0, 16
+	;; payload bytes r8[0..len) -> buffer + RPMSG_HDR_SIZE
+	MOV r1, 0
+tx_copy_payload:
+	QBEQ tx_payload_done, r1.w0, r9.w0
+	LBBO r0.b0, r8, r1, 1
+	ADD r4, r1, RPMSG_HDR_SIZE
+	SBBO r0.b0, r10, r4, 1
+	ADD r1, r1, 1
+	JMP tx_copy_payload
+tx_payload_done:
+	;; publish: used->ring[used->idx % VRING_NUM] = {head, hdr+len},
+	;; then bump used->idx (ordered stores, see file comment).
+	LBBO r4, r3, ST_VQ0_USED, 4
+	LBBO r0, r4, 2, 2		; used->idx
+	AND r1, r0.b0, VRING_NUM - 1
+	LSL r1, r1, 3			; * sizeof({u32 id; u32 len})
+	ADD r1, r1, 4			; ring[] starts at offset 4
+	ADD r1, r1, r4
+	MOV r12, r6.w0			; id = head
+	MOV r13, r9.w0
+	ADD r13, r13, RPMSG_HDR_SIZE	; len = header + payload
+	SBBO r12, r1, 0, 8
+	ADD r0, r0, 1
+	SBBO r0, r4, 2, 2		; used->idx++
+	ADD r5, r5, 1
+	SBBO r5, r3, ST_VQ0_LAST, 2
+	;; kick the ARM unless it asked not to (VRING_AVAIL_F_NO_INTERRUPT)
+	LBBO r4, r3, ST_VQ0_AVAIL, 4
+	LBBO r0, r4, 0, 2		; avail->flags
+	QBBS tx_done, r0, 0
+	MOV r31.b0, 32 + (RPMSG_EVT_TO_ARM - 16)
+tx_done:
+	JMP r29.w0
+
+;;; _rpmsg_rx_drain: return every pending ARM->PRU buffer on vring1 to
+;;; its used ring, remembering the last sender as the host address.
+;;; Only the 16-byte header is read; payload content is ignored.
+;;; Link register: r29.w0.
+_rpmsg_rx_drain:
+	MOV r3, RPMSG_STATE_ADDR
+	LBBO r4, r3, ST_VQ1_AVAIL, 4
+	LBBO r5, r3, ST_VQ1_LAST, 2
+	MOV r16, r5.w0
+rx_next:
+	LBBO r0, r4, 2, 2		; avail->idx
+	QBEQ rx_done, r0.w0, r5.w0
+	;; head = avail->ring[last % VRING_NUM]
+	AND r6, r5.b0, VRING_NUM - 1
+	LSL r6, r6, 1
+	ADD r6, r6, 4
+	ADD r6, r6, r4
+	LBBO r6, r6, 0, 2
+	;; message buffer, first word of the header is the source address
+	LBBO r0, r3, ST_VQ1_DESC, 4
+	LSL r1, r6.w0, 4
+	ADD r0, r0, r1
+	LBBO r10, r0, 0, 8		; desc addr lo/hi
+	LBBO r12, r0, 8, 4		; desc->len, echoed in the used entry
+	LBBO r1, r10, 0, 4		; header.src
+	SBBO r1, r3, ST_HOST_ADDR, 2
+	;; return the buffer: used->ring[used->idx % VRING_NUM]
+	LBBO r0, r3, ST_VQ1_USED, 4
+	LBBO r1, r0, 2, 2		; used->idx
+	AND r13, r1.b0, VRING_NUM - 1
+	LSL r13, r13, 3
+	ADD r13, r13, 4
+	ADD r13, r13, r0
+	MOV r14, r6.w0			; id = head
+	MOV r15, r12			; len
+	SBBO r14, r13, 0, 8
+	ADD r1, r1, 1
+	SBBO r1, r0, 2, 2		; used->idx++
+	ADD r5, r5, 1
+	SBBO r5, r3, ST_VQ1_LAST, 2
+	JMP rx_next
+rx_done:
+	;; kick so the kernel refills its ring, but only if we actually
+	;; consumed something (and unless interrupts are suppressed)
+	QBEQ rx_no_kick, r5.w0, r16.w0
+	LBBO r0, r4, 0, 2		; avail->flags
+	QBBS rx_no_kick, r0, 0
+	MOV r31.b0, 32 + (RPMSG_EVT_TO_ARM - 16)
+rx_no_kick:
+	JMP r29.w0

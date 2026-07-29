@@ -54,6 +54,21 @@ PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
 COMMON_LIBS=common/libbeaglegbase.a gcode-parser/libgcodeparser.a
 SUBDIRS=common gcode-parser
 
+# Host-side PRU backend. "uio" talks to the legacy uio_pruss driver via
+# libprussdrv (needs the PRU-UIO device-tree overlay). "remoteproc"
+# drives the PRU through the kernel remoteproc stack + rpmsg, as found
+# on stock BeagleBone Debian images with the default PRU-RPROC overlay.
+PRU_BACKEND?=uio
+ifeq ($(PRU_BACKEND),remoteproc)
+  PRU_BACKEND_OBJ=remoteproc-pruss-interface.o
+  PRU_BACKEND_LIBS=
+  CFLAGS+=-DBEAGLEG_PRU_BACKEND_REMOTEPROC
+  PRU_FIRMWARE=beagleg-pru0-fw
+else
+  PRU_BACKEND_OBJ=uio-pruss-interface.o
+  PRU_BACKEND_LIBS=$(PRUSS_LIBS)
+endif
+
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
 
@@ -62,10 +77,10 @@ GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o pwm-timer.o config-parser.o \
 	      machine-control-config.o hardware-mapping.o \
 	      spindle-control.o planner.o adc.o
-OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
+OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o $(PRU_BACKEND_OBJ) $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 
-TARGETS=../machine-control ../gcode-print-stats gcode2ps
+TARGETS=../machine-control ../gcode-print-stats gcode2ps $(PRU_FIRMWARE)
 UNITTEST_BINARIES=gcode-machine-control_test config-parser_test machine-control-config_test planner_test motion-queue-motor-operations_test pru-motion-queue_test
 
 DEPENDENCY_RULES=$(OBJECTS:=.d) $(UNITTEST_BINARIES:=.o.d) $(MAIN_OBJECTS:=.d) hershey.o.d
@@ -82,7 +97,7 @@ gcode-parser/libgcodeparser.a: FORCE
 	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(LDFLAGS)
 
 ../machine-control: machine-control.o $(OBJECTS) $(COMMON_LIBS)
-	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(PRU_BACKEND_LIBS) $(LDFLAGS)
 
 # While this is developed and does not have a final name yet, let's not make
 # it a toplevel tool in ../
@@ -122,7 +137,7 @@ $(PRU_BIN) : motor-interface-constants.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
 %_test: %_test.o $(OBJECTS) $(COMMON_LIBS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(GTEST_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRU_BACKEND_LIBS) $(GTEST_LIBS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -134,6 +149,36 @@ $(PRU_BIN) : motor-interface-constants.h \
 
 %_bin.h : %.p $(PASM) compiler-flags
 	$(PASM) -I$(CAPE_INCLUDE) -V3 -c $<
+
+# The remoteproc firmware: the same PASM-assembled motion core (rpmsg
+# notification variant) plus the static resource-table/irq-map data,
+# packaged as the ELF the kernel's pru_rproc loader expects. GNU PRU
+# binutils (Debian: binutils-pru) does the packaging; no compiler.
+PRU_AS?=pru-elf-as
+PRU_LD?=pru-elf-ld
+PRU_OBJCOPY?=pru-elf-objcopy
+
+RPMSG_FIRMWARE_DEPS=motor-interface-pru.p pru-rpmsg.hp pru-rpmsg-layout.h \
+                    motor-interface-constants.h \
+                    $(CAPE_INCLUDE)/beagleg-pin-mapping.h \
+                    $(CAPE_INCLUDE)/pru-io-routines.hp
+
+motor-interface-pru-rpmsg.bin : motor-interface-pru-rpmsg.p $(RPMSG_FIRMWARE_DEPS) $(PASM) compiler-flags
+	$(PASM) -I$(CAPE_INCLUDE) -V3 -b $<
+
+motor-interface-pru-rpmsg.text.o : motor-interface-pru-rpmsg.bin
+	$(PRU_OBJCOPY) -I binary -O elf32-pru \
+	    --rename-section .data=.text,alloc,load,readonly,code $< $@
+
+pru-rpmsg-data.o : pru-rpmsg-data.s pru-rpmsg-layout.h
+	$(CC) -E -x assembler-with-cpp -I. $< | $(PRU_AS) -o $@ -
+
+pru-firmware.ld : pru-firmware.ld.in pru-rpmsg-layout.h
+	$(CC) -E -P -x c -I. $< -o $@
+
+beagleg-pru0-fw : motor-interface-pru-rpmsg.text.o pru-rpmsg-data.o pru-firmware.ld
+	$(PRU_LD) -T pru-firmware.ld -o $@ \
+	    motor-interface-pru-rpmsg.text.o pru-rpmsg-data.o
 
 $(PASM):
 	make -C $(AM335_BASE)
@@ -149,7 +194,7 @@ uio-pruss-interface.o : $(PRU_BIN)
 -include $(DEPENDENCY_RULES)
 
 clean:
-	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) hershey.o *.gcda *.gcov *.gcno *.cc.gcov.html *.h.gcov.html *.func.html
+	rm -rf $(TARGETS) $(MAIN_OBJECTS) $(OBJECTS) $(PRU_BIN) $(UNITTEST_BINARIES) $(UNITTEST_BINARIES:=.o) $(DEPENDENCY_RULES) $(TEST_FRAMEWORK_OBJECTS) hershey.o beagleg-pru0-fw motor-interface-pru-rpmsg.bin motor-interface-pru-rpmsg.text.o pru-rpmsg-data.o pru-firmware.ld *.gcda *.gcov *.gcno *.cc.gcov.html *.h.gcov.html *.func.html
 	$(MAKE) -C common clean
 	$(MAKE) -C gcode-parser clean
 

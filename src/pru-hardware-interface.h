@@ -53,4 +53,32 @@ class UioPrussInterface : public PruHardwareInterface {
   bool Shutdown() final;
 };
 
+// PRU hardware control via the kernel's remoteproc stack (stock
+// BeagleBone Debian images with the default PRU-RPROC overlay):
+// firmware lifecycle through /sys/class/remoteproc/, the shared motion
+// queue through a /dev/mem mapping of PRU0 DRAM, and per-segment
+// completion events through the firmware's rpmsg channel
+// (/dev/rpmsg_pru30).
+class RemoteprocPruInterface : public PruHardwareInterface {
+ public:
+  RemoteprocPruInterface();
+  ~RemoteprocPruInterface() final;
+
+  bool Init() final;
+  bool AllocateSharedMem(void **pru_mmap, size_t size) final;
+  bool StartExecution() final;
+  unsigned WaitEvent() final;
+  bool Shutdown() final;
+
+ private:
+  // (Re-)open /dev/rpmsg_pru30 and send the address handshake; needed
+  // after every PRU start since the channel dies across stop/start.
+  bool EstablishRpmsgChannel();
+
+  int rpmsg_fd_;
+  void *mmap_;
+  size_t mmap_size_;
+  char *rproc_dir_;  // e.g. "/sys/class/remoteproc/remoteproc1"
+};
+
 #endif  // BEAGLEG_PRU_HARDWARE_INTERFACE_

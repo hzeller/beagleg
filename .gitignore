@@ -9,3 +9,6 @@ test-out/
 compile_commands.json
 .cache
 flake.lock
+beagleg-pru0-fw
+flake.lock
+result

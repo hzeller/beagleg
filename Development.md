@@ -49,8 +49,12 @@ the root of the environment.
 nix-shell
 ```
 
-The shell pulls in the host build deps: gtest, valgrind, clang-tools,
-lcov, ghostscript, graphviz.
+The shell pulls in the host build deps (gtest, valgrind, clang-tools,
+lcov, ghostscript, graphviz) plus `binutils-pru` from
+`nix/pru-toolchain.nix`, used to package the remoteproc firmware ELF.
+The PRU firmware itself is assembled by the vendored PASM for both
+backends; the rpmsg protocol of the remoteproc variant is plain PRU
+assembly too (`src/pru-rpmsg.hp`).
 
 #### Building with the flake
 

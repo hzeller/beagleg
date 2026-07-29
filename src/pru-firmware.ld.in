@@ -1,0 +1,34 @@
+/* Linker script template for the remoteproc firmware ELF; the build
+ * runs it through cpp so the DRAM addresses come from
+ * pru-rpmsg-layout.h. Nothing is linked in the usual sense -- the PASM
+ * image is a self-contained blob -- this only arranges the sections at
+ * the device addresses the kernel's pru_rproc loader expects:
+ * instructions at 0x20000000 (PRU0 IRAM), data in DRAM at 0.
+ */
+
+#include "pru-rpmsg-layout.h"
+
+OUTPUT_ARCH(pru)
+
+MEMORY
+{
+  imem (x)   : ORIGIN = 0x20000000, LENGTH = 8K
+  dmem (rw!x) : ORIGIN = 0, LENGTH = 8K
+}
+
+/* The PRU starts executing at IRAM offset 0. */
+_start = ORIGIN(imem);
+ENTRY(_start)
+
+SECTIONS
+{
+  .text : { *(.text) } > imem
+
+  .resource_table RPMSG_RT_ADDR : { KEEP(*(.resource_table)) } > dmem
+  .rpmsg_ns_tmpl RPMSG_NS_TMPL_ADDR : { KEEP(*(.rpmsg_ns_tmpl)) } > dmem
+
+  /* Parsed from the ELF file by the kernel; not loaded to memory. */
+  .pru_irq_map 0 : { KEEP(*(.pru_irq_map)) }
+
+  /DISCARD/ : { *(.comment) *(.note*) }
+}
