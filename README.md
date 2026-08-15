@@ -58,6 +58,10 @@ _enable_ the line containing the `PRU-UIO` (remove `#` in front).
 uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
 ```
 
+Note: current images no longer ship the `uio_pruss` driver this setup
+relies on. On those, build with the `genirq` backend instead — see
+the "images without uio_pruss" section in [INSTALL.md](./INSTALL.md).
+
 Reboot.
 
 ### Enable Output Pins for your board
