@@ -18,8 +18,16 @@ CONFIG_FLAGS?=
 #CROSS_COMPILE?=arm-arago-linux-gnueabi-
 
 # Tuning options for ARM CPU. Unset this in an environment variable if compiled
-# on a different system.
-ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a
+# on a different system. The explicit -mfpu names the Cortex-A8's
+# FP/SIMD hardware: gcc >= 12 derives the FPU from -march alone, and a
+# bare -march=armv7-a selects none, which the mandatory hard-float ABI
+# of Debian armhf rejects ("selected architecture lacks an FPU").
+# -mfpu=neon includes the whole vfpv3 scalar instruction set and is
+# understood since gcc 4.4, so older systems build unchanged. (gcc
+# only auto-vectorizes float math on NEON with unsafe-math flags we do
+# not use, since ARMv7 NEON singles are not IEEE; doubles always run
+# on the VFP either way.)
+ARM_COMPILE_FLAGS?=-mtune=cortex-a8 -march=armv7-a -mfpu=neon
 
 # Allow to c onfigure e.g. BEAGLEG_HARDWARE_TARGET in a configuration file.
 -include config.mk
