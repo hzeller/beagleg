@@ -54,6 +54,23 @@ PRUSS_LIBS=$(LIBDIR_APP_LOADER)/libprussdrv.a
 COMMON_LIBS=common/libbeaglegbase.a gcode-parser/libgcodeparser.a
 SUBDIRS=common gcode-parser
 
+# Host-side PRU backend. "uio" talks to the legacy uio_pruss driver via
+# libprussdrv (needs the PRU-UIO device-tree overlay). "genirq" needs
+# no PRU-specific kernel driver: it drives the PRU through the memory
+# maps of a generic UIO device and gets completion interrupts through
+# its blocking read -- uio_pdrv_genirq, wired up by the overlay in
+# ../dts/, see INSTALL.md; use it on stock mainline-kernel BeagleBone
+# Debian images.
+PRU_BACKEND?=uio
+ifeq ($(PRU_BACKEND),genirq)
+  PRU_BACKEND_OBJ=uio-genirq-interface.o
+  PRU_BACKEND_LIBS=
+  CFLAGS+=-DBEAGLEG_PRU_BACKEND_GENIRQ
+else
+  PRU_BACKEND_OBJ=uio-pruss-interface.o
+  PRU_BACKEND_LIBS=$(PRUSS_LIBS)
+endif
+
 # Assembled binary from *.p file.
 PRU_BIN=motor-interface-pru_bin.h
 
@@ -62,7 +79,7 @@ GCODE_OBJECTS=gcode-machine-control.o determine-print-stats.o \
               generic-gpio.o pwm-timer.o config-parser.o \
 	      machine-control-config.o hardware-mapping.o \
 	      spindle-control.o planner.o adc.o
-OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o uio-pruss-interface.o $(GCODE_OBJECTS)
+OBJECTS=motion-queue-motor-operations.o sim-firmware.o sim-audio-out.o pru-motion-queue.o $(PRU_BACKEND_OBJ) $(GCODE_OBJECTS)
 MAIN_OBJECTS=machine-control.o gcode-print-stats.o gcode2ps.o
 
 TARGETS=../machine-control ../gcode-print-stats gcode2ps
@@ -82,7 +99,7 @@ gcode-parser/libgcodeparser.a: FORCE
 	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(LDFLAGS)
 
 ../machine-control: machine-control.o $(OBJECTS) $(COMMON_LIBS)
-	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(PRUSS_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $^ $(COMMON_LIBS) $(PRU_BACKEND_LIBS) $(LDFLAGS)
 
 # While this is developed and does not have a final name yet, let's not make
 # it a toplevel tool in ../
@@ -122,7 +139,7 @@ $(PRU_BIN) : motor-interface-constants.h \
 	     $(CAPE_INCLUDE)/pru-io-routines.hp
 
 %_test: %_test.o $(OBJECTS) $(COMMON_LIBS) compiler-flags
-	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRUSS_LIBS) $(GTEST_LIBS) $(LDFLAGS)
+	$(CROSS_COMPILE)$(CXX) -o $@ $< $(OBJECTS) $(COMMON_LIBS) $(PRU_BACKEND_LIBS) $(GTEST_LIBS) $(LDFLAGS)
 
 %.o: %.cc compiler-flags
 	$(CROSS_COMPILE)$(CXX) $(CXXFLAGS)  -c  $< -o $@
@@ -144,6 +161,7 @@ $(PASM):
 
 # Explicit dependencies
 uio-pruss-interface.o : $(PRU_BIN)
+uio-genirq-interface.o : $(PRU_BIN)
 
 # Auto generated dependencies
 -include $(DEPENDENCY_RULES)
