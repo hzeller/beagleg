@@ -52,6 +52,33 @@ jobs:
       run: |
         make valgrind-test
 
+  build-genirq-backend:
+    runs-on: ubuntu-latest
+    name: Build PRU_BACKEND=genirq
+    steps:
+    - name: Prepare
+      run: |
+        sudo apt-get update -qq
+        sudo apt install -y g++ clang pkg-config libgtest-dev libgmock-dev
+
+    - uses: actions/checkout@v7
+      with:
+        submodules: recursive
+
+    - name: Configure shell
+      run: |
+        echo "ARM_COMPILE_FLAGS=" >> $GITHUB_ENV
+        echo "BEAGLEG_OPT_CFLAGS=-O2 -Werror" >> $GITHUB_ENV
+
+    - name: Build with g++
+      run: |
+        make -C src PRU_BACKEND=genirq ../machine-control
+
+    - name: Build with clang++
+      run: |
+        make -C src clean
+        CXX=clang++ make -C src PRU_BACKEND=genirq ../machine-control
+
   build-and-test_cpp11:
     runs-on: ubuntu-latest
     strategy:
