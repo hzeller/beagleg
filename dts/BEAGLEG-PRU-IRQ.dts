@@ -1,0 +1,93 @@
+/* BeagleG: expose the PRU to userspace as /dev/uioN via the kernel's
+ * generic uio_pdrv_genirq driver -- no PRU-specific kernel driver
+ * needed. Two things are wired up:
+ *
+ *  - interrupts: PRU system event 19, raised by the firmware when a
+ *    motion segment completes (must match PRU0_ARM_INTERRUPT in
+ *    src/motor-interface-pru.p), routed through the PRUSS interrupt
+ *    controller as event 19 -> INTC channel 2 -> host interrupt 2.
+ *    This is the same routing libprussdrv's PRUSS_INTC_INITDATA
+ *    programs for the uio_pruss backend. Cell meaning per the binding
+ *    https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/ti,pruss-intc.yaml
+ *  - reg: the PRU0 memories, exported as UIO mmap regions in
+ *    declaration order: map 0 = PRU0 data RAM, map 1 = PRU0 control,
+ *    map 2 = PRU0 instruction RAM. This order is the backend's mmap
+ *    contract (src/uio-genirq-interface.cc); the offset-selects-region
+ *    mmap convention is
+ *    https://www.kernel.org/doc/html/latest/driver-api/uio-howto.html
+ *
+ * The addresses come from the AM335x Technical Reference Manual, TI
+ * document SPRUH73 (page anchors per revision Q): the PRU-ICSS sits
+ * on the L4_FAST interconnect, occupying 0x4a30_0000..0x4a37_ffff --
+ * Table 2-4 "L4 Fast Peripheral Memory Map",
+ * https://www.ti.com/lit/pdf/spruh73#page=185 -- and within it PRU0
+ * data RAM is at offset 0x00000 (8 KiB), the PRU0 control registers
+ * at 0x22000 and PRU0 instruction RAM at 0x34000 (8 KiB) -- section
+ * 4.3.2, Table 4-8 "Global Memory Map",
+ * https://www.ti.com/lit/pdf/spruh73#page=207. The kernel's hardware
+ * description carries the same values in
+ * arch/arm/boot/dts/ti/omap/am33xx.dtsi (pruss node).
+ *
+ * Needs uio_pdrv_genirq.of_id=generic-uio on the kernel command line;
+ * see INSTALL.md for the full setup.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	/* This overlay depends only on the AM335x chip (its PRU-ICSS),
+	 * not on any board, so it declares the chip-level compatible.
+	 * Boards list their identity from most to least specific -- the
+	 * BeagleBone Green, for example: "ti,am335x-bone-green",
+	 * "ti,am335x-bone-black", "ti,am335x-bone", "ti,am33xx" -- and
+	 * a match on any entry suffices. This single generic string
+	 * therefore covers every AM335x board (Black, Green, Green
+	 * Wireless, PocketBeagle, ...), including boards that do not
+	 * exist yet, while an explicit board list would only assert a
+	 * board dependence this overlay does not have.
+	 */
+	compatible = "ti,am33xx";
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			beagleg_pru_irq@4a300000 {
+				compatible = "generic-uio";
+				reg = <0x4a300000 0x2000>,	/* PRU0 data RAM */
+				      <0x4a322000 0x1000>,	/* PRU0 control */
+				      <0x4a334000 0x2000>;	/* PRU0 instruction RAM */
+				interrupt-parent = <&pruss_intc>;
+				interrupts = <19 2 2>;	/* sysevent 19, channel 2, host 2 */
+			};
+		};
+	};
+
+	/* BeagleG owns PRU0, so keep the kernel's pru_rproc from binding
+	 * it: with two independent writers of the same IRAM/control
+	 * registers, a remoteproc "start" while BeagleG runs would race.
+	 * Same mutual exclusion the historical PRU-UIO overlays used;
+	 * PRU1 is left available to remoteproc.
+	 *
+	 * Ordering matters: overlays merge last-writer-wins with no
+	 * conflict detection, so an overlay applied after this one that
+	 * touches &pru0 would silently undo the lockout. Load this file
+	 * through the uboot_overlay_pru slot of /boot/uEnv.txt -- u-boot
+	 * applies that slot after all generic uboot_overlay_addrN cape
+	 * slots (bb.org u-boot, include/configs/ti_armv7_common.h), so
+	 * the PRU0 claim stays the effective last word -- and keep
+	 * PRU-touching overlays out of the even-later slots
+	 * (uboot_overlay_pru_add, dtb_overlay). All merging happens in
+	 * u-boot before Linux boots, so pru_rproc never probes PRU0; the
+	 * result is verifiable at runtime:
+	 * /proc/device-tree/ocp/interconnect@4a000000/segment@0/
+	 * target-module@300000/pruss@0/pru@34000/status == "disabled".
+	 */
+	fragment@1 {
+		target = <&pru0>;
+		__overlay__ {
+			status = "disabled";
+		};
+	};
+};
