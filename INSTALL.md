@@ -48,6 +48,60 @@ look like this:
 uboot_overlay_pru=/lib/firmware/AM335X-PRU-UIO-00A0.dtbo
 ```
 
+### Alternative: images without uio_pruss (PRU_BACKEND=genirq)
+
+Recent BeagleBone Debian images (mainline kernel) ship neither the
+`uio_pruss` driver nor the `PRU-UIO` overlay above. There, build
+BeagleG with `make PRU_BACKEND=genirq`: it needs no PRU kernel driver
+at all — the PRU memories and the motion interrupt are exposed to
+BeagleG by the kernel's generic UIO driver, so PRU access is governed
+by the permissions of `/dev/uio0` alone.
+
+Which backend do I need? The kernel flavor suffix alone does not tell
+you. The `uio_pruss` driver was removed from mainline Linux in 2024
+("uio: pruss: Remove this driver"), so kernel series 6.12 and newer
+lack it on either flavor, while series branched earlier still ship it
+(TI kernels up to 5.10, `-bone` kernels up to 6.6). Check your kernel
+directly:
+
+```
+ls /lib/modules/$(uname -r)/kernel/drivers/uio/
+```
+
+If `uio_pruss.ko*` is listed, the default `uio` backend and the
+`PRU-UIO` overlay above work. If it is not — e.g. the 6.12 kernels of
+current images — use `genirq`; it works on any kernel >= 5.10, either
+flavor.
+
+One-time setup: compile the overlay that exports the PRU to userspace
+
+```
+sudo apt install device-tree-compiler
+sudo dtc -@ -o /lib/firmware/BEAGLEG-PRU-IRQ.dtbo dts/BEAGLEG-PRU-IRQ.dts
+```
+
+then in `/boot/uEnv.txt` enable u-boot overlays, select ours, and
+allow `uio_pdrv_genirq` to bind to it (append to the existing
+`cmdline=` line):
+
+```
+enable_uboot_overlays=1
+uboot_overlay_pru=/lib/firmware/BEAGLEG-PRU-IRQ.dtbo
+cmdline=coherent_pool=1M net.ifnames=0 quiet uio_pdrv_genirq.of_id=generic-uio
+```
+
+Use the `uboot_overlay_pru` slot specifically, not a generic
+`uboot_overlay_addrN` one: overlays merge last-writer-wins, and
+u-boot applies the PRU slot after all the generic cape slots, so this
+overlay's claim on PRU0 (it disables the PRU0 remoteproc node so the
+kernel and BeagleG never fight over the core) cannot be silently
+overridden by a cape overlay.
+
+After a reboot, `cat /sys/class/uio/uio0/name` should print
+`beagleg_pru_irq` (newer kernels append the node's `@4a300000`
+unit-address). BeagleG needs read/write access to that `/dev/uio0`
+device node.
+
 ## Install BeagleG
 
 
