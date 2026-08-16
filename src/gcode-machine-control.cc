@@ -766,11 +766,8 @@ void GCodeMachineControl::Impl::mprint_endstop_status() {
       any_endstops_found = true;
     }
     if (hardware_mapping_->HasProbeSwitch(axis)) {
-      mprintf(
-        "%c_probe:%s ", tolower(gcodep_axis2letter(axis)),
-        hardware_mapping_->TestProbeSwitch()
-          ? "TRIGGERED"
-          : "open");
+      mprintf("%c_probe:%s ", tolower(gcodep_axis2letter(axis)),
+              hardware_mapping_->TestProbeSwitch() ? "TRIGGERED" : "open");
       any_endstops_found = true;
     }
   }

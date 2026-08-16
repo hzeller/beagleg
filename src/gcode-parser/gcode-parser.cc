@@ -253,9 +253,7 @@ class GCodeParser::Impl {
   // Set the units factor for metric/imperial scaling.
   // G20/G70 - imperial (inches, scale = 25.4)
   // G21/G71 - metric (millimeters, scale = 1.0)
-  void set_units_factor(float value) {
-    xyz_unit_to_mm_factor_ = value;
-  }
+  void set_units_factor(float value) { xyz_unit_to_mm_factor_ = value; }
 
   // Given the axis and the given value passed in the block, convert
   // this value into absolute metric coordinates. Takes into account if
