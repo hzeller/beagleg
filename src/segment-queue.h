@@ -77,6 +77,10 @@ class SegmentQueue {
   // source (e.g. homing). This will allow accurate reporting of the
   // PhysicalStatus.
   virtual void SetExternalPosition(int axis, int position_steps) = 0;
+
+  // Immediately stop any motion and clear the internal queue.
+  // Current physical status will be lost.
+  virtual void HaltAndDiscard() = 0;
 };
 
 #endif  // _BEAGLEG_MOTOR_OPERATIONS_H_

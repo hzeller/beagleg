@@ -43,6 +43,12 @@ class PruHardwareInterface {
 
   // Halt the PRU
   virtual bool Shutdown() = 0;
+
+  // Halt any program execution. An halted program can be restarted.
+  virtual void Halt() = 0;
+
+  // Restart the execution of the previously halted program.
+  virtual void Restart() = 0;
 };
 
 // PRU control via the uio_pruss kernel driver and TI's libprussdrv:
@@ -56,6 +62,8 @@ class UioPrussInterface final : public PruHardwareInterface {
   bool StartExecution() final;
   unsigned WaitEvent() final;
   bool Shutdown() final;
+  void Halt() final;
+  void Restart() final;
 };
 
 // PRU hardware control without any PRU-specific kernel driver, for

@@ -175,6 +175,17 @@ void PRUMotionQueue::Shutdown(bool flush_queue) {
   MotorEnable(false);
 }
 
+void PRUMotionQueue::HaltAndDiscard() {
+  // De-energize first so any pulse the PRU emits before Halt() is ignored
+  // by the now-disabled drivers.
+  MotorEnable(false);
+  pru_interface_->Halt();
+  ClearRingBuffer();
+  memset((void *)&pru_data_->status, 0, sizeof(pru_data_->status));
+  queue_pos_ = 0;
+  pru_interface_->Restart();
+}
+
 PRUMotionQueue::~PRUMotionQueue() {}
 
 PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
@@ -185,6 +196,12 @@ PRUMotionQueue::PRUMotionQueue(HardwareMapping *hw, PruHardwareInterface *pru)
   assert(success);
 }
 
+void PRUMotionQueue::ClearRingBuffer() {
+  for (int i = 0; i < QUEUE_LEN; ++i) {
+    pru_data_->ring_buffer[i].state = STATE_EMPTY;
+  }
+}
+
 bool PRUMotionQueue::Init() {
   MotorEnable(false);  // motors off initially.
   if (!pru_interface_->Init()) return false;
@@ -192,11 +209,7 @@ bool PRUMotionQueue::Init() {
   if (!pru_interface_->AllocateSharedMem((void **)&pru_data_,
                                          sizeof(*pru_data_)))
     return false;
-
-  for (int i = 0; i < QUEUE_LEN; ++i) {
-    pru_data_->ring_buffer[i].state = STATE_EMPTY;
-  }
+  ClearRingBuffer();
   queue_pos_ = 0;
-
   return pru_interface_->StartExecution();
 }
